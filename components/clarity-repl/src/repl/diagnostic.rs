@@ -1,8 +1,4 @@
-use clarity::vm::{
-    diagnostic::{DiagnosableError, Diagnostic, Level},
-    representations::Span,
-};
-use std::fmt;
+use clarity::vm::diagnostic::{Diagnostic, Level};
 
 fn level_to_string(level: &Level) -> String {
     match level {
@@ -43,7 +39,6 @@ pub fn output_code(diagnostic: &Diagnostic, lines: &[String]) -> Vec<String> {
     }
     let span = &diagnostic.spans[0];
     let first_line = span.start_line.saturating_sub(1) as usize;
-    let last_line = span.end_line.saturating_sub(1) as usize;
 
     output.push(lines[first_line].clone());
     let mut pointer = format!(

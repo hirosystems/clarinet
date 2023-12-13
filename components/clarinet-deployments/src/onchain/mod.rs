@@ -202,7 +202,7 @@ pub fn encode_contract_publish(
 pub enum TransactionStatus {
     Queued,
     Encoded(StacksTransaction, TransactionCheck),
-    Broadcasted(TransactionCheck),
+    Broadcasted(TransactionCheck, String),
     Confirmed,
     Error(String),
 }
@@ -218,8 +218,7 @@ pub struct TransactionTracker {
 pub enum TransactionCheck {
     NonceCheck(StandardPrincipalData, u64),
     ContractPublish(StandardPrincipalData, ContractName),
-    // TODO(lgalabru): Handle Bitcoin checks
-    // BtcTransfer(),
+    BtcTransfer,
 }
 
 #[derive(Clone, Debug)]
@@ -403,15 +402,7 @@ pub fn apply_on_chain_deployment(
     }
 
     for batch_spec in deployment.plan.batches.iter() {
-        let epoch = match batch_spec.epoch {
-            Some(epoch) => {
-                if network != StacksNetwork::Devnet {
-                    println!("warning: 'epoch' specified for a deployment batch is ignored when applying a deployment plan. This field should only be specified for deployments plans used to launch a devnet with 'clarinet integrate'.");
-                }
-                epoch
-            }
-            None => default_epoch,
-        };
+        let epoch = batch_spec.epoch.unwrap_or(default_epoch);
         let mut batch = Vec::new();
         for transaction in batch_spec.transactions.iter() {
             let tracker = match transaction {
@@ -823,7 +814,7 @@ pub fn apply_on_chain_deployment(
             };
             match stacks_rpc.post_transaction(&transaction) {
                 Ok(res) => {
-                    tracker.status = TransactionStatus::Broadcasted(check);
+                    tracker.status = TransactionStatus::Broadcasted(check, res.txid.clone());
 
                     let _ = deployment_event_tx
                         .send(DeploymentEvent::TransactionUpdate(tracker.clone()));
@@ -840,9 +831,11 @@ pub fn apply_on_chain_deployment(
                 }
             };
         }
+        let mut last_stacks_chain_check_at_height = 0;
+        let mut last_bitcoin_chain_check_at_height = 0;
 
         loop {
-            let (burn_block_height, stacks_tip_height) = match stacks_rpc.get_info() {
+            let (bitcoin_tip_height, stacks_tip_height) = match stacks_rpc.get_info() {
                 Ok(info) => (info.burn_block_height, info.stacks_tip_height),
                 _ => {
                     std::thread::sleep(std::time::Duration::from_secs(delay_between_checks));
@@ -850,58 +843,78 @@ pub fn apply_on_chain_deployment(
                 }
             };
 
-            // If no block has been mined since `delay_between_checks`,
-            // avoid flooding the stacks-node with status update requests.
-            if burn_block_height <= current_bitcoin_block_height {
+            let mut keep_looping = false;
+
+            // Handle Stacks releated checks
+            if stacks_tip_height > last_stacks_chain_check_at_height {
+                for (_, tracker) in ongoing_batch.iter_mut() {
+                    let TransactionStatus::Broadcasted(brodcasting_status, _) = &tracker.status
+                    else {
+                        continue;
+                    };
+
+                    match &brodcasting_status {
+                        TransactionCheck::ContractPublish(deployer, contract_name) => {
+                            let deployer_address = deployer.to_address();
+                            let res =
+                                stacks_rpc.get_contract_source(&deployer_address, contract_name);
+                            match res {
+                                Ok(_contract) => {
+                                    tracker.status = TransactionStatus::Confirmed;
+                                    let _ = deployment_event_tx
+                                        .send(DeploymentEvent::TransactionUpdate(tracker.clone()));
+                                }
+                                Err(_e) => {
+                                    keep_looping = true;
+                                    break;
+                                }
+                            }
+                        }
+                        TransactionCheck::NonceCheck(tx_sender, expected_nonce) => {
+                            let tx_sender_address = tx_sender.to_address();
+                            let res = stacks_rpc.get_nonce(&tx_sender_address);
+                            if let Ok(current_nonce) = res {
+                                if current_nonce.gt(expected_nonce) {
+                                    tracker.status = TransactionStatus::Confirmed;
+                                    let _ = deployment_event_tx
+                                        .send(DeploymentEvent::TransactionUpdate(tracker.clone()));
+                                } else {
+                                    keep_looping = true;
+                                    break;
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            } else {
                 std::thread::sleep(std::time::Duration::from_secs(delay_between_checks));
                 continue;
             }
 
-            current_bitcoin_block_height = burn_block_height;
-            current_block_height = stacks_tip_height;
-
-            let mut keep_looping = false;
-
-            for (_txid, tracker) in ongoing_batch.iter_mut() {
-                match &tracker.status {
-                    TransactionStatus::Broadcasted(TransactionCheck::ContractPublish(
-                        deployer,
-                        contract_name,
-                    )) => {
-                        let deployer_address = deployer.to_address();
-                        let res = stacks_rpc.get_contract_source(&deployer_address, contract_name);
-                        match res {
-                            Ok(_contract) => {
-                                tracker.status = TransactionStatus::Confirmed;
-                                let _ = deployment_event_tx
-                                    .send(DeploymentEvent::TransactionUpdate(tracker.clone()));
-                            }
-                            Err(_e) => {
-                                keep_looping = true;
-                                break;
-                            }
+            // Handle Bitcoin releated checks
+            if bitcoin_tip_height > last_bitcoin_chain_check_at_height {
+                for (_, tracker) in ongoing_batch.iter_mut() {
+                    let TransactionStatus::Broadcasted(brodcasting_status, _) = &tracker.status
+                    else {
+                        continue;
+                    };
+                    match &brodcasting_status {
+                        TransactionCheck::BtcTransfer => {
+                            // TODO
                         }
+                        TransactionCheck::ContractPublish(_, _)
+                        | TransactionCheck::NonceCheck(_, _) => {}
                     }
-                    TransactionStatus::Broadcasted(TransactionCheck::NonceCheck(
-                        tx_sender,
-                        expected_nonce,
-                    )) => {
-                        let tx_sender_address = tx_sender.to_address();
-                        let res = stacks_rpc.get_nonce(&tx_sender_address);
-                        if let Ok(current_nonce) = res {
-                            if current_nonce.gt(expected_nonce) {
-                                tracker.status = TransactionStatus::Confirmed;
-                                let _ = deployment_event_tx
-                                    .send(DeploymentEvent::TransactionUpdate(tracker.clone()));
-                            } else {
-                                keep_looping = true;
-                                break;
-                            }
-                        }
-                    }
-                    _ => {}
                 }
+            } else {
+                std::thread::sleep(std::time::Duration::from_secs(delay_between_checks));
+                continue;
             }
+
+            last_stacks_chain_check_at_height = stacks_tip_height;
+            last_bitcoin_chain_check_at_height = bitcoin_tip_height;
+
             if !keep_looping {
                 break;
             }

@@ -1,14 +1,8 @@
 use std::convert::TryInto;
 
 use crate::analysis;
-use crate::analysis::coverage::CoverageReporter;
 use clarity::types::chainstate::StacksAddress;
-use clarity::types::StacksEpochId;
 use clarity::vm::types::{PrincipalData, QualifiedContractIdentifier, StandardPrincipalData};
-use clarity::vm::ClarityVersion;
-
-const DEFAULT_COSTS_VERSION: u32 = 2;
-const DEFAULT_PARSER_VERSION: u32 = 2;
 
 #[derive(Clone, Debug)]
 pub struct InitialContract {

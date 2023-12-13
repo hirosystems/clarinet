@@ -60,14 +60,14 @@ In the terminal, run `node --version` to make sure it's available and up to date
 
 Open your terminal and go to a new or existing Clarinet project:
 
-```sh
+```console
 cd my-project
 ls # you should see a Clarinet.toml file in the list
 ```
 
 Run the following command to setup the testing framework:
 
-```sh
+```console
 npx @hirosystems/clarinet-sdk
 ```
 
@@ -92,19 +92,45 @@ Note: If you want to write your test in JavaScript but still have a certain leve
 
 ## Contributing
 
-Clone the clarinet repo and go to the clarinet-sdk component directory:
-```sh
+The clarinet-sdk requires a few steps to be built and tested locally.
+We'll look into simplifying this workflow in a future version.
+
+Clone the clarinet repo and `cd` into it:
+```console
 git clone git@github.com:hirosystems/clarinet.git
-cd clarinet/components/clarinet-sdk
+cd clarinet
 ```
 
-Open the SDK workspace in VSCode:
-```sh
-code ./clarinet-sdk.code-workspace
+Open the SDK workspace in VSCode, it's especially useful to get rust-analyzer
+to consider the right files with the right cargo features.
+```console
+code components/clarinet-sdk/clarinet-sdk.code-workspace
 ```
 
-Compile the project (both WASM and JS):
-```sh
-npm install
-npm run build
+The SDK mainly relies on two components:
+- the Rust component: `components/clarinet-sdk-wasm`
+- the TS component: `components/clarinet-sdk`
+
+To work with these two packages locally, the first one needs to be built with
+wasm-pack and linked with: [npm link](https://docs.npmjs.com/cli/v8/commands/npm-link).
+
+Install [wasm-pack](https://rustwasm.github.io/wasm-pack/installer) and run:
+```console
+cd components/clarinet-sdk-wasm
+wasm-pack build --release --target=nodejs --scope hirosystems
+cd pkg
+npm link
 ```
+
+Go to the `clarinet-sdk` directory and link the package that was just built.
+It will tell npm to use it instead of the published version. You don't need to
+repeat the steps everytime the `clarinet-sdk-wasm` changes, it only needs to be
+rebuilt with wasm-pack and npm will use it.
+
+Built the TS project:
+```console
+cd ../../clarinet-sdk
+npm link @hirosystems/clarinet-sdk-wasm
+```
+
+You can now run `npm test`, it wil be using the local version of `clarinet-sdk-wasm`

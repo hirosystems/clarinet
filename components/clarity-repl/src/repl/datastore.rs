@@ -11,16 +11,12 @@ use clarity::types::StacksEpochId;
 use clarity::util::hash::Sha512Trunc256Sum;
 use clarity::vm::analysis::AnalysisDatabase;
 use clarity::vm::database::BurnStateDB;
-use clarity::vm::database::{ClarityBackingStore, ClarityDatabase, HeadersDB};
-use clarity::vm::errors::{
-    CheckErrors, IncomparableError, InterpreterError, InterpreterResult as Result, RuntimeErrorType,
-};
+use clarity::vm::database::{ClarityBackingStore, HeadersDB};
+use clarity::vm::errors::InterpreterResult as Result;
 use clarity::vm::types::QualifiedContractIdentifier;
 use clarity::vm::types::TupleData;
-use clarity::vm::EvalHook;
 use clarity::vm::StacksEpoch;
 use std::collections::HashMap;
-use std::hash::Hash;
 
 #[derive(Clone, Debug)]
 pub struct Datastore {
@@ -241,7 +237,7 @@ impl ClarityBackingStore for Datastore {
 
     /// The contract commitment is the hash of the contract, plus the block height in
     ///   which the contract was initialized.
-    fn make_contract_commitment(&mut self, contract_hash: Sha512Trunc256Sum) -> String {
+    fn make_contract_commitment(&mut self, _contract_hash: Sha512Trunc256Sum) -> String {
         "".to_string()
     }
 
@@ -267,7 +263,7 @@ impl ClarityBackingStore for Datastore {
         }
     }
 
-    fn get_with_proof(&mut self, key: &str) -> Option<(String, Vec<u8>)> {
+    fn get_with_proof(&mut self, _key: &str) -> Option<(String, Vec<u8>)> {
         None
     }
 
@@ -475,7 +471,7 @@ impl BurnStateDB for BurnDatastore {
     /// Returns Some if `self.get_burn_start_height() <= height < self.get_burn_block_height(sorition_id)`, and None otherwise.
     fn get_burn_header_hash(
         &self,
-        height: u32,
+        _height: u32,
         sortition_id: &SortitionId,
     ) -> Option<BurnchainHeaderHash> {
         self.sortition_lookup
@@ -496,18 +492,18 @@ impl BurnStateDB for BurnDatastore {
 
     /// The epoch is defined as by a start and end height. This returns
     /// the epoch enclosing `height`.
-    fn get_stacks_epoch(&self, height: u32) -> Option<StacksEpoch> {
+    fn get_stacks_epoch(&self, _height: u32) -> Option<StacksEpoch> {
         None
     }
 
-    fn get_stacks_epoch_by_epoch_id(&self, epoch_id: &StacksEpochId) -> Option<StacksEpoch> {
+    fn get_stacks_epoch_by_epoch_id(&self, _epoch_id: &StacksEpochId) -> Option<StacksEpoch> {
         None
     }
 
     /// Get the PoX payout addresses for a given burnchain block
     fn get_pox_payout_addrs(
         &self,
-        height: u32,
+        _height: u32,
         sortition_id: &SortitionId,
     ) -> Option<(Vec<TupleData>, u128)> {
         self.sortition_lookup
@@ -516,13 +512,13 @@ impl BurnStateDB for BurnDatastore {
             .map(|block_info| block_info.pox_payout_addrs.clone())
     }
 
-    fn get_ast_rules(&self, height: u32) -> clarity::vm::ast::ASTRules {
+    fn get_ast_rules(&self, _height: u32) -> clarity::vm::ast::ASTRules {
         clarity::vm::ast::ASTRules::PrecheckSize
     }
 }
 
 impl Datastore {
-    pub fn open(path_str: &str, miner_tip: Option<&StacksBlockId>) -> Result<Datastore> {
+    pub fn open(_path_str: &str, _miner_tip: Option<&StacksBlockId>) -> Result<Datastore> {
         Ok(Datastore::new())
     }
 
@@ -539,7 +535,7 @@ impl Datastore {
     /// this is a "lower-level" rollback than the roll backs performed in
     ///   ClarityDatabase or AnalysisDatabase -- this is done at the backing store level.
 
-    pub fn begin(&mut self, current: &StacksBlockId, next: &StacksBlockId) {
+    pub fn begin(&mut self, _current: &StacksBlockId, _next: &StacksBlockId) {
         // self.marf.begin(current, next)
         //     .expect(&format!("ERROR: Failed to begin new MARF block {} - {})", current, next));
         // self.chain_tip = self.marf.get_open_chain_tip()
@@ -555,7 +551,7 @@ impl Datastore {
     // This is used by miners
     //   so that the block validation and processing logic doesn't
     //   reprocess the same data as if it were already loaded
-    pub fn commit_mined_block(&mut self, will_move_to: &StacksBlockId) {
+    pub fn commit_mined_block(&mut self, _will_move_to: &StacksBlockId) {
         // rollback the side_store
         //    the side_store shouldn't commit data for blocks that won't be
         //    included in the processed chainstate (like a block constructed during mining)
@@ -565,7 +561,7 @@ impl Datastore {
         // self.marf.commit_mined(will_move_to)
         //     .expect("ERROR: Failed to commit MARF block");
     }
-    pub fn commit_to(&mut self, final_bhh: &StacksBlockId) {
+    pub fn commit_to(&mut self, _final_bhh: &StacksBlockId) {
         // println!("commit_to({})", final_bhh);
         // self.side_store.commit_metadata_to(&self.chain_tip, final_bhh);
         // self.side_store.commit(&self.chain_tip);

@@ -1,9 +1,7 @@
 use crate::repl::{settings::SessionSettings, Session};
 
-use ansi_term::{Colour, Style};
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
-use std::io::{stdin, stdout, Write};
 
 const VERSION: Option<&'static str> = option_env!("CARGO_PKG_VERSION");
 const HISTORY_FILE: Option<&'static str> = option_env!("CLARITY_REPL_HISTORY_FILE");
@@ -118,7 +116,7 @@ impl Terminal {
                     input_buffer.push(command);
                     let input = input_buffer.join(" ");
                     match complete_input(&input) {
-                        Ok(Input::Complete(forms)) => {
+                        Ok(Input::Complete(_)) => {
                             let (reload, output) = self.session.handle_command(&input);
                             for line in output {
                                 println!("{}", line);

@@ -1,11 +1,13 @@
 pub mod boot;
 pub mod datastore;
-pub mod debug;
 pub mod diagnostic;
 pub mod interpreter;
 pub mod session;
 pub mod settings;
 pub mod tracer;
+
+#[cfg(not(feature = "wasm"))]
+pub mod debug;
 
 use serde::ser::{Serialize, SerializeMap, Serializer};
 use std::convert::TryInto;

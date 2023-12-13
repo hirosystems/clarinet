@@ -1,6 +1,6 @@
 [package]
 name = "stacks-rpc-client"
-version = "1.0.10"
+version = "2.1.0"
 description = "HTTP Client for the Stacks blockchain"
 license = "GPL-3.0"
 edition = "2021"
@@ -15,7 +15,7 @@ reqwest = { version = "0.11", default-features = false, features = [
     "rustls-tls",
 ] }
 hmac = "0.12.0"
-pbkdf2 = { version = "0.11.0", features = ["simple"], default-features = false }
+pbkdf2 = { version = "0.12.2", features = ["simple"], default-features = false }
 sha2 = "0.10.0"
 tiny-hderive = { version = "0.3.0" }
 libsecp256k1 = { version = "0.7.0" }

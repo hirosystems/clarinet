@@ -1,0 +1,10 @@
+coverage:
+  status:
+    patch: false
+    project:
+      default:
+        threshold: 5%
+        if_not_found: failure
+
+github_checks:
+  annotations: false

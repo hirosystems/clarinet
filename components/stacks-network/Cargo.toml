@@ -1,6 +1,6 @@
 [package]
 name = "stacks-network"
-version = "2.0.0"
+version = "2.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -32,8 +32,8 @@ chrono = "0.4.31"
 futures = "0.3.12"
 base58 = "0.2.0"
 
-# chainhook-sdk = { version = "=0.10.2", default-features = true, path = "../../../chainhook/components/chainhook-sdk" }
-chainhook-sdk = { version = "=0.10.2", default-features = true }
+# chainhook-sdk = { version = "=0.11", default-features = true, path = "../../../chainhook/components/chainhook-sdk" }
+chainhook-sdk = { version = "=0.11", default-features = true }
 stacks-rpc-client = { path = "../stacks-rpc-client" }
 clarinet-files = { path = "../clarinet-files", features = ["cli"] }
 clarinet-deployments = { path = "../clarinet-deployments", features = ["cli"] }
@@ -41,7 +41,7 @@ clarinet-utils = { path = "../clarinet-utils" }
 hiro-system-kit = { path = "../hiro-system-kit", features = ["log"] }
 clarity-repl = { path = "../clarity-repl", features = ["cli"] }
 dirs = { version = "4.0.0" }
-clap = { version = "4.2.7", features = ["derive"] }
+clap = { version = "4.4.8", features = ["derive"] }
 serde_yaml = "0.8.23"
 
 [lib]

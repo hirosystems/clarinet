@@ -12,6 +12,8 @@ use project::GetChangesForNewProject;
 
 use clarinet_files::ProjectManifest;
 
+use self::contract::GetChangesForRmContract;
+
 pub fn get_changes_for_new_project(
     project_path: String,
     project_name: String,
@@ -30,6 +32,14 @@ pub fn get_changes_for_new_contract(
     let mut command =
         GetChangesForNewContract::new(manifest_location.clone(), contract_name, source);
     command.run(include_test)
+}
+
+pub fn get_changes_for_rm_contract(
+    manifest_location: &FileLocation,
+    contract_name: String,
+) -> Result<Vec<Changes>, String> {
+    let mut command = GetChangesForRmContract::new(manifest_location.clone(), contract_name);
+    command.run()
 }
 
 pub fn get_changes_for_new_chainhook(

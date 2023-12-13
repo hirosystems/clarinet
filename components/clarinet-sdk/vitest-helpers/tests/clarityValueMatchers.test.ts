@@ -49,7 +49,7 @@ describe("test simple clarity values assertions", () => {
     expect(nestedOks).toBeOk(expect.toBeOk(expect.toBeUint(1)));
 
     expect(() => expect(Cl.uint(1)).toBeOk(Cl.uint(1))).toThrow(
-      'actual value must be a Clarity "ResponseOk", received "UInt"'
+      'actual value must be a Clarity "ResponseOk", received "UInt"',
     );
 
     try {
@@ -78,7 +78,7 @@ describe("test simple clarity values assertions", () => {
     expect(Cl.some(Cl.uint(1))).toBeSome(Cl.uint(1));
 
     expect(() => expect(Cl.some(Cl.uint(1))).toBeSome(Cl.uint(2))).toThrow(
-      "expected (some u1) to be (some u2)"
+      "expected (some u1) to be (some u2)",
     );
   });
 
@@ -98,10 +98,10 @@ describe("test simple clarity values assertions", () => {
     expect(Cl.bool(false)).toBeBool(false);
 
     expect(() => expect(Cl.uint(1)).toBeBool(false)).toThrow(
-      'actual value must be a Clarity "BoolFalse", received "UInt"'
+      'actual value must be a Clarity "BoolFalse", received "UInt"',
     );
     expect(() => expect(false).toBeBool(false)).toThrow(
-      'actual value must be a Clarity "BoolFalse", received "boolean"'
+      'actual value must be a Clarity "BoolFalse", received "boolean"',
     );
   });
 
@@ -110,7 +110,7 @@ describe("test simple clarity values assertions", () => {
     expect(Cl.int(1)).toBeInt(1n);
 
     expect(() => expect(Cl.uint(1)).toBeInt(1)).toThrow(
-      'actual value must be a Clarity "Int", received "UInt"'
+      'actual value must be a Clarity "Int", received "UInt"',
     );
 
     try {
@@ -128,7 +128,7 @@ describe("test simple clarity values assertions", () => {
     expect(Cl.uint(1)).toBeUint(1n);
 
     expect(() => expect(Cl.int(1)).toBeUint(1)).toThrow(
-      'actual value must be a Clarity "UInt", received "Int"'
+      'actual value must be a Clarity "UInt", received "Int"',
     );
 
     try {
@@ -145,7 +145,7 @@ describe("test simple clarity values assertions", () => {
     expect(Cl.stringAscii("hello world")).toBeAscii("hello world");
 
     expect(() => expect(Cl.int(1)).toBeAscii("hello world")).toThrow(
-      'actual value must be a Clarity "StringASCII", received "Int"'
+      'actual value must be a Clarity "StringASCII", received "Int"',
     );
 
     try {
@@ -162,7 +162,7 @@ describe("test simple clarity values assertions", () => {
     expect(Cl.stringUtf8("hello world")).toBeUtf8("hello world");
 
     expect(() => expect(Cl.int(1)).toBeUtf8("hello world")).toThrow(
-      'actual value must be a Clarity "StringUTF8", received "Int"'
+      'actual value must be a Clarity "StringUTF8", received "Int"',
     );
 
     try {
@@ -190,12 +190,12 @@ describe("test simple clarity values assertions", () => {
     }
 
     expect(() => expect(Cl.standardPrincipal(addr)).toBePrincipal("INVALID")).toThrow(
-      "expected INVALID to be a principal"
+      "expected INVALID to be a principal",
     );
 
     const contractAddress = "ST2CY5V39NHDPWSXMW9QDT3HC3GD6Q6XX4CFRK9AG.contract";
     expect(
-      Cl.contractPrincipal("ST2CY5V39NHDPWSXMW9QDT3HC3GD6Q6XX4CFRK9AG", "contract")
+      Cl.contractPrincipal("ST2CY5V39NHDPWSXMW9QDT3HC3GD6Q6XX4CFRK9AG", "contract"),
     ).toBePrincipal(contractAddress);
   });
 
@@ -210,7 +210,7 @@ describe("test simple clarity values assertions", () => {
     expect(Cl.buffer(Uint8Array.from(val))).toStrictEqual(Cl.bufferFromUtf8("btc"));
 
     expect(() => expect(Cl.int(1)).toBeBuff(Uint8Array.from(val))).toThrow(
-      'actual value must be a Clarity "Buffer", received "Int"'
+      'actual value must be a Clarity "Buffer", received "Int"',
     );
 
     try {
@@ -225,7 +225,7 @@ describe("test simple clarity values assertions", () => {
     }
 
     expect(() =>
-      expect(Cl.buffer(Uint8Array.from(val))).not.toBeBuff(Uint8Array.from(val))
+      expect(Cl.buffer(Uint8Array.from(val))).not.toBeBuff(Uint8Array.from(val)),
     ).toThrow("the received Buffer does match the expected one");
   });
 });
@@ -236,11 +236,11 @@ describe("tests lists", () => {
     expect(Cl.list([Cl.uint(1), Cl.uint(2)])).toBeList([expect.toBeUint(1), expect.toBeUint(2)]);
 
     expect(() =>
-      expect(Cl.list([Cl.uint(1), Cl.uint(2)])).toBeList([Cl.uint(1), Cl.uint(3)])
+      expect(Cl.list([Cl.uint(1), Cl.uint(2)])).toBeList([Cl.uint(1), Cl.uint(3)]),
     ).toThrow("the received List does not match the expected one");
 
     expect(() =>
-      expect(Cl.list([Cl.uint(1), Cl.uint(2)])).not.toBeList([Cl.uint(1), Cl.uint(2)])
+      expect(Cl.list([Cl.uint(1), Cl.uint(2)])).not.toBeList([Cl.uint(1), Cl.uint(2)]),
     ).toThrow("the received List does match the expected one");
   });
 
@@ -284,14 +284,14 @@ describe("tests tuple", () => {
       expect(tuple).toBeTuple({
         count: Cl.int(2),
         owner: Cl.standardPrincipal(addr),
-      })
+      }),
     ).toThrow("the received Tuple does not match the expected one");
 
     expect(() =>
       expect(tuple).not.toBeTuple({
         count: Cl.int(1),
         owner: Cl.standardPrincipal(addr),
-      })
+      }),
     ).toThrow("the received Tuple does match the expected one");
   });
 
@@ -315,6 +315,32 @@ describe("tests tuple", () => {
       expect(e.message).toStrictEqual("the received Tuple does not match the expected one");
       expect(e.actual).toBe('{\n  id: u1,\n  message: "hello world"\n}');
       expect(e.expected).toBe('{\n  id: u2,\n  message: "hello world"\n}');
+    }
+  });
+
+  it("properly orders tuple keys", () => {
+    // keys in non-alphabetical order
+    const tuple = Cl.tuple({
+      b: Cl.int(1),
+      a: Cl.int(1),
+      c: Cl.int(1),
+    });
+
+    try {
+      const failingTest = () =>
+        // keys in non-alphabetical order
+        expect(tuple).toBeTuple({
+          c: Cl.int(1),
+          b: Cl.int(1),
+          // different value here
+          a: Cl.int(2),
+        });
+      expect(failingTest).toThrow();
+      failingTest();
+    } catch (e: any) {
+      expect(e.message).toStrictEqual("the received Tuple does not match the expected one");
+      expect(e.actual).toBe("{\n  a: 1,\n  b: 1,\n  c: 1\n}");
+      expect(e.expected).toBe("{\n  a: 2,\n  b: 1,\n  c: 1\n}");
     }
   });
 });

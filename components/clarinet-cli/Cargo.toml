@@ -1,6 +1,6 @@
 [package]
 name = "clarinet-cli"
-version = "2.0.0"
+version = "2.1.0"
 authors = ["Ludo Galabru <ludo@hiro.so>", "Brice Dobry <brice@hiro.so>"]
 edition = "2021"
 description = "Clarinet is a simple, modern and opinionated runtime for testing, integrating and deploying Clarity smart contracts."
@@ -18,8 +18,8 @@ categories = [
 
 [dependencies]
 ansi_term = "0.12.1"
-clap = { version = "3.2.23", features = ["derive"], optional = true }
-clap_generate = { version = "3.0.3", optional = true }
+clap = { version = "4.4.8", features = ["derive"], optional = true }
+clap_complete = { version = "4.4.4", optional = true }
 toml = { version = "0.5.6", features = ["preserve_order"] }
 serde = { version = "1.0.136", features = ["derive"] }
 serde_json = { version = "1.0.79", features = ["preserve_order"] }
@@ -30,7 +30,7 @@ secure_tempfile = { version = "3.8.0", package = "tempfile" }
 tokio-util = { version = "0.7.1", features = ["io"], optional = true }
 libsecp256k1 = "0.7.0"
 hmac = "0.12.0"
-pbkdf2 = { version = "0.11.0", features = ["simple"], default-features = false }
+pbkdf2 = { version = "0.12.2", features = ["simple"], default-features = false }
 futures = "0.3.12"
 tokio = { version = "1.24", features = ["full"] }
 lazy_static = "1.4.0"
@@ -117,5 +117,5 @@ path = "src/bin.rs"
 
 [features]
 default = ["cli", "telemetry"]
-cli = ["tokio-util", "clap", "clap_generate", "tower-lsp"]
+cli = ["tokio-util", "clap", "clap_complete", "tower-lsp"]
 telemetry = ["segment", "mac_address"]

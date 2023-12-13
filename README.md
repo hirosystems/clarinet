@@ -375,7 +375,7 @@ You can use Clarinet to deploy your contracts to your own local offline environm
 evaluation on a blockchain by using the following command:
 
 ```bash
-clarinet integrate
+clarinet devnet start
 ```
 
 **Note** Make sure you have a working installation of Docker running locally.
@@ -474,7 +474,7 @@ trusted_caller = false
 callee_filter = false
 ```
 
-As a next step we can generate a deployment plan for this project. If you are running `clarinet integrate` for the first time, this file should be created by Clarinet. In addition, you can run `clarinet deployment generate --devnet` to create or overwrite the file.
+As a next step we can generate a deployment plan for this project. If you are running `clarinet devnet start` for the first time, this file should be created by Clarinet. In addition, you can run `clarinet deployment generate --devnet` to create or overwrite the file.
 
 ```yaml
 ---
@@ -680,7 +680,7 @@ This same file may also be used for customizing the subnet-node (miner, etc).
 When running the command:
 
 ```bash
-clarinet integrate
+clarinet devnet start
 ```
 
 Clarinet will spin-up a subnet node. More documentation on how to use and interact with this incoming L2 can be found on the [Hyperchain repository](https://github.com/hirosystems/stacks-subnets).
@@ -753,13 +753,14 @@ To start contributing:
 
 5. After making your changes, ensure the following:
    -  `cargo build` runs successfully.
-   -  `cargo test` runs successfully.
+   -  `cargo tst` runs successfully.
+      -  `cargo tst` is an alias declared in `./cargo/config`, it runs [cargo-nextest](https://crates.io/crates/cargo-nextest)
    -  You have formatted your code with `cargo fmt --all --`
    -  All functional tests in the `examples` directory pass.
       ```bash
       for testdir in $(ls examples); do
           pushd examples/${testdir}
-              ../../target/debug/clarinet test .
+              ../../target/debug/clarinet check .
           popd
       done
       ```

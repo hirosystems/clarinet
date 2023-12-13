@@ -1,4 +1,5 @@
 /target
+/coverage
 .DS_Store
 clarinet.code-workspace
 history.txt
@@ -18,3 +19,5 @@ components/stacks-devnet-js/build
 *.zip
 *.rdb
 *.lcov
+*.info
+*.profraw

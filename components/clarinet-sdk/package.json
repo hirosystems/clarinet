@@ -1,6 +1,6 @@
 {
   "name": "@hirosystems/clarinet-sdk",
-  "version": "1.0.4",
+  "version": "1.1.1",
   "description": "A SDK to interact with Clarity Smart Contracts",
   "homepage": "https://docs.hiro.so/clarinet/feature-guides/clarinet-js-sdk",
   "repository": {
@@ -58,11 +58,11 @@
   "license": "GPL-3.0",
   "readme": "./README.md",
   "dependencies": {
-    "@hirosystems/clarinet-sdk-wasm": "^1.0.6",
+    "@hirosystems/clarinet-sdk-wasm": "^1.1.0",
     "@stacks/transactions": "^6.9.0",
     "kolorist": "^1.8.0",
     "prompts": "^2.4.2",
-    "vitest": "^0.34.5",
+    "vitest": "^1.0.4",
     "yargs": "^17.7.2"
   },
   "devDependencies": {

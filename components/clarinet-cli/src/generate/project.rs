@@ -128,7 +128,7 @@ impl GetChangesForNewProject {
       "type": "shell",
       "command": "clarinet check"
     },
-    {{
+    {
       "type": "npm",
       "script": "test",
       "group": "test",
@@ -487,6 +487,7 @@ btc_address = "mvZtbibDAAA3WLpY7zXXFqRa3T4XSknBX7"
   "name": "{}-tests",
   "version": "1.0.0",
   "description": "Run unit tests on this project.",
+  "type": "module",
   "private": true,
   "scripts": {{
     "test": "vitest run",
@@ -500,9 +501,9 @@ btc_address = "mvZtbibDAAA3WLpY7zXXFqRa3T4XSknBX7"
     "@stacks/transactions": "^6.9.0",
     "chokidar-cli": "^3.0.0",
     "typescript": "^5.2.2",
-    "vite": "^4.4.9",
-    "vitest": "^0.34.4",
-    "vitest-environment-clarinet": "^1.0.0"
+    "vite": "^5.0.6",
+    "vitest": "^1.0.1",
+    "vitest-environment-clarinet": "^1.1.0"
   }}
 }}
 "#,

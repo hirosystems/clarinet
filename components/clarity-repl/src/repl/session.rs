@@ -1,45 +1,33 @@
 use super::boot::{STACKS_BOOT_CODE_MAINNET, STACKS_BOOT_CODE_TESTNET};
 use super::diagnostic::output_diagnostic;
-use super::{
-    ClarityCodeSource, ClarityContract, ClarityInterpreter, ContractDeployer, DEFAULT_EPOCH,
-};
-use crate::analysis::ast_dependency_detector::{ASTDependencyDetector, Dependency};
-use crate::analysis::coverage::{self, TestCoverageReport};
-use crate::repl::settings::InitialContract;
+use super::{ClarityCodeSource, ClarityContract, ClarityInterpreter, ContractDeployer};
+use crate::analysis::coverage::TestCoverageReport;
 use crate::repl::Settings;
 use crate::utils;
-use ansi_term::{Colour, Style};
+use ansi_term::Colour;
 use clarity::codec::StacksMessageCodec;
 use clarity::types::chainstate::StacksAddress;
 use clarity::types::StacksEpochId;
-use clarity::vm::analysis::ContractAnalysis;
 use clarity::vm::ast::ContractAST;
 use clarity::vm::diagnostic::{Diagnostic, Level};
 use clarity::vm::docs::{make_api_reference, make_define_reference, make_keyword_reference};
-use clarity::vm::errors::Error;
 use clarity::vm::functions::define::DefineFunctions;
 use clarity::vm::functions::NativeFunctions;
 use clarity::vm::types::{
     PrincipalData, QualifiedContractIdentifier, StandardPrincipalData, Value,
 };
 use clarity::vm::variables::NativeVariables;
-use clarity::vm::{
-    ClarityVersion, ContractName, CostSynthesis, EvalHook, EvaluationResult, ExecutionResult,
-    StacksEpoch,
-};
-use reqwest;
-use serde::Serialize;
-use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
-use std::convert::TryFrom;
+use clarity::vm::{ClarityVersion, CostSynthesis, EvalHook, EvaluationResult, ExecutionResult};
+use std::collections::{BTreeMap, HashMap};
 use std::fmt;
-use std::fs::{self, File};
-use std::io::Write;
 use std::num::ParseIntError;
-use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
 
 #[cfg(feature = "cli")]
+use clarity::vm::analysis::ContractAnalysis;
+#[cfg(feature = "cli")]
 use prettytable::{Cell, Row, Table};
+#[cfg(feature = "cli")]
+use reqwest;
 
 use super::SessionSettings;
 
@@ -55,12 +43,9 @@ lazy_static! {
         PrincipalData::parse_standard_principal(BOOT_TESTNET_ADDRESS).unwrap();
     static ref BOOT_MAINNET_PRINCIPAL: StandardPrincipalData =
         PrincipalData::parse_standard_principal(BOOT_MAINNET_ADDRESS).unwrap();
-}
-
-lazy_static! {
     pub static ref BOOT_CONTRACTS_DATA: BTreeMap<QualifiedContractIdentifier, (ClarityContract, ContractAST)> = {
         let mut result = BTreeMap::new();
-        let deploy: [(&StandardPrincipalData, [(&str, &str); 11]); 2] = [
+        let deploy: [(&StandardPrincipalData, [(&str, &str); 10]); 2] = [
             (&*BOOT_TESTNET_PRINCIPAL, *STACKS_BOOT_CODE_TESTNET),
             (&*BOOT_MAINNET_PRINCIPAL, *STACKS_BOOT_CODE_MAINNET),
         ];
@@ -97,15 +82,6 @@ lazy_static! {
     };
 }
 
-enum Command {
-    LoadLocalContract(String),
-    LoadDeployContract(String),
-    UnloadContract(String),
-    ExecuteSnippet(String),
-    OpenSession,
-    CloseSession,
-}
-
 #[derive(Clone, Debug)]
 pub struct CostsReport {
     pub test_name: String,
@@ -117,8 +93,6 @@ pub struct CostsReport {
 
 #[derive(Clone, Debug)]
 pub struct Session {
-    session_id: u32,
-    started_at: u32,
     pub is_interactive: bool,
     pub settings: SessionSettings,
     pub contracts: BTreeMap<String, BTreeMap<String, Vec<String>>>,
@@ -145,8 +119,6 @@ impl Session {
         };
 
         Session {
-            session_id: 0,
-            started_at: 0,
             is_interactive: false,
             interpreter: ClarityInterpreter::new(tx_sender, settings.repl_settings.clone()),
             asts: BTreeMap::new(),
@@ -211,43 +183,9 @@ impl Session {
         }
     }
 
-    #[cfg(feature = "wasm")]
-    pub async fn start_wasm(&mut self) -> String {
-        let mut output = Vec::<String>::new();
-
-        if !self.settings.include_boot_contracts.is_empty() {
-            let default_tx_sender = self.interpreter.get_tx_sender();
-
-            let boot_testnet_deployer =
-                PrincipalData::parse_standard_principal(BOOT_TESTNET_ADDRESS)
-                    .expect("Unable to parse deployer's address");
-            self.interpreter.set_tx_sender(boot_testnet_deployer);
-            self.include_boot_contracts(false);
-
-            let boot_mainnet_deployer =
-                PrincipalData::parse_standard_principal(BOOT_MAINNET_ADDRESS)
-                    .expect("Unable to parse deployer's address");
-            self.interpreter.set_tx_sender(boot_mainnet_deployer);
-            self.include_boot_contracts(true);
-
-            self.interpreter.set_tx_sender(default_tx_sender);
-        }
-
-        // The cost of maintaining the "requirements" / "links" feature on WASM builds
-        // is pretty high, and the amount of code duplicated is very important.
-        // We will timeshift through git and restore this feature if we
-        // can identify a concrete use case in the future
-
-        if !self.settings.initial_contracts.is_empty() {
-            output.push(blue!("Contracts"));
-            self.get_contracts(&mut output);
-        }
-
-        output.join("\n")
-    }
-
     pub fn handle_command(&mut self, command: &str) -> (bool, Vec<String>) {
         let mut output = Vec::<String>::new();
+
         #[allow(unused_mut)]
         let mut reload = false;
         match command {
@@ -271,6 +209,7 @@ impl Session {
             cmd if cmd.starts_with("::set_epoch") => self.set_epoch(&mut output, cmd),
             cmd if cmd.starts_with("::encode") => self.encode(&mut output, cmd),
             cmd if cmd.starts_with("::decode") => self.decode(&mut output, cmd),
+
             #[cfg(feature = "cli")]
             cmd if cmd.starts_with("::debug") => self.debug(&mut output, cmd),
             #[cfg(feature = "cli")]
@@ -365,6 +304,7 @@ impl Session {
         output.append(&mut result);
     }
 
+    #[cfg(feature = "cli")]
     fn get_costs_percentage(consumed: &u64, limit: &u64) -> String {
         let calc = (*consumed as f64 / *limit as f64) * 100_f64;
 
@@ -373,18 +313,16 @@ impl Session {
 
     pub fn formatted_interpretation(
         &mut self,
+        // @TODO: should be &str, it implies 80+ changes in unit tests
         snippet: String,
         name: Option<String>,
         cost_track: bool,
         eval_hooks: Option<Vec<&mut dyn EvalHook>>,
-        test_name: Option<String>,
+        _test_name: Option<String>,
     ) -> Result<(Vec<String>, ExecutionResult), Vec<String>> {
-        let light_red = Colour::Red.bold();
-
         let result = self.eval(snippet.to_string(), eval_hooks, cost_track);
         let mut output = Vec::<String>::new();
-        let lines = snippet.lines();
-        let formatted_lines: Vec<String> = lines.map(|l| l.to_string()).collect();
+        let formatted_lines: Vec<String> = snippet.lines().map(|l| l.to_string()).collect();
         let contract_name = name.unwrap_or("<stdin>".to_string());
 
         match result {
@@ -520,12 +458,10 @@ impl Session {
             _ => return output.push(red!("Usage: ::read <filename>")),
         };
 
-        let snippet = match fs::read_to_string(filename) {
-            Ok(snippet) => snippet,
-            Err(err) => return output.push(red!(format!("unable to read {}: {}", filename, err))),
+        match std::fs::read_to_string(filename) {
+            Ok(snippet) => self.run_snippet(output, self.show_costs, &snippet),
+            Err(err) => output.push(red!(format!("unable to read {}: {}", filename, err))),
         };
-
-        self.run_snippet(output, self.show_costs, &snippet.to_string());
     }
 
     pub fn stx_transfer(
@@ -573,8 +509,14 @@ impl Session {
             contract.expect_resolved_contract_identifier(Some(&self.interpreter.get_tx_sender()));
 
         let result = if let Some(mut ast) = ast.take() {
-            self.interpreter
-                .run_ast(contract, &mut ast, cost_track, Some(hooks))
+            self.interpreter.run_ast(
+                contract,
+                &mut ast,
+                &mut vec![],
+                true,
+                cost_track,
+                Some(hooks),
+            )
         } else {
             self.interpreter.run(contract, cost_track, Some(hooks))
         };
@@ -698,11 +640,7 @@ impl Session {
             return Some(function_doc);
         }
 
-        if let Some(keyword_doc) = self.keywords_reference.get(exp) {
-            return Some(keyword_doc);
-        }
-
-        None
+        self.keywords_reference.get(exp)
     }
 
     pub fn get_api_reference_index(&self) -> Vec<String> {
@@ -727,7 +665,6 @@ impl Session {
 
     fn display_help(&self, output: &mut Vec<String>) {
         let help_colour = Colour::Yellow;
-        let coming_soon_colour = Colour::Black.bold();
         output.push(format!(
             "{}",
             help_colour.paint("::help\t\t\t\t\tDisplay help")
@@ -817,14 +754,14 @@ impl Session {
     }
 
     #[cfg(not(feature = "wasm"))]
-    fn easter_egg(&self, output: &mut [String]) {
+    fn easter_egg(&self, _output: &mut [String]) {
         let result = hiro_system_kit::nestable_block_on(fetch_message());
         let message = result.unwrap_or("You found it!".to_string());
         println!("{}", message);
     }
 
     #[cfg(feature = "wasm")]
-    fn easter_egg(&self, output: &mut [String]) {}
+    fn easter_egg(&self, _output: &mut [String]) {}
 
     fn parse_and_advance_chain_tip(&mut self, output: &mut Vec<String>, command: &str) {
         let args: Vec<_> = command.split(' ').collect();
@@ -888,6 +825,7 @@ impl Session {
         output.push(green!(format!("Current height: {}", height)));
     }
 
+    #[cfg(feature = "cli")]
     fn get_account_name(&self, address: &String) -> Option<&String> {
         for account in self.settings.initial_accounts.iter() {
             if &account.address == address {
@@ -911,13 +849,13 @@ impl Session {
     }
 
     pub fn set_epoch(&mut self, output: &mut Vec<String>, cmd: &str) {
-        let epoch = match cmd.split_once(' ') {
-            Some((_, epoch)) if epoch.eq("2.0") => StacksEpochId::Epoch20,
-            Some((_, epoch)) if epoch.eq("2.05") => StacksEpochId::Epoch2_05,
-            Some((_, epoch)) if epoch.eq("2.1") => StacksEpochId::Epoch21,
-            Some((_, epoch)) if epoch.eq("2.2") => StacksEpochId::Epoch22,
-            Some((_, epoch)) if epoch.eq("2.3") => StacksEpochId::Epoch23,
-            Some((_, epoch)) if epoch.eq("2.4") => StacksEpochId::Epoch24,
+        let epoch = match cmd.split_once(' ').map(|(_, epoch)| epoch) {
+            Some("2.0") => StacksEpochId::Epoch20,
+            Some("2.05") => StacksEpochId::Epoch2_05,
+            Some("2.1") => StacksEpochId::Epoch21,
+            Some("2.2") => StacksEpochId::Epoch22,
+            Some("2.3") => StacksEpochId::Epoch23,
+            Some("2.4") => StacksEpochId::Epoch24,
             _ => {
                 return output.push(red!(
                     "Usage: ::set_epoch 2.0 | 2.05 | 2.1 | 2.2 | 2.3 | 2.4"
@@ -973,11 +911,11 @@ impl Session {
     }
 
     pub fn decode(&mut self, output: &mut Vec<String>, cmd: &str) {
-        let byteString = match cmd.split_once(' ') {
+        let byte_string = match cmd.split_once(' ') {
             Some((_, bytes)) => bytes,
             _ => return output.push(red!("Usage: ::decode <hex-bytes>")),
         };
-        let tx_bytes = match decode_hex(byteString) {
+        let tx_bytes = match decode_hex(byte_string) {
             Ok(tx_bytes) => tx_bytes,
             Err(e) => return output.push(red!(format!("Parsing error: {}", e))),
         };
@@ -990,8 +928,6 @@ impl Session {
     }
 
     pub fn get_costs(&mut self, output: &mut Vec<String>, cmd: &str) {
-        let command: String = cmd.to_owned();
-
         let expr = match cmd.split_once(' ') {
             Some((_, expr)) => expr,
             _ => return output.push(red!("Usage: ::get_costs <expr>")),
@@ -1103,7 +1039,7 @@ impl Session {
 
     #[cfg(not(feature = "cli"))]
     fn get_contracts(&self, output: &mut Vec<String>) {
-        for (contract_id, methods) in self.contracts.iter() {
+        for (contract_id, _methods) in self.contracts.iter() {
             if !contract_id.ends_with(".pox")
                 && !contract_id.ends_with(".bns")
                 && !contract_id.ends_with(".costs")
@@ -1154,7 +1090,6 @@ impl Session {
 
     fn display_doc(&self, output: &mut Vec<String>, command: &str) {
         let help_colour = Colour::Yellow;
-        let help_accent_colour = Colour::Yellow.bold();
         let keyword = {
             let mut s = command.to_string();
             s = s.replace("::describe", "");
@@ -1207,19 +1142,19 @@ impl From<ParseIntError> for DecodeHexError {
     }
 }
 
-fn decode_hex(byteString: &str) -> Result<Vec<u8>, DecodeHexError> {
-    let byteStringFiltered: String = byteString
+fn decode_hex(byte_string: &str) -> Result<Vec<u8>, DecodeHexError> {
+    let byte_string_filtered: String = byte_string
         .strip_prefix("0x")
-        .unwrap_or(byteString)
+        .unwrap_or(byte_string)
         .chars()
         .filter(|c| !c.is_whitespace())
         .collect();
-    if byteStringFiltered.len() % 2 != 0 {
+    if byte_string_filtered.len() % 2 != 0 {
         return Err(DecodeHexError::OddLength);
     }
-    let result: Result<Vec<u8>, ParseIntError> = (0..byteStringFiltered.len())
+    let result: Result<Vec<u8>, ParseIntError> = (0..byte_string_filtered.len())
         .step_by(2)
-        .map(|i| u8::from_str_radix(&byteStringFiltered[i..i + 2], 16))
+        .map(|i| u8::from_str_radix(&byte_string_filtered[i..i + 2], 16))
         .collect();
     match result {
         Ok(result) => Ok(result),
@@ -1280,7 +1215,25 @@ fn clarity_keywords() -> HashMap<String, String> {
 
 #[cfg(test)]
 mod tests {
+    use crate::repl::{self, settings::Account};
+
     use super::*;
+
+    #[test]
+    fn initial_accounts() {
+        let address = "ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5";
+        let mut session = Session::new(SessionSettings {
+            initial_accounts: vec![Account {
+                address: address.to_owned(),
+                balance: 1000000,
+                name: "wallet_1".to_owned(),
+            }],
+            ..Default::default()
+        });
+        let _ = session.start();
+        let balance = session.interpreter.get_balance_for_account(address, "STX");
+        assert_eq!(balance, 1000000);
+    }
 
     #[test]
     fn encode_simple() {
@@ -1409,8 +1362,10 @@ mod tests {
 
     #[test]
     fn evaluate_at_block() {
-        let mut settings = SessionSettings::default();
-        settings.include_boot_contracts = vec!["costs".into(), "costs-2".into(), "costs-3".into()];
+        let settings = SessionSettings {
+            include_boot_contracts: vec!["costs".into(), "costs-2".into(), "costs-3".into()],
+            ..Default::default()
+        };
 
         let mut session = Session::new(settings);
         session.start().expect("session could not start");
@@ -1432,7 +1387,7 @@ mod tests {
             name: "contract".to_string(),
             deployer: ContractDeployer::Address("ST000000000000000000002AMW42H".into()),
             clarity_version: ClarityVersion::Clarity1,
-            epoch: DEFAULT_EPOCH,
+            epoch: repl::DEFAULT_EPOCH,
         };
 
         let _ = session.deploy_contract(&contract, None, false, None, &mut None);
@@ -1475,8 +1430,9 @@ mod tests {
     }
 }
 
+#[cfg(not(feature = "wasm"))]
 async fn fetch_message() -> Result<String, reqwest::Error> {
-    const gist: &str = "https://storage.googleapis.com/hiro-public/assets/clarinet-egg.txt";
+    let gist: &str = "https://storage.googleapis.com/hiro-public/assets/clarinet-egg.txt";
     let response = reqwest::get(gist).await?;
     let message = response.text().await?;
     Ok(message)
