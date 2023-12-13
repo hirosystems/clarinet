@@ -539,7 +539,7 @@ dependencies = [
  "serde-hex",
  "serde_derive",
  "serde_json",
- "stacks-rpc-client 2.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "stacks-rpc-client 2.0.0",
  "threadpool",
  "tokio",
 ]
@@ -624,7 +624,7 @@ checksum = "702fc72eb24e5a1e48ce58027a675bc24edd52096d5397d4aea7c6dd9eca0bd1"
 
 [[package]]
 name = "clarinet-cli"
-version = "2.0.0"
+version = "2.1.0"
 dependencies = [
  "ansi_term",
  "atty",
@@ -637,7 +637,7 @@ dependencies = [
  "clarinet-files",
  "clarinet-utils 1.0.0",
  "clarity-lsp",
- "clarity-repl 2.0.0",
+ "clarity-repl 2.1.0",
  "crossbeam-channel",
  "crossterm 0.22.1",
  "ctrlc",
@@ -684,7 +684,7 @@ dependencies = [
 
 [[package]]
 name = "clarinet-deployments"
-version = "1.0.3"
+version = "2.1.0"
 dependencies = [
  "base58 0.2.0",
  "base64 0.21.3",
@@ -693,7 +693,7 @@ dependencies = [
  "bitcoincore-rpc-json",
  "clarinet-files",
  "clarinet-utils 1.0.0",
- "clarity-repl 2.0.0",
+ "clarity-repl 2.1.0",
  "colored 2.0.4",
  "libsecp256k1 0.7.1",
  "reqwest",
@@ -701,19 +701,19 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "serde_yaml",
- "stacks-rpc-client 2.0.0",
+ "stacks-rpc-client 2.1.0",
  "tiny-hderive",
 ]
 
 [[package]]
 name = "clarinet-files"
-version = "2.0.1"
+version = "2.1.0"
 dependencies = [
  "bip39",
  "bitcoin 0.29.2",
  "chainhook-types",
  "clarinet-utils 1.0.0",
- "clarity-repl 2.0.0",
+ "clarity-repl 2.1.0",
  "js-sys",
  "libsecp256k1 0.7.1",
  "serde",
@@ -733,7 +733,7 @@ version = "1.1.0"
 dependencies = [
  "clarinet-deployments",
  "clarinet-files",
- "clarity-repl 2.0.0",
+ "clarity-repl 2.1.0",
  "console_error_panic_hook",
  "gloo-utils",
  "js-sys",
@@ -772,7 +772,7 @@ version = "1.0.0"
 dependencies = [
  "clap",
  "clarinet-files",
- "clarity-repl 2.0.0",
+ "clarity-repl 2.1.0",
  "serde",
  "serde_derive",
  "serde_json",
@@ -784,7 +784,7 @@ name = "clarity-jupyter-kernel"
 version = "1.0.0"
 dependencies = [
  "chrono",
- "clarity-repl 2.0.0",
+ "clarity-repl 2.1.0",
  "colored 1.9.3",
  "dirs",
  "failure",
@@ -806,7 +806,7 @@ version = "1.0.0"
 dependencies = [
  "clarinet-deployments",
  "clarinet-files",
- "clarity-repl 2.0.0",
+ "clarity-repl 2.1.0",
  "console_error_panic_hook",
  "js-sys",
  "lazy_static",
@@ -823,6 +823,29 @@ dependencies = [
 [[package]]
 name = "clarity-repl"
 version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fb0935839b51a01d7436b31420713e0a9698d2920cfa0493482c9dbb4fe0a696"
+dependencies = [
+ "ansi_term",
+ "atty",
+ "chrono",
+ "clarity-vm",
+ "getrandom 0.2.8",
+ "hiro-system-kit 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "integer-sqrt",
+ "lazy_static",
+ "regex",
+ "reqwest",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "sha2 0.10.6",
+ "sha3 0.9.1",
+]
+
+[[package]]
+name = "clarity-repl"
+version = "2.1.0"
 dependencies = [
  "ansi_term",
  "atty",
@@ -851,29 +874,6 @@ dependencies = [
  "tokio-util 0.7.7",
  "wasm-bindgen",
  "wasm-bindgen-futures",
-]
-
-[[package]]
-name = "clarity-repl"
-version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fb0935839b51a01d7436b31420713e0a9698d2920cfa0493482c9dbb4fe0a696"
-dependencies = [
- "ansi_term",
- "atty",
- "chrono",
- "clarity-vm",
- "getrandom 0.2.8",
- "hiro-system-kit 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "integer-sqrt",
- "lazy_static",
- "regex",
- "reqwest",
- "serde",
- "serde_derive",
- "serde_json",
- "sha2 0.10.6",
- "sha3 0.9.1",
 ]
 
 [[package]]
@@ -4084,7 +4084,7 @@ dependencies = [
 
 [[package]]
 name = "stacks-devnet-js"
-version = "2.0.0"
+version = "2.1.0"
 dependencies = [
  "clarinet-deployments",
  "clarinet-files",
@@ -4100,7 +4100,7 @@ dependencies = [
 
 [[package]]
 name = "stacks-network"
-version = "2.0.0"
+version = "2.1.0"
 dependencies = [
  "ansi_term",
  "atty",
@@ -4115,7 +4115,7 @@ dependencies = [
  "clarinet-deployments",
  "clarinet-files",
  "clarinet-utils 1.0.0",
- "clarity-repl 2.0.0",
+ "clarity-repl 2.1.0",
  "crossbeam-channel",
  "crossterm 0.22.1",
  "ctrlc",
@@ -4127,7 +4127,7 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "serde_yaml",
- "stacks-rpc-client 2.0.0",
+ "stacks-rpc-client 2.1.0",
  "tracing",
  "tracing-appender",
  "tracing-subscriber",
@@ -4137,6 +4137,8 @@ dependencies = [
 [[package]]
 name = "stacks-rpc-client"
 version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9ab91f2053d36c8caedfdb2b98ace2cf852aba6d27c40ae92e2b35d946504a6e"
 dependencies = [
  "clarity-repl 2.0.0",
  "hmac 0.12.1",
@@ -4152,11 +4154,9 @@ dependencies = [
 
 [[package]]
 name = "stacks-rpc-client"
-version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9ab91f2053d36c8caedfdb2b98ace2cf852aba6d27c40ae92e2b35d946504a6e"
+version = "2.1.0"
 dependencies = [
- "clarity-repl 2.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "clarity-repl 2.1.0",
  "hmac 0.12.1",
  "libsecp256k1 0.7.1",
  "pbkdf2 0.12.2",
