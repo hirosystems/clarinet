@@ -502,7 +502,7 @@ btc_address = "mvZtbibDAAA3WLpY7zXXFqRa3T4XSknBX7"
     "typescript": "^5.2.2",
     "vite": "^5.0.6",
     "vitest": "^1.0.1",
-    "vitest-environment-clarinet": "^1.0.0"
+    "vitest-environment-clarinet": "^1.1.0"
   }}
 }}
 "#,
