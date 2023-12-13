@@ -1,3 +1,37 @@
+#### #### [2.1.0](https://github.com/hirosystems/clarinet/compare/v2.0.0...v2.1.0) (2023-12-13)
+
+##### Documentation Changes
+
+*  Change `contract publish` -> `deployments apply` (#1287) (f9a55262)
+*  Improve clarinet-sdk contributing section (#1281) (3c85bd85)
+
+##### New Features
+
+*  Add `clarinet contract rm <name>` (#1261) (98f9d4d8)
+*  Upgrade clarinet-sdk templates (#1280) (#1287) (#1289) (9e9f7706)
+*  Alias `clarinet integrate` to `clarinet devnet start` (#1244) (28ae908c)
+
+##### Bug Fixes
+
+*  Polish deployment ux (#1286) (47e6aac1)
+*  Properly handle clap try_parse errors (1f306758)
+*  Remove extra { in package.json template (#1256) (7f20e504)
+*  **SDK:** tuple diff (#1284) (8ece84ba)
+*  **SDK:** add getBlockTime() to simnet (#1273) (28a9e927)
+
+##### Refactors
+
+*  Implement test fixtures, fix clippy issues, add some tests (#1246) (8dc67803)
+
+##### Chores
+
+*  Upgrade clap (#1263) (ee608aaf)
+
+##### Continuous Integration
+
+*  Implement nextest and improve caching (#1258) (d77d27e2)
+*  Add coverage (#1241) (6a72d54f)
+
 #### [2.0.0](https://github.com/hirosystems/clarinet/compare/v1.8.0...v2.0.0) (2023-10-26)
 
 ##### New Features
