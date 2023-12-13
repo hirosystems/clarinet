@@ -487,6 +487,7 @@ btc_address = "mvZtbibDAAA3WLpY7zXXFqRa3T4XSknBX7"
   "name": "{}-tests",
   "version": "1.0.0",
   "description": "Run unit tests on this project.",
+  "type": "module",
   "private": true,
   "scripts": {{
     "test": "vitest run",
