@@ -464,7 +464,6 @@ jobs:
 
   dist_clarity_repl:
     name: Build Clarity REPL Distribution
-    if: startsWith(github.ref, 'refs/heads/main') && needs.get_release_info.outputs.tag != ''
     runs-on: ubuntu-latest
     needs: pre_run
     defaults:
@@ -507,6 +506,7 @@ jobs:
           path: clarity-repl-${{ env.SHORT_TARGET_NAME }}.tar.gz
 
       - name: Publish clarity-repl to crates.io
+        if: startsWith(github.ref, 'refs/heads/main') && needs.get_release_info.outputs.tag != ''
         run: |
           cargo login ${{ secrets.CARGO_CRATES_IO_API_KEY }}
           cargo publish
