@@ -688,7 +688,7 @@ dependencies = [
  "serde-hex",
  "serde_derive",
  "serde_json",
- "stacks-rpc-client 2.0.1 (git+https://github.com/hirosystems/clarinet.git?branch=chore/upgrade-clarity-vm)",
+ "stacks-rpc-client 2.0.1",
  "threadpool",
  "tokio",
 ]
@@ -938,7 +938,7 @@ dependencies = [
 [[package]]
 name = "clarity"
 version = "2.2.0"
-source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-next#d8c58b1e673702f1ad2008aadfc78e5920df8e4d"
+source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-next#3966aa092a7770ba24802fa8102b3c921dbafc7c"
 dependencies = [
  "integer-sqrt",
  "lazy_static",
@@ -1044,29 +1044,7 @@ dependencies = [
  "tokio-util 0.7.7",
  "wasm-bindgen",
  "wasm-bindgen-futures",
-]
-
-[[package]]
-name = "clarity-vm"
-version = "2.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "90cebf93044798d7729008e9a467b16578aead7f0b3568219a2b20b421b683db"
-dependencies = [
- "integer-sqrt",
- "lazy_static",
- "rand 0.7.3",
- "rand_chacha 0.2.2",
- "regex",
- "rstest",
- "rstest_reuse",
- "rusqlite",
- "serde",
- "serde_derive",
- "serde_json",
- "serde_stacker",
- "sha2-asm",
- "stacks-common",
- "time 0.2.27",
+ "wsts",
 ]
 
 [[package]]
@@ -4816,7 +4794,7 @@ dependencies = [
 [[package]]
 name = "stacks-common"
 version = "0.0.2"
-source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-next#d8c58b1e673702f1ad2008aadfc78e5920df8e4d"
+source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-next#3966aa092a7770ba24802fa8102b3c921dbafc7c"
 dependencies = [
  "chrono",
  "curve25519-dalek",
@@ -4897,15 +4875,10 @@ dependencies = [
 
 [[package]]
 name = "stacks-rpc-client"
-<<<<<<< HEAD
-version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9ab91f2053d36c8caedfdb2b98ace2cf852aba6d27c40ae92e2b35d946504a6e"
-=======
 version = "2.0.1"
->>>>>>> cdf408cd (chore: upgrade dependencies)
+source = "git+https://github.com/hirosystems/clarinet.git?branch=chore/upgrade-clarity-vm#4a11d5c8ddcb0f1f01e57221a8c33124c59337f8"
 dependencies = [
- "clarity-repl 2.1.0",
+ "clarity-repl 2.1.0 (git+https://github.com/hirosystems/clarinet.git?branch=chore/upgrade-clarity-vm)",
  "hmac 0.12.1",
  "libsecp256k1 0.7.1",
  "pbkdf2 0.12.2",
@@ -4921,7 +4894,7 @@ dependencies = [
 name = "stacks-rpc-client"
 version = "2.1.0"
 dependencies = [
- "clarity-repl 2.1.0 (git+https://github.com/hirosystems/clarinet.git?branch=chore/upgrade-clarity-vm)",
+ "clarity-repl 2.1.0",
  "hmac 0.12.1",
  "libsecp256k1 0.7.1",
  "pbkdf2 0.12.2",
