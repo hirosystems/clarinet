@@ -384,7 +384,7 @@ pub async fn start_chains_coordinator(
                 let _ = stacks_rpc.get_pox_info();
 
                 let should_submit_pox_orders = known_tip.block.metadata.pox_cycle_position
-                    == (known_tip.block.metadata.pox_cycle_length - 2);
+                    == (known_tip.block.metadata.pox_cycle_length - 5);
                 if should_submit_pox_orders {
                     let bitcoin_block_height = known_tip
                         .block
