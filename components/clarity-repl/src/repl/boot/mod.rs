@@ -31,9 +31,11 @@ const BOOT_CODE_GENESIS: &str = std::include_str!("genesis.clar");
 pub const POX_1_NAME: &str = "pox";
 pub const POX_2_NAME: &str = "pox-2";
 pub const POX_3_NAME: &str = "pox-3";
+pub const POX_4_NAME: &str = "pox-4";
 
 const POX_2_BODY: &str = std::include_str!("pox-2.clar");
 const POX_3_BODY: &str = std::include_str!("pox-3.clar");
+const POX_4_BODY: &str = std::include_str!("pox-4.clar");
 
 pub const COSTS_1_NAME: &str = "costs";
 pub const COSTS_2_NAME: &str = "costs-2";
@@ -51,8 +53,12 @@ lazy_static! {
         format!("{}\n{}", BOOT_CODE_POX_MAINNET_CONSTS, POX_3_BODY);
     pub static ref POX_3_TESTNET_CODE: String =
         format!("{}\n{}", BOOT_CODE_POX_TESTNET_CONSTS, POX_3_BODY);
+    pub static ref POX_4_MAINNET_CODE: String =
+        format!("{}\n{}", BOOT_CODE_POX_MAINNET_CONSTS, POX_4_BODY);
+    pub static ref POX_4_TESTNET_CODE: String =
+        format!("{}\n{}", BOOT_CODE_POX_TESTNET_CONSTS, POX_4_BODY);
     pub static ref BOOT_CODE_COST_VOTING_TESTNET: String = make_testnet_cost_voting();
-    pub static ref STACKS_BOOT_CODE_MAINNET: [(&'static str, &'static str); 10] = [
+    pub static ref STACKS_BOOT_CODE_MAINNET: [(&'static str, &'static str); 11] = [
         ("pox", &BOOT_CODE_POX_MAINNET),
         ("lockup", &BOOT_CODE_LOCKUP),
         ("costs", &BOOT_CODE_COSTS),
@@ -63,8 +69,9 @@ lazy_static! {
         ("pox-2", &POX_2_MAINNET_CODE),
         ("costs-3", &BOOT_CODE_COSTS_3),
         ("pox-3", &POX_3_MAINNET_CODE),
+        ("pox-4", &POX_4_MAINNET_CODE),
     ];
-    pub static ref STACKS_BOOT_CODE_TESTNET: [(&'static str, &'static str); 10] = [
+    pub static ref STACKS_BOOT_CODE_TESTNET: [(&'static str, &'static str); 11] = [
         ("pox", &BOOT_CODE_POX_TESTNET),
         ("lockup", &BOOT_CODE_LOCKUP),
         ("costs", &BOOT_CODE_COSTS),
@@ -75,6 +82,7 @@ lazy_static! {
         ("pox-2", &POX_2_TESTNET_CODE),
         ("costs-3", &BOOT_CODE_COSTS_3_TESTNET),
         ("pox-3", &POX_3_TESTNET_CODE),
+        ("pox-4", &POX_4_TESTNET_CODE),
     ];
 }
 
