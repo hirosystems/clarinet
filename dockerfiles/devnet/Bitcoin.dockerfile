@@ -69,7 +69,30 @@ RUN git clone --depth 1 --branch v${BTC_VERSION} https://github.com/bitcoin/bitc
     && strip /out/*
 
 FROM debian
-RUN mkdir /bitcoin
+RUN apt-get update && apt-get install -y \
+    autoconf \
+    automake \
+    autotools-dev \
+    bsdmainutils \
+    build-essential \
+    clang \
+    curl \
+    git \
+    libboost-dev \
+    libboost-filesystem-dev \
+    libboost-system-dev \
+    libboost-thread-dev \
+    libczmq-dev \
+    libevent-dev \
+    libminiupnpc-dev \
+    libnatpmp-dev \
+    libsqlite3-dev \
+    libssl-dev \
+    libtool \
+    pkg-config \
+    python3 \
+    wget \
+    && mkdir /bitcoin
 COPY --from=build /out/ /usr/local/bin/
 
 CMD ["/usr/local/bin/bitcoind", "-server", "-datadir=/bitcoin", "-rpcuser=btcuser", "-rpcpassword=btcpass", "-rpcallowip=0.0.0.0/0", "-bind=0.0.0.0:8333", "-rpcbind=0.0.0.0:8332", "-dbcache=512", "-rpcthreads=256", "-disablewallet", "-txindex"]

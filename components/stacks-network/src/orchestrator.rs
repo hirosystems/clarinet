@@ -908,7 +908,10 @@ rpcport={bitcoin_node_rpc_port}
         Ok(())
     }
 
-    pub fn prepare_stacks_node_config(&self, boot_index: u32) -> Result<Config<String>, String> {
+    pub fn prepare_stacks_node_config(
+        &self,
+        boot_index: u32,
+    ) -> Result<(Config<String>, String), String> {
         let (network_config, devnet_config) = match &self.network_config {
             Some(ref network_config) => match network_config.devnet {
                 Some(ref devnet_config) => (network_config, devnet_config),
@@ -939,12 +942,15 @@ rpcport={bitcoin_node_rpc_port}
 working_dir = "/devnet"
 rpc_bind = "0.0.0.0:{stacks_node_rpc_port}"
 p2p_bind = "0.0.0.0:{stacks_node_p2p_port}"
+data_url = "http://127.0.0.1:{stacks_node_rpc_port}"
+p2p_address = "127.0.0.1:{stacks_node_rpc_port}"
 miner = true
 seed = "{miner_secret_key_hex}"
 local_peer_seed = "{miner_secret_key_hex}"
 pox_sync_sample_secs = 0
 wait_time_for_blocks = 0
-wait_time_for_microblocks = {wait_time_for_microblocks}
+wait_time_for_microblocks = 0
+mine_microblocks = false
 microblock_frequency = 1000
 
 [connection_options]
@@ -957,15 +963,18 @@ disable_inbound_walks = true
 public_ip_address = "1.1.1.1:1234"
 
 [miner]
+min_tx_fee = 1
 first_attempt_time_ms = {first_attempt_time_ms}
-subsequent_attempt_time_ms = {subsequent_attempt_time_ms}
+second_attempt_time_ms = {subsequent_attempt_time_ms}
 block_reward_recipient = "{miner_coinbase_recipient}"
+wait_for_block_download = false
+microblock_attempt_time_ms = 10
+self_signing_seed = 1
 # microblock_attempt_time_ms = 15000
 "#,
             stacks_node_rpc_port = devnet_config.stacks_node_rpc_port,
             stacks_node_p2p_port = devnet_config.stacks_node_p2p_port,
             miner_secret_key_hex = devnet_config.miner_secret_key_hex,
-            wait_time_for_microblocks = devnet_config.stacks_node_wait_time_for_microblocks,
             first_attempt_time_ms = devnet_config.stacks_node_first_attempt_time_ms,
             subsequent_attempt_time_ms = devnet_config.stacks_node_subsequent_attempt_time_ms,
             miner_coinbase_recipient = devnet_config.miner_coinbase_recipient,
@@ -1037,7 +1046,11 @@ events_keys = ["*"]
             r#"
         [burnchain]
         chain = "bitcoin"
-        mode = "krypton"
+        mode = "nakamoto-neon"
+        magic_bytes = "T3"
+        pox_prepare_length = 5
+        pox_reward_length = 10
+        burn_fee_cap = 20_000
         poll_time_secs = 1
         timeout = 30
         peer_host = "host.docker.internal"
@@ -1056,8 +1069,7 @@ events_keys = ["*"]
         ));
 
         stacks_conf.push_str(&format!(
-            r#"pox_2_activation = {pox_2_activation}
-
+            r#"
         [[burnchain.epochs]]
         epoch_name = "1.0"
         start_height = 0
@@ -1092,7 +1104,6 @@ events_keys = ["*"]
             epoch_2_2 = devnet_config.epoch_2_2,
             epoch_2_3 = devnet_config.epoch_2_3,
             epoch_2_4 = devnet_config.epoch_2_4,
-            pox_2_activation = devnet_config.pox_2_activation,
         ));
 
         if devnet_config.use_nakamoto {
@@ -1180,7 +1191,7 @@ events_keys = ["*"]
             ..Default::default()
         };
 
-        Ok(config)
+        Ok((config, stacks_conf))
     }
 
     pub async fn prepare_stacks_node_container(
@@ -1210,7 +1221,14 @@ events_keys = ["*"]
             .await
             .map_err(|e| format!("unable to create image: {}", e))?;
 
-        let config = self.prepare_stacks_node_config(boot_index)?;
+        let (config, config_str) = self.prepare_stacks_node_config(boot_index)?;
+
+        let file_path = "./stacks_config2.toml";
+        let mut file =
+            File::create(file_path).map_err(|e| format!("unable to create file: {}", e))?;
+
+        file.write_all(config_str.as_bytes())
+            .map_err(|e| format!("unable to write to file: {}", e))?;
 
         let options = CreateContainerOptions {
             name: format!("stacks-node.{}", self.network_name),
@@ -1296,8 +1314,11 @@ wait_time_for_microblocks = {wait_time_for_microblocks}
 wait_before_first_anchored_block = 0
 
 [miner]
+min_tx_fee = 1
 first_attempt_time_ms = {first_attempt_time_ms}
 subsequent_attempt_time_ms = {subsequent_attempt_time_ms}
+wait_for_block_download = false
+self_signing_seed = 1
 # microblock_attempt_time_ms = 15_000
 
 [burnchain]
@@ -2216,7 +2237,15 @@ events_keys = ["*"]
             .map_err(|e| format!("unable to create container: {}", e))?
             .id;
 
-        let stacks_node_config = self.prepare_stacks_node_config(boot_index)?;
+        let (stacks_node_config, config_str) = self.prepare_stacks_node_config(boot_index)?;
+
+        let file_path = "./stacks_config2.toml";
+        let mut file =
+            File::create(file_path).map_err(|e| format!("unable to create file: {}", e))?;
+
+        file.write_all(config_str.as_bytes())
+            .map_err(|e| format!("unable to write to file: {}", e))?;
+
         let options = CreateContainerOptions {
             name: format!("stacks-node.{}", self.network_name),
         };
