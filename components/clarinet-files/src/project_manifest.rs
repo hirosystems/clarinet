@@ -309,6 +309,7 @@ impl ProjectManifest {
                 "pox".to_string(),
                 "pox-2".to_string(),
                 "pox-3".to_string(),
+                "pox-4".to_string(),
                 "lockup".to_string(),
                 "costs-2".to_string(),
                 "costs-3".to_string(),

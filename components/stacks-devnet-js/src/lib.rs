@@ -632,6 +632,20 @@ impl StacksDevnet {
         }
 
         if let Ok(res) = devnet_settings
+            .get(&mut cx, "epoch_2_5")?
+            .downcast::<JsNumber, _>(&mut cx)
+        {
+            overrides.epoch_2_5 = Some(res.value(&mut cx) as u64);
+        }
+
+        if let Ok(res) = devnet_settings
+            .get(&mut cx, "epoch_3_0")?
+            .downcast::<JsNumber, _>(&mut cx)
+        {
+            overrides.epoch_3_0 = Some(res.value(&mut cx) as u64);
+        }
+
+        if let Ok(res) = devnet_settings
             .get(&mut cx, "pox_2_activation")?
             .downcast::<JsNumber, _>(&mut cx)
         {

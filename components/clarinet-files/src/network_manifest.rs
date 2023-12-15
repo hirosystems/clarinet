@@ -138,6 +138,7 @@ pub struct DevnetConfigFile {
     pub pox_2_activation: Option<u64>,
     pub use_docker_gateway_routing: Option<bool>,
     pub docker_platform: Option<String>,
+    pub use_nakamoto: Option<bool>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -303,6 +304,7 @@ pub struct DevnetConfig {
     pub pox_2_activation: u64,
     pub use_docker_gateway_routing: bool,
     pub docker_platform: String,
+    pub use_nakamoto: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -670,6 +672,14 @@ impl NetworkManifest {
                     devnet_config.epoch_2_4 = Some(*val);
                 }
 
+                if let Some(ref val) = devnet_override.epoch_2_5 {
+                    devnet_config.epoch_2_5 = Some(*val);
+                }
+
+                if let Some(ref val) = devnet_override.epoch_3_0 {
+                    devnet_config.epoch_3_0 = Some(*val);
+                }
+
                 if let Some(ref val) = devnet_override.pox_2_activation {
                     devnet_config.pox_2_activation = Some(*val);
                 }
@@ -921,6 +931,7 @@ impl NetworkManifest {
                 docker_platform: devnet_config
                     .docker_platform
                     .unwrap_or(DEFAULT_DOCKER_PLATFORM.to_string()),
+                use_nakamoto: devnet_config.use_nakamoto.unwrap_or(false),
             };
             Some(config)
         } else {
