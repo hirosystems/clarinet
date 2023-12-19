@@ -393,6 +393,7 @@ pub async fn start_chains_coordinator(
                         .index;
                     let res = publish_stacking_orders(
                         &config.devnet_config,
+                        &devnet_event_tx,
                         &config.accounts,
                         &config.services_map_hosts,
                         config.deployment_fee_rate,
@@ -531,6 +532,7 @@ pub fn relay_devnet_protocol_deployment(
 
 pub async fn publish_stacking_orders(
     devnet_config: &DevnetConfig,
+    _devnet_event_tx: &Sender<DevnetEvent>,
     accounts: &[AccountConfig],
     services_map_hosts: &ServicesMapHosts,
     fee_rate: u64,
@@ -551,7 +553,7 @@ pub async fn publish_stacking_orders(
         .expect("Unable to parse contract");
 
     for pox_stacking_order in devnet_config.pox_stacking_orders.iter() {
-        if pox_stacking_order.start_at_cycle - 1 == pox_info.reward_cycle_id {
+        if pox_stacking_order.start_at_cycle + 9 == pox_info.reward_cycle_id {
             let mut account = None;
             let accounts_iter = accounts.iter();
             for e in accounts_iter {
