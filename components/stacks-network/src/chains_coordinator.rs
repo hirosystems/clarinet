@@ -381,38 +381,36 @@ pub async fn start_chains_coordinator(
                 let _ = devnet_event_tx.send(DevnetEvent::info(message));
 
                 let stacks_rpc = StacksRpc::new(&config.consolidated_stacks_rpc_url());
-                let prepare_phase_length = match stacks_rpc.get_pox_info() {
-                    Ok(pox_info) => pox_info.prepare_phase_block_length,
-                    Err(_) => {
-                        // If we weren't able to retrieve the pox info, we'll assume
-                        // the default value of 5 blocks.
-                        5
-                    }
-                };
-                // Pox orders should be processed before the prepare phase, so submit them
-                // when the pox cycle position is two blocks prior to the prepare phase.
-                let should_submit_pox_orders = known_tip.block.metadata.pox_cycle_position
-                    == known_tip.block.metadata.pox_cycle_length - (prepare_phase_length + 3);
-                if should_submit_pox_orders {
-                    let bitcoin_block_height = known_tip
-                        .block
-                        .metadata
-                        .bitcoin_anchor_block_identifier
-                        .index;
-                    let res = publish_stacking_orders(
-                        &config.devnet_config,
-                        &devnet_event_tx,
-                        &config.accounts,
-                        &config.services_map_hosts,
-                        config.deployment_fee_rate,
-                        bitcoin_block_height as u32,
-                    )
-                    .await;
-                    if let Some(tx_count) = res {
-                        let _ = devnet_event_tx.send(DevnetEvent::success(format!(
-                            "Will broadcast {} stacking orders",
-                            tx_count
-                        )));
+                // If get_pox_info fails, the node is not ready yet.
+                if let Ok(pox_info) = stacks_rpc.get_pox_info() {
+                    let prepare_phase_length = pox_info.prepare_phase_block_length;
+
+                    // Pox orders should be processed before the prepare phase, so submit them
+                    // when the pox cycle position is two blocks prior to the prepare phase.
+                    let should_submit_pox_orders = known_tip.block.metadata.pox_cycle_position
+                        == known_tip.block.metadata.pox_cycle_length - (prepare_phase_length + 3);
+                    if should_submit_pox_orders {
+                        let bitcoin_block_height = known_tip
+                            .block
+                            .metadata
+                            .bitcoin_anchor_block_identifier
+                            .index;
+                        let res = publish_stacking_orders(
+                            pox_info,
+                            &config.devnet_config,
+                            &devnet_event_tx,
+                            &config.accounts,
+                            &config.services_map_hosts,
+                            config.deployment_fee_rate,
+                            bitcoin_block_height as u32,
+                        )
+                        .await;
+                        if let Some(tx_count) = res {
+                            let _ = devnet_event_tx.send(DevnetEvent::success(format!(
+                                "Will broadcast {} stacking orders",
+                                tx_count
+                            )));
+                        }
                     }
                 }
             }
@@ -539,6 +537,7 @@ pub fn relay_devnet_protocol_deployment(
 }
 
 pub async fn publish_stacking_orders(
+    pox_info: PoxInfo,
     devnet_config: &DevnetConfig,
     _devnet_event_tx: &Sender<DevnetEvent>,
     accounts: &[AccountConfig],
@@ -553,12 +552,6 @@ pub async fn publish_stacking_orders(
     let stacks_node_rpc_url = format!("http://{}", &services_map_hosts.stacks_node_host);
 
     let mut transactions = 0;
-    let pox_info: PoxInfo = reqwest::get(format!("{}/v2/pox", stacks_node_rpc_url))
-        .await
-        .expect("Unable to retrieve pox info")
-        .json()
-        .await
-        .expect("Unable to parse contract");
 
     for pox_stacking_order in devnet_config.pox_stacking_orders.iter() {
         if pox_stacking_order.start_at_cycle + 9 == pox_info.reward_cycle_id {
