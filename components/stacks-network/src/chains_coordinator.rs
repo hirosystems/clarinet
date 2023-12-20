@@ -381,10 +381,18 @@ pub async fn start_chains_coordinator(
                 let _ = devnet_event_tx.send(DevnetEvent::info(message));
 
                 let stacks_rpc = StacksRpc::new(&config.consolidated_stacks_rpc_url());
-                let _ = stacks_rpc.get_pox_info();
-
+                let prepare_phase_length = match stacks_rpc.get_pox_info() {
+                    Ok(pox_info) => pox_info.prepare_phase_block_length,
+                    Err(_) => {
+                        // If we weren't able to retrieve the pox info, we'll assume
+                        // the default value of 5 blocks.
+                        5
+                    }
+                };
+                // Pox orders should be processed before the prepare phase, so submit them
+                // when the pox cycle position is two blocks prior to the prepare phase.
                 let should_submit_pox_orders = known_tip.block.metadata.pox_cycle_position
-                    == (known_tip.block.metadata.pox_cycle_length - 5);
+                    == known_tip.block.metadata.pox_cycle_length - (prepare_phase_length + 3);
                 if should_submit_pox_orders {
                     let bitcoin_block_height = known_tip
                         .block
