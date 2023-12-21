@@ -1223,7 +1223,7 @@ events_keys = ["*"]
 
         let (config, config_str) = self.prepare_stacks_node_config(boot_index)?;
 
-        let file_path = "./stacks_config2.toml";
+        let file_path = "./stacks_config.toml";
         let mut file =
             File::create(file_path).map_err(|e| format!("unable to create file: {}", e))?;
 
