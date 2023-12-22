@@ -13,10 +13,17 @@ use tiny_hderive::bip32::ExtendedPrivKey;
 use toml::value::Value;
 
 pub const DEFAULT_DERIVATION_PATH: &str = "m/44'/5757'/0'/0/0";
+
 pub const DEFAULT_BITCOIN_NODE_IMAGE: &str = "quay.io/hirosystems/bitcoind:devnet-v3";
 pub const DEFAULT_STACKS_NODE_IMAGE: &str = "quay.io/hirosystems/stacks-node:devnet-2.4.0.0.0";
-pub const DEFAULT_BITCOIN_EXPLORER_IMAGE: &str = "quay.io/hirosystems/bitcoin-explorer:devnet";
 pub const DEFAULT_STACKS_API_IMAGE: &str = "hirosystems/stacks-blockchain-api:latest";
+
+// Nakamoto images overrides
+pub const DEFAULT_BITCOIN_NODE_IMAGE_NAKA: &str = "quay.io/hirosystems/bitcoind:25.0";
+pub const DEFAULT_STACKS_NODE_IMAGE_NAKA: &str = "blockstack/stacks-blockchain:next-devnet";
+pub const DEFAULT_STACKS_API_IMAGE_NAKA: &str = "hirosystems/stacks-blockchain-api:nakamoto";
+
+pub const DEFAULT_BITCOIN_EXPLORER_IMAGE: &str = "quay.io/hirosystems/bitcoin-explorer:devnet";
 pub const DEFAULT_STACKS_EXPLORER_IMAGE: &str = "hirosystems/explorer:latest";
 pub const DEFAULT_POSTGRES_IMAGE: &str = "postgres:14";
 pub const DEFAULT_SUBNET_NODE_IMAGE: &str = "hirosystems/stacks-subnets:0.8.1";
@@ -845,18 +852,33 @@ impl NetworkManifest {
                     .take()
                     .unwrap_or("subnet_api".to_string()),
                 execute_script: devnet_config.execute_script.take().unwrap_or(vec![]),
-                bitcoin_node_image_url: devnet_config
-                    .bitcoin_node_image_url
-                    .take()
-                    .unwrap_or(DEFAULT_BITCOIN_NODE_IMAGE.to_string()),
-                stacks_node_image_url: devnet_config
-                    .stacks_node_image_url
-                    .take()
-                    .unwrap_or(DEFAULT_STACKS_NODE_IMAGE.to_string()),
-                stacks_api_image_url: devnet_config
-                    .stacks_api_image_url
-                    .take()
-                    .unwrap_or(DEFAULT_STACKS_API_IMAGE.to_string()),
+                bitcoin_node_image_url: devnet_config.bitcoin_node_image_url.take().unwrap_or_else(
+                    || {
+                        if devnet_config.use_nakamoto.unwrap_or(false) {
+                            DEFAULT_BITCOIN_NODE_IMAGE_NAKA.to_string()
+                        } else {
+                            DEFAULT_BITCOIN_NODE_IMAGE.to_string()
+                        }
+                    },
+                ),
+                stacks_node_image_url: devnet_config.stacks_node_image_url.take().unwrap_or_else(
+                    || {
+                        if devnet_config.use_nakamoto.unwrap_or(false) {
+                            DEFAULT_STACKS_NODE_IMAGE_NAKA.to_string()
+                        } else {
+                            DEFAULT_STACKS_NODE_IMAGE.to_string()
+                        }
+                    },
+                ),
+                stacks_api_image_url: devnet_config.stacks_api_image_url.take().unwrap_or_else(
+                    || {
+                        if devnet_config.use_nakamoto.unwrap_or(false) {
+                            DEFAULT_STACKS_API_IMAGE_NAKA.to_string()
+                        } else {
+                            DEFAULT_STACKS_API_IMAGE.to_string()
+                        }
+                    },
+                ),
                 postgres_image_url: devnet_config
                     .postgres_image_url
                     .take()
