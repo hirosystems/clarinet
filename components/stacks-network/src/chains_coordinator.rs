@@ -554,7 +554,7 @@ pub async fn publish_stacking_orders(
     let mut transactions = 0;
 
     for pox_stacking_order in devnet_config.pox_stacking_orders.iter() {
-        if pox_stacking_order.start_at_cycle + 9 == pox_info.reward_cycle_id {
+        if pox_stacking_order.start_at_cycle - 1 == pox_info.reward_cycle_id {
             let mut account = None;
             let accounts_iter = accounts.iter();
             for e in accounts_iter {

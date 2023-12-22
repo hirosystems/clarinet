@@ -42,7 +42,7 @@ pub const DEFAULT_EPOCH_2_2: u64 = 103;
 pub const DEFAULT_EPOCH_2_3: u64 = 104;
 pub const DEFAULT_EPOCH_2_4: u64 = 105;
 pub const DEFAULT_EPOCH_2_5: u64 = 106;
-pub const DEFAULT_EPOCH_3_0: u64 = 107;
+pub const DEFAULT_EPOCH_3_0: u64 = 121;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct NetworkManifestFile {
