@@ -414,21 +414,21 @@ disable_stacks_api = false
 
 # Send some stacking orders
 [[devnet.pox_stacking_orders]]
-start_at_cycle = 3
+start_at_cycle = 2
 duration = 12
 wallet = "wallet_1"
 slots = 2
 btc_address = "mr1iPkD9N3RJZZxXRk7xF9d36gffa6exNC"
 
 [[devnet.pox_stacking_orders]]
-start_at_cycle = 3
+start_at_cycle = 2
 duration = 12
 wallet = "wallet_2"
 slots = 1
 btc_address = "muYdXKmX9bByAueDe6KFfHd5Ff1gdN9ErG"
 
 [[devnet.pox_stacking_orders]]
-start_at_cycle = 3
+start_at_cycle = 2
 duration = 12
 wallet = "wallet_3"
 slots = 1
