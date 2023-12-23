@@ -1046,7 +1046,7 @@ events_keys = ["*"]
             r#"
         [burnchain]
         chain = "bitcoin"
-        mode = "nakamoto-neon"
+        mode = "{burnchain_mode}"
         magic_bytes = "T3"
         pox_prepare_length = 5
         pox_reward_length = 10
@@ -1061,6 +1061,11 @@ events_keys = ["*"]
         rpc_port = {orchestrator_ingestion_port}
         peer_port = {bitcoin_node_p2p_port}
         "#,
+            burnchain_mode = if devnet_config.use_nakamoto {
+                "nakamoto-neon"
+            } else {
+                "krypton"
+            },
             bitcoin_node_username = devnet_config.bitcoin_node_username,
             bitcoin_node_password = devnet_config.bitcoin_node_password,
             bitcoin_node_p2p_port = devnet_config.bitcoin_node_p2p_port,
