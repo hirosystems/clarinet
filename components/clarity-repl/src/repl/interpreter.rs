@@ -824,8 +824,8 @@ impl ClarityInterpreter {
                                 g,
                                 &called_contract.contract_context,
                                 &mut call_stack,
-                                Some(StandardPrincipalData::transient().into()),
-                                Some(StandardPrincipalData::transient().into()),
+                                Some(tx_sender.clone()),
+                                Some(tx_sender),
                                 None,
                             ) {
                                 Ok(res) => res,
