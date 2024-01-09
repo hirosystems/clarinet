@@ -539,7 +539,7 @@ pub fn relay_devnet_protocol_deployment(
 pub async fn publish_stacking_orders(
     pox_info: PoxInfo,
     devnet_config: &DevnetConfig,
-    _devnet_event_tx: &Sender<DevnetEvent>,
+    devnet_event_tx: &Sender<DevnetEvent>,
     accounts: &[AccountConfig],
     services_map_hosts: &ServicesMapHosts,
     fee_rate: u64,
@@ -579,52 +579,73 @@ pub async fn publish_stacking_orders(
             let node_url = stacks_node_rpc_url.clone();
             let pox_contract_id = pox_info.contract_id.clone();
 
-            let _ = hiro_system_kit::thread_named("Stacking orders handler").spawn(move || {
-                let default_fee = fee_rate * 1000;
-                let stacks_rpc = StacksRpc::new(&node_url);
-                let nonce = stacks_rpc
-                    .get_nonce(&account.stx_address)
-                    .expect("Unable to retrieve nonce");
+            let stacking_result =
+                hiro_system_kit::thread_named("Stacking orders handler").spawn(move || {
+                    let default_fee = fee_rate * 1000;
+                    let stacks_rpc = StacksRpc::new(&node_url);
+                    let nonce = stacks_rpc.get_nonce(&account.stx_address)?;
 
-                let (_, _, account_secret_key) = clarinet_files::compute_addresses(
-                    &account.mnemonic,
-                    &account.derivation,
-                    &StacksNetwork::Devnet.get_networks(),
-                );
+                    let (_, _, account_secret_key) = clarinet_files::compute_addresses(
+                        &account.mnemonic,
+                        &account.derivation,
+                        &StacksNetwork::Devnet.get_networks(),
+                    );
 
-                let addr_bytes = Hash160::from_bytes(&addr_bytes[1..21]).unwrap();
-                let addr_version = AddressHashMode::SerializeP2PKH;
-                let stack_stx_tx = codec::build_contrat_call_transaction(
-                    pox_contract_id,
-                    "stack-stx".into(),
-                    vec![
-                        ClarityValue::UInt(stx_amount.into()),
-                        ClarityValue::Tuple(
-                            TupleData::from_data(vec![
-                                (
-                                    ClarityName::try_from("version".to_owned()).unwrap(),
-                                    ClarityValue::buff_from_byte(addr_version as u8),
-                                ),
-                                (
-                                    ClarityName::try_from("hashbytes".to_owned()).unwrap(),
-                                    ClarityValue::Sequence(SequenceData::Buffer(BuffData {
-                                        data: addr_bytes.as_bytes().to_vec(),
-                                    })),
-                                ),
-                            ])
-                            .unwrap(),
-                        ),
-                        ClarityValue::UInt((bitcoin_block_height - 1).into()),
-                        ClarityValue::UInt(duration),
-                    ],
-                    nonce,
-                    default_fee,
-                    &hex_bytes(&account_secret_key).unwrap(),
-                );
-                let _ = stacks_rpc
-                    .post_transaction(&stack_stx_tx)
-                    .expect("Unable to broadcast transaction");
-            });
+                    let addr_bytes = Hash160::from_bytes(&addr_bytes[1..21]).unwrap();
+                    let addr_version = AddressHashMode::SerializeP2PKH;
+                    let stack_stx_tx = codec::build_contrat_call_transaction(
+                        pox_contract_id,
+                        "stack-stx".into(),
+                        vec![
+                            ClarityValue::UInt(stx_amount.into()),
+                            ClarityValue::Tuple(
+                                TupleData::from_data(vec![
+                                    (
+                                        ClarityName::try_from("version".to_owned()).unwrap(),
+                                        ClarityValue::buff_from_byte(addr_version as u8),
+                                    ),
+                                    (
+                                        ClarityName::try_from("hashbytes".to_owned()).unwrap(),
+                                        ClarityValue::Sequence(SequenceData::Buffer(BuffData {
+                                            data: addr_bytes.as_bytes().to_vec(),
+                                        })),
+                                    ),
+                                ])
+                                .unwrap(),
+                            ),
+                            ClarityValue::UInt((bitcoin_block_height - 1).into()),
+                            ClarityValue::UInt(duration),
+                            // ClarityValue::buff_from(vec![0; 33]).unwrap(),
+                        ],
+                        nonce,
+                        default_fee,
+                        &hex_bytes(&account_secret_key).unwrap(),
+                    );
+                    stacks_rpc.post_transaction(&stack_stx_tx)
+                });
+
+            // match stacking_result {
+            //     Ok(result) => {
+            //         if let Ok(result) = result.join() {
+            //             match result {
+            //                 Ok(_) => {
+            //                     let _ = devnet_event_tx.send(DevnetEvent::success(format!(
+            //                         "stacking order for {} STX submitted",
+            //                         stx_amount
+            //                     )));
+            //                 }
+            //                 Err(e) => {
+            //                     let _ = devnet_event_tx
+            //                         .send(DevnetEvent::error(format!("unable to stack: {}", e)));
+            //                 }
+            //             }
+            //         };
+            //     }
+            //     Err(e) => {
+            //         let _ =
+            //             devnet_event_tx.send(DevnetEvent::error(format!("unable to stack: {}", e)));
+            //     }
+            // }
         }
     }
     if transactions > 0 {

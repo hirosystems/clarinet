@@ -7,6 +7,9 @@ use std::io::Cursor;
 
 use clarity_repl::codec::{StacksTransaction, TransactionPayload};
 
+use std::fs::File;
+use std::io::prelude::*;
+
 #[derive(Debug)]
 pub enum RpcError {
     Generic,
@@ -58,12 +61,14 @@ pub struct PoxInfo {
     pub contract_id: String,
     pub pox_activation_threshold_ustx: u64,
     pub first_burnchain_block_height: u64,
+    pub current_burnchain_block_height: u64,
     pub prepare_phase_block_length: u32,
     pub reward_phase_block_length: u32,
     pub reward_slots: u32,
     pub reward_cycle_id: u32,
     pub total_liquid_supply_ustx: u64,
-    pub next_cycle: PoxCycle,
+    pub current_cycle: CurrentPoxCycle,
+    pub next_cycle: NextPoxCycle,
 }
 
 impl PoxInfo {
@@ -84,6 +89,7 @@ impl PoxInfo {
         PoxInfo {
             contract_id: "ST000000000000000000002AMW42H.pox-3".into(),
             pox_activation_threshold_ustx: 0,
+            current_burnchain_block_height: 2000000,
             first_burnchain_block_height: 2000000,
             prepare_phase_block_length: 50,
             reward_phase_block_length: 1000,
@@ -103,19 +109,29 @@ impl Default for PoxInfo {
         PoxInfo {
             contract_id: "ST000000000000000000002AMW42H.pox".into(),
             pox_activation_threshold_ustx: 0,
+            current_burnchain_block_height: 100,
             first_burnchain_block_height: 100,
             prepare_phase_block_length: 4,
             reward_phase_block_length: 6,
-            reward_slots: 12,
+            reward_slots: 10,
             total_liquid_supply_ustx: 1000000000000000,
             reward_cycle_id: 0,
-            next_cycle: PoxCycle::default(),
+            current_cycle: CurrentPoxCycle::default(),
+            next_cycle: NextPoxCycle::default(),
         }
     }
 }
 
 #[derive(Deserialize, Debug, Clone, Default)]
-pub struct PoxCycle {
+pub struct CurrentPoxCycle {
+    pub id: u64,
+    pub min_threshold_ustx: u64,
+    pub stacked_ustx: u64,
+    pub is_pox_active: bool,
+}
+
+#[derive(Deserialize, Debug, Clone, Default)]
+pub struct NextPoxCycle {
     pub min_threshold_ustx: u64,
 }
 
@@ -222,6 +238,11 @@ impl StacksRpc {
             .map_err(|e| RpcError::Message(e.to_string()))?
             .json()
             .map_err(|e| RpcError::Message(e.to_string()))?;
+
+        // Write `res` to a file
+        let mut file = File::create("output.txt").expect("ok");
+        let _ = file.write_all(format!("{:#?}", res).as_bytes());
+
         Ok(res)
     }
 

@@ -1,18 +1,12 @@
-use chainhook_sdk::types::{StacksBlockData, StacksMicroblockData, StacksTransactionData};
+use super::{app::BlockData, App};
 
 use crate::{event::Status, log::LogLevel};
 
-use super::{app::BlockData, App};
-use tui::{
-    backend::Backend,
-    layout::{Constraint, Corner, Direction, Layout, Rect},
-    style::{Color, Modifier, Style},
-    text::{Span, Spans},
-    widgets::{Block, Borders, Cell, List, ListItem, Paragraph, Row, Table, Tabs},
-    Frame,
-};
+use chainhook_sdk::types::{StacksBlockData, StacksMicroblockData, StacksTransactionData};
+use ratatui::{prelude::*, widgets::*};
+use stacks_rpc_client::PoxInfo;
 
-pub fn draw<B: Backend>(f: &mut Frame<B>, app: &mut App) {
+pub fn draw(f: &mut Frame, app: &mut App) {
     let page_components = Layout::default()
         .direction(Direction::Vertical)
         .constraints(
@@ -48,10 +42,7 @@ pub fn draw<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     draw_help(f, app, page_components[3]);
 }
 
-fn draw_services_status<B>(f: &mut Frame<B>, app: &mut App, area: Rect)
-where
-    B: Backend,
-{
+fn draw_services_status(f: &mut Frame, app: &mut App, area: Rect) {
     let rows = app.services.items.iter().map(|service| {
         let status = match service.status {
             Status::Green => "🟩",
@@ -66,10 +57,10 @@ where
         ])
     });
 
-    let t = Table::new(rows)
+    let t = Table::new(rows, vec![] as Vec<&Constraint>)
         .block(Block::default().borders(Borders::ALL).title("Services"))
-        .style(Style::default().fg(Color::White))
-        .widths(&[
+        .style(Style::new().fg(Color::White))
+        .widths([
             Constraint::Length(3),
             Constraint::Length(20),
             Constraint::Length(37),
@@ -77,32 +68,21 @@ where
     f.render_widget(t, area);
 }
 
-fn draw_mempool<B>(f: &mut Frame<B>, app: &mut App, area: Rect)
-where
-    B: Backend,
-{
+fn draw_mempool(f: &mut Frame, app: &mut App, area: Rect) {
     let rows = app.mempool.items.iter().map(|item| {
         let cells = vec![Cell::from(item.tx_description.clone())];
         Row::new(cells).height(1).bottom_margin(0)
     });
 
-    let t = Table::new(rows)
+    let t = Table::new(rows, vec![] as Vec<&Constraint>)
         .block(Block::default().borders(Borders::ALL).title("Mempool"))
-        .style(Style::default().fg(Color::White))
-        .widths(&[Constraint::Percentage(100)]);
+        .style(Style::new().fg(Color::White))
+        .widths([Constraint::Percentage(100)]);
 
     f.render_widget(t, area);
 }
 
-fn draw_devnet_status<B>(f: &mut Frame<B>, app: &mut App, area: Rect)
-where
-    B: Backend,
-{
-    // let page_components = Layout::default()
-    //     .direction(Direction::Vertical)
-    //     .constraints([Constraint::Length(20), Constraint::Min(1), Constraint::Length(5)].as_ref())
-    //     .split(f.size());
-
+fn draw_devnet_status(f: &mut Frame, app: &mut App, area: Rect) {
     let logs: Vec<ListItem> = app
         .logs
         .items
@@ -118,7 +98,7 @@ where
                 LogLevel::Debug => (Style::default().fg(Color::DarkGray), "DEBG"),
             };
 
-            let log = Spans::from(vec![
+            let log = Line::from(vec![
                 Span::styled(format!("{:<5}", label), style),
                 Span::styled(&log.occurred_at, Style::default().fg(Color::DarkGray)),
                 Span::raw(" "),
@@ -136,18 +116,14 @@ where
     inner_area.height = inner_area.height.saturating_sub(1);
     f.render_widget(block, area);
 
-    let logs_component = List::new(logs).start_corner(Corner::BottomLeft);
+    let logs_component = List::new(logs).direction(ListDirection::BottomToTop);
     f.render_widget(logs_component, inner_area);
 }
 
-fn draw_blocks<B>(f: &mut Frame<B>, app: &mut App, area: Rect)
-where
-    B: Backend,
-{
-    let t = Table::new(vec![])
+fn draw_blocks(f: &mut Frame, app: &mut App, area: Rect) {
+    let t = Table::new(vec![], vec![] as Vec<&Constraint>)
         .block(Block::default().borders(Borders::ALL))
-        .style(Style::default().fg(Color::White))
-        .widths(&[]);
+        .style(Style::default().fg(Color::White));
     f.render_widget(t, area);
 
     let blocks_components = Layout::default()
@@ -157,10 +133,10 @@ where
 
     let titles = app.tabs.titles.iter().cloned().collect();
     let blocks = Tabs::new(titles)
-        .divider("")
+        .block(Block::default().borders(Borders::NONE))
+        .divider(symbols::line::HORIZONTAL)
         .style(Style::default().fg(Color::White))
         .highlight_style(Style::default().bg(Color::White).fg(Color::Black))
-        .block(Block::default().borders(Borders::NONE))
         .select(app.tabs.index);
 
     let block_details_components = Layout::default()
@@ -177,8 +153,13 @@ where
     }
     let transactions = match &app.blocks[(app.tabs.titles.len() - 1) - app.tabs.index] {
         BlockData::Block(selected_block) => {
-            draw_block_details(f, block_details_components[0], selected_block);
-            &selected_block.transactions
+            draw_block_details(
+                f,
+                block_details_components[0],
+                &selected_block.0,
+                &selected_block.1,
+            );
+            &selected_block.0.transactions
         }
         BlockData::Microblock(selected_microblock) => {
             draw_microblock_details(f, block_details_components[0], selected_microblock);
@@ -188,117 +169,124 @@ where
     draw_transactions(f, block_details_components[1], transactions);
 }
 
-fn draw_block_details<B>(f: &mut Frame<B>, area: Rect, block: &StacksBlockData)
-where
-    B: Backend,
-{
-    let paragraph = Paragraph::new(String::new()).block(
-        Block::default()
-            .borders(Borders::NONE)
-            .style(Style::default().fg(Color::White))
-            .title("Block Informations"),
-    );
-    f.render_widget(paragraph, area);
-
+fn draw_block_details(f: &mut Frame, area: Rect, block: &StacksBlockData, pox_info: &PoxInfo) {
     let labels = Layout::default()
         .direction(Direction::Vertical)
         .constraints(
             [
-                Constraint::Length(2),
-                Constraint::Length(1),
-                Constraint::Length(2),
-                Constraint::Length(1),
-                Constraint::Length(2),
-                Constraint::Length(1),
-                Constraint::Length(2),
-                Constraint::Length(1),
-                Constraint::Length(2),
-                Constraint::Length(1),
-                Constraint::Length(2),
+                Constraint::Length(2), // "Block informations" title
+                Constraint::Length(2), // Stacks block height
+                Constraint::Length(2), // Bitcoin block height
+                Constraint::Length(1), // Stacks block hash label
+                Constraint::Length(2), // Stacks block hash
+                Constraint::Length(1), // Bitcoin block hash label
+                Constraint::Length(2), // Bitcoin block hash
+                Constraint::Length(2), // "Pox informations" title
+                Constraint::Length(2), // PoX cycle
+                Constraint::Length(2), // PoX phase
+                Constraint::Length(2), // PoX Stacked StW
+                Constraint::Length(1), // PoX contract label
+                Constraint::Length(2), // PoX contract
             ]
             .as_ref(),
         )
         .split(area);
 
-    let label = "Block height:".to_string();
-    let paragraph = Paragraph::new(label)
-        .style(Style::default().fg(Color::White))
-        .block(Block::default().borders(Borders::NONE));
-    f.render_widget(paragraph, labels[1]);
+    let title =
+        Paragraph::new("Block informations").style(Style::default().add_modifier(Modifier::BOLD));
+    f.render_widget(title, labels[0]);
 
-    let value = format!("{}", block.block_identifier.index);
-    let paragraph = Paragraph::new(value)
-        .style(Style::default().fg(Color::White))
-        .block(Block::default().borders(Borders::NONE));
-    f.render_widget(paragraph, labels[2]);
+    let line = Line::from(vec![
+        Span::raw("Stacks block height: "),
+        Span::styled(
+            block.block_identifier.index.to_string(),
+            Style::default().add_modifier(Modifier::BOLD),
+        ),
+    ]);
+    f.render_widget(Paragraph::new(line), labels[1]);
 
-    let label = "Block hash:".to_string();
-    let paragraph = Paragraph::new(label)
-        .style(Style::default().fg(Color::White))
-        .block(Block::default().borders(Borders::NONE));
+    let line = Line::from(vec![
+        Span::raw("Bitcoin block height: "),
+        Span::styled(
+            block
+                .metadata
+                .bitcoin_anchor_block_identifier
+                .index
+                .to_string(),
+            Style::default().add_modifier(Modifier::BOLD),
+        ),
+    ]);
+    f.render_widget(Paragraph::new(line), labels[2]);
+
+    let paragraph = Paragraph::new("Stacks block hash:");
     f.render_widget(paragraph, labels[3]);
 
-    let value = block.block_identifier.hash.to_string();
-    let paragraph = Paragraph::new(value)
-        .style(Style::default().fg(Color::White))
-        .block(Block::default().borders(Borders::NONE));
+    let label = block.block_identifier.hash.clone();
+    let paragraph = Paragraph::new(label);
     f.render_widget(paragraph, labels[4]);
 
-    let label = "Bitcoin block height:".to_string();
-    let paragraph = Paragraph::new(label)
-        .style(Style::default().fg(Color::White))
-        .block(Block::default().borders(Borders::NONE));
+    let paragraph = Paragraph::new("Bitcoin block hash:");
     f.render_widget(paragraph, labels[5]);
 
-    let value = format!("{}", block.metadata.bitcoin_anchor_block_identifier.index);
-    let paragraph = Paragraph::new(value)
-        .style(Style::default().fg(Color::White))
-        .block(Block::default().borders(Borders::NONE));
+    let label = block.metadata.bitcoin_anchor_block_identifier.hash.clone();
+    let paragraph = Paragraph::new(label);
     f.render_widget(paragraph, labels[6]);
 
-    let label = "Bitcoin block hash:".to_string();
-    let paragraph = Paragraph::new(label)
-        .style(Style::default().fg(Color::White))
-        .block(Block::default().borders(Borders::NONE));
-    f.render_widget(paragraph, labels[7]);
+    let title =
+        Paragraph::new("PoX informations").style(Style::default().add_modifier(Modifier::BOLD));
+    f.render_widget(title, labels[7]);
 
-    let value = block
-        .metadata
-        .bitcoin_anchor_block_identifier
-        .hash
-        .to_string();
-    let paragraph = Paragraph::new(value)
-        .style(Style::default().fg(Color::White))
-        .block(Block::default().borders(Borders::NONE));
+    let label = format!("Pox Cycle: {}", block.metadata.pox_cycle_index);
+    let paragraph = Paragraph::new(label);
     f.render_widget(paragraph, labels[8]);
 
-    let label = "Pox Cycle:".to_string();
-    let paragraph = Paragraph::new(label)
-        .style(Style::default().fg(Color::White))
-        .block(Block::default().borders(Borders::NONE));
+    let PoxInfo {
+        current_burnchain_block_height,
+        first_burnchain_block_height,
+        prepare_phase_block_length,
+        reward_phase_block_length,
+        current_cycle,
+        ..
+    } = pox_info;
+
+    let cycle_height = current_burnchain_block_height
+        - first_burnchain_block_height
+        - (current_cycle.id
+            * ((*prepare_phase_block_length as u64) + (*reward_phase_block_length as u64)));
+
+    let phase = if cycle_height <= (*prepare_phase_block_length as u64) {
+        "prepare"
+    } else {
+        "reward"
+    };
+
+    let label = format!("PoX Phase: {}", phase);
+    let paragraph = Paragraph::new(label);
     f.render_widget(paragraph, labels[9]);
 
-    let value = format!("{}", block.metadata.pox_cycle_index);
-    let paragraph = Paragraph::new(value)
-        .style(Style::default().fg(Color::White))
-        .block(Block::default().borders(Borders::NONE));
+    let label = Line::from(vec![
+        Span::raw("Stacked STX: "),
+        Span::styled(
+            format!("{}", current_cycle.stacked_ustx / 6),
+            Style::default().add_modifier(Modifier::BOLD),
+        ),
+    ]);
+    let paragraph = Paragraph::new(label);
     f.render_widget(paragraph, labels[10]);
 
-    // TODO(ludo): PoX informations
+    let paragraph = Paragraph::new("PoX contract:");
+    f.render_widget(paragraph, labels[11]);
+
+    let contract = pox_info.contract_id.clone();
+    let paragraph = Paragraph::new(contract);
+    f.render_widget(paragraph, labels[12])
+
     // TODO(ludo): Mining informations (miner, VRF)
 }
 
-fn draw_microblock_details<B>(f: &mut Frame<B>, area: Rect, microblock: &StacksMicroblockData)
-where
-    B: Backend,
-{
-    let paragraph = Paragraph::new(String::new()).block(
-        Block::default()
-            .borders(Borders::NONE)
-            .style(Style::default().fg(Color::White))
-            .title("Microblock Informations"),
-    );
-    f.render_widget(paragraph, area);
+fn draw_microblock_details(f: &mut Frame, area: Rect, microblock: &StacksMicroblockData) {
+    let title = Paragraph::new("Microblock Informations").white().bold();
+    f.render_widget(title, area);
 
     let labels = Layout::default()
         .direction(Direction::Vertical)
@@ -321,62 +309,43 @@ where
         .split(area);
 
     let label = "Microblock height:".to_string();
-    let paragraph = Paragraph::new(label)
-        .style(Style::default().fg(Color::White))
-        .block(Block::default().borders(Borders::NONE));
+    let paragraph = Paragraph::new(label);
     f.render_widget(paragraph, labels[1]);
 
     let value = format!("{}", microblock.block_identifier.index);
-    let paragraph = Paragraph::new(value)
-        .style(Style::default().fg(Color::White))
-        .block(Block::default().borders(Borders::NONE));
+    let paragraph = Paragraph::new(value);
     f.render_widget(paragraph, labels[2]);
 
     let label = "Microblock hash:".to_string();
-    let paragraph = Paragraph::new(label)
-        .style(Style::default().fg(Color::White))
-        .block(Block::default().borders(Borders::NONE));
+    let paragraph = Paragraph::new(label);
     f.render_widget(paragraph, labels[3]);
 
     let value = microblock.block_identifier.hash.to_string();
-    let paragraph = Paragraph::new(value)
-        .style(Style::default().fg(Color::White))
-        .block(Block::default().borders(Borders::NONE));
+    let paragraph = Paragraph::new(value);
     f.render_widget(paragraph, labels[4]);
 
     let label = "Anchor block height:".to_string();
-    let paragraph = Paragraph::new(label)
-        .style(Style::default().fg(Color::White))
-        .block(Block::default().borders(Borders::NONE));
+    let paragraph = Paragraph::new(label);
     f.render_widget(paragraph, labels[5]);
 
     let value = format!("{}", microblock.metadata.anchor_block_identifier.index);
-    let paragraph = Paragraph::new(value)
-        .style(Style::default().fg(Color::White))
-        .block(Block::default().borders(Borders::NONE));
+    let paragraph = Paragraph::new(value);
     f.render_widget(paragraph, labels[6]);
 
     let label = "Anchor block hash:".to_string();
-    let paragraph = Paragraph::new(label)
-        .style(Style::default().fg(Color::White))
-        .block(Block::default().borders(Borders::NONE));
+    let paragraph = Paragraph::new(label);
     f.render_widget(paragraph, labels[7]);
 
     let value = microblock.metadata.anchor_block_identifier.hash.to_string();
-    let paragraph = Paragraph::new(value)
-        .style(Style::default().fg(Color::White))
-        .block(Block::default().borders(Borders::NONE));
+    let paragraph = Paragraph::new(value);
     f.render_widget(paragraph, labels[8]);
 }
 
-fn draw_transactions<B>(f: &mut Frame<B>, area: Rect, transactions: &[StacksTransactionData])
-where
-    B: Backend,
-{
+fn draw_transactions(f: &mut Frame, area: Rect, transactions: &[StacksTransactionData]) {
     let transactions: Vec<ListItem> = transactions
         .iter()
         .map(|t| {
-            let tx_info = Spans::from(vec![
+            let tx_info = Line::from(vec![
                 Span::styled(
                     match t.metadata.success {
                         true => "🟩",
@@ -414,10 +383,7 @@ where
     f.render_widget(list, inner_area);
 }
 
-fn draw_help<B>(f: &mut Frame<B>, app: &mut App, area: Rect)
-where
-    B: Backend,
-{
+fn draw_help(f: &mut Frame, app: &mut App, area: Rect) {
     // let help =
     //     " ⬅️  ➡️  Explore blocks          ⬆️  ⬇️  Explore transactions          0️⃣  Genesis Reset";
     let help = format!(" ⬅️  ➡️  Explore blocks          Path: {}", app.devnet_path);

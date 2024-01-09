@@ -1,14 +1,15 @@
 use super::util::{StatefulList, TabsState};
 use crate::event::ServiceStatusData;
 use crate::{LogData, MempoolAdmissionData};
+
 use chainhook_sdk::types::{StacksBlockData, StacksMicroblockData, StacksTransactionData};
 use chainhook_sdk::utils::Context;
 use hiro_system_kit::slog;
-use tui::style::{Color, Style};
-use tui::text::{Span, Spans};
+use ratatui::prelude::*;
+use stacks_rpc_client::PoxInfo;
 
 pub enum BlockData {
-    Block(StacksBlockData),
+    Block((StacksBlockData, PoxInfo)),
     Microblock(StacksMicroblockData),
 }
 
@@ -100,7 +101,7 @@ impl<'a> App<'a> {
         self.mempool.items.push(tx);
     }
 
-    pub fn display_block(&mut self, block: StacksBlockData) {
+    pub fn display_block(&mut self, block: StacksBlockData, pox_info: PoxInfo) {
         let (start, end) =
             if block.metadata.pox_cycle_position == (block.metadata.pox_cycle_length - 1) {
                 ("", "<")
@@ -114,7 +115,8 @@ impl<'a> App<'a> {
         } else {
             "␂"
         };
-        self.tabs.titles.push_front(Spans::from(Span::styled(
+
+        self.tabs.titles.push_front(Span::styled(
             format!(
                 "{}[{}{}]{}",
                 end, block.block_identifier.index, has_tx, start
@@ -124,18 +126,18 @@ impl<'a> App<'a> {
             } else {
                 Style::default().fg(Color::LightYellow)
             },
-        )));
-        self.blocks.push(BlockData::Block(block));
+        ));
+
+        self.blocks.push(BlockData::Block((block, pox_info)));
         if self.tabs.index != 0 {
             self.tabs.index += 1;
         }
     }
 
     pub fn display_microblock(&mut self, block: StacksMicroblockData) {
-        self.tabs.titles.push_front(Spans::from(Span::styled(
-            "[·]".to_string(),
-            Style::default().fg(Color::White),
-        )));
+        self.tabs
+            .titles
+            .push_front(Span::from("[·]".to_string()).fg(Color::White));
         self.blocks.push(BlockData::Microblock(block));
         if self.tabs.index != 0 {
             self.tabs.index += 1;

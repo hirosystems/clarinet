@@ -10,7 +10,6 @@ atty = "0.2.14"
 ansi_term = "0.12.1"
 bollard = "0.11.0"
 bytes = "1.4.0"
-crossterm = { version = "0.22.1", optional = true }
 bitcoin = "0.29.2"
 bitcoincore-rpc = "0.16.0"
 serde = { version = "1.0.136", features = ["derive"] }
@@ -25,8 +24,9 @@ reqwest = { version = "0.11", default-features = false, features = [
     "json",
     "rustls-tls",
 ] }
-tui = { version = "0.18.0", default-features = false, features = ["crossterm"] }
 crossbeam-channel = "0.5.6"
+crossterm = { version = "0.27.0" }
+ratatui = { version = "0.25.0", default-features = false, features = ["crossterm"] }
 
 chrono = "0.4.31"
 futures = "0.3.12"
@@ -55,6 +55,3 @@ crate-type = ["cdylib", "rlib"]
 [[bin]]
 name = "stacks-network"
 path = "src/main.rs"
-
-[features]
-default = ["crossterm"]
