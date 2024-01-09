@@ -238,11 +238,6 @@ impl StacksRpc {
             .map_err(|e| RpcError::Message(e.to_string()))?
             .json()
             .map_err(|e| RpcError::Message(e.to_string()))?;
-
-        // Write `res` to a file
-        let mut file = File::create("output.txt").expect("ok");
-        let _ = file.write_all(format!("{:#?}", res).as_bytes());
-
         Ok(res)
     }
 
