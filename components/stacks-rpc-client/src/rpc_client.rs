@@ -133,6 +133,9 @@ pub struct CurrentPoxCycle {
 #[derive(Deserialize, Debug, Clone, Default)]
 pub struct NextPoxCycle {
     pub min_threshold_ustx: u64,
+    pub stacked_ustx: u64,
+    pub blocks_until_prepare_phase: i16,
+    pub blocks_until_reward_phase: i16,
 }
 
 #[derive(Deserialize, Debug)]

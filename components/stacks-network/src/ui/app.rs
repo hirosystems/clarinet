@@ -2,7 +2,9 @@ use super::util::{StatefulList, TabsState};
 use crate::event::ServiceStatusData;
 use crate::{LogData, MempoolAdmissionData};
 
-use chainhook_sdk::types::{StacksBlockData, StacksMicroblockData, StacksTransactionData};
+use chainhook_sdk::types::{
+    StacksBlockData, StacksMicroblockData, StacksTransactionData, StacksTransactionKind,
+};
 use chainhook_sdk::utils::Context;
 use hiro_system_kit::slog;
 use ratatui::prelude::*;
@@ -110,7 +112,22 @@ impl<'a> App<'a> {
             } else {
                 ("", "")
             };
-        let has_tx = if block.transactions.len() <= 1 {
+
+        let has_tenure_change_tx = block
+            .transactions
+            .iter()
+            .any(|tx| tx.metadata.kind == StacksTransactionKind::TenureChange);
+
+        let has_coinbase_tx = block
+            .transactions
+            .iter()
+            .any(|tx| tx.metadata.kind == StacksTransactionKind::Coinbase);
+
+        let has_tx = if (block.transactions.len()
+            - has_coinbase_tx as usize
+            - has_tenure_change_tx as usize)
+            == 0
+        {
             ""
         } else {
             "␂"
@@ -121,14 +138,15 @@ impl<'a> App<'a> {
                 "{}[{}{}]{}",
                 end, block.block_identifier.index, has_tx, start
             ),
-            if block.metadata.pox_cycle_index % 2 == 1 {
-                Style::default().fg(Color::Yellow)
+            if has_tenure_change_tx {
+                Style::default().fg(Color::Green)
             } else {
-                Style::default().fg(Color::LightYellow)
+                Style::default().fg(Color::Yellow)
             },
         ));
 
         self.blocks.push(BlockData::Block((block, pox_info)));
+
         if self.tabs.index != 0 {
             self.tabs.index += 1;
         }

@@ -183,10 +183,9 @@ fn draw_block_details(f: &mut Frame, area: Rect, block: &StacksBlockData, pox_in
                 Constraint::Length(2), // Bitcoin block hash
                 Constraint::Length(2), // "Pox informations" title
                 Constraint::Length(2), // PoX cycle
+                Constraint::Length(2), // PoX cycle position
                 Constraint::Length(2), // PoX phase
-                Constraint::Length(2), // PoX Stacked StW
-                Constraint::Length(1), // PoX contract label
-                Constraint::Length(2), // PoX contract
+                Constraint::Length(2), // PoX Stacked Stx
             ]
             .as_ref(),
         )
@@ -241,20 +240,12 @@ fn draw_block_details(f: &mut Frame, area: Rect, block: &StacksBlockData, pox_in
     f.render_widget(paragraph, labels[8]);
 
     let PoxInfo {
-        current_burnchain_block_height,
-        first_burnchain_block_height,
         prepare_phase_block_length,
-        reward_phase_block_length,
         current_cycle,
         ..
     } = pox_info;
 
-    let cycle_height = current_burnchain_block_height
-        - first_burnchain_block_height
-        - (current_cycle.id
-            * ((*prepare_phase_block_length as u64) + (*reward_phase_block_length as u64)));
-
-    let phase = if cycle_height <= (*prepare_phase_block_length as u64) {
+    let phase = if &block.metadata.pox_cycle_position <= prepare_phase_block_length {
         "prepare"
     } else {
         "reward"
@@ -264,22 +255,19 @@ fn draw_block_details(f: &mut Frame, area: Rect, block: &StacksBlockData, pox_in
     let paragraph = Paragraph::new(label);
     f.render_widget(paragraph, labels[9]);
 
+    let label = format!("PoX Cycle Position: {}", block.metadata.pox_cycle_position);
+    let paragraph = Paragraph::new(label);
+    f.render_widget(paragraph, labels[10]);
+
     let label = Line::from(vec![
         Span::raw("Stacked STX: "),
         Span::styled(
-            format!("{}", current_cycle.stacked_ustx / 6),
+            format!("{}", current_cycle.stacked_ustx / 1_000_000),
             Style::default().add_modifier(Modifier::BOLD),
         ),
     ]);
     let paragraph = Paragraph::new(label);
-    f.render_widget(paragraph, labels[10]);
-
-    let paragraph = Paragraph::new("PoX contract:");
     f.render_widget(paragraph, labels[11]);
-
-    let contract = pox_info.contract_id.clone();
-    let paragraph = Paragraph::new(contract);
-    f.render_widget(paragraph, labels[12])
 
     // TODO(ludo): Mining informations (miner, VRF)
 }

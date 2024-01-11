@@ -42,11 +42,10 @@ pub const DEFAULT_DOCKER_PLATFORM: &str = "linux/amd64";
 pub const DEFAULT_EPOCH_2_0: u64 = 100;
 pub const DEFAULT_EPOCH_2_05: u64 = 100;
 pub const DEFAULT_EPOCH_2_1: u64 = 101;
-pub const DEFAULT_POX2_ACTIVATION: u64 = 102;
-pub const DEFAULT_EPOCH_2_2: u64 = 103;
-pub const DEFAULT_EPOCH_2_3: u64 = 104;
-pub const DEFAULT_EPOCH_2_4: u64 = 105;
-pub const DEFAULT_EPOCH_2_5: u64 = 106;
+pub const DEFAULT_EPOCH_2_2: u64 = 102;
+pub const DEFAULT_EPOCH_2_3: u64 = 103;
+pub const DEFAULT_EPOCH_2_4: u64 = 104;
+pub const DEFAULT_EPOCH_2_5: u64 = 105;
 pub const DEFAULT_EPOCH_3_0: u64 = 121;
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -140,7 +139,6 @@ pub struct DevnetConfigFile {
     pub epoch_2_4: Option<u64>,
     pub epoch_2_5: Option<u64>,
     pub epoch_3_0: Option<u64>,
-    pub pox_2_activation: Option<u64>,
     pub use_docker_gateway_routing: Option<bool>,
     pub docker_platform: Option<String>,
     pub use_nakamoto: Option<bool>,
@@ -306,7 +304,6 @@ pub struct DevnetConfig {
     pub epoch_2_4: u64,
     pub epoch_2_5: u64,
     pub epoch_3_0: u64,
-    pub pox_2_activation: u64,
     pub use_docker_gateway_routing: bool,
     pub docker_platform: String,
     pub use_nakamoto: bool,
@@ -685,10 +682,6 @@ impl NetworkManifest {
                     devnet_config.epoch_3_0 = Some(*val);
                 }
 
-                if let Some(ref val) = devnet_override.pox_2_activation {
-                    devnet_config.pox_2_activation = Some(*val);
-                }
-
                 if let Some(val) = devnet_override.network_id {
                     devnet_config.network_id = Some(val);
                 }
@@ -929,9 +922,6 @@ impl NetworkManifest {
                 epoch_2_4: devnet_config.epoch_2_4.unwrap_or(DEFAULT_EPOCH_2_4),
                 epoch_2_5: devnet_config.epoch_2_5.unwrap_or(DEFAULT_EPOCH_2_5),
                 epoch_3_0: devnet_config.epoch_3_0.unwrap_or(DEFAULT_EPOCH_3_0),
-                pox_2_activation: devnet_config
-                    .pox_2_activation
-                    .unwrap_or(DEFAULT_POX2_ACTIVATION),
                 stacks_node_env_vars: devnet_config.stacks_node_env_vars.take().unwrap_or(vec![]),
                 stacks_api_env_vars: devnet_config.stacks_api_env_vars.take().unwrap_or(vec![]),
                 stacks_explorer_env_vars: devnet_config
