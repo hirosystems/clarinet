@@ -1,7 +1,6 @@
 use clarity::vm::representations::Span;
 use clarity::vm::ClarityName;
 use regex::Regex;
-use std::convert::TryFrom;
 
 #[derive(Debug)]
 pub enum AnnotationKind {
@@ -33,7 +32,7 @@ impl std::str::FromStr for AnnotationKind {
                         let params: Vec<ClarityName> = value
                             .split(',')
                             .filter(|s| !s.is_empty())
-                            .map(|s| ClarityName::try_from(s.trim()).unwrap())
+                            .map(|s| ClarityName::from(s.trim()))
                             .collect();
                         if params.is_empty() {
                             Err("missing value for 'filter' annotation".to_string())

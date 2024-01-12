@@ -908,10 +908,7 @@ rpcport={bitcoin_node_rpc_port}
         Ok(())
     }
 
-    pub fn prepare_stacks_node_config(
-        &self,
-        boot_index: u32,
-    ) -> Result<(Config<String>, String), String> {
+    pub fn prepare_stacks_node_config(&self, boot_index: u32) -> Result<Config<String>, String> {
         let (network_config, devnet_config) = match &self.network_config {
             Some(ref network_config) => match network_config.devnet {
                 Some(ref devnet_config) => (network_config, devnet_config),
@@ -1197,7 +1194,7 @@ events_keys = ["*"]
             ..Default::default()
         };
 
-        Ok((config, stacks_conf))
+        Ok(config)
     }
 
     pub async fn prepare_stacks_node_container(
@@ -1227,14 +1224,7 @@ events_keys = ["*"]
             .await
             .map_err(|e| format!("unable to create image: {}", e))?;
 
-        let (config, config_str) = self.prepare_stacks_node_config(boot_index)?;
-
-        let file_path = "./stacks_config.toml";
-        let mut file =
-            File::create(file_path).map_err(|e| format!("unable to create file: {}", e))?;
-
-        file.write_all(config_str.as_bytes())
-            .map_err(|e| format!("unable to write to file: {}", e))?;
+        let config = self.prepare_stacks_node_config(boot_index)?;
 
         let options = CreateContainerOptions {
             name: format!("stacks-node.{}", self.network_name),
@@ -2243,14 +2233,7 @@ events_keys = ["*"]
             .map_err(|e| format!("unable to create container: {}", e))?
             .id;
 
-        let (stacks_node_config, config_str) = self.prepare_stacks_node_config(boot_index)?;
-
-        let file_path = "./stacks_config2.toml";
-        let mut file =
-            File::create(file_path).map_err(|e| format!("unable to create file: {}", e))?;
-
-        file.write_all(config_str.as_bytes())
-            .map_err(|e| format!("unable to write to file: {}", e))?;
+        let stacks_node_config = self.prepare_stacks_node_config(boot_index)?;
 
         let options = CreateContainerOptions {
             name: format!("stacks-node.{}", self.network_name),
