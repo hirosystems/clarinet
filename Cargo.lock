@@ -1064,7 +1064,7 @@ dependencies = [
 [[package]]
 name = "clarity-repl"
 version = "2.1.0"
-source = "git+https://github.com/hirosystems/clarinet.git?branch=chore/upgrade-clarity-vm#a1c8b2a751ab3c0885439e8007099c27d934195e"
+source = "git+https://github.com/hirosystems/clarinet.git?branch=chore/upgrade-clarity-vm#1b12d5241d7cfde5050ca9906701cbc9b06a96bc"
 dependencies = [
  "ansi_term",
  "atty",
@@ -2293,7 +2293,7 @@ dependencies = [
 [[package]]
 name = "hiro-system-kit"
 version = "0.1.0"
-source = "git+https://github.com/hirosystems/clarinet.git?branch=chore/upgrade-clarity-vm#a1c8b2a751ab3c0885439e8007099c27d934195e"
+source = "git+https://github.com/hirosystems/clarinet.git?branch=chore/upgrade-clarity-vm#1b12d5241d7cfde5050ca9906701cbc9b06a96bc"
 dependencies = [
  "ansi_term",
  "atty",
@@ -4987,7 +4987,7 @@ dependencies = [
 [[package]]
 name = "stacks-rpc-client"
 version = "2.1.0"
-source = "git+https://github.com/hirosystems/clarinet.git?branch=chore/upgrade-clarity-vm#a1c8b2a751ab3c0885439e8007099c27d934195e"
+source = "git+https://github.com/hirosystems/clarinet.git?branch=chore/upgrade-clarity-vm#1b12d5241d7cfde5050ca9906701cbc9b06a96bc"
 dependencies = [
  "clarity-repl 2.1.0 (git+https://github.com/hirosystems/clarinet.git?branch=chore/upgrade-clarity-vm)",
  "hmac 0.12.1",
