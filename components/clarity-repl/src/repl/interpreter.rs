@@ -129,7 +129,7 @@ impl ClarityInterpreter {
 
         // when running clarity-repl/wasm (ie. not natively), we can't run clar2wasm
         #[cfg(all(feature = "cli", not(feature = "wasm")))]
-        {
+        if self.repl_settings.is_clarity_wasm_enabled() {
             let mut contract_wasm = contract.clone();
             contract_wasm.deployer =
                 ContractDeployer::Address("ST3NBRSFKX28FQ2ZJ1MAKX58HKHSDGNV5N7R21XCP".into());
