@@ -6,12 +6,12 @@ use crate::analysis::{self};
 use crate::repl::datastore::BurnDatastore;
 use crate::repl::datastore::Datastore;
 use crate::repl::Settings;
-#[cfg(not(feature = "wasm"))]
+#[cfg(all(feature = "cli", not(feature = "wasm")))]
 use clar2wasm::Module;
 use clarity::consts::CHAIN_ID_TESTNET;
 use clarity::vm::analysis::ContractAnalysis;
 use clarity::vm::ast::{build_ast_with_diagnostics, ContractAST};
-#[cfg(not(feature = "wasm"))]
+#[cfg(all(feature = "cli", not(feature = "wasm")))]
 use clarity::vm::clarity_wasm::{call_function, initialize_contract};
 use clarity::vm::contexts::{CallStack, ContractContext, Environment, GlobalContext, LocalContext};
 use clarity::vm::contracts::Contract;
@@ -128,7 +128,7 @@ impl ClarityInterpreter {
         let result = self.run(contract, ast, cost_track, eval_hooks);
 
         // when running clarity-repl/wasm (ie. not natively), we can't run clar2wasm
-        #[cfg(not(feature = "wasm"))]
+        #[cfg(all(feature = "cli", not(feature = "wasm")))]
         {
             let mut contract_wasm = contract.clone();
             contract_wasm.deployer =
@@ -221,7 +221,7 @@ impl ClarityInterpreter {
         Ok(result)
     }
 
-    #[cfg(not(feature = "wasm"))]
+    #[cfg(all(feature = "cli", not(feature = "wasm")))]
     pub fn run_wasm(
         &mut self,
         contract: &ClarityContract,
@@ -730,7 +730,7 @@ impl ClarityInterpreter {
         Ok(execution_result)
     }
 
-    #[cfg(not(feature = "wasm"))]
+    #[cfg(all(feature = "cli", not(feature = "wasm")))]
     fn execute_wasm(
         &mut self,
         contract: &ClarityContract,
