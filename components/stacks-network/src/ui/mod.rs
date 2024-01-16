@@ -111,9 +111,14 @@ pub fn do_start_ui(
         terminal
             .draw(|f| ui::draw(f, &mut app))
             .map_err(|e| format!("unable to update ui: {}", e))?;
+
         let event = match devnet_events_rx.recv() {
             Ok(event) => event,
-            Err(_e) => {
+            Err(e) => {
+                app.display_log(
+                    DevnetEvent::log_error(format!("Error receiving event: {}", e)),
+                    ctx,
+                );
                 let _ = terminate(
                     &mut terminal,
                     chains_coordinator_commands_tx,
@@ -262,12 +267,7 @@ pub fn do_start_ui(
                     let _ = bitcoin_mining_tx.send(BitcoinMiningCommand::Start);
                 }
                 mining_command_tx = Some(bitcoin_mining_tx);
-            } // DevnetEvent::Terminate => {
-
-              // },
-              // DevnetEvent::Restart => {
-
-              // },
+            }
         }
         if app.should_quit {
             break;
@@ -285,12 +285,12 @@ fn terminate(
     let _ = disable_raw_mode();
     let _ = execute!(terminal.backend_mut(), LeaveAlternateScreen);
     let res = chains_coordinator_commands_tx.send(ChainsCoordinatorCommand::Terminate);
-    if let Err(_e) = res {
-        // Display log
+    if let Err(e) = res {
+        println!("Error sending terminate command: {}", e);
     }
     let res = orchestrator_terminated_rx.recv();
-    if let Err(_e) = res {
-        // Display log
+    if let Err(e) = res {
+        println!("Error sending terminate command: {}", e);
     }
     let _ = terminal.show_cursor();
     Ok(())
