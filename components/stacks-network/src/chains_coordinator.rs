@@ -658,7 +658,7 @@ pub async fn publish_stacking_orders(
                         }
                         Err(e) => {
                             let _ = devnet_event_tx
-                                .send(DevnetEvent::error(format!("unable to stack: {}", e)));
+                                .send(DevnetEvent::error(format!("Unable to stack: {}", e)));
                         }
                     }
                 };
