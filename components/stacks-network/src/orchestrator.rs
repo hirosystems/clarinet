@@ -2196,11 +2196,7 @@ events_keys = ["*"]
         Ok(())
     }
 
-    pub async fn start_containers(
-        &self,
-        boot_index: u32,
-        // devnet_config: &DevnetConfig,
-    ) -> Result<(String, String), String> {
+    pub async fn start_containers(&self, boot_index: u32) -> Result<(String, String), String> {
         let containers_ids = match (
             &self.stacks_api_container_id,
             &self.stacks_explorer_container_id,
