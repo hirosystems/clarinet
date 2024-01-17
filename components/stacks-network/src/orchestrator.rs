@@ -1043,23 +1043,23 @@ events_keys = ["*"]
 
         stacks_conf.push_str(&format!(
             r#"
-        [burnchain]
-        chain = "bitcoin"
-        mode = "{burnchain_mode}"
-        magic_bytes = "T3"
-        pox_prepare_length = 5
-        pox_reward_length = 10
-        burn_fee_cap = 20_000
-        poll_time_secs = 1
-        timeout = 30
-        peer_host = "host.docker.internal"
-        rpc_ssl = false
-        wallet_name = "{miner_wallet_name}"
-        username = "{bitcoin_node_username}"
-        password = "{bitcoin_node_password}"
-        rpc_port = {orchestrator_ingestion_port}
-        peer_port = {bitcoin_node_p2p_port}
-        "#,
+[burnchain]
+chain = "bitcoin"
+mode = "{burnchain_mode}"
+magic_bytes = "T3"
+pox_prepare_length = 4
+pox_reward_length = 10
+burn_fee_cap = 20_000
+poll_time_secs = 1
+timeout = 30
+peer_host = "host.docker.internal"
+rpc_ssl = false
+wallet_name = "{miner_wallet_name}"
+username = "{bitcoin_node_username}"
+password = "{bitcoin_node_password}"
+rpc_port = {orchestrator_ingestion_port}
+peer_port = {bitcoin_node_p2p_port}
+"#,
             burnchain_mode = if devnet_config.use_nakamoto {
                 "nakamoto-neon"
             } else {
@@ -1074,34 +1074,34 @@ events_keys = ["*"]
 
         stacks_conf.push_str(&format!(
             r#"
-        [[burnchain.epochs]]
-        epoch_name = "1.0"
-        start_height = 0
+[[burnchain.epochs]]
+epoch_name = "1.0"
+start_height = 0
 
-        [[burnchain.epochs]]
-        epoch_name = "2.0"
-        start_height = {epoch_2_0}
+[[burnchain.epochs]]
+epoch_name = "2.0"
+start_height = {epoch_2_0}
 
-        [[burnchain.epochs]]
-        epoch_name = "2.05"
-        start_height = {epoch_2_05}
+[[burnchain.epochs]]
+epoch_name = "2.05"
+start_height = {epoch_2_05}
 
-        [[burnchain.epochs]]
-        epoch_name = "2.1"
-        start_height = {epoch_2_1}
+[[burnchain.epochs]]
+epoch_name = "2.1"
+start_height = {epoch_2_1}
 
-        [[burnchain.epochs]]
-        epoch_name = "2.2"
-        start_height = {epoch_2_2}
+[[burnchain.epochs]]
+epoch_name = "2.2"
+start_height = {epoch_2_2}
 
-        [[burnchain.epochs]]
-        epoch_name = "2.3"
-        start_height = {epoch_2_3}
+[[burnchain.epochs]]
+epoch_name = "2.3"
+start_height = {epoch_2_3}
 
-        [[burnchain.epochs]]
-        epoch_name = "2.4"
-        start_height = {epoch_2_4}
-        "#,
+[[burnchain.epochs]]
+epoch_name = "2.4"
+start_height = {epoch_2_4}
+"#,
             epoch_2_0 = devnet_config.epoch_2_0,
             epoch_2_05 = devnet_config.epoch_2_05,
             epoch_2_1 = devnet_config.epoch_2_1,
@@ -1113,14 +1113,14 @@ events_keys = ["*"]
         if devnet_config.use_nakamoto {
             stacks_conf.push_str(&format!(
                 r#"
-        [[burnchain.epochs]]
-        epoch_name = "2.5"
-        start_height = {epoch_2_5}
+[[burnchain.epochs]]
+epoch_name = "2.5"
+start_height = {epoch_2_5}
 
-        [[burnchain.epochs]]
-        epoch_name = "3.0"
-        start_height = {epoch_3_0}
-        "#,
+[[burnchain.epochs]]
+epoch_name = "3.0"
+start_height = {epoch_3_0}
+"#,
                 epoch_2_5 = devnet_config.epoch_2_5,
                 epoch_3_0 = devnet_config.epoch_3_0,
             ));
