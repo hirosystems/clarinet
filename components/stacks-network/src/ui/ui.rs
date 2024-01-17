@@ -184,7 +184,7 @@ fn draw_block_details(f: &mut Frame, area: Rect, block: &StacksBlockData) {
         .split(area);
 
     let title =
-        Paragraph::new("Block informations").style(Style::default().add_modifier(Modifier::BOLD));
+        Paragraph::new("Block information").style(Style::default().add_modifier(Modifier::BOLD));
     f.render_widget(title, labels[0]);
 
     let line = Line::from(vec![
