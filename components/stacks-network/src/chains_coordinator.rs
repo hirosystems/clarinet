@@ -14,6 +14,7 @@ use chainhook_sdk::observer::{
 use chainhook_sdk::types::BitcoinBlockSignaling;
 use chainhook_sdk::types::BitcoinChainEvent;
 use chainhook_sdk::types::BitcoinNetwork;
+use chainhook_sdk::types::StacksBlockData;
 use chainhook_sdk::types::StacksChainEvent;
 use chainhook_sdk::types::StacksNetwork;
 use chainhook_sdk::types::StacksNodeConfig;
@@ -34,7 +35,8 @@ use clarity_repl::codec;
 use hiro_system_kit;
 use hiro_system_kit::slog;
 use hiro_system_kit::yellow;
-use stacks_rpc_client::{PoxInfo, StacksRpc};
+use stacks_rpc_client::PoxInfo;
+use stacks_rpc_client::StacksRpc;
 use std::convert::TryFrom;
 use std::str;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -380,41 +382,39 @@ pub async fn start_chains_coordinator(
                 };
                 let _ = devnet_event_tx.send(DevnetEvent::info(message));
 
-                let stacks_rpc = StacksRpc::new(&config.consolidated_stacks_rpc_url());
-                let pox_cycle_position = known_tip.block.metadata.pox_cycle_position;
-
                 // only publish stacking order txs in tenure-change blocks
-                // TODO(hugo): only have this extra check for pox-4 / use_nakamoto
                 let has_coinbase_tx = known_tip
                     .block
                     .transactions
                     .iter()
                     .any(|tx| tx.metadata.kind == StacksTransactionKind::Coinbase);
                 if has_coinbase_tx {
-                    // If get_pox_info fails, the node is not ready yet.
-                    if let Ok(pox_info) = stacks_rpc.get_pox_info() {
-                        let bitcoin_block_height = known_tip
-                            .block
-                            .metadata
-                            .bitcoin_anchor_block_identifier
-                            .index;
-                        if pox_cycle_position == 8 {
-                            let res = publish_stacking_orders(
-                                pox_info,
-                                &config.devnet_config,
-                                &devnet_event_tx,
-                                &config.accounts,
-                                &config.services_map_hosts,
-                                config.deployment_fee_rate,
-                                bitcoin_block_height as u32,
-                            )
-                            .await;
-                            if let Some(tx_count) = res {
-                                let _ = devnet_event_tx.send(DevnetEvent::success(format!(
-                                    "Will broadcast {} stacking orders",
-                                    tx_count
-                                )));
-                            }
+                    let bitcoin_block_height = known_tip
+                        .block
+                        .metadata
+                        .bitcoin_anchor_block_identifier
+                        .index;
+                    let should_submit_pox_orders = known_tip.block.metadata.pox_cycle_position
+                        == (known_tip.block.metadata.pox_cycle_length - 5);
+                    if should_submit_pox_orders {
+                        let _ = devnet_event_tx.send(DevnetEvent::info(
+                            "Attempting to publish stacking orders".to_string(),
+                        ));
+                        let res = publish_stacking_orders(
+                            &known_tip.block,
+                            &config.devnet_config,
+                            &devnet_event_tx,
+                            &config.accounts,
+                            &config.services_map_hosts,
+                            config.deployment_fee_rate,
+                            bitcoin_block_height as u32,
+                        )
+                        .await;
+                        if let Some(tx_count) = res {
+                            let _ = devnet_event_tx.send(DevnetEvent::success(format!(
+                                "Will broadcast {} stacking orders",
+                                tx_count
+                            )));
                         }
                     }
                 }
@@ -542,7 +542,7 @@ pub fn relay_devnet_protocol_deployment(
 }
 
 pub async fn publish_stacking_orders(
-    pox_info: PoxInfo,
+    block: &StacksBlockData,
     devnet_config: &DevnetConfig,
     devnet_event_tx: &Sender<DevnetEvent>,
     accounts: &[AccountConfig],
@@ -559,9 +559,17 @@ pub async fn publish_stacking_orders(
     let mut transactions = 0;
 
     for (i, pox_stacking_order) in devnet_config.pox_stacking_orders.iter().enumerate() {
-        if pox_stacking_order.start_at_cycle != pox_info.reward_cycle_id {
+        if pox_stacking_order.start_at_cycle - 1 != block.metadata.pox_cycle_index {
             continue;
         }
+
+        let pox_info: PoxInfo = reqwest::get(format!("{}/v2/pox", stacks_node_rpc_url))
+            .await
+            .expect("Unable to retrieve pox info")
+            .json()
+            .await
+            .expect("Unable to parse contract");
+
         let account = accounts
             .iter()
             .find(|e| e.label == pox_stacking_order.wallet);

@@ -4,7 +4,6 @@ use crate::{event::Status, log::LogLevel};
 
 use chainhook_sdk::types::{StacksBlockData, StacksMicroblockData, StacksTransactionData};
 use ratatui::{prelude::*, widgets::*};
-use stacks_rpc_client::PoxInfo;
 
 pub fn draw(f: &mut Frame, app: &mut App) {
     let page_components = Layout::default()
@@ -153,13 +152,8 @@ fn draw_blocks(f: &mut Frame, app: &mut App, area: Rect) {
     }
     let transactions = match &app.blocks[(app.tabs.titles.len() - 1) - app.tabs.index] {
         BlockData::Block(selected_block) => {
-            draw_block_details(
-                f,
-                block_details_components[0],
-                &selected_block.0,
-                &selected_block.1,
-            );
-            &selected_block.0.transactions
+            draw_block_details(f, block_details_components[0], selected_block);
+            &selected_block.transactions
         }
         BlockData::Microblock(selected_microblock) => {
             draw_microblock_details(f, block_details_components[0], selected_microblock);
@@ -169,7 +163,7 @@ fn draw_blocks(f: &mut Frame, app: &mut App, area: Rect) {
     draw_transactions(f, block_details_components[1], transactions);
 }
 
-fn draw_block_details(f: &mut Frame, area: Rect, block: &StacksBlockData, pox_info: &PoxInfo) {
+fn draw_block_details(f: &mut Frame, area: Rect, block: &StacksBlockData) {
     let labels = Layout::default()
         .direction(Direction::Vertical)
         .constraints(
@@ -184,8 +178,6 @@ fn draw_block_details(f: &mut Frame, area: Rect, block: &StacksBlockData, pox_in
                 Constraint::Length(2), // "Pox informations" title
                 Constraint::Length(2), // PoX cycle
                 Constraint::Length(2), // PoX cycle position
-                Constraint::Length(2), // PoX phase
-                Constraint::Length(2), // PoX Stacked Stx
             ]
             .as_ref(),
         )
@@ -235,40 +227,15 @@ fn draw_block_details(f: &mut Frame, area: Rect, block: &StacksBlockData, pox_in
         Paragraph::new("PoX informations").style(Style::default().add_modifier(Modifier::BOLD));
     f.render_widget(title, labels[7]);
 
-    let label = format!("Pox Cycle: {}", block.metadata.pox_cycle_index);
+    let label = format!("PoX Cycle: {}", block.metadata.pox_cycle_index);
     let paragraph = Paragraph::new(label);
     f.render_widget(paragraph, labels[8]);
 
-    let PoxInfo {
-        prepare_phase_block_length,
-        current_cycle,
-        ..
-    } = pox_info;
-
-    let phase = if &block.metadata.pox_cycle_position <= prepare_phase_block_length {
-        "prepare"
-    } else {
-        "reward"
-    };
-
-    let label = format!("PoX Phase: {}", phase);
+    let label = format!("PoX Cycle Position: {}", block.metadata.pox_cycle_position);
     let paragraph = Paragraph::new(label);
     f.render_widget(paragraph, labels[9]);
 
-    let label = format!("PoX Cycle Position: {}", block.metadata.pox_cycle_position);
-    let paragraph = Paragraph::new(label);
-    f.render_widget(paragraph, labels[10]);
-
-    let label = Line::from(vec![
-        Span::raw("Stacked STX: "),
-        Span::styled(
-            format!("{}", current_cycle.stacked_ustx / 1_000_000),
-            Style::default().add_modifier(Modifier::BOLD),
-        ),
-    ]);
-    let paragraph = Paragraph::new(label);
-    f.render_widget(paragraph, labels[11]);
-
+    // TODO: Add more PoX data (from pox_info)
     // TODO(ludo): Mining informations (miner, VRF)
 }
 

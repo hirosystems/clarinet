@@ -234,27 +234,23 @@ impl StacksRpc {
     pub fn get_pox_info(&self) -> Result<PoxInfo, RpcError> {
         let request_url = format!("{}/v2/pox", self.url);
 
-        let res: PoxInfo = self
-            .client
+        self.client
             .get(request_url)
             .send()
             .map_err(|e| RpcError::Message(e.to_string()))?
-            .json()
-            .map_err(|e| RpcError::Message(e.to_string()))?;
-        Ok(res)
+            .json::<PoxInfo>()
+            .map_err(|e| RpcError::Message(e.to_string()))
     }
 
     pub fn get_info(&self) -> Result<NodeInfo, RpcError> {
         let request_url = format!("{}/v2/info", self.url);
 
-        let res: NodeInfo = self
-            .client
+        self.client
             .get(request_url)
             .send()
             .map_err(|e| RpcError::Message(e.to_string()))?
-            .json()
-            .map_err(|e| RpcError::Message(e.to_string()))?;
-        Ok(res)
+            .json::<NodeInfo>()
+            .map_err(|e| RpcError::Message(e.to_string()))
     }
 
     pub fn get_contract_source(

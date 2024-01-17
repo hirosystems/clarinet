@@ -8,10 +8,9 @@ use chainhook_sdk::types::{
 use chainhook_sdk::utils::Context;
 use hiro_system_kit::slog;
 use ratatui::prelude::*;
-use stacks_rpc_client::PoxInfo;
 
 pub enum BlockData {
-    Block((StacksBlockData, PoxInfo)),
+    Block(StacksBlockData),
     Microblock(StacksMicroblockData),
 }
 
@@ -103,7 +102,7 @@ impl<'a> App<'a> {
         self.mempool.items.push(tx);
     }
 
-    pub fn display_block(&mut self, block: StacksBlockData, pox_info: PoxInfo) {
+    pub fn display_block(&mut self, block: StacksBlockData) {
         let (start, end) =
             if block.metadata.pox_cycle_position == (block.metadata.pox_cycle_length - 1) {
                 ("", "<")
@@ -145,7 +144,7 @@ impl<'a> App<'a> {
             },
         ));
 
-        self.blocks.push(BlockData::Block((block, pox_info)));
+        self.blocks.push(BlockData::Block(block));
 
         if self.tabs.index != 0 {
             self.tabs.index += 1;

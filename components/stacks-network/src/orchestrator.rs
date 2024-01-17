@@ -239,7 +239,7 @@ impl DevnetOrchestrator {
             .as_ref()
             .and_then(|ipam| ipam.config.as_ref())
             .and_then(|config| config.first())
-            .and_then(|map| map.get("Gateway"))
+            .and_then(|map| map.gateway.clone())
             .ok_or("unable to retrieve gateway")?;
 
         let services_map_hosts = if devnet_config.use_docker_gateway_routing {
@@ -821,6 +821,7 @@ rpcport={bitcoin_node_rpc_port}
         let container_name = format!("bitcoin-node.{}", self.network_name);
         let options = CreateContainerOptions {
             name: container_name.as_str(),
+            platform: Some(&devnet_config.docker_platform),
         };
 
         let container = match docker
@@ -1228,6 +1229,7 @@ events_keys = ["*"]
 
         let options = CreateContainerOptions {
             name: format!("stacks-node.{}", self.network_name),
+            platform: Some(devnet_config.docker_platform.to_string()),
         };
 
         let container = docker
@@ -1486,6 +1488,7 @@ events_keys = ["*"]
 
         let options = CreateContainerOptions {
             name: format!("subnet-node.{}", self.network_name),
+            platform: Some(devnet_config.docker_platform.to_string()),
         };
 
         let container = docker
@@ -1609,6 +1612,7 @@ events_keys = ["*"]
 
         let options = CreateContainerOptions {
             name: format!("stacks-api.{}", self.network_name),
+            platform: Some(devnet_config.docker_platform.to_string()),
         };
 
         let container = docker
@@ -1732,6 +1736,7 @@ events_keys = ["*"]
 
         let options = CreateContainerOptions {
             name: format!("subnet-api.{}", self.network_name),
+            platform: Some(devnet_config.docker_platform.to_string()),
         };
 
         let container = docker
@@ -1864,6 +1869,7 @@ events_keys = ["*"]
 
         let options = CreateContainerOptions {
             name: format!("postgres.{}", self.network_name),
+            platform: Some(devnet_config.docker_platform.to_string()),
         };
 
         let container = docker
@@ -1972,6 +1978,7 @@ events_keys = ["*"]
 
         let options = CreateContainerOptions {
             name: format!("stacks-explorer.{}", self.network_name),
+            platform: Some(devnet_config.docker_platform.to_string()),
         };
 
         let container = docker
@@ -2091,6 +2098,7 @@ events_keys = ["*"]
 
         let options = CreateContainerOptions {
             name: format!("bitcoin-explorer.{}", self.network_name),
+            platform: Some(devnet_config.docker_platform.to_string()),
         };
 
         let container = docker
@@ -2188,7 +2196,11 @@ events_keys = ["*"]
         Ok(())
     }
 
-    pub async fn start_containers(&self, boot_index: u32) -> Result<(String, String), String> {
+    pub async fn start_containers(
+        &self,
+        boot_index: u32,
+        // devnet_config: &DevnetConfig,
+    ) -> Result<(String, String), String> {
         let containers_ids = match (
             &self.stacks_api_container_id,
             &self.stacks_explorer_container_id,
@@ -2224,8 +2236,16 @@ events_keys = ["*"]
             .await;
 
         let bitcoin_node_config = self.prepare_bitcoin_node_config(boot_index)?;
+
+        let platform = self
+            .network_config
+            .as_ref()
+            .and_then(|c| c.devnet.as_ref())
+            .map(|c| c.docker_platform.to_string());
+
         let options = CreateContainerOptions {
             name: format!("bitcoin-node.{}", self.network_name),
+            platform: platform.clone(),
         };
         let bitcoin_node_c_id = docker
             .create_container::<String, String>(Some(options), bitcoin_node_config)
@@ -2237,6 +2257,7 @@ events_keys = ["*"]
 
         let options = CreateContainerOptions {
             name: format!("stacks-node.{}", self.network_name),
+            platform,
         };
         let stacks_node_c_id = docker
             .create_container::<String, String>(Some(options), stacks_node_config)

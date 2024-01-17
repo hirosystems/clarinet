@@ -114,7 +114,6 @@ async fn do_run_devnet(
         &ctx,
         ip_address_setup,
     );
-    let devnet_url = config.consolidated_stacks_rpc_url();
 
     let chains_coordinator_tx = devnet_events_tx.clone();
     let (chains_coordinator_commands_tx, chains_coordinator_commands_rx) =
@@ -183,7 +182,6 @@ async fn do_run_devnet(
             orchestrator_terminated_rx.expect(
                 "orchestrator_terminated_rx should be provided when display_dashboard set to true",
             ),
-            &devnet_url,
             &devnet_path,
             devnet_config.enable_subnet_node,
             !devnet_config.bitcoin_controller_automining_disabled,

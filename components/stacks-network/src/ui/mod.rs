@@ -17,7 +17,6 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::{backend::CrosstermBackend, Terminal};
-use stacks_rpc_client::StacksRpc;
 use std::sync::mpsc::{Receiver, Sender};
 use std::{
     error::Error,
@@ -31,7 +30,6 @@ pub fn start_ui(
     devnet_events_rx: Receiver<DevnetEvent>,
     chains_coordinator_commands_tx: crossbeam_channel::Sender<ChainsCoordinatorCommand>,
     orchestrator_terminated_rx: Receiver<bool>,
-    devnet_url: &str,
     devnet_path: &str,
     subnet_enabled: bool,
     automining_enabled: bool,
@@ -42,7 +40,6 @@ pub fn start_ui(
         devnet_events_rx,
         chains_coordinator_commands_tx,
         orchestrator_terminated_rx,
-        devnet_url,
         devnet_path,
         subnet_enabled,
         automining_enabled,
@@ -59,7 +56,6 @@ pub fn do_start_ui(
     devnet_events_rx: Receiver<DevnetEvent>,
     chains_coordinator_commands_tx: crossbeam_channel::Sender<ChainsCoordinatorCommand>,
     orchestrator_terminated_rx: Receiver<bool>,
-    devnet_url: &str,
     devnet_path: &str,
     subnet_enabled: bool,
     automining_enabled: bool,
@@ -204,11 +200,7 @@ pub fn do_start_ui(
                             app.mempool.items.remove(i);
                         }
                         for block_update in update.new_blocks.into_iter() {
-                            let pox_info = StacksRpc::new(devnet_url)
-                                .get_pox_info()
-                                .unwrap_or_default();
-
-                            app.display_block(block_update.block, pox_info);
+                            app.display_block(block_update.block);
                         }
                     }
                     StacksChainEvent::ChainUpdatedWithMicroblocks(update) => {
