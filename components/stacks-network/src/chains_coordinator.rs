@@ -394,8 +394,10 @@ pub async fn start_chains_coordinator(
                         .metadata
                         .bitcoin_anchor_block_identifier
                         .index;
-                    let should_submit_pox_orders = known_tip.block.metadata.pox_cycle_position
-                        == (known_tip.block.metadata.pox_cycle_length - 5);
+
+                    // stacking early in the cycle to make sure that
+                    // the transactions are included in the next cycle
+                    let should_submit_pox_orders = known_tip.block.metadata.pox_cycle_position == 1;
                     if should_submit_pox_orders {
                         let _ = devnet_event_tx.send(DevnetEvent::info(
                             "Attempting to publish stacking orders".to_string(),
