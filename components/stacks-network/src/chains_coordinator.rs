@@ -654,7 +654,7 @@ pub async fn publish_stacking_orders(
                     match result {
                         Ok(_) => {
                             let _ = devnet_event_tx.send(DevnetEvent::success(format!(
-                                "stacking order for {} STX submitted",
+                                "Stacking order for {} STX submitted",
                                 stx_amount
                             )));
                         }
