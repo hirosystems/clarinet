@@ -399,9 +399,6 @@ pub async fn start_chains_coordinator(
                     // the transactions are included in the next cycle
                     let should_submit_pox_orders = known_tip.block.metadata.pox_cycle_position == 1;
                     if should_submit_pox_orders {
-                        let _ = devnet_event_tx.send(DevnetEvent::info(
-                            "Attempting to publish stacking orders".to_string(),
-                        ));
                         let res = publish_stacking_orders(
                             &known_tip.block,
                             &config.devnet_config,
@@ -414,7 +411,7 @@ pub async fn start_chains_coordinator(
                         .await;
                         if let Some(tx_count) = res {
                             let _ = devnet_event_tx.send(DevnetEvent::success(format!(
-                                "Will broadcast {} stacking orders",
+                                "Broadcasted {} stacking orders",
                                 tx_count
                             )));
                         }
