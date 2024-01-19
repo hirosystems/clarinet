@@ -1,15 +1,9 @@
 FROM alpine as build
 
-ARG BTC_VERSION="24.0"
-ARG BDB_PREFIX="/src/bitcoin/db4"
-
-ENV BTC_VERSION=${BTC_VERSION}
-ENV BDB_PREFIX=${BDB_PREFIX}
-
-WORKDIR /src
 RUN apk --no-cache add --update \
     libgcc \
     boost-dev \
+    curl \
     boost-thread \
     boost-filesystem \
     boost-system \
@@ -38,30 +32,27 @@ RUN apk --no-cache add --update \
     && /sbin/ldconfig /usr/lib /lib \
     && mkdir /out
 
+WORKDIR /src
 
-RUN git clone --depth 1 --branch v${BTC_VERSION} https://github.com/bitcoin/bitcoin \
-    && cd bitcoin \
-    && sh contrib/install_db4.sh . \
+RUN wget https://github.com/bitcoin/bitcoin/archive/refs/tags/v26.0.tar.gz && tar -xvf v26.0.tar.gz
+
+RUN cd bitcoin-26.0 \
     && ./autogen.sh \
+    && export CXXFLAGS="-O2" \
     && ./configure \
-        BDB_LIBS="-L${BDB_PREFIX}/lib -ldb_cxx-4.8" \
-        BDB_CFLAGS="-I${BDB_PREFIX}/include"  \
-        --disable-tests  \
-        --enable-static  \
-        --without-miniupnpc  \
-        --with-pic  \
-        --enable-cxx  \
-        --with-sqlite=yes  \
-        --with-gui=no  \
-        --enable-util-util=no  \
-        --enable-util-tx=no  \
-        --with-boost-libdir=/usr/lib \
-        --bindir=/out \
+        CXX=g++ \
+        CC=gcc \
+        --disable-wallet \
+        --disable-gui-tests \
+        --disable-tests \
+        --without-miniupnpc \
+        --with-pic \
+        --enable-cxx \
+        --enable-static \
+        --disable-shared \
     && make -j2 STATIC=1 \
-    && make install \
-    && strip /out/*
+    && make install
 
-FROM alpine
 RUN apk --no-cache add --update \
     curl \
     boost-system \
@@ -74,6 +65,5 @@ RUN apk --no-cache add --update \
     sqlite \
     sqlite-libs \
     && mkdir /bitcoin
-COPY --from=build /out/ /usr/local/bin/
 
-CMD ["/usr/local/bin/bitcoind", "-server", "-datadir=/bitcoin", "-rpcuser=btcuser", "-rpcpassword=btcpass", "-rpcallowip=0.0.0.0/0", "-bind=0.0.0.0:8333", "-rpcbind=0.0.0.0:8332", "-dbcache=512", "-rpcthreads=256", "-disablewallet", "-txindex"]
+CMD ["bitcoind", "-server", "-datadir=/bitcoin", "-rpcuser=btcuser", "-rpcpassword=btcpass", "-rpcallowip=0.0.0.0/0", "-bind=0.0.0.0:8333", "-rpcbind=0.0.0.0:8332", "-dbcache=512", "-rpcthreads=256", "-txindex"]
