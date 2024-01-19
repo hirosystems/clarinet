@@ -42,7 +42,6 @@ RUN cd bitcoin-26.0 \
     && ./configure \
         CXX=g++ \
         CC=gcc \
-        --disable-wallet \
         --disable-gui-tests \
         --disable-tests \
         --without-miniupnpc \
@@ -66,4 +65,4 @@ RUN apk --no-cache add --update \
     sqlite-libs \
     && mkdir /bitcoin
 
-CMD ["bitcoind", "-server", "-datadir=/bitcoin", "-rpcuser=btcuser", "-rpcpassword=btcpass", "-rpcallowip=0.0.0.0/0", "-bind=0.0.0.0:8333", "-rpcbind=0.0.0.0:8332", "-dbcache=512", "-rpcthreads=256", "-txindex"]
+CMD ["bitcoind", "-server", "-datadir=/bitcoin", "-rpcuser=btcuser", "-rpcpassword=btcpass", "-rpcallowip=0.0.0.0/0", "-bind=0.0.0.0:8333", "-rpcbind=0.0.0.0:8332", "-dbcache=512", "-rpcthreads=256", "-disablewallet", "-txindex"]
