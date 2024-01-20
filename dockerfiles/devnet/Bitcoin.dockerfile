@@ -1,5 +1,7 @@
 FROM alpine as build
 
+WORKDIR /src
+
 RUN apk --no-cache add --update \
     libgcc \
     boost-dev \
@@ -32,8 +34,6 @@ RUN apk --no-cache add --update \
     && /sbin/ldconfig /usr/lib /lib \
     && mkdir /out
 
-WORKDIR /src
-
 RUN wget https://github.com/bitcoin/bitcoin/archive/refs/tags/v26.0.tar.gz && tar -xvf v26.0.tar.gz
 
 RUN cd bitcoin-26.0 \
@@ -49,9 +49,17 @@ RUN cd bitcoin-26.0 \
         --enable-cxx \
         --enable-static \
         --disable-shared \
+        --with-sqlite=yes  \
+        --with-gui=no  \
+        --enable-util-util=no  \
+        --enable-util-tx=no  \
+        --with-boost-libdir=/usr/lib \
+        --bindir=/out \
     && make -j2 STATIC=1 \
-    && make install
+    && make install \
+    && strip /out/*
 
+FROM alpine
 RUN apk --no-cache add --update \
     curl \
     boost-system \
@@ -65,4 +73,4 @@ RUN apk --no-cache add --update \
     sqlite-libs \
     && mkdir /bitcoin
 
-CMD ["bitcoind", "-server", "-datadir=/bitcoin", "-rpcuser=btcuser", "-rpcpassword=btcpass", "-rpcallowip=0.0.0.0/0", "-bind=0.0.0.0:8333", "-rpcbind=0.0.0.0:8332", "-dbcache=512", "-rpcthreads=256", "-disablewallet", "-txindex"]
+COPY --from=build /out/ /usr/local/bin/
