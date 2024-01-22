@@ -550,10 +550,7 @@ pub async fn publish_stacking_orders(
     fee_rate: u64,
     bitcoin_block_height: u32,
 ) -> Option<usize> {
-    if devnet_config.pox_stacking_orders.is_empty() {
-        return None;
-    }
-    let current_orders: Vec<&PoxStackingOrder> = devnet_config
+    let orders_to_broadcast: Vec<&PoxStackingOrder> = devnet_config
         .pox_stacking_orders
         .iter()
         .filter(|pox_stacking_order| {
@@ -561,7 +558,7 @@ pub async fn publish_stacking_orders(
         })
         .collect();
 
-    if current_orders.is_empty() {
+    if orders_to_broadcast.is_empty() {
         return None;
     }
 
@@ -576,7 +573,7 @@ pub async fn publish_stacking_orders(
         .await
         .expect("Unable to parse contract");
 
-    for (i, pox_stacking_order) in current_orders.iter().enumerate() {
+    for (i, pox_stacking_order) in orders_to_broadcast.iter().enumerate() {
         let account = accounts
             .iter()
             .find(|e| e.label == pox_stacking_order.wallet);
