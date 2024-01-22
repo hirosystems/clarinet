@@ -20,10 +20,10 @@ pub const DEFAULT_STACKS_API_IMAGE: &str = "hirosystems/stacks-blockchain-api:la
 pub const DEFAULT_STACKS_NODE_IMAGE_NAKA: &str = "blockstack/stacks-blockchain:next-devnet";
 pub const DEFAULT_STACKS_API_IMAGE_NAKA: &str = "hirosystems/stacks-blockchain-api:nakamoto";
 
-pub const DEFAULT_BITCOIN_NODE_IMAGE: &str = "quay.io/hirosystems/bitcoind:25.0";
+pub const DEFAULT_BITCOIN_NODE_IMAGE: &str = "quay.io/hirosystems/bitcoind:26.0";
 pub const DEFAULT_BITCOIN_EXPLORER_IMAGE: &str = "quay.io/hirosystems/bitcoin-explorer:devnet";
 pub const DEFAULT_STACKS_EXPLORER_IMAGE: &str = "hirosystems/explorer:latest";
-pub const DEFAULT_POSTGRES_IMAGE: &str = "postgres:14";
+pub const DEFAULT_POSTGRES_IMAGE: &str = "postgres:alpine";
 pub const DEFAULT_SUBNET_NODE_IMAGE: &str = "hirosystems/stacks-subnets:0.8.1";
 pub const DEFAULT_SUBNET_API_IMAGE: &str = "hirosystems/stacks-blockchain-api:latest";
 pub const DEFAULT_SUBNET_CONTRACT_ID: &str =
