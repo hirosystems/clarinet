@@ -25,6 +25,7 @@ use clarinet_deployments::onchain::{
     apply_on_chain_deployment, DeploymentCommand, DeploymentEvent,
 };
 use clarinet_deployments::types::DeploymentSpecification;
+use clarinet_files::PoxStackingOrder;
 use clarinet_files::{self, AccountConfig, DevnetConfig, NetworkManifest, ProjectManifest};
 use clarity_repl::clarity::address::AddressHashMode;
 use clarity_repl::clarity::util::hash::{hex_bytes, Hash160};
@@ -552,23 +553,30 @@ pub async fn publish_stacking_orders(
     if devnet_config.pox_stacking_orders.is_empty() {
         return None;
     }
+    let current_orders: Vec<&PoxStackingOrder> = devnet_config
+        .pox_stacking_orders
+        .iter()
+        .filter(|pox_stacking_order| {
+            pox_stacking_order.start_at_cycle - 1 == block.metadata.pox_cycle_index
+        })
+        .collect();
+
+    if current_orders.is_empty() {
+        return None;
+    }
 
     let stacks_node_rpc_url = format!("http://{}", &services_map_hosts.stacks_node_host);
 
     let mut transactions = 0;
 
-    for (i, pox_stacking_order) in devnet_config.pox_stacking_orders.iter().enumerate() {
-        if pox_stacking_order.start_at_cycle - 1 != block.metadata.pox_cycle_index {
-            continue;
-        }
+    let pox_info: PoxInfo = reqwest::get(format!("{}/v2/pox", stacks_node_rpc_url))
+        .await
+        .expect("Unable to retrieve pox info")
+        .json()
+        .await
+        .expect("Unable to parse contract");
 
-        let pox_info: PoxInfo = reqwest::get(format!("{}/v2/pox", stacks_node_rpc_url))
-            .await
-            .expect("Unable to retrieve pox info")
-            .json()
-            .await
-            .expect("Unable to parse contract");
-
+    for (i, pox_stacking_order) in current_orders.iter().enumerate() {
         let account = accounts
             .iter()
             .find(|e| e.label == pox_stacking_order.wallet);
