@@ -61,11 +61,6 @@ RUN cd bitcoin-26.0 \
 
 FROM alpine
 RUN apk --no-cache add --update \
-    curl \
-    boost-system \
-    boost-filesystem \
-    boost-thread \
-    boost-chrono \
     libevent \
     libzmq \
     libgcc \
