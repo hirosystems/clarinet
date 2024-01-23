@@ -6,7 +6,6 @@ use crate::event::Status;
 use crate::orchestrator::ServicesMapHosts;
 
 use base58::FromBase58;
-use chainhook_sdk::chainhooks::types::ChainhookConfig;
 use chainhook_sdk::observer::{
     start_event_observer, EventObserverConfig, ObserverCommand, ObserverEvent,
     StacksChainMempoolEvent,

@@ -7,7 +7,7 @@ use hiro_system_kit::slog;
 use std::path::PathBuf;
 use std::sync::mpsc::channel;
 
-use stacks_network::{do_run_chain_coordinator, load_chainhooks};
+use stacks_network::do_run_chain_coordinator;
 use stacks_network::{Context, DevnetOrchestrator};
 
 #[derive(Parser, Debug)]
@@ -60,16 +60,6 @@ fn main() {
     let deployment = serde_yaml::from_slice(&deployment_specification_file_content)
         .unwrap_or_else(|e| panic!("deployment plan malformatted {:?}", e));
 
-    let chainhooks = match load_chainhooks(
-        &manifest_location,
-        &(BitcoinNetwork::Regtest, StacksNetwork::Devnet),
-    ) {
-        Ok(hooks) => hooks,
-        Err(e) => {
-            panic!("failed to load chainhooks {}", e);
-        }
-    };
-
     let logger = hiro_system_kit::log::setup_logger();
     let _guard = hiro_system_kit::log::setup_global_logger(logger.clone());
     let ctx = Context {
@@ -82,7 +72,6 @@ fn main() {
     let res = hiro_system_kit::nestable_block_on(do_run_chain_coordinator(
         orchestrator,
         deployment,
-        &mut Some(chainhooks),
         None,
         ctx,
         orchestrator_terminated_tx,

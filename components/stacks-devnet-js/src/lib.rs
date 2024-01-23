@@ -150,7 +150,6 @@ impl StacksDevnet {
                         let res = hiro_system_kit::nestable_block_on(do_run_local_devnet(
                             devnet,
                             deployment,
-                            &mut None,
                             Some(log_tx),
                             false,
                             stacks_network::Context::empty(),
