@@ -8,9 +8,8 @@ edition = "2021"
 [dependencies]
 atty = "0.2.14"
 ansi_term = "0.12.1"
-bollard = "0.11.0"
+bollard = "0.15.0"
 bytes = "1.4.0"
-crossterm = { version = "0.22.1", optional = true }
 bitcoin = "0.29.2"
 bitcoincore-rpc = "0.16.0"
 serde = { version = "1.0.136", features = ["derive"] }
@@ -25,15 +24,16 @@ reqwest = { version = "0.11", default-features = false, features = [
     "json",
     "rustls-tls",
 ] }
-tui = { version = "0.18.0", default-features = false, features = ["crossterm"] }
 crossbeam-channel = "0.5.6"
-
+crossterm = { version = "0.27.0" }
+ratatui = { version = "0.25.0", default-features = false, features = ["crossterm"] }
 chrono = "0.4.31"
 futures = "0.3.12"
 base58 = "0.2.0"
+tokio = { version = "1.35.1", features = ["full"] }
 
-# chainhook-sdk = { version = "=0.11", default-features = true, path = "../../../chainhook/components/chainhook-sdk" }
-chainhook-sdk = { version = "=0.11", default-features = true }
+chainhook-sdk = { default-features = true, git = "https://github.com/hirosystems/chainhook.git", rev = "a938e61846a430750ad31d84b2032efabf6d039f"}
+# chainhook-sdk = { version = "=0.11", default-features = true }
 stacks-rpc-client = { path = "../stacks-rpc-client" }
 clarinet-files = { path = "../clarinet-files", features = ["cli"] }
 clarinet-deployments = { path = "../clarinet-deployments", features = ["cli"] }
@@ -55,6 +55,3 @@ crate-type = ["cdylib", "rlib"]
 [[bin]]
 name = "stacks-network"
 path = "src/main.rs"
-
-[features]
-default = ["crossterm"]

@@ -2,7 +2,7 @@ pub mod changes;
 mod contract;
 mod project;
 
-pub use changes::{Changes, DirectoryCreation, FileCreation, TOMLEdition};
+pub use changes::Changes;
 use clarinet_files::FileLocation;
 use contract::GetChangesForNewContract;
 use project::GetChangesForNewProject;

@@ -1,8 +1,7 @@
 use crate::FileAccessor;
 
 use super::FileLocation;
-use clarity_repl::clarity::stacks_common::types::StacksEpochId;
-use clarity_repl::clarity::ClarityVersion;
+use clarity_repl::clarity::{ClarityVersion, StacksEpochId};
 use clarity_repl::repl;
 use clarity_repl::repl::{ClarityCodeSource, ClarityContract, ContractDeployer};
 use serde::ser::SerializeMap;
@@ -113,6 +112,10 @@ where
                     StacksEpochId::Epoch23
                 } else if epoch.eq("2.4") {
                     StacksEpochId::Epoch24
+                } else if epoch.eq("2.5") {
+                    StacksEpochId::Epoch25
+                } else if epoch.eq("3.0") {
+                    StacksEpochId::Epoch30
                 } else {
                     return Err(serde::de::Error::custom(INVALID_EPOCH));
                 }
@@ -131,6 +134,10 @@ where
                     StacksEpochId::Epoch23
                 } else if epoch.eq(&2.4) {
                     StacksEpochId::Epoch24
+                } else if epoch.eq(&2.5) {
+                    StacksEpochId::Epoch25
+                } else if epoch.eq(&3.0) {
+                    StacksEpochId::Epoch30
                 } else {
                     return Err(serde::de::Error::custom(INVALID_EPOCH));
                 }
@@ -302,6 +309,7 @@ impl ProjectManifest {
                 "pox".to_string(),
                 "pox-2".to_string(),
                 "pox-3".to_string(),
+                "pox-4".to_string(),
                 "lockup".to_string(),
                 "costs-2".to_string(),
                 "costs-3".to_string(),
@@ -411,6 +419,10 @@ fn get_epoch_and_clarity_version(
                 StacksEpochId::Epoch23
             } else if epoch.eq("2.4") {
                 StacksEpochId::Epoch24
+            } else if epoch.eq("2.5") {
+                StacksEpochId::Epoch25
+            } else if epoch.eq("3.0") {
+                StacksEpochId::Epoch30
             } else {
                 return Err(INVALID_EPOCH.into());
             }
@@ -428,6 +440,10 @@ fn get_epoch_and_clarity_version(
                 StacksEpochId::Epoch23
             } else if epoch.eq(&2.4) {
                 StacksEpochId::Epoch24
+            } else if epoch.eq(&2.5) {
+                StacksEpochId::Epoch25
+            } else if epoch.eq(&3.0) {
+                StacksEpochId::Epoch30
             } else {
                 return Err(INVALID_EPOCH.into());
             }

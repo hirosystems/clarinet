@@ -1,22 +1,18 @@
 use clarinet_deployments::onchain::TransactionStatus;
 
 use super::App;
-use tui::{
-    backend::Backend,
+use ratatui::{
     layout::{Constraint, Rect},
     style::{Color, Style},
     widgets::{Block, Cell, Row, Table},
     Frame,
 };
 
-pub fn draw<B: Backend>(f: &mut Frame<B>, app: &mut App) {
+pub fn draw(f: &mut Frame, app: &mut App) {
     draw_contracts_status(f, app, f.size());
 }
 
-fn draw_contracts_status<B>(f: &mut Frame<B>, app: &mut App, area: Rect)
-where
-    B: Backend,
-{
+fn draw_contracts_status(f: &mut Frame, app: &mut App, area: Rect) {
     let rows = app.transactions.items.iter().map(|tx| {
         let (status, default_comment) = match &tx.status {
             TransactionStatus::Queued => ("🟪", "Transaction indexed".to_string()),
@@ -39,10 +35,10 @@ where
         .bottom_margin(0)
     });
 
-    let t = Table::new(rows)
+    let t = Table::new(rows, vec![] as Vec<&Constraint>)
         .block(Block::default().title(format!("Broadcasting transactions to {}", app.node_url)))
         .style(Style::default().fg(Color::White))
-        .widths(&[
+        .widths([
             Constraint::Length(3),
             Constraint::Length(90),
             Constraint::Length(110),

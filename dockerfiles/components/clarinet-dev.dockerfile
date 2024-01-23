@@ -2,9 +2,9 @@ FROM rust:bookworm as build
 
 WORKDIR /src
 
-RUN apt update && apt install -y ca-certificates pkg-config libssl-dev
+RUN apt update && apt install -y ca-certificates pkg-config libssl-dev libclang-dev
 
-RUN rustup update stable && rustup default stable
+RUN rustup update stable && rustup default stable && rustup toolchain install stable --component rustfmt
 
 COPY . .
 

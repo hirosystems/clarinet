@@ -988,12 +988,13 @@ pub fn main() {
                 }
             };
             let contract_id = QualifiedContractIdentifier::transient();
+            let epoch = DEFAULT_EPOCH;
             let contract = ClarityContract {
                 code_source: ClarityCodeSource::ContractInMemory(code_source),
                 deployer: ContractDeployer::Transient,
                 name: "transient".to_string(),
-                clarity_version: ClarityVersion::Clarity1,
-                epoch: DEFAULT_EPOCH,
+                clarity_version: ClarityVersion::default_for_epoch(epoch),
+                epoch,
             };
             let (ast, mut diagnostics, mut success) = session.interpreter.build_ast(&contract);
             let (annotations, mut annotation_diagnostics) = session

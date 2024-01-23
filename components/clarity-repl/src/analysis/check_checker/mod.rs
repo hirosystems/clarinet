@@ -879,6 +879,7 @@ mod tests {
     #[test]
     fn allow_unchecked_bool_in_private_function_with_unchecked_params_annotation() {
         let mut settings = SessionSettings::default();
+        settings.repl_settings.disable_clarity_wasm(); // TODO(hugo): re-enable when fixed on clarity-wasm
         settings.repl_settings.analysis.passes = vec![Pass::CheckChecker];
         let mut session = Session::new(settings);
         let snippet = "
@@ -2653,6 +2654,7 @@ mod tests {
     #[test]
     fn dynamic_contract_call() {
         let mut settings = SessionSettings::default();
+        settings.repl_settings.disable_clarity_wasm(); // TODO(hugo): re-enable when fixed on clarity-wasm
         settings.repl_settings.analysis.passes = vec![Pass::CheckChecker];
         let mut session = Session::new(settings);
         let snippet = "
@@ -3464,6 +3466,7 @@ mod tests {
     #[test]
     fn filter_trait() {
         let mut settings = SessionSettings::default();
+        settings.repl_settings.disable_clarity_wasm(); // TODO(hugo): re-enable when fixed on clarity-wasm
         settings.repl_settings.analysis.passes = vec![Pass::CheckChecker];
         let mut session = Session::new(settings);
         let snippet = "

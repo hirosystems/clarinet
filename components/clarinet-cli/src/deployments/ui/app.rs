@@ -1,5 +1,5 @@
 use clarinet_deployments::onchain::TransactionTracker;
-use tui::widgets::ListState;
+use ratatui::widgets::ListState;
 
 pub struct StatefulList<T> {
     pub state: ListState,

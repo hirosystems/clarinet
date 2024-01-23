@@ -27,12 +27,12 @@ serde_derive = "1"
 log = { version = "=0.4.17", features = ["serde"] }
 signal-hook-registry = "1.4.0"
 secure_tempfile = { version = "3.8.0", package = "tempfile" }
-tokio-util = { version = "0.7.1", features = ["io"], optional = true }
 libsecp256k1 = "0.7.0"
 hmac = "0.12.0"
 pbkdf2 = { version = "0.12.2", features = ["simple"], default-features = false }
 futures = "0.3.12"
-tokio = { version = "1.24", features = ["full"] }
+tokio = { version = "1.35.1", features = ["full"] }
+tokio-util = { version = "0.7.10", features = ["io"], optional = true }
 lazy_static = "1.4.0"
 atty = "0.2.14"
 termcolor = "1.1.2"
@@ -47,7 +47,8 @@ reqwest = { version = "0.11", default-features = false, features = [
     "json",
     "rustls-tls",
 ] }
-crossterm = "0.22.1"
+crossterm = "0.27.0"
+ratatui = { version = "0.25.0", default-features = false, features = ["crossterm"] }
 base58 = "0.2.0"
 ctrlc = "3.1.9"
 strum = { version = "0.23.0", features = ["derive"] }
@@ -74,11 +75,6 @@ clarinet-deployments = { path = "../clarinet-deployments", features = ["cli"] }
 hiro-system-kit = { path = "../hiro-system-kit" }
 clarinet-utils = { path = "../clarinet-utils" }
 stacks-network = { path = "../stacks-network" }
-
-[dependencies.tui]
-version = "0.18.0"
-default-features = false
-features = ["crossterm"]
 
 [target.'cfg(unix)'.dependencies]
 nix = "=0.24.2"

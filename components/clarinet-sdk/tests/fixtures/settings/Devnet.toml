@@ -38,10 +38,9 @@ disable_stacks_api = false
 # epoch_2_0 = 100
 # epoch_2_05 = 100
 # epoch_2_1 = 101
-# pox_2_activation = 102
-# epoch_2_2 = 103
-# epoch_2_3 = 104
-# epoch_2_4 = 105
+# epoch_2_2 = 102
+# epoch_2_3 = 103
+# epoch_2_4 = 104
 
 # Send some stacking orders
 [[devnet.pox_stacking_orders]]

@@ -1,4 +1,4 @@
-use clarity_repl::clarity::stacks_common::types::StacksEpochId;
+use clarity_repl::clarity::StacksEpochId;
 use clarity_repl::repl::{ClarityCodeSource, ClarityContract, ContractDeployer};
 use clarity_repl::repl::{DEFAULT_CLARITY_VERSION, DEFAULT_EPOCH};
 
@@ -119,10 +119,10 @@ pub fn update_session_with_contracts_executions(
 ) -> BTreeMap<QualifiedContractIdentifier, Result<ExecutionResult, Vec<Diagnostic>>> {
     let boot_contracts_data = BOOT_CONTRACTS_DATA.clone();
 
-    for (_, (boot_contract, mut ast)) in boot_contracts_data {
+    for (_, (boot_contract, ast)) in boot_contracts_data {
         session
             .interpreter
-            .run_ast(&boot_contract, &mut ast, &mut vec![], true, false, None)
+            .run(&boot_contract, &mut Some(ast), false, None)
             .expect("failed to interprete boot contract");
     }
 

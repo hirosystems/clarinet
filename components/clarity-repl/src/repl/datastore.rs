@@ -437,7 +437,15 @@ impl BurnStateDB for BurnDatastore {
         0
     }
 
+    fn get_v3_unlock_height(&self) -> u32 {
+        0
+    }
+
     fn get_pox_3_activation_height(&self) -> u32 {
+        0
+    }
+
+    fn get_pox_4_activation_height(&self) -> u32 {
         0
     }
 
