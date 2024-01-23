@@ -17,7 +17,7 @@ pub const DEFAULT_DERIVATION_PATH: &str = "m/44'/5757'/0'/0/0";
 pub const DEFAULT_STACKS_NODE_IMAGE: &str = "quay.io/hirosystems/stacks-node:devnet-2.4.0.0.0";
 pub const DEFAULT_STACKS_API_IMAGE: &str = "hirosystems/stacks-blockchain-api:latest";
 // Nakamoto images overrides
-pub const DEFAULT_STACKS_NODE_IMAGE_NAKA: &str = "blockstack/stacks-blockchain:next-devnet";
+pub const DEFAULT_STACKS_NODE_IMAGE_NAKA: &str = "blockstack/stacks-blockchain:feat-devnet-tweaks";
 pub const DEFAULT_STACKS_API_IMAGE_NAKA: &str = "hirosystems/stacks-blockchain-api:nakamoto";
 
 pub const DEFAULT_BITCOIN_NODE_IMAGE: &str = "quay.io/hirosystems/bitcoind:26.0";

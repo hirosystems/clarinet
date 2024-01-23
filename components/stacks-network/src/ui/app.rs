@@ -137,10 +137,10 @@ impl<'a> App<'a> {
                 "{}[{}{}]{}",
                 end, block.block_identifier.index, has_tx, start
             ),
-            if has_tenure_change_tx {
-                Style::default().fg(Color::LightBlue)
-            } else {
+            if has_coinbase_tx {
                 Style::default().fg(Color::Green)
+            } else {
+                Style::default().fg(Color::LightBlue)
             },
         ));
 
