@@ -22,7 +22,6 @@ use clarinet_deployments::types::{DeploymentGenerationArtifacts, DeploymentSpeci
 use clarinet_deployments::{
     get_default_deployment_path, load_deployment, setup_session_with_deployment,
 };
-use clarinet_files::chainhook_types::Chain;
 use clarinet_files::chainhook_types::StacksNetwork;
 use clarinet_files::{
     get_manifest_location, FileLocation, NetworkManifest, ProjectManifest, ProjectManifestFile,
@@ -36,7 +35,7 @@ use clarity_repl::clarity::ClarityVersion;
 use clarity_repl::repl::diagnostic::output_diagnostic;
 use clarity_repl::repl::{ClarityCodeSource, ClarityContract, ContractDeployer, DEFAULT_EPOCH};
 use clarity_repl::{analysis, repl, Terminal};
-use stacks_network::{self, check_chainhooks, DevnetOrchestrator};
+use stacks_network::{self, DevnetOrchestrator};
 use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::prelude::*;
@@ -73,9 +72,6 @@ enum Command {
     /// Interact with contracts deployed on Mainnet
     #[clap(subcommand, name = "requirements", aliases = &["requirement"])]
     Requirements(Requirements),
-    /// Subcommands for working with chainhooks
-    #[clap(subcommand, name = "chainhooks", aliases = &["chainhook"])]
-    Chainhooks(Chainhooks),
     /// Manage contracts deployments on Simnet/Devnet/Testnet/Mainnet
     #[clap(subcommand, name = "deployments", aliases = &["deployment"])]
     Deployments(Deployments),
@@ -139,20 +135,6 @@ enum Deployments {
     /// Apply deployment
     #[clap(name = "apply", bin_name = "apply")]
     ApplyDeployment(ApplyDeployment),
-}
-
-#[allow(clippy::enum_variant_names)]
-#[derive(Subcommand, PartialEq, Clone, Debug)]
-enum Chainhooks {
-    /// Generate files and settings for a new hook
-    #[clap(name = "new", bin_name = "new")]
-    NewChainhook(NewChainhook),
-    /// Check hooks format
-    #[clap(name = "check", bin_name = "check")]
-    CheckChainhooks(CheckChainhooks),
-    /// Publish contracts on chain
-    #[clap(name = "deploy", bin_name = "deploy")]
-    DeployChainhook(DeployChainhook),
 }
 
 #[derive(Parser, PartialEq, Clone, Debug)]
@@ -284,38 +266,6 @@ struct GenerateDeployment {
         long = "manual-cost"
     )]
     pub manual_cost: bool,
-}
-
-#[derive(Parser, PartialEq, Clone, Debug)]
-struct NewChainhook {
-    /// Hook's name
-    pub name: String,
-    /// Path to Clarinet.toml
-    #[clap(long = "manifest-path")]
-    pub manifest_path: Option<String>,
-    /// Generate a Bitcoin chainhook
-    #[clap(long = "bitcoin", conflicts_with = "stacks")]
-    pub bitcoin: bool,
-    /// Generate a Stacks chainhook
-    #[clap(long = "stacks", conflicts_with = "bitcoin")]
-    pub stacks: bool,
-}
-
-#[derive(Parser, PartialEq, Clone, Debug)]
-struct CheckChainhooks {
-    /// Path to Clarinet.toml
-    #[clap(long = "manifest-path")]
-    pub manifest_path: Option<String>,
-    /// Display chainhooks JSON representation
-    #[clap(long = "output-json")]
-    pub output_json: bool,
-}
-
-#[derive(Parser, PartialEq, Clone, Debug)]
-struct DeployChainhook {
-    /// Path to Clarinet.toml
-    #[clap(long = "manifest-path")]
-    pub manifest_path: Option<String>,
 }
 
 #[derive(Parser, PartialEq, Clone, Debug)]
@@ -866,49 +816,6 @@ pub fn main() {
                         }
                     }
                 }
-            }
-        },
-        Command::Chainhooks(subcommand) => match subcommand {
-            Chainhooks::NewChainhook(cmd) => {
-                let manifest = load_manifest_or_exit(cmd.manifest_path);
-
-                let chain = match (cmd.bitcoin, cmd.stacks) {
-                    (true, false) => Chain::Bitcoin,
-                    (false, true) => Chain::Stacks,
-                    (_, _) => {
-                        println!(
-                            "{}",
-                            format_err!("either --bitcoin or --stacks must be passed")
-                        );
-                        process::exit(1);
-                    }
-                };
-
-                let changes =
-                    match generate::get_changes_for_new_chainhook(&manifest, cmd.name, chain) {
-                        Ok(changes) => changes,
-                        Err(message) => {
-                            println!("{}", format_err!(message));
-                            std::process::exit(1);
-                        }
-                    };
-
-                if !execute_changes(changes) {
-                    std::process::exit(1);
-                }
-                if global_settings.enable_hints.unwrap_or(true) {
-                    display_post_check_hint();
-                }
-            }
-            Chainhooks::CheckChainhooks(cmd) => {
-                let manifest_location = get_manifest_location_or_exit(cmd.manifest_path);
-                // Ensure that all the hooks can correctly be deserialized.
-                println!("Checking chainhooks");
-                let _ = check_chainhooks(&manifest_location, cmd.output_json);
-            }
-            Chainhooks::DeployChainhook(_cmd) => {
-                // TODO(lgalabru): follow-up on this implementation
-                unimplemented!()
             }
         },
         Command::Contracts(subcommand) => match subcommand {

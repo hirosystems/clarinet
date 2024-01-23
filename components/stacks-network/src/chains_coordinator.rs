@@ -4,7 +4,6 @@ use crate::event::ServiceStatusData;
 use crate::event::Status;
 use crate::orchestrator::ServicesMapHosts;
 use base58::FromBase58;
-use chainhook_sdk::chainhooks::types::ChainhookConfig;
 use chainhook_sdk::types::BitcoinBlockSignaling;
 use chainhook_sdk::types::BitcoinChainEvent;
 use chainhook_sdk::types::BitcoinNetwork;
@@ -97,7 +96,6 @@ impl DevnetEventObserverConfig {
         manifest: ProjectManifest,
         network_manifest: Option<NetworkManifest>,
         deployment: DeploymentSpecification,
-        chainhooks: ChainhookConfig,
         ctx: &Context,
         services_map_hosts: ServicesMapHosts,
     ) -> Self {
@@ -114,7 +112,6 @@ impl DevnetEventObserverConfig {
         };
         let event_observer_config = EventObserverConfig {
             bitcoin_rpc_proxy_enabled: true,
-            chainhook_config: Some(chainhooks),
             ingestion_port: devnet_config.orchestrator_ingestion_port,
             bitcoind_rpc_username: devnet_config.bitcoin_node_username.clone(),
             bitcoind_rpc_password: devnet_config.bitcoin_node_password.clone(),
@@ -125,6 +122,7 @@ impl DevnetEventObserverConfig {
             }),
 
             display_logs: true,
+            chainhook_config: None,
             cache_path: devnet_config.working_dir.to_string(),
             bitcoin_network: BitcoinNetwork::Regtest,
             stacks_network: StacksNetwork::Devnet,
@@ -187,17 +185,6 @@ pub async fn start_chains_coordinator(
         Some(mining_command_tx.clone()),
         &boot_completed,
     );
-
-    if let Some(ref hooks) = config.event_observer_config.chainhook_config {
-        let chainhooks_count = hooks.bitcoin_chainhooks.len() + hooks.stacks_chainhooks.len();
-        if chainhooks_count > 0 {
-            devnet_event_tx
-                .send(DevnetEvent::info(format!(
-                    "{chainhooks_count} chainhooks registered",
-                )))
-                .expect("Unable to terminate event observer");
-        }
-    }
 
     // Spawn event observer
     let (observer_event_tx, observer_event_rx) = crossbeam_channel::unbounded();

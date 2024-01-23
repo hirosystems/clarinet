@@ -1,16 +1,11 @@
-mod chainhook;
 pub mod changes;
 mod contract;
 mod project;
 
-use chainhook::GetChangesForNewChainhook;
 pub use changes::{Changes, DirectoryCreation, FileCreation, TOMLEdition};
-use clarinet_files::chainhook_types::Chain;
 use clarinet_files::FileLocation;
 use contract::GetChangesForNewContract;
 use project::GetChangesForNewProject;
-
-use clarinet_files::ProjectManifest;
 
 use self::contract::GetChangesForRmContract;
 
@@ -39,14 +34,5 @@ pub fn get_changes_for_rm_contract(
     contract_name: String,
 ) -> Result<Vec<Changes>, String> {
     let mut command = GetChangesForRmContract::new(manifest_location.clone(), contract_name);
-    command.run()
-}
-
-pub fn get_changes_for_new_chainhook(
-    manifest: &ProjectManifest,
-    chainhook_name: String,
-    chain: Chain,
-) -> Result<Vec<Changes>, String> {
-    let mut command = GetChangesForNewChainhook::new(manifest, chainhook_name, chain);
     command.run()
 }
