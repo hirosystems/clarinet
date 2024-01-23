@@ -1,20 +1,25 @@
 use crate::impl_byte_array_newtype;
+
+pub use clarity::codec::StacksMessageCodec;
+
 use clarity::address::AddressHashMode;
 use clarity::address::{
     C32_ADDRESS_VERSION_MAINNET_MULTISIG, C32_ADDRESS_VERSION_MAINNET_SINGLESIG,
     C32_ADDRESS_VERSION_TESTNET_MULTISIG, C32_ADDRESS_VERSION_TESTNET_SINGLESIG,
 };
 use clarity::codec::MAX_MESSAGE_LEN;
-use clarity::codec::{read_next, write_next, Error as CodecError, StacksMessageCodec};
-use clarity::stacks_common::types::chainstate::{
-    BlockHeaderHash, BurnchainHeaderHash, ConsensusHash, StacksWorkScore, TrieHash,
+use clarity::codec::{read_next, write_next, Error as CodecError};
+use clarity::types::chainstate::{
+    BlockHeaderHash, BurnchainHeaderHash, ConsensusHash, StacksBlockId, StacksWorkScore, TrieHash,
 };
-use clarity::stacks_common::types::chainstate::{StacksAddress, StacksPublicKey};
+use clarity::types::chainstate::{StacksAddress, StacksPublicKey};
+use clarity::types::PrivateKey;
 use clarity::util::hash::{Hash160, Sha512Trunc256Sum};
 use clarity::util::retry::BoundReader;
 use clarity::util::secp256k1::{
     MessageSignature, Secp256k1PrivateKey, Secp256k1PublicKey, MESSAGE_SIGNATURE_ENCODED_SIZE,
 };
+use clarity::util::vrf::VRFProof;
 use clarity::vm::types::{
     PrincipalData, QualifiedContractIdentifier, StandardPrincipalData, Value,
 };
@@ -32,9 +37,9 @@ use std::io::{Read, Write};
 use std::ops::Deref;
 use std::ops::DerefMut;
 use std::str::FromStr;
-
-#[cfg(not(feature = "wasm"))]
-use clarity::stacks_common::types::PrivateKey;
+use wsts::common::Signature as Secp256k1Signature;
+use wsts::curve::point::{Compressed as Secp256k1Compressed, Point as Secp256k1Point};
+use wsts::curve::scalar::Scalar as Secp256k1Scalar;
 
 pub const MAX_BLOCK_LEN: u32 = 2 * 1024 * 1024;
 pub const MAX_TRANSACTION_LEN: u32 = MAX_BLOCK_LEN;
@@ -1307,6 +1312,128 @@ pub struct TransactionSmartContract {
     pub code_body: StacksString,
 }
 
+/// Schnorr threshold signature using types from `wsts`
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ThresholdSignature(pub wsts::common::Signature);
+
+impl StacksMessageCodec for ThresholdSignature {
+    fn consensus_serialize<W: Write>(&self, fd: &mut W) -> Result<(), CodecError> {
+        let compressed = self.0.R.compress();
+        let bytes = compressed.as_bytes();
+        fd.write_all(bytes).map_err(CodecError::WriteError)?;
+        write_next(fd, &self.0.z.to_bytes())?;
+        Ok(())
+    }
+
+    fn consensus_deserialize<R: Read>(fd: &mut R) -> Result<Self, CodecError> {
+        // Read curve point
+        let mut buf = [0u8; 33];
+        fd.read_exact(&mut buf).map_err(CodecError::ReadError)?;
+        let r = Secp256k1Point::try_from(&Secp256k1Compressed::from(buf))
+            .map_err(|_| CodecError::DeserializeError("Failed to read curve point".into()))?;
+
+        // Read scalar
+        let mut buf = [0u8; 32];
+        fd.read_exact(&mut buf).map_err(CodecError::ReadError)?;
+        let z = Secp256k1Scalar::from(buf);
+
+        Ok(Self(Secp256k1Signature { R: r, z }))
+    }
+}
+
+/// Cause of change in mining tenure
+/// Depending on cause, tenure can be ended or extended
+#[repr(u8)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub enum TenureChangeCause {
+    /// A valid winning block-commit
+    BlockFound = 0,
+    /// The next burnchain block is taking too long, so extend the runtime budget
+    Extended = 1,
+}
+
+impl TryFrom<u8> for TenureChangeCause {
+    type Error = ();
+
+    fn try_from(num: u8) -> Result<Self, Self::Error> {
+        match num {
+            0 => Ok(Self::BlockFound),
+            1 => Ok(Self::Extended),
+            _ => Err(()),
+        }
+    }
+}
+
+impl StacksMessageCodec for TenureChangeCause {
+    fn consensus_serialize<W: Write>(&self, fd: &mut W) -> Result<(), CodecError> {
+        let byte = (*self) as u8;
+        write_next(fd, &byte)
+    }
+
+    fn consensus_deserialize<R: Read>(fd: &mut R) -> Result<TenureChangeCause, CodecError> {
+        let byte: u8 = read_next(fd)?;
+        TenureChangeCause::try_from(byte).map_err(|_| {
+            CodecError::DeserializeError(format!("Unrecognized TenureChangeCause byte {byte}"))
+        })
+    }
+}
+
+/// A transaction from Stackers to signal new mining tenure
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TenureChangePayload {
+    /// Consensus hash of this tenure.  Corresponds to the sortition in which the miner of this
+    /// block was chosen.  It may be the case that this miner's tenure gets _extended_ across
+    /// subsequent sortitions; if this happens, then this `consensus_hash` value _remains the same_
+    /// as the sortition in which the winning block-commit was mined.
+    pub tenure_consensus_hash: ConsensusHash,
+    /// Consensus hash of the previous tenure.  Corresponds to the sortition of the previous
+    /// winning block-commit.
+    pub prev_tenure_consensus_hash: ConsensusHash,
+    /// Current consensus hash on the underlying burnchain.  Corresponds to the last-seen
+    /// sortition.
+    pub burn_view_consensus_hash: ConsensusHash,
+    /// The StacksBlockId of the last block from the previous tenure
+    pub previous_tenure_end: StacksBlockId,
+    /// The number of blocks produced since the last sortition-linked tenure
+    pub previous_tenure_blocks: u32,
+    /// A flag to indicate the cause of this tenure change
+    pub cause: TenureChangeCause,
+    /// The ECDSA public key hash of the current tenure
+    pub pubkey_hash: Hash160,
+    /// The Stacker signature
+    pub signature: ThresholdSignature,
+    /// A bitmap of which Stackers signed
+    pub signers: Vec<u8>,
+}
+
+impl StacksMessageCodec for TenureChangePayload {
+    fn consensus_serialize<W: Write>(&self, fd: &mut W) -> Result<(), CodecError> {
+        write_next(fd, &self.tenure_consensus_hash)?;
+        write_next(fd, &self.prev_tenure_consensus_hash)?;
+        write_next(fd, &self.burn_view_consensus_hash)?;
+        write_next(fd, &self.previous_tenure_end)?;
+        write_next(fd, &self.previous_tenure_blocks)?;
+        write_next(fd, &self.cause)?;
+        write_next(fd, &self.pubkey_hash)?;
+        write_next(fd, &self.signature)?;
+        write_next(fd, &self.signers)
+    }
+
+    fn consensus_deserialize<R: Read>(fd: &mut R) -> Result<Self, CodecError> {
+        Ok(Self {
+            tenure_consensus_hash: read_next(fd)?,
+            prev_tenure_consensus_hash: read_next(fd)?,
+            burn_view_consensus_hash: read_next(fd)?,
+            previous_tenure_end: read_next(fd)?,
+            previous_tenure_blocks: read_next(fd)?,
+            cause: read_next(fd)?,
+            pubkey_hash: read_next(fd)?,
+            signature: read_next(fd)?,
+            signers: read_next(fd)?,
+        })
+    }
+}
+
 /// A coinbase commits to 32 bytes of control-plane information
 pub struct CoinbasePayload(pub [u8; 32]);
 impl_byte_array_message_codec!(CoinbasePayload, 32);
@@ -1327,8 +1454,10 @@ pub enum TransactionPayload {
     TokenTransfer(PrincipalData, u64, TokenTransferMemo),
     ContractCall(TransactionContractCall),
     SmartContract(TransactionSmartContract, Option<ClarityVersion>),
-    PoisonMicroblock(StacksMicroblockHeader, StacksMicroblockHeader), // the previous epoch leader sent two microblocks with the same sequence, and this is proof
-    Coinbase(CoinbasePayload, Option<PrincipalData>),
+    // the previous epoch leader sent two microblocks with the same sequence, and this is proof
+    PoisonMicroblock(StacksMicroblockHeader, StacksMicroblockHeader),
+    Coinbase(CoinbasePayload, Option<PrincipalData>, Option<VRFProof>),
+    TenureChange(TenureChangePayload),
 }
 
 impl TransactionPayload {
@@ -1339,6 +1468,7 @@ impl TransactionPayload {
             TransactionPayload::SmartContract(..) => "SmartContract",
             TransactionPayload::PoisonMicroblock(..) => "PoisonMicroblock",
             TransactionPayload::Coinbase(..) => "Coinbase",
+            TransactionPayload::TenureChange(..) => "TenureChange",
         }
     }
 }
@@ -1351,8 +1481,12 @@ pub enum TransactionPayloadID {
     ContractCall = 2,
     PoisonMicroblock = 3,
     Coinbase = 4,
+    // has an alt principal, but no VRF proof
     CoinbaseToAltRecipient = 5,
     VersionedSmartContract = 6,
+    TenureChange = 7,
+    // has a VRF proof, and may have an alt principal
+    NakamotoCoinbase = 8,
 }
 
 /// Encoding of an asset type identifier
@@ -2438,7 +2572,7 @@ impl StacksMessageCodec for TransactionPayload {
             }
             x if x == TransactionPayloadID::Coinbase as u8 => {
                 let payload: CoinbasePayload = read_next(fd)?;
-                TransactionPayload::Coinbase(payload, None)
+                TransactionPayload::Coinbase(payload, None, None)
             }
             x if x == TransactionPayloadID::CoinbaseToAltRecipient as u8 => {
                 let payload: CoinbasePayload = read_next(fd)?;
@@ -2450,7 +2584,30 @@ impl StacksMessageCodec for TransactionPayload {
                     }
                 };
 
-                TransactionPayload::Coinbase(payload, Some(recipient))
+                TransactionPayload::Coinbase(payload, Some(recipient), None)
+            }
+            x if x == TransactionPayloadID::NakamotoCoinbase as u8 => {
+                let payload: CoinbasePayload = read_next(fd)?;
+                let principal_value_opt: Value = read_next(fd)?;
+                let recipient_opt = if let Value::Optional(optional_data) = principal_value_opt {
+                    if let Some(principal_value) = optional_data.data {
+                        if let Value::Principal(recipient_principal) = *principal_value {
+                            Some(recipient_principal)
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                } else {
+                    return Err(CodecError::DeserializeError("Failed to parse nakamoto coinbase transaction -- did not receive an optional recipient principal value".to_string()));
+                };
+                let vrf_proof: VRFProof = read_next(fd)?;
+                TransactionPayload::Coinbase(payload, recipient_opt, Some(vrf_proof))
+            }
+            x if x == TransactionPayloadID::TenureChange as u8 => {
+                let payload: TenureChangePayload = read_next(fd)?;
+                TransactionPayload::TenureChange(payload)
             }
             _ => {
                 return Err(CodecError::DeserializeError(format!(

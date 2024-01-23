@@ -772,8 +772,8 @@ fn get_iterator_cb_completion_item(version: &ClarityVersion, func: &str) -> Vec<
 #[cfg(test)]
 mod get_contract_global_data_tests {
     use clarity_repl::clarity::ast::build_ast_with_rules;
-    use clarity_repl::clarity::stacks_common::types::StacksEpochId;
-    use clarity_repl::clarity::{vm::types::QualifiedContractIdentifier, ClarityVersion};
+    use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
+    use clarity_repl::clarity::{ClarityVersion, StacksEpochId};
     use lsp_types::Position;
 
     use super::ContractDefinedData;
@@ -821,7 +821,7 @@ mod get_contract_global_data_tests {
 #[cfg(test)]
 mod get_contract_local_data_tests {
     use clarity_repl::clarity::ast::build_ast_with_rules;
-    use clarity_repl::clarity::stacks_common::types::StacksEpochId;
+    use clarity_repl::clarity::StacksEpochId;
     use clarity_repl::clarity::{vm::types::QualifiedContractIdentifier, ClarityVersion};
     use lsp_types::Position;
 
@@ -876,8 +876,8 @@ mod get_contract_local_data_tests {
 #[cfg(test)]
 mod populate_snippet_with_options_tests {
     use clarity_repl::clarity::ast::build_ast_with_rules;
-    use clarity_repl::clarity::stacks_common::types::StacksEpochId;
-    use clarity_repl::clarity::{vm::types::QualifiedContractIdentifier, ClarityVersion};
+    use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
+    use clarity_repl::clarity::{ClarityVersion, StacksEpochId};
     use lsp_types::Position;
 
     use super::ContractDefinedData;

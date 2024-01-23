@@ -1,10 +1,10 @@
 use clarinet_files::{
     DEFAULT_BITCOIN_EXPLORER_IMAGE, DEFAULT_BITCOIN_NODE_IMAGE, DEFAULT_DERIVATION_PATH,
     DEFAULT_EPOCH_2_0, DEFAULT_EPOCH_2_05, DEFAULT_EPOCH_2_1, DEFAULT_EPOCH_2_2, DEFAULT_EPOCH_2_3,
-    DEFAULT_EPOCH_2_4, DEFAULT_FAUCET_MNEMONIC, DEFAULT_POSTGRES_IMAGE, DEFAULT_POX2_ACTIVATION,
-    DEFAULT_STACKS_API_IMAGE, DEFAULT_STACKS_EXPLORER_IMAGE, DEFAULT_STACKS_MINER_MNEMONIC,
-    DEFAULT_STACKS_NODE_IMAGE, DEFAULT_SUBNET_API_IMAGE, DEFAULT_SUBNET_CONTRACT_ID,
-    DEFAULT_SUBNET_MNEMONIC, DEFAULT_SUBNET_NODE_IMAGE,
+    DEFAULT_EPOCH_2_4, DEFAULT_EPOCH_2_5, DEFAULT_EPOCH_3_0, DEFAULT_FAUCET_MNEMONIC,
+    DEFAULT_POSTGRES_IMAGE, DEFAULT_STACKS_API_IMAGE, DEFAULT_STACKS_EXPLORER_IMAGE,
+    DEFAULT_STACKS_MINER_MNEMONIC, DEFAULT_STACKS_NODE_IMAGE, DEFAULT_SUBNET_API_IMAGE,
+    DEFAULT_SUBNET_CONTRACT_ID, DEFAULT_SUBNET_MNEMONIC, DEFAULT_SUBNET_NODE_IMAGE,
 };
 
 use super::changes::{Changes, DirectoryCreation, FileCreation};
@@ -403,32 +403,33 @@ disable_stacks_api = false
 # subnet_api_postgres_database = "subnet_api"
 
 # For testing in epoch 2.1 / using Clarity2
-# epoch_2_0 = {default_epoch_2_0}
-# epoch_2_05 = {default_epoch_2_05}
-# epoch_2_1 = {default_epoch_2_1}
-# pox_2_activation = {default_pox2_activation}
-# epoch_2_2 = {default_epoch_2_2}
-# epoch_2_3 = {default_epoch_2_3}
-# epoch_2_4 = {default_epoch_2_4}
+# epoch_2_0 = {DEFAULT_EPOCH_2_0}
+# epoch_2_05 = {DEFAULT_EPOCH_2_05}
+# epoch_2_1 = {DEFAULT_EPOCH_2_1}
+# epoch_2_2 = {DEFAULT_EPOCH_2_2}
+# epoch_2_3 = {DEFAULT_EPOCH_2_3}
+# epoch_2_4 = {DEFAULT_EPOCH_2_4}
+# epoch_2_5 = {DEFAULT_EPOCH_2_5}
+# epoch_3_0 = {DEFAULT_EPOCH_3_0}
 
 
 # Send some stacking orders
 [[devnet.pox_stacking_orders]]
-start_at_cycle = 3
+start_at_cycle = 0
 duration = 12
 wallet = "wallet_1"
 slots = 2
 btc_address = "mr1iPkD9N3RJZZxXRk7xF9d36gffa6exNC"
 
 [[devnet.pox_stacking_orders]]
-start_at_cycle = 3
+start_at_cycle = 1
 duration = 12
 wallet = "wallet_2"
 slots = 1
 btc_address = "muYdXKmX9bByAueDe6KFfHd5Ff1gdN9ErG"
 
 [[devnet.pox_stacking_orders]]
-start_at_cycle = 3
+start_at_cycle = 2
 duration = 12
 wallet = "wallet_3"
 slots = 1
@@ -447,13 +448,6 @@ btc_address = "mvZtbibDAAA3WLpY7zXXFqRa3T4XSknBX7"
             default_subnet_api_image = DEFAULT_SUBNET_API_IMAGE,
             default_stacks_miner_mnemonic = DEFAULT_STACKS_MINER_MNEMONIC,
             default_stacks_faucet_mnemonic = DEFAULT_FAUCET_MNEMONIC,
-            default_epoch_2_0 = DEFAULT_EPOCH_2_0,
-            default_epoch_2_05 = DEFAULT_EPOCH_2_05,
-            default_epoch_2_1 = DEFAULT_EPOCH_2_1,
-            default_pox2_activation = DEFAULT_POX2_ACTIVATION,
-            default_epoch_2_2 = DEFAULT_EPOCH_2_2,
-            default_epoch_2_3 = DEFAULT_EPOCH_2_3,
-            default_epoch_2_4 = DEFAULT_EPOCH_2_4,
         );
         let name = "Devnet.toml".into();
         let path = format!(

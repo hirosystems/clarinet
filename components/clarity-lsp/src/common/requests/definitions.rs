@@ -587,11 +587,10 @@ mod definitions_visitor_tests {
     use std::collections::HashMap;
 
     use clarity_repl::clarity::ast::build_ast_with_rules;
-    use clarity_repl::clarity::stacks_common::types::StacksEpochId;
+    use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
     use clarity_repl::clarity::vm::types::StandardPrincipalData;
-    use clarity_repl::clarity::{
-        vm::types::QualifiedContractIdentifier, ClarityVersion, SymbolicExpression,
-    };
+    use clarity_repl::clarity::StacksEpochId;
+    use clarity_repl::clarity::{ClarityVersion, SymbolicExpression};
     use lsp_types::{Position, Range};
 
     use super::{DefinitionLocation, Definitions};

@@ -4,7 +4,7 @@ mod contract;
 mod project;
 
 use chainhook::GetChangesForNewChainhook;
-pub use changes::{Changes, DirectoryCreation, FileCreation, TOMLEdition};
+pub use changes::Changes;
 use clarinet_files::chainhook_types::Chain;
 use clarinet_files::FileLocation;
 use contract::GetChangesForNewContract;

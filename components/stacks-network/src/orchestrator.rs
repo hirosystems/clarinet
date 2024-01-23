@@ -239,7 +239,7 @@ impl DevnetOrchestrator {
             .as_ref()
             .and_then(|ipam| ipam.config.as_ref())
             .and_then(|config| config.first())
-            .and_then(|map| map.get("Gateway"))
+            .and_then(|map| map.gateway.clone())
             .ok_or("unable to retrieve gateway")?;
 
         let services_map_hosts = if devnet_config.use_docker_gateway_routing {
@@ -821,6 +821,7 @@ rpcport={bitcoin_node_rpc_port}
         let container_name = format!("bitcoin-node.{}", self.network_name);
         let options = CreateContainerOptions {
             name: container_name.as_str(),
+            platform: Some(&devnet_config.docker_platform),
         };
 
         let container = match docker
@@ -939,12 +940,15 @@ rpcport={bitcoin_node_rpc_port}
 working_dir = "/devnet"
 rpc_bind = "0.0.0.0:{stacks_node_rpc_port}"
 p2p_bind = "0.0.0.0:{stacks_node_p2p_port}"
+data_url = "http://127.0.0.1:{stacks_node_rpc_port}"
+p2p_address = "127.0.0.1:{stacks_node_rpc_port}"
 miner = true
 seed = "{miner_secret_key_hex}"
 local_peer_seed = "{miner_secret_key_hex}"
 pox_sync_sample_secs = 0
 wait_time_for_blocks = 0
-wait_time_for_microblocks = {wait_time_for_microblocks}
+wait_time_for_microblocks = 0
+mine_microblocks = false
 microblock_frequency = 1000
 
 [connection_options]
@@ -957,15 +961,19 @@ disable_inbound_walks = true
 public_ip_address = "1.1.1.1:1234"
 
 [miner]
+min_tx_fee = 1
 first_attempt_time_ms = {first_attempt_time_ms}
-subsequent_attempt_time_ms = {subsequent_attempt_time_ms}
+second_attempt_time_ms = {subsequent_attempt_time_ms}
 block_reward_recipient = "{miner_coinbase_recipient}"
+wait_for_block_download = false
+microblock_attempt_time_ms = 10
+self_signing_seed = 1
+mining_key = "19ec1c3e31d139c989a23a27eac60d1abfad5277d3ae9604242514c738258efa01"
 # microblock_attempt_time_ms = 15000
 "#,
             stacks_node_rpc_port = devnet_config.stacks_node_rpc_port,
             stacks_node_p2p_port = devnet_config.stacks_node_p2p_port,
             miner_secret_key_hex = devnet_config.miner_secret_key_hex,
-            wait_time_for_microblocks = devnet_config.stacks_node_wait_time_for_microblocks,
             first_attempt_time_ms = devnet_config.stacks_node_first_attempt_time_ms,
             subsequent_attempt_time_ms = devnet_config.stacks_node_subsequent_attempt_time_ms,
             miner_coinbase_recipient = devnet_config.miner_coinbase_recipient,
@@ -1037,26 +1045,35 @@ events_keys = ["*"]
             r#"
 [burnchain]
 chain = "bitcoin"
-mode = "krypton"
+mode = "{burnchain_mode}"
+magic_bytes = "T3"
+pox_prepare_length = 4
+pox_reward_length = 10
+burn_fee_cap = 20_000
 poll_time_secs = 1
 timeout = 30
 peer_host = "host.docker.internal"
 rpc_ssl = false
-wallet_name = "devnet"
+wallet_name = "{miner_wallet_name}"
 username = "{bitcoin_node_username}"
 password = "{bitcoin_node_password}"
 rpc_port = {orchestrator_ingestion_port}
 peer_port = {bitcoin_node_p2p_port}
 "#,
+            burnchain_mode = if devnet_config.use_nakamoto {
+                "nakamoto-neon"
+            } else {
+                "krypton"
+            },
             bitcoin_node_username = devnet_config.bitcoin_node_username,
             bitcoin_node_password = devnet_config.bitcoin_node_password,
             bitcoin_node_p2p_port = devnet_config.bitcoin_node_p2p_port,
             orchestrator_ingestion_port = devnet_config.orchestrator_ingestion_port,
+            miner_wallet_name = devnet_config.miner_wallet_name,
         ));
 
         stacks_conf.push_str(&format!(
-            r#"pox_2_activation = {pox_2_activation}
-
+            r#"
 [[burnchain.epochs]]
 epoch_name = "1.0"
 start_height = 0
@@ -1091,8 +1108,23 @@ start_height = {epoch_2_4}
             epoch_2_2 = devnet_config.epoch_2_2,
             epoch_2_3 = devnet_config.epoch_2_3,
             epoch_2_4 = devnet_config.epoch_2_4,
-            pox_2_activation = devnet_config.pox_2_activation,
         ));
+
+        if devnet_config.use_nakamoto {
+            stacks_conf.push_str(&format!(
+                r#"
+[[burnchain.epochs]]
+epoch_name = "2.5"
+start_height = {epoch_2_5}
+
+[[burnchain.epochs]]
+epoch_name = "3.0"
+start_height = {epoch_3_0}
+"#,
+                epoch_2_5 = devnet_config.epoch_2_5,
+                epoch_3_0 = devnet_config.epoch_3_0,
+            ));
+        }
 
         let mut stacks_conf_path = PathBuf::from(&devnet_config.working_dir);
         stacks_conf_path.push("conf/Stacks.toml");
@@ -1197,6 +1229,7 @@ start_height = {epoch_2_4}
 
         let options = CreateContainerOptions {
             name: format!("stacks-node.{}", self.network_name),
+            platform: Some(devnet_config.docker_platform.to_string()),
         };
 
         let container = docker
@@ -1279,8 +1312,11 @@ wait_time_for_microblocks = {wait_time_for_microblocks}
 wait_before_first_anchored_block = 0
 
 [miner]
+min_tx_fee = 1
 first_attempt_time_ms = {first_attempt_time_ms}
 subsequent_attempt_time_ms = {subsequent_attempt_time_ms}
+wait_for_block_download = false
+self_signing_seed = 1
 # microblock_attempt_time_ms = 15_000
 
 [burnchain]
@@ -1452,6 +1488,7 @@ events_keys = ["*"]
 
         let options = CreateContainerOptions {
             name: format!("subnet-node.{}", self.network_name),
+            platform: Some(devnet_config.docker_platform.to_string()),
         };
 
         let container = docker
@@ -1575,6 +1612,7 @@ events_keys = ["*"]
 
         let options = CreateContainerOptions {
             name: format!("stacks-api.{}", self.network_name),
+            platform: Some(devnet_config.docker_platform.to_string()),
         };
 
         let container = docker
@@ -1698,6 +1736,7 @@ events_keys = ["*"]
 
         let options = CreateContainerOptions {
             name: format!("subnet-api.{}", self.network_name),
+            platform: Some(devnet_config.docker_platform.to_string()),
         };
 
         let container = docker
@@ -1830,6 +1869,7 @@ events_keys = ["*"]
 
         let options = CreateContainerOptions {
             name: format!("postgres.{}", self.network_name),
+            platform: Some(devnet_config.docker_platform.to_string()),
         };
 
         let container = docker
@@ -1938,6 +1978,7 @@ events_keys = ["*"]
 
         let options = CreateContainerOptions {
             name: format!("stacks-explorer.{}", self.network_name),
+            platform: Some(devnet_config.docker_platform.to_string()),
         };
 
         let container = docker
@@ -2057,6 +2098,7 @@ events_keys = ["*"]
 
         let options = CreateContainerOptions {
             name: format!("bitcoin-explorer.{}", self.network_name),
+            platform: Some(devnet_config.docker_platform.to_string()),
         };
 
         let container = docker
@@ -2190,8 +2232,16 @@ events_keys = ["*"]
             .await;
 
         let bitcoin_node_config = self.prepare_bitcoin_node_config(boot_index)?;
+
+        let platform = self
+            .network_config
+            .as_ref()
+            .and_then(|c| c.devnet.as_ref())
+            .map(|c| c.docker_platform.to_string());
+
         let options = CreateContainerOptions {
             name: format!("bitcoin-node.{}", self.network_name),
+            platform: platform.clone(),
         };
         let bitcoin_node_c_id = docker
             .create_container::<String, String>(Some(options), bitcoin_node_config)
@@ -2200,8 +2250,10 @@ events_keys = ["*"]
             .id;
 
         let stacks_node_config = self.prepare_stacks_node_config(boot_index)?;
+
         let options = CreateContainerOptions {
             name: format!("stacks-node.{}", self.network_name),
+            platform,
         };
         let stacks_node_c_id = docker
             .create_container::<String, String>(Some(options), stacks_node_config)
@@ -2551,7 +2603,7 @@ events_keys = ["*"]
                 "jsonrpc": "1.0",
                 "id": "stacks-network",
                 "method": "createwallet",
-                "params": json!({ "wallet_name": "", "disable_private_keys": true })
+                "params": json!({ "wallet_name": devnet_config.miner_wallet_name, "disable_private_keys": true })
             }))
             .send()
             .await

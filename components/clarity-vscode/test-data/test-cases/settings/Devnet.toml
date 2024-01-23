@@ -76,7 +76,6 @@ disable_stacks_api = false
 # epoch_2_0 = 103
 # epoch_2_05 = 104
 # epoch_2_1 = 106
-# pox_2_activation = 109
 
 
 # Send some stacking orders

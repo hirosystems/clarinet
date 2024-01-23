@@ -37,6 +37,7 @@ pub static BOOT_MAINNET_ADDRESS: &str = "SP000000000000000000002Q6VF78";
 pub static V1_BOOT_CONTRACTS: &[&str] = &["bns"];
 pub static V2_BOOT_CONTRACTS: &[&str] = &["pox-2", "costs-3"];
 pub static V3_BOOT_CONTRACTS: &[&str] = &["pox-3"];
+pub static V4_BOOT_CONTRACTS: &[&str] = &["pox-4"];
 
 lazy_static! {
     static ref BOOT_TESTNET_PRINCIPAL: StandardPrincipalData =
@@ -45,7 +46,7 @@ lazy_static! {
         PrincipalData::parse_standard_principal(BOOT_MAINNET_ADDRESS).unwrap();
     pub static ref BOOT_CONTRACTS_DATA: BTreeMap<QualifiedContractIdentifier, (ClarityContract, ContractAST)> = {
         let mut result = BTreeMap::new();
-        let deploy: [(&StandardPrincipalData, [(&str, &str); 10]); 2] = [
+        let deploy: [(&StandardPrincipalData, [(&str, &str); 11]); 2] = [
             (&*BOOT_TESTNET_PRINCIPAL, *STACKS_BOOT_CODE_TESTNET),
             (&*BOOT_MAINNET_PRINCIPAL, *STACKS_BOOT_CODE_MAINNET),
         ];
@@ -54,7 +55,9 @@ lazy_static! {
             ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
         for (deployer, boot_code) in deploy.iter() {
             for (name, code) in boot_code.iter() {
-                let (epoch, clarity_version) = if (*name).eq("pox-3") {
+                let (epoch, clarity_version) = if (*name).eq("pox-4") {
+                    (StacksEpochId::Epoch25, ClarityVersion::Clarity2)
+                } else if (*name).eq("pox-3") {
                     (StacksEpochId::Epoch24, ClarityVersion::Clarity2)
                 } else if (*name).eq("pox-2") || (*name).eq("costs-3") {
                     (StacksEpochId::Epoch21, ClarityVersion::Clarity2)
@@ -160,7 +163,9 @@ impl Session {
                 .include_boot_contracts
                 .contains(&name.to_string())
             {
-                let (epoch, clarity_version) = if (*name).eq("pox-3") {
+                let (epoch, clarity_version) = if (*name).eq("pox-4") {
+                    (StacksEpochId::Epoch25, ClarityVersion::Clarity2)
+                } else if (*name).eq("pox-3") {
                     (StacksEpochId::Epoch24, ClarityVersion::Clarity2)
                 } else if (*name).eq("pox-2") || (*name).eq("costs-3") {
                     (StacksEpochId::Epoch21, ClarityVersion::Clarity2)
@@ -508,18 +513,9 @@ impl Session {
         let contract_id =
             contract.expect_resolved_contract_identifier(Some(&self.interpreter.get_tx_sender()));
 
-        let result = if let Some(mut ast) = ast.take() {
-            self.interpreter.run_ast(
-                contract,
-                &mut ast,
-                &mut vec![],
-                true,
-                cost_track,
-                Some(hooks),
-            )
-        } else {
-            self.interpreter.run(contract, cost_track, Some(hooks))
-        };
+        let result = self
+            .interpreter
+            .run_both(contract, ast, cost_track, Some(hooks));
 
         match result {
             Ok(result) => {
@@ -575,13 +571,17 @@ impl Session {
         };
 
         self.set_tx_sender(sender.into());
-        let execution = match self.interpreter.run(&contract_call, true, Some(hooks)) {
-            Ok(result) => result,
-            Err(e) => {
-                self.set_tx_sender(initial_tx_sender);
-                return Err(e);
-            }
-        };
+        let execution =
+            match self
+                .interpreter
+                .run_both(&contract_call, &mut None, true, Some(hooks))
+            {
+                Ok(result) => result,
+                Err(e) => {
+                    self.set_tx_sender(initial_tx_sender);
+                    return Err(e);
+                }
+            };
         self.set_tx_sender(initial_tx_sender);
         self.coverage_reports.push(coverage);
 
@@ -615,7 +615,9 @@ impl Session {
         let contract_identifier =
             contract.expect_resolved_contract_identifier(Some(&self.interpreter.get_tx_sender()));
 
-        let result = self.interpreter.run(&contract, cost_track, eval_hooks);
+        let result = self
+            .interpreter
+            .run_both(&contract, &mut None, cost_track, eval_hooks);
 
         match result {
             Ok(result) => {
@@ -856,9 +858,11 @@ impl Session {
             Some("2.2") => StacksEpochId::Epoch22,
             Some("2.3") => StacksEpochId::Epoch23,
             Some("2.4") => StacksEpochId::Epoch24,
+            Some("2.5") => StacksEpochId::Epoch25,
+            Some("3.0") => StacksEpochId::Epoch30,
             _ => {
                 return output.push(red!(
-                    "Usage: ::set_epoch 2.0 | 2.05 | 2.1 | 2.2 | 2.3 | 2.4"
+                    "Usage: ::set_epoch 2.0 | 2.05 | 2.1 | 2.2 | 2.3 | 2.4 | 2.5 | 3.0"
                 ))
             }
         };

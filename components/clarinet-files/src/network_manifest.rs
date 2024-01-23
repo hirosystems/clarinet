@@ -4,22 +4,26 @@ use super::{FileAccessor, FileLocation};
 use bip39::{Language, Mnemonic};
 use chainhook_types::{BitcoinNetwork, StacksNetwork};
 use clarinet_utils::get_bip39_seed_from_mnemonic;
-use clarity_repl::clarity::address::AddressHashMode;
-use clarity_repl::clarity::stacks_common::types::chainstate::StacksAddress;
 use clarity_repl::clarity::util::hash::bytes_to_hex;
 use clarity_repl::clarity::util::secp256k1::Secp256k1PublicKey;
 use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
+use clarity_repl::clarity::{address::AddressHashMode, chainstate::StacksAddress};
 use libsecp256k1::{PublicKey, SecretKey};
 use tiny_hderive::bip32::ExtendedPrivKey;
 use toml::value::Value;
 
 pub const DEFAULT_DERIVATION_PATH: &str = "m/44'/5757'/0'/0/0";
-pub const DEFAULT_BITCOIN_NODE_IMAGE: &str = "quay.io/hirosystems/bitcoind:devnet-v3";
+
 pub const DEFAULT_STACKS_NODE_IMAGE: &str = "quay.io/hirosystems/stacks-node:devnet-2.4.0.0.0";
-pub const DEFAULT_BITCOIN_EXPLORER_IMAGE: &str = "quay.io/hirosystems/bitcoin-explorer:devnet";
 pub const DEFAULT_STACKS_API_IMAGE: &str = "hirosystems/stacks-blockchain-api:latest";
+// Nakamoto images overrides
+pub const DEFAULT_STACKS_NODE_IMAGE_NAKA: &str = "blockstack/stacks-blockchain:next-devnet";
+pub const DEFAULT_STACKS_API_IMAGE_NAKA: &str = "hirosystems/stacks-blockchain-api:nakamoto";
+
+pub const DEFAULT_BITCOIN_NODE_IMAGE: &str = "quay.io/hirosystems/bitcoind:26.0";
+pub const DEFAULT_BITCOIN_EXPLORER_IMAGE: &str = "quay.io/hirosystems/bitcoin-explorer:devnet";
 pub const DEFAULT_STACKS_EXPLORER_IMAGE: &str = "hirosystems/explorer:latest";
-pub const DEFAULT_POSTGRES_IMAGE: &str = "postgres:14";
+pub const DEFAULT_POSTGRES_IMAGE: &str = "postgres:alpine";
 pub const DEFAULT_SUBNET_NODE_IMAGE: &str = "hirosystems/stacks-subnets:0.8.1";
 pub const DEFAULT_SUBNET_API_IMAGE: &str = "hirosystems/stacks-blockchain-api:latest";
 pub const DEFAULT_SUBNET_CONTRACT_ID: &str =
@@ -38,10 +42,11 @@ pub const DEFAULT_DOCKER_PLATFORM: &str = "linux/amd64";
 pub const DEFAULT_EPOCH_2_0: u64 = 100;
 pub const DEFAULT_EPOCH_2_05: u64 = 100;
 pub const DEFAULT_EPOCH_2_1: u64 = 101;
-pub const DEFAULT_POX2_ACTIVATION: u64 = 102;
-pub const DEFAULT_EPOCH_2_2: u64 = 103;
-pub const DEFAULT_EPOCH_2_3: u64 = 104;
-pub const DEFAULT_EPOCH_2_4: u64 = 105;
+pub const DEFAULT_EPOCH_2_2: u64 = 102;
+pub const DEFAULT_EPOCH_2_3: u64 = 103;
+pub const DEFAULT_EPOCH_2_4: u64 = 104;
+pub const DEFAULT_EPOCH_2_5: u64 = 105;
+pub const DEFAULT_EPOCH_3_0: u64 = 121;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct NetworkManifestFile {
@@ -87,6 +92,7 @@ pub struct DevnetConfigFile {
     pub miner_mnemonic: Option<String>,
     pub miner_derivation_path: Option<String>,
     pub miner_coinbase_recipient: Option<String>,
+    pub miner_wallet_name: Option<String>,
     pub faucet_mnemonic: Option<String>,
     pub faucet_derivation_path: Option<String>,
     pub bitcoin_controller_block_time: Option<u32>,
@@ -131,9 +137,11 @@ pub struct DevnetConfigFile {
     pub epoch_2_2: Option<u64>,
     pub epoch_2_3: Option<u64>,
     pub epoch_2_4: Option<u64>,
-    pub pox_2_activation: Option<u64>,
+    pub epoch_2_5: Option<u64>,
+    pub epoch_3_0: Option<u64>,
     pub use_docker_gateway_routing: Option<bool>,
     pub docker_platform: Option<String>,
+    pub use_nakamoto: Option<bool>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -243,6 +251,7 @@ pub struct DevnetConfig {
     pub miner_mnemonic: String,
     pub miner_derivation_path: String,
     pub miner_coinbase_recipient: String,
+    pub miner_wallet_name: String,
     pub faucet_stx_address: String,
     pub faucet_secret_key_hex: String,
     pub faucet_btc_address: String,
@@ -293,9 +302,11 @@ pub struct DevnetConfig {
     pub epoch_2_2: u64,
     pub epoch_2_3: u64,
     pub epoch_2_4: u64,
-    pub pox_2_activation: u64,
+    pub epoch_2_5: u64,
+    pub epoch_3_0: u64,
     pub use_docker_gateway_routing: bool,
     pub docker_platform: String,
+    pub use_nakamoto: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -663,8 +674,12 @@ impl NetworkManifest {
                     devnet_config.epoch_2_4 = Some(*val);
                 }
 
-                if let Some(ref val) = devnet_override.pox_2_activation {
-                    devnet_config.pox_2_activation = Some(*val);
+                if let Some(ref val) = devnet_override.epoch_2_5 {
+                    devnet_config.epoch_2_5 = Some(*val);
+                }
+
+                if let Some(ref val) = devnet_override.epoch_3_0 {
+                    devnet_config.epoch_3_0 = Some(*val);
                 }
 
                 if let Some(val) = devnet_override.network_id {
@@ -800,6 +815,7 @@ impl NetworkManifest {
                 miner_coinbase_recipient: devnet_config
                     .miner_coinbase_recipient
                     .unwrap_or(miner_stx_address),
+                miner_wallet_name: devnet_config.miner_wallet_name.unwrap_or("".to_string()),
                 faucet_btc_address,
                 faucet_stx_address,
                 faucet_mnemonic,
@@ -831,14 +847,24 @@ impl NetworkManifest {
                     .bitcoin_node_image_url
                     .take()
                     .unwrap_or(DEFAULT_BITCOIN_NODE_IMAGE.to_string()),
-                stacks_node_image_url: devnet_config
-                    .stacks_node_image_url
-                    .take()
-                    .unwrap_or(DEFAULT_STACKS_NODE_IMAGE.to_string()),
-                stacks_api_image_url: devnet_config
-                    .stacks_api_image_url
-                    .take()
-                    .unwrap_or(DEFAULT_STACKS_API_IMAGE.to_string()),
+                stacks_node_image_url: devnet_config.stacks_node_image_url.take().unwrap_or_else(
+                    || {
+                        if devnet_config.use_nakamoto.unwrap_or(false) {
+                            DEFAULT_STACKS_NODE_IMAGE_NAKA.to_string()
+                        } else {
+                            DEFAULT_STACKS_NODE_IMAGE.to_string()
+                        }
+                    },
+                ),
+                stacks_api_image_url: devnet_config.stacks_api_image_url.take().unwrap_or_else(
+                    || {
+                        if devnet_config.use_nakamoto.unwrap_or(false) {
+                            DEFAULT_STACKS_API_IMAGE_NAKA.to_string()
+                        } else {
+                            DEFAULT_STACKS_API_IMAGE.to_string()
+                        }
+                    },
+                ),
                 postgres_image_url: devnet_config
                     .postgres_image_url
                     .take()
@@ -894,9 +920,8 @@ impl NetworkManifest {
                 epoch_2_2: devnet_config.epoch_2_2.unwrap_or(DEFAULT_EPOCH_2_2),
                 epoch_2_3: devnet_config.epoch_2_3.unwrap_or(DEFAULT_EPOCH_2_3),
                 epoch_2_4: devnet_config.epoch_2_4.unwrap_or(DEFAULT_EPOCH_2_4),
-                pox_2_activation: devnet_config
-                    .pox_2_activation
-                    .unwrap_or(DEFAULT_POX2_ACTIVATION),
+                epoch_2_5: devnet_config.epoch_2_5.unwrap_or(DEFAULT_EPOCH_2_5),
+                epoch_3_0: devnet_config.epoch_3_0.unwrap_or(DEFAULT_EPOCH_3_0),
                 stacks_node_env_vars: devnet_config.stacks_node_env_vars.take().unwrap_or(vec![]),
                 stacks_api_env_vars: devnet_config.stacks_api_env_vars.take().unwrap_or(vec![]),
                 stacks_explorer_env_vars: devnet_config
@@ -911,6 +936,7 @@ impl NetworkManifest {
                 docker_platform: devnet_config
                     .docker_platform
                     .unwrap_or(DEFAULT_DOCKER_PLATFORM.to_string()),
+                use_nakamoto: devnet_config.use_nakamoto.unwrap_or(false),
             };
             Some(config)
         } else {

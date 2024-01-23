@@ -6,7 +6,9 @@ mod ui;
 mod util;
 
 use super::DevnetEvent;
+
 use crate::{chains_coordinator::BitcoinMiningCommand, ChainsCoordinatorCommand};
+
 use app::App;
 use chainhook_sdk::{types::StacksChainEvent, utils::Context};
 use crossterm::{
@@ -14,6 +16,7 @@ use crossterm::{
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
+use ratatui::{backend::CrosstermBackend, Terminal};
 use std::sync::mpsc::{Receiver, Sender};
 use std::{
     error::Error,
@@ -21,7 +24,6 @@ use std::{
     thread,
     time::{Duration, Instant},
 };
-use tui::{backend::CrosstermBackend, Terminal};
 
 pub fn start_ui(
     devnet_events_tx: Sender<DevnetEvent>,
@@ -105,9 +107,14 @@ pub fn do_start_ui(
         terminal
             .draw(|f| ui::draw(f, &mut app))
             .map_err(|e| format!("unable to update ui: {}", e))?;
+
         let event = match devnet_events_rx.recv() {
             Ok(event) => event,
-            Err(_e) => {
+            Err(e) => {
+                app.display_log(
+                    DevnetEvent::log_error(format!("Error receiving event: {}", e)),
+                    ctx,
+                );
                 let _ = terminate(
                     &mut terminal,
                     chains_coordinator_commands_tx,
@@ -119,20 +126,33 @@ pub fn do_start_ui(
         match event {
             DevnetEvent::KeyEvent(event) => match (event.modifiers, event.code) {
                 (KeyModifiers::CONTROL, KeyCode::Char('c')) => {
-                    app.display_log(DevnetEvent::log_warning("Ctrl+C received, initiating termination sequence.".into()), ctx);
+                    app.display_log(
+                        DevnetEvent::log_warning(
+                            "Ctrl+C received, initiating termination sequence.".into(),
+                        ),
+                        ctx,
+                    );
                     let _ = terminate(
                         &mut terminal,
                         chains_coordinator_commands_tx,
                         orchestrator_terminated_rx,
-                        );
+                    );
                     break;
                 }
                 (KeyModifiers::NONE, KeyCode::Char('n')) => {
                     if let Some(ref tx) = mining_command_tx {
                         let _ = tx.send(BitcoinMiningCommand::Mine);
-                        app.display_log(DevnetEvent::log_success("Bitcoin block mining triggered manually".to_string()), ctx);
+                        app.display_log(
+                            DevnetEvent::log_success(
+                                "Bitcoin block mining triggered manually".to_string(),
+                            ),
+                            ctx,
+                        );
                     } else {
-                        app.display_log(DevnetEvent::log_error("Manual block mining not ready".to_string()), ctx);
+                        app.display_log(
+                            DevnetEvent::log_error("Manual block mining not ready".to_string()),
+                            ctx,
+                        );
                     }
                 }
                 (KeyModifiers::NONE, KeyCode::Left) => app.on_left(),
@@ -143,10 +163,10 @@ pub fn do_start_ui(
             },
             DevnetEvent::Tick => {
                 app.on_tick();
-            },
+            }
             DevnetEvent::Log(log) => {
                 app.display_log(log, ctx);
-            },
+            }
             DevnetEvent::ServiceStatus(status) => {
                 app.display_service_status_update(status);
             }
@@ -156,7 +176,16 @@ pub fn do_start_ui(
                         let raw_txs = if app.mempool.items.is_empty() {
                             vec![]
                         } else {
-                            update.new_blocks.iter().flat_map(|b| b.block.transactions.iter().map(|tx| tx.metadata.raw_tx.as_str())).collect::<Vec<_>>()
+                            update
+                                .new_blocks
+                                .iter()
+                                .flat_map(|b| {
+                                    b.block
+                                        .transactions
+                                        .iter()
+                                        .map(|tx| tx.metadata.raw_tx.as_str())
+                                })
+                                .collect::<Vec<_>>()
                         };
 
                         let mut indices_to_remove = vec![];
@@ -178,7 +207,13 @@ pub fn do_start_ui(
                         let raw_txs = if app.mempool.items.is_empty() {
                             vec![]
                         } else {
-                            update.new_microblocks.iter().flat_map(|b| b.transactions.iter().map(|tx| tx.metadata.raw_tx.as_str())).collect::<Vec<_>>()
+                            update
+                                .new_microblocks
+                                .iter()
+                                .flat_map(|b| {
+                                    b.transactions.iter().map(|tx| tx.metadata.raw_tx.as_str())
+                                })
+                                .collect::<Vec<_>>()
                         };
 
                         let mut indices_to_remove = vec![];
@@ -199,8 +234,7 @@ pub fn do_start_ui(
                     _ => {} // handle display on re-org, theorically unreachable in context of devnet
                 }
             }
-            DevnetEvent::BitcoinChainEvent(_chain_event) => {
-            }
+            DevnetEvent::BitcoinChainEvent(_chain_event) => {}
             DevnetEvent::MempoolAdmission(tx) => {
                 app.add_to_mempool(tx);
             }
@@ -213,22 +247,19 @@ pub fn do_start_ui(
                     &mut terminal,
                     chains_coordinator_commands_tx,
                     orchestrator_terminated_rx,
-                    );
-                return Err(message)
-            },
+                );
+                return Err(message);
+            }
             DevnetEvent::BootCompleted(bitcoin_mining_tx) => {
-                app.display_log(DevnetEvent::log_success("Local Devnet network ready".into()), ctx);
+                app.display_log(
+                    DevnetEvent::log_success("Local Devnet network ready".into()),
+                    ctx,
+                );
                 if automining_enabled {
                     let _ = bitcoin_mining_tx.send(BitcoinMiningCommand::Start);
                 }
                 mining_command_tx = Some(bitcoin_mining_tx);
             }
-            // DevnetEvent::Terminate => {
-
-            // },
-            // DevnetEvent::Restart => {
-
-            // },
         }
         if app.should_quit {
             break;
@@ -246,12 +277,12 @@ fn terminate(
     let _ = disable_raw_mode();
     let _ = execute!(terminal.backend_mut(), LeaveAlternateScreen);
     let res = chains_coordinator_commands_tx.send(ChainsCoordinatorCommand::Terminate);
-    if let Err(_e) = res {
-        // Display log
+    if let Err(e) = res {
+        println!("Error sending terminate command: {}", e);
     }
     let res = orchestrator_terminated_rx.recv();
-    if let Err(_e) = res {
-        // Display log
+    if let Err(e) = res {
+        println!("Error sending terminate command: {}", e);
     }
     let _ = terminal.show_cursor();
     Ok(())

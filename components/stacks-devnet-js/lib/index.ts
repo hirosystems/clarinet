@@ -367,11 +367,17 @@ export interface DevnetConfig {
    */
   epoch_2_4?: number;
   /**
-   * Bitcoin block height activating switch to POX 2.0
+   * Bitcoin block height starting the epoch 2.5
    * @type {number}
    * @memberof DevnetConfig
    */
-  pox_2_activation?: number;
+  epoch_2_5?: number;
+  /**
+   * Bitcoin block height starting the epoch 3.0
+   * @type {number}
+   * @memberof DevnetConfig
+   */
+  epoch_3_0?: number;
 }
 
 /**
@@ -411,7 +417,7 @@ export class DevnetNetworkFactory {
   private static instance: DevnetNetworkFactory | undefined = undefined;
   private nextNetworkId: number = 0;
 
-  private constructor() { }
+  private constructor() {}
 
   static sharedInstance(): DevnetNetworkFactory {
     if (!DevnetNetworkFactory.instance) {
@@ -421,13 +427,19 @@ export class DevnetNetworkFactory {
   }
 
   buildNetwork(manifest: NetworkConfig): DevnetNetworkOrchestrator {
-    let network = new DevnetNetworkOrchestrator(getIsolatedNetworkConfigUsingNetworkId(this.nextNetworkId, manifest));
+    let network = new DevnetNetworkOrchestrator(
+      getIsolatedNetworkConfigUsingNetworkId(this.nextNetworkId, manifest)
+    );
     this.nextNetworkId += 1;
     return network;
   }
 }
 
-export function getIsolatedNetworkConfigUsingNetworkId(networkId: number, networkConfig: NetworkConfig, interval = 10000) {
+export function getIsolatedNetworkConfigUsingNetworkId(
+  networkId: number,
+  networkConfig: NetworkConfig,
+  interval = 10000
+) {
   const manifestPath = networkConfig.clarinetManifestPath || "./Clarinet.toml";
   const logs = networkConfig.logs || false;
   const accounts = networkConfig.accounts || [];
@@ -537,16 +549,21 @@ export class DevnetNetworkOrchestrator {
    * @summary Wait for the next Stacks block
    * @memberof DevnetNetworkOrchestrator
    */
-  async waitForNextStacksBlock(maxErrors = 5, emptyQueuedBlocks = false): Promise<StacksChainUpdate> {
+  async waitForNextStacksBlock(
+    maxErrors = 5,
+    emptyQueuedBlocks = false
+  ): Promise<StacksChainUpdate> {
     let errorCount = 0;
     while (true) {
       try {
-        let chainUpdate = await this.mineBitcoinBlockAndHopeForStacksBlock(emptyQueuedBlocks);
+        let chainUpdate = await this.mineBitcoinBlockAndHopeForStacksBlock(
+          emptyQueuedBlocks
+        );
         if (chainUpdate == undefined) {
           this.currentCooldown += this.defaultCooldown;
           errorCount += 1;
           if (errorCount >= maxErrors) {
-            throw 'waitForNextStacksBlock maxErrors reached'
+            throw "waitForNextStacksBlock maxErrors reached";
           }
           continue;
         }
@@ -565,19 +582,26 @@ export class DevnetNetworkOrchestrator {
    * @summary Wait for the next Stacks block
    * @memberof DevnetNetworkOrchestrator
    */
-  async mineBitcoinBlockAndHopeForStacksBlock(emptyQueuedBlocks = false): Promise<StacksChainUpdate | undefined> {
+  async mineBitcoinBlockAndHopeForStacksBlock(
+    emptyQueuedBlocks = false
+  ): Promise<StacksChainUpdate | undefined> {
     let now = new Date();
-    let ms_elapsed = (now.getTime() - this.lastCooldownEndedAt.getTime());
+    let ms_elapsed = now.getTime() - this.lastCooldownEndedAt.getTime();
     let cooldown = Math.max(0, this.currentCooldown - ms_elapsed);
-    let wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+    let wait = (ms: number) =>
+      new Promise((resolve) => setTimeout(resolve, ms));
     return wait(cooldown)
       .then(() => {
         this.lastCooldownEndedAt = new Date();
-        return stacksDevnetWaitForStacksBlock.call(this.handle, this.currentCooldown, emptyQueuedBlocks)
+        return stacksDevnetWaitForStacksBlock.call(
+          this.handle,
+          this.currentCooldown,
+          emptyQueuedBlocks
+        );
       })
-      .catch(e => {
+      .catch((e) => {
         this.lastCooldownEndedAt = new Date();
-        throw e
+        throw e;
       });
   }
 
@@ -585,11 +609,19 @@ export class DevnetNetworkOrchestrator {
    * @summary Wait for the next Stacks block
    * @memberof DevnetNetworkOrchestrator
    */
-  async waitForStacksBlockOfHeight(targetBlockHeight: number, maxErrors = 5, emptyQueuedBlocks = false): Promise<StacksChainUpdate> {
+  async waitForStacksBlockOfHeight(
+    targetBlockHeight: number,
+    maxErrors = 5,
+    emptyQueuedBlocks = false
+  ): Promise<StacksChainUpdate> {
     while (true) {
       try {
-        let chainUpdate = await this.waitForNextStacksBlock(maxErrors, emptyQueuedBlocks);
-        let currentBlockHeight = chainUpdate.new_blocks[0].block.block_identifier.index;
+        let chainUpdate = await this.waitForNextStacksBlock(
+          maxErrors,
+          emptyQueuedBlocks
+        );
+        let currentBlockHeight =
+          chainUpdate.new_blocks[0].block.block_identifier.index;
         if (currentBlockHeight >= targetBlockHeight) {
           return chainUpdate;
         }
@@ -603,12 +635,21 @@ export class DevnetNetworkOrchestrator {
    * @summary Wait for the next Stacks block
    * @memberof DevnetNetworkOrchestrator
    */
-  async waitForStacksBlockAnchoredOnBitcoinBlockOfHeight(minBitcoinBlockHeight: number, maxErrors = 5, emptyQueuedBlocks = false): Promise<StacksChainUpdate> {
+  async waitForStacksBlockAnchoredOnBitcoinBlockOfHeight(
+    minBitcoinBlockHeight: number,
+    maxErrors = 5,
+    emptyQueuedBlocks = false
+  ): Promise<StacksChainUpdate> {
     while (true) {
       try {
-        let chainUpdate = await this.waitForNextStacksBlock(maxErrors, emptyQueuedBlocks);
-        let metadata = chainUpdate.new_blocks[0].block.metadata! as StacksBlockMetadata;
-        let currentBitcoinBlockHeight = metadata.bitcoin_anchor_block_identifier.index;
+        let chainUpdate = await this.waitForNextStacksBlock(
+          maxErrors,
+          emptyQueuedBlocks
+        );
+        let metadata = chainUpdate.new_blocks[0].block
+          .metadata! as StacksBlockMetadata;
+        let currentBitcoinBlockHeight =
+          metadata.bitcoin_anchor_block_identifier.index;
         if (currentBitcoinBlockHeight >= minBitcoinBlockHeight) {
           return chainUpdate;
         }
@@ -624,26 +665,29 @@ export class DevnetNetworkOrchestrator {
    */
   async waitForNextBitcoinBlock(): Promise<BitcoinChainUpdate> {
     let now = new Date();
-    let ms_elapsed = (now.getTime() - this.lastCooldownEndedAt.getTime());
+    let ms_elapsed = now.getTime() - this.lastCooldownEndedAt.getTime();
     let cooldown = Math.max(0, this.currentCooldown - ms_elapsed);
-    let wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+    let wait = (ms: number) =>
+      new Promise((resolve) => setTimeout(resolve, ms));
     return wait(cooldown)
       .then(() => {
         this.lastCooldownEndedAt = new Date();
-        return stacksDevnetWaitForBitcoinBlock.call(this.handle)
-      })     
-      .catch(e => {
+        return stacksDevnetWaitForBitcoinBlock.call(this.handle);
+      })
+      .catch((e) => {
         this.lastCooldownEndedAt = new Date();
-        throw e
+        throw e;
       });
   }
-
 
   /**
    * @summary Wait for the next Bitcoin block
    * @memberof DevnetNetworkOrchestrator
    */
-  async waitForStacksBlockIncludingTransaction(txid: string, ttl = 5): Promise<{ chainUpdate: StacksChainUpdate, transaction: Transaction }> {
+  async waitForStacksBlockIncludingTransaction(
+    txid: string,
+    ttl = 5
+  ): Promise<{ chainUpdate: StacksChainUpdate; transaction: Transaction }> {
     while (ttl > 0) {
       let chainUpdate = await this.waitForNextStacksBlock();
       for (const transaction of chainUpdate.new_blocks[0].block.transactions) {
@@ -656,8 +700,8 @@ export class DevnetNetworkOrchestrator {
       }
       ttl -= 1;
     }
-    throw 'waitForStacksBlockIncludingTransaction TTL expired'
-  };
+    throw "waitForStacksBlockIncludingTransaction TTL expired";
+  }
 
   /**
    * @summary Terminates the containers

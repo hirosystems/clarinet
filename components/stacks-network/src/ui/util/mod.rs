@@ -1,12 +1,11 @@
 use std::collections::VecDeque;
 
-use tui::text::Spans;
-use tui::widgets::ListState;
+use ratatui::text::Span;
+use ratatui::widgets::ListState;
 
 #[derive(Clone)]
-
 pub struct TabsState<'a> {
-    pub titles: VecDeque<Spans<'a>>,
+    pub titles: VecDeque<Span<'a>>,
     pub index: usize,
 }
 

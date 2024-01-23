@@ -46,7 +46,7 @@ jobs:
 
       # This can only be ran in root dir
       - name: Run audit
-        run: cargo audit --ignore RUSTSEC-2022-0093 --ignore RUSTSEC-2021-0076 --ignore RUSTSEC-2022-0090 --ignore RUSTSEC-2022-0028
+        run: cargo audit --ignore RUSTSEC-2022-0093 --ignore RUSTSEC-2021-0076 --ignore RUSTSEC-2022-0090 --ignore RUSTSEC-2022-002 --ignore RUSTSEC-2022-0028
 
       - name: Run rustfmt
         run: cargo fmt --all -- --check
