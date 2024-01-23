@@ -1400,10 +1400,6 @@ pub struct TenureChangePayload {
     pub cause: TenureChangeCause,
     /// The ECDSA public key hash of the current tenure
     pub pubkey_hash: Hash160,
-    /// The Stacker signature
-    pub signature: ThresholdSignature,
-    /// A bitmap of which Stackers signed
-    pub signers: Vec<u8>,
 }
 
 impl StacksMessageCodec for TenureChangePayload {
@@ -1414,9 +1410,7 @@ impl StacksMessageCodec for TenureChangePayload {
         write_next(fd, &self.previous_tenure_end)?;
         write_next(fd, &self.previous_tenure_blocks)?;
         write_next(fd, &self.cause)?;
-        write_next(fd, &self.pubkey_hash)?;
-        write_next(fd, &self.signature)?;
-        write_next(fd, &self.signers)
+        write_next(fd, &self.pubkey_hash)
     }
 
     fn consensus_deserialize<R: Read>(fd: &mut R) -> Result<Self, CodecError> {
@@ -1428,8 +1422,6 @@ impl StacksMessageCodec for TenureChangePayload {
             previous_tenure_blocks: read_next(fd)?,
             cause: read_next(fd)?,
             pubkey_hash: read_next(fd)?,
-            signature: read_next(fd)?,
-            signers: read_next(fd)?,
         })
     }
 }
