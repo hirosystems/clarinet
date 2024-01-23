@@ -713,7 +713,7 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 [[package]]
 name = "chainhook-sdk"
 version = "0.12.1"
-source = "git+https://github.com/hirosystems/chainhook.git?rev=54f80164c764180344cdbf25ee3847a310859132#54f80164c764180344cdbf25ee3847a310859132"
+source = "git+https://github.com/hirosystems/chainhook.git?rev=2a47192#2a4719238ded642d6961885e5b2c5ae48c727d56"
 dependencies = [
  "base58 0.2.0",
  "base64 0.21.7",
@@ -738,7 +738,7 @@ dependencies = [
  "serde-hex",
  "serde_derive",
  "serde_json",
- "stacks-rpc-client 2.1.0 (git+https://github.com/hirosystems/clarinet.git?rev=e3ce0c2d2ffb1e73d876ae79b492a0b758755401)",
+ "stacks-rpc-client 2.1.0 (git+https://github.com/hirosystems/clarinet.git?rev=53a6d8ed)",
  "threadpool",
  "tokio",
 ]
@@ -746,7 +746,7 @@ dependencies = [
 [[package]]
 name = "chainhook-types"
 version = "1.3.1"
-source = "git+https://github.com/hirosystems/chainhook.git?rev=54f80164c764180344cdbf25ee3847a310859132#54f80164c764180344cdbf25ee3847a310859132"
+source = "git+https://github.com/hirosystems/chainhook.git?rev=2a47192#2a4719238ded642d6961885e5b2c5ae48c727d56"
 dependencies = [
  "hex 0.4.3",
  "schemars",
@@ -1102,14 +1102,14 @@ dependencies = [
 [[package]]
 name = "clarity-repl"
 version = "2.1.0"
-source = "git+https://github.com/hirosystems/clarinet.git?rev=e3ce0c2d2ffb1e73d876ae79b492a0b758755401#e3ce0c2d2ffb1e73d876ae79b492a0b758755401"
+source = "git+https://github.com/hirosystems/clarinet.git?rev=53a6d8ed#53a6d8ed65bd31aadd2cad691230a801f15f47b1"
 dependencies = [
  "ansi_term",
  "atty",
  "chrono",
  "clarity",
  "getrandom 0.2.8",
- "hiro-system-kit 0.1.0 (git+https://github.com/hirosystems/clarinet.git?rev=e3ce0c2d2ffb1e73d876ae79b492a0b758755401)",
+ "hiro-system-kit 0.1.0 (git+https://github.com/hirosystems/clarinet.git?rev=53a6d8ed)",
  "integer-sqrt",
  "lazy_static",
  "regex",
@@ -2280,7 +2280,7 @@ dependencies = [
 [[package]]
 name = "hiro-system-kit"
 version = "0.1.0"
-source = "git+https://github.com/hirosystems/clarinet.git?rev=e3ce0c2d2ffb1e73d876ae79b492a0b758755401#e3ce0c2d2ffb1e73d876ae79b492a0b758755401"
+source = "git+https://github.com/hirosystems/clarinet.git?rev=53a6d8ed#53a6d8ed65bd31aadd2cad691230a801f15f47b1"
 dependencies = [
  "ansi_term",
  "atty",
@@ -4924,9 +4924,9 @@ dependencies = [
 [[package]]
 name = "stacks-rpc-client"
 version = "2.1.0"
-source = "git+https://github.com/hirosystems/clarinet.git?rev=e3ce0c2d2ffb1e73d876ae79b492a0b758755401#e3ce0c2d2ffb1e73d876ae79b492a0b758755401"
+source = "git+https://github.com/hirosystems/clarinet.git?rev=53a6d8ed#53a6d8ed65bd31aadd2cad691230a801f15f47b1"
 dependencies = [
- "clarity-repl 2.1.0 (git+https://github.com/hirosystems/clarinet.git?rev=e3ce0c2d2ffb1e73d876ae79b492a0b758755401)",
+ "clarity-repl 2.1.0 (git+https://github.com/hirosystems/clarinet.git?rev=53a6d8ed)",
  "hmac 0.12.1",
  "libsecp256k1 0.7.1",
  "pbkdf2",
