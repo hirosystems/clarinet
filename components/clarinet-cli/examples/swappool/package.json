@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Run unit tests on this project.",
   "private": true,
+  "type": "module",
   "scripts": {
     "test": "vitest run",
     "test:report": "vitest run -- --coverage --costs",
@@ -15,8 +16,8 @@
     "@stacks/transactions": "^6.9.0",
     "chokidar-cli": "^3.0.0",
     "typescript": "^5.2.2",
-    "vite": "^4.4.12",
-    "vitest": "^0.34.4",
+    "vite": "^5.0.12",
+    "vitest": "^1.2.1",
     "vitest-environment-clarinet": "^1.0.0"
   }
 }
