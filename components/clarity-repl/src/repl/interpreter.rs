@@ -531,7 +531,6 @@ impl ClarityInterpreter {
                                 .collect();
                             let res = env.execute_contract(&contract_id, &method, &args, false)?;
 
-                            // println!("execute intr: {:?}μs", start.elapsed().as_micros());
                             if show_timings {
                                 println!("execution time: {:?}μs", start.elapsed().as_micros());
                             }
