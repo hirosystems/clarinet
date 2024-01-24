@@ -33,6 +33,7 @@ use clarity_repl::clarity::vm::analysis::AnalysisDatabase;
 use clarity_repl::clarity::vm::costs::LimitedCostTracker;
 use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
 use clarity_repl::clarity::ClarityVersion;
+use clarity_repl::frontend::terminal::print_clarity_wasm_warning;
 use clarity_repl::repl::diagnostic::output_diagnostic;
 use clarity_repl::repl::{ClarityCodeSource, ClarityContract, ContractDeployer, DEFAULT_EPOCH};
 use clarity_repl::{analysis, repl, Terminal};
@@ -397,6 +398,9 @@ struct Console {
         conflicts_with = "use_on_disk_deployment_plan"
     )]
     pub use_computed_deployment_plan: bool,
+    /// Prevent the Clarity Wasm preview from running in parallel of the Clarity interpreter
+    #[clap(long = "disable-clarity-wasm")]
+    pub disable_clarity_wasm: bool,
 }
 
 #[derive(Parser, PartialEq, Clone, Debug)]
@@ -1022,9 +1026,50 @@ pub fn main() {
                             std::process::exit(1);
                         }
 
-                        Terminal::load(artifacts.session)
+                        if cmd.disable_clarity_wasm {
+                            Terminal::load(artifacts.session, None)
+                        } else {
+                            let mut manifest_wasm = manifest.clone();
+                            manifest_wasm.repl_settings.clarity_wasm_mode = true;
+                            let (_, _, artifacts_wasm) = load_deployment_and_artifacts_or_exit(
+                                &manifest_wasm,
+                                &cmd.deployment_plan_path,
+                                cmd.use_on_disk_deployment_plan,
+                                cmd.use_computed_deployment_plan,
+                            );
+                            if artifacts.success != artifacts_wasm.success {
+                                for contract in deployment.contracts.keys() {
+                                    let empty_diag = vec![];
+                                    let diag = artifacts
+                                        .diags
+                                        .get(contract)
+                                        .unwrap_or(empty_diag.as_ref());
+                                    let diag_wasm = artifacts_wasm
+                                        .diags
+                                        .get(contract)
+                                        .unwrap_or(empty_diag.as_ref());
+
+                                    if diag.len() != diag_wasm.len() {
+                                        dbg!(&diag);
+                                        dbg!(&diag_wasm);
+                                    }
+                                }
+                                print_clarity_wasm_warning();
+                            }
+
+                            Terminal::load(artifacts.session, Some(artifacts_wasm.session))
+                        }
                     }
-                    None => Terminal::new(repl::SessionSettings::default()),
+                    None => {
+                        let settings = repl::SessionSettings::default();
+                        if cmd.disable_clarity_wasm {
+                            Terminal::new(settings, None)
+                        } else {
+                            let mut settings_wasm = repl::SessionSettings::default();
+                            settings_wasm.repl_settings.clarity_wasm_mode = true;
+                            Terminal::new(settings, Some(settings_wasm))
+                        }
+                    }
                 };
                 let reload = terminal.start();
 

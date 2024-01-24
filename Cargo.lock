@@ -793,7 +793,7 @@ checksum = "702fc72eb24e5a1e48ce58027a675bc24edd52096d5397d4aea7c6dd9eca0bd1"
 [[package]]
 name = "clar2wasm"
 version = "0.1.0"
-source = "git+https://github.com/stacks-network/clarity-wasm.git#4e06a7b10efde6986ec8d12d4e791e677d033cb1"
+source = "git+https://github.com/stacks-network/clarity-wasm.git#c0de401eb055572c2abd064e219eecdae28d7be9"
 dependencies = [
  "clap",
  "clarity",
@@ -950,7 +950,7 @@ dependencies = [
 [[package]]
 name = "clarity"
 version = "2.2.0"
-source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-next#25b82d1dcc62d7353db1bd4056be8a4538816eae"
+source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-next#5956df38f851fa46204d4e57614bf77e633d553b"
 dependencies = [
  "integer-sqrt",
  "lazy_static",
@@ -1057,7 +1057,7 @@ dependencies = [
  "tokio-util",
  "wasm-bindgen",
  "wasm-bindgen-futures",
- "wsts",
+ "wsts 5.0.0",
 ]
 
 [[package]]
@@ -1079,7 +1079,7 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "sha2 0.10.6",
- "wsts",
+ "wsts 5.0.0",
 ]
 
 [[package]]
@@ -4789,7 +4789,7 @@ dependencies = [
 [[package]]
 name = "stacks-common"
 version = "0.0.2"
-source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-next#25b82d1dcc62d7353db1bd4056be8a4538816eae"
+source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-next#5956df38f851fa46204d4e57614bf77e633d553b"
 dependencies = [
  "chrono",
  "curve25519-dalek",
@@ -4813,7 +4813,7 @@ dependencies = [
  "slog-term",
  "time 0.2.27",
  "winapi",
- "wsts",
+ "wsts 6.1.0",
 ]
 
 [[package]]
@@ -6407,6 +6407,28 @@ name = "wsts"
 version = "5.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2c250118354755b4abb091a83cb8d659b511c0ae211ccdb3b1254e3db199cb86"
+dependencies = [
+ "aes-gcm",
+ "bs58 0.5.0",
+ "hashbrown 0.14.0",
+ "hex 0.4.3",
+ "num-traits",
+ "p256k1",
+ "polynomial",
+ "primitive-types",
+ "rand_core 0.6.4",
+ "serde",
+ "sha2 0.10.6",
+ "thiserror",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "wsts"
+version = "6.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6c7db3d3fe28c359e0cdb7f7ad83e3316bda0ba982b8cd1bf0fbe73ae4127e4b"
 dependencies = [
  "aes-gcm",
  "bs58 0.5.0",
