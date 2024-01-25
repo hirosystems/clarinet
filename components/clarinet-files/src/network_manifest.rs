@@ -798,6 +798,25 @@ impl NetworkManifest {
                     epoch_3_0, DEFAULT_POX_REWARD_LENGTH, DEFAULT_POX_PREPARE_LENGTH
                 ));
             }
+
+            // for stacking orders, we validate that wallet names match one of the provided accounts
+            if let Some(ref val) = devnet_config.pox_stacking_orders {
+                for (i, stacking_order) in val.iter().enumerate() {
+                    let wallet_name = &stacking_order.wallet;
+                    let wallet_is_in_accounts = accounts
+                        .iter()
+                        .any(|(account_name, _)| wallet_name == account_name);
+                    if !wallet_is_in_accounts {
+                        return Err(format!(
+                                        "Account data was not provided for the wallet ({}) listed in stacking order {}.",
+                                        wallet_name,
+                                        i + 1
+                                    ));
+                    };
+                }
+
+                devnet_config.pox_stacking_orders = Some(val.clone());
+            }
             let config = DevnetConfig {
                 name: devnet_config.name.take().unwrap_or("devnet".into()),
                 network_id: devnet_config.network_id,
