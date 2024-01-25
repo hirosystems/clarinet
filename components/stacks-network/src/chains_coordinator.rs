@@ -14,18 +14,16 @@ use chainhook_sdk::observer::{
 use chainhook_sdk::types::BitcoinBlockSignaling;
 use chainhook_sdk::types::BitcoinChainEvent;
 use chainhook_sdk::types::BitcoinNetwork;
-use chainhook_sdk::types::StacksBlockData;
 use chainhook_sdk::types::StacksChainEvent;
 use chainhook_sdk::types::StacksNetwork;
 use chainhook_sdk::types::StacksNodeConfig;
-use chainhook_sdk::types::StacksTransactionKind;
 use chainhook_sdk::utils::Context;
 use clarinet_deployments::onchain::TransactionStatus;
 use clarinet_deployments::onchain::{
     apply_on_chain_deployment, DeploymentCommand, DeploymentEvent,
 };
 use clarinet_deployments::types::DeploymentSpecification;
-use clarinet_files::PoxStackingOrder;
+use clarinet_files::DEFAULT_FIRST_BURN_HEADER_HEIGHT;
 use clarinet_files::{self, AccountConfig, DevnetConfig, NetworkManifest, ProjectManifest};
 use clarity_repl::clarity::address::AddressHashMode;
 use clarity_repl::clarity::util::hash::{hex_bytes, Hash160};
@@ -38,6 +36,7 @@ use hiro_system_kit::slog;
 use hiro_system_kit::yellow;
 use stacks_rpc_client::PoxInfo;
 use stacks_rpc_client::StacksRpc;
+use std::borrow::BorrowMut;
 use std::convert::TryFrom;
 use std::str;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -152,7 +151,7 @@ impl DevnetEventObserverConfig {
 }
 
 pub async fn start_chains_coordinator(
-    config: DevnetEventObserverConfig,
+    mut config: DevnetEventObserverConfig,
     devnet_event_tx: Sender<DevnetEvent>,
     chains_coordinator_commands_rx: crossbeam_channel::Receiver<ChainsCoordinatorCommand>,
     _chains_coordinator_commands_tx: crossbeam_channel::Sender<ChainsCoordinatorCommand>,
@@ -285,9 +284,32 @@ pub async fn start_chains_coordinator(
                 let (log, status) = match &chain_update {
                     BitcoinChainEvent::ChainUpdatedWithBlocks(event) => {
                         let tip = event.new_blocks.last().unwrap();
-                        let log = format!("Bitcoin block #{} received", tip.block_identifier.index);
+                        let bitcoin_block_height = tip.block_identifier.index;
+                        let log = format!("Bitcoin block #{} received", bitcoin_block_height);
                         let status =
-                            format!("mining blocks (chaintip = #{})", tip.block_identifier.index);
+                            format!("mining blocks (chaintip = #{})", bitcoin_block_height);
+
+                        // todo: before, we were validating that we only published stacking orders during tenure change blocks
+                        if bitcoin_block_height > DEFAULT_FIRST_BURN_HEADER_HEIGHT + 1 {
+                            let res = publish_stacking_orders(
+                                config.devnet_config.borrow_mut(),
+                                &devnet_event_tx,
+                                &config.accounts,
+                                &config.services_map_hosts,
+                                config.deployment_fee_rate,
+                                bitcoin_block_height as u32,
+                            )
+                            .await;
+                            if let Some(tx_count) = res {
+                                let _ = devnet_event_tx.send(DevnetEvent::success(format!(
+                                    "Broadcasted {} stacking orders",
+                                    tx_count
+                                )));
+                            }
+                        }
+
+                        // }
+
                         (log, status)
                     }
                     BitcoinChainEvent::ChainUpdatedWithReorg(events) => {
@@ -382,42 +404,6 @@ pub async fn start_chains_coordinator(
                     )
                 };
                 let _ = devnet_event_tx.send(DevnetEvent::info(message));
-
-                // only publish stacking order txs in tenure-change blocks
-                let has_coinbase_tx = known_tip
-                    .block
-                    .transactions
-                    .iter()
-                    .any(|tx| tx.metadata.kind == StacksTransactionKind::Coinbase);
-                if has_coinbase_tx {
-                    let bitcoin_block_height = known_tip
-                        .block
-                        .metadata
-                        .bitcoin_anchor_block_identifier
-                        .index;
-
-                    // stacking early in the cycle to make sure that
-                    // the transactions are included in the next cycle
-                    let should_submit_pox_orders = known_tip.block.metadata.pox_cycle_position == 1;
-                    if should_submit_pox_orders {
-                        let res = publish_stacking_orders(
-                            &known_tip.block,
-                            &config.devnet_config,
-                            &devnet_event_tx,
-                            &config.accounts,
-                            &config.services_map_hosts,
-                            config.deployment_fee_rate,
-                            bitcoin_block_height as u32,
-                        )
-                        .await;
-                        if let Some(tx_count) = res {
-                            let _ = devnet_event_tx.send(DevnetEvent::success(format!(
-                                "Broadcasted {} stacking orders",
-                                tx_count
-                            )));
-                        }
-                    }
-                }
             }
             ObserverEvent::NotifyBitcoinTransactionProxied => {
                 if !boot_completed.load(Ordering::SeqCst) {
@@ -542,38 +528,54 @@ pub fn relay_devnet_protocol_deployment(
 }
 
 pub async fn publish_stacking_orders(
-    block: &StacksBlockData,
-    devnet_config: &DevnetConfig,
+    devnet_config: &mut DevnetConfig,
     devnet_event_tx: &Sender<DevnetEvent>,
     accounts: &[AccountConfig],
     services_map_hosts: &ServicesMapHosts,
     fee_rate: u64,
     bitcoin_block_height: u32,
 ) -> Option<usize> {
-    let orders_to_broadcast: Vec<&PoxStackingOrder> = devnet_config
-        .pox_stacking_orders
-        .iter()
-        .filter(|pox_stacking_order| {
-            pox_stacking_order.start_at_cycle - 1 == block.metadata.pox_cycle_index
-        })
-        .collect();
+    let stacks_node_rpc_url = format!("http://{}", &services_map_hosts.stacks_node_host);
+    let pox_info: PoxInfo = match reqwest::get(format!("{}/v2/pox", stacks_node_rpc_url)).await {
+        Ok(result) => match result.json().await {
+            Ok(pox_info) => Some(pox_info),
+            Err(e) => {
+                let _ = devnet_event_tx.send(DevnetEvent::warning(format!(
+                    "Unable to parse pox info: {}",
+                    e
+                )));
+                None
+            }
+        },
+        Err(e) => {
+            let _ = devnet_event_tx.send(DevnetEvent::warning(format!(
+                "unable to retrieve pox info: {}",
+                e
+            )));
+            None
+        }
+    }?;
 
-    if orders_to_broadcast.is_empty() {
+    let effective_height = u64::saturating_sub(
+        bitcoin_block_height.into(),
+        pox_info.first_burnchain_block_height,
+    );
+    let pox_cycle_length: u64 =
+        (pox_info.prepare_phase_block_length + pox_info.reward_phase_block_length).into();
+    let reward_cycle_id = effective_height / pox_cycle_length;
+
+    let pox_cycle_position = (effective_height % pox_cycle_length) as u32;
+
+    let should_submit_pox_orders = pox_cycle_position == 1;
+    if !should_submit_pox_orders {
         return None;
     }
 
-    let stacks_node_rpc_url = format!("http://{}", &services_map_hosts.stacks_node_host);
-
     let mut transactions = 0;
-
-    let pox_info: PoxInfo = reqwest::get(format!("{}/v2/pox", stacks_node_rpc_url))
-        .await
-        .expect("Unable to retrieve pox info")
-        .json()
-        .await
-        .expect("Unable to parse contract");
-
-    for (i, pox_stacking_order) in orders_to_broadcast.iter().enumerate() {
+    for (i, pox_stacking_order) in devnet_config.pox_stacking_orders.iter_mut().enumerate() {
+        if (pox_stacking_order.start_at_cycle - 1) as u64 != reward_cycle_id {
+            continue;
+        }
         let account = accounts
             .iter()
             .find(|e| e.label == pox_stacking_order.wallet);
@@ -599,6 +601,18 @@ pub async fn publish_stacking_orders(
             .and_then(|version| version.parse::<u32>().ok())
             .unwrap();
 
+        let has_stacked_previous_cycle = pox_stacking_order.cycles_stacked.is_some();
+        if let Some(auto_extend) = pox_stacking_order.auto_extend {
+            if auto_extend {
+                let _ = devnet_event_tx.send(DevnetEvent::success(format!(
+                    "Extending stacking order {}. Will re-stack at cycle {}.",
+                    i + 1,
+                    pox_stacking_order.start_at_cycle + pox_stacking_order.duration
+                )));
+                pox_stacking_order.start_at_cycle += pox_stacking_order.duration;
+                pox_stacking_order.update_cycles_stacked();
+            }
+        }
         let stacking_result =
             hiro_system_kit::thread_named("Stacking orders handler").spawn(move || {
                 let default_fee = fee_rate * 1000;
@@ -614,40 +628,80 @@ pub async fn publish_stacking_orders(
                 let addr_bytes = Hash160::from_bytes(&addr_bytes[1..21]).unwrap();
                 let addr_version = AddressHashMode::SerializeP2PKH;
 
-                let mut arguments = vec![
-                    ClarityValue::UInt(stx_amount.into()),
-                    ClarityValue::Tuple(
-                        TupleData::from_data(vec![
-                            (
-                                ClarityName::try_from("version".to_owned()).unwrap(),
-                                ClarityValue::buff_from_byte(addr_version as u8),
+                let tx = match has_stacked_previous_cycle {
+                    false => {
+                        let mut arguments = vec![
+                            ClarityValue::UInt(stx_amount.into()),
+                            ClarityValue::Tuple(
+                                TupleData::from_data(vec![
+                                    (
+                                        ClarityName::try_from("version".to_owned()).unwrap(),
+                                        ClarityValue::buff_from_byte(addr_version as u8),
+                                    ),
+                                    (
+                                        ClarityName::try_from("hashbytes".to_owned()).unwrap(),
+                                        ClarityValue::Sequence(SequenceData::Buffer(BuffData {
+                                            data: addr_bytes.as_bytes().to_vec(),
+                                        })),
+                                    ),
+                                ])
+                                .unwrap(),
                             ),
-                            (
-                                ClarityName::try_from("hashbytes".to_owned()).unwrap(),
-                                ClarityValue::Sequence(SequenceData::Buffer(BuffData {
-                                    data: addr_bytes.as_bytes().to_vec(),
-                                })),
-                            ),
-                        ])
-                        .unwrap(),
-                    ),
-                    ClarityValue::UInt((bitcoin_block_height - 1).into()),
-                    ClarityValue::UInt(duration),
-                ];
-                if pox_version >= 4 {
-                    let signer_key = vec![i as u8; 33];
-                    arguments.push(ClarityValue::buff_from(signer_key).unwrap());
-                };
+                            ClarityValue::UInt((bitcoin_block_height - 1).into()),
+                            ClarityValue::UInt(duration),
+                        ];
+                        if pox_version >= 4 {
+                            let mut signer_key = vec![0; 33];
+                            signer_key[0] = i as u8;
+                            signer_key[1] = nonce as u8;
+                            arguments.push(ClarityValue::buff_from(signer_key).unwrap());
+                        };
 
-                let stack_stx_tx = codec::build_contrat_call_transaction(
-                    pox_contract_id,
-                    "stack-stx".into(),
-                    arguments,
-                    nonce,
-                    default_fee,
-                    &hex_bytes(&account_secret_key).unwrap(),
-                );
-                stacks_rpc.post_transaction(&stack_stx_tx)
+                        codec::build_contrat_call_transaction(
+                            pox_contract_id,
+                            "stack-stx".into(),
+                            arguments,
+                            nonce,
+                            default_fee,
+                            &hex_bytes(&account_secret_key).unwrap(),
+                        )
+                    }
+                    true => {
+                        let mut arguments = vec![
+                            ClarityValue::UInt(duration),
+                            ClarityValue::Tuple(
+                                TupleData::from_data(vec![
+                                    (
+                                        ClarityName::try_from("version".to_owned()).unwrap(),
+                                        ClarityValue::buff_from_byte(addr_version as u8),
+                                    ),
+                                    (
+                                        ClarityName::try_from("hashbytes".to_owned()).unwrap(),
+                                        ClarityValue::Sequence(SequenceData::Buffer(BuffData {
+                                            data: addr_bytes.as_bytes().to_vec(),
+                                        })),
+                                    ),
+                                ])
+                                .unwrap(),
+                            ),
+                        ];
+                        if pox_version >= 4 {
+                            let mut signer_key = vec![0; 33];
+                            signer_key[0] = i as u8;
+                            signer_key[1] = nonce as u8;
+                            arguments.push(ClarityValue::buff_from(signer_key).unwrap());
+                        };
+                        codec::build_contrat_call_transaction(
+                            pox_contract_id,
+                            "stack-extend".into(),
+                            arguments,
+                            nonce,
+                            default_fee,
+                            &hex_bytes(&account_secret_key).unwrap(),
+                        )
+                    }
+                };
+                stacks_rpc.post_transaction(&tx)
             });
 
         match stacking_result {
