@@ -777,6 +777,19 @@ impl NetworkManifest {
             let remapped_subnet_contract_id =
                 format!("{}.{}", default_deployer.stx_address, contract_id.name);
 
+            // validate that epoch 3.0 is started in a reward phase
+            let epoch_3_0 = devnet_config.epoch_3_0.unwrap_or(DEFAULT_EPOCH_3_0);
+            if !is_in_reward_phase(
+                DEFAULT_FIRST_BURN_HEADER_HEIGHT,
+                DEFAULT_POX_REWARD_LENGTH,
+                DEFAULT_POX_PREPARE_LENGTH,
+                &epoch_3_0,
+            ) {
+                return Err(format!(
+                    "Epoch 3.0 must start *during* a reward phase, not a prepare phase. Epoch 3.0 start set to: {}. Reward Cycle Length: {}. Prepare Phase Length: {}",
+                    epoch_3_0, DEFAULT_POX_REWARD_LENGTH, DEFAULT_POX_PREPARE_LENGTH
+                ));
+            }
             let config = DevnetConfig {
                 name: devnet_config.name.take().unwrap_or("devnet".into()),
                 network_id: devnet_config.network_id,
@@ -1013,6 +1026,27 @@ fn compute_btc_address(public_key: &PublicKey, network: &BitcoinNetwork) -> Stri
         },
     );
     btc_address.to_string()
+}
+
+// This logic was taken from stacks-core:
+// https://github.com/stacks-network/stacks-core/blob/524b0e1ae9ad3c8d2d2ac37e72be4aee2c045ef8/src/burnchains/mod.rs#L513C30-L530
+pub fn is_in_reward_phase(
+    first_block_height: u64,
+    reward_cycle_length: u64,
+    prepare_length: u64,
+    block_height: &u64,
+) -> bool {
+    if block_height <= &first_block_height {
+        // not a reward cycle start if we're the first block after genesis.
+        false
+    } else {
+        let effective_height = block_height - first_block_height;
+        let reward_index = effective_height % reward_cycle_length;
+
+        // NOTE: first block in reward cycle is mod 1, so mod 0 is the last block in the
+        // prepare phase.
+        !(reward_index == 0 || reward_index > (reward_cycle_length - prepare_length))
+    }
 }
 
 #[cfg(feature = "wasm")]
