@@ -48,6 +48,13 @@ pub const DEFAULT_EPOCH_2_4: u64 = 104;
 pub const DEFAULT_EPOCH_2_5: u64 = 105;
 pub const DEFAULT_EPOCH_3_0: u64 = 121;
 
+// Currently, the pox-4 contract has these values hardcoded:
+// https://github.com/stacks-network/stacks-core/blob/e09ab931e2f15ff70f3bb5c2f4d7afb[…]42bd7bec6/stackslib/src/chainstate/stacks/boot/pox-testnet.clar
+// but they may be configurable in the future.
+pub const DEFAULT_POX_PREPARE_LENGTH: u64 = 4;
+pub const DEFAULT_POX_REWARD_LENGTH: u64 = 10;
+pub const DEFAULT_FIRST_BURN_HEADER_HEIGHT: u64 = 100;
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct NetworkManifestFile {
     network: NetworkConfigFile,
