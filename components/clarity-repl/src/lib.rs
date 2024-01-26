@@ -15,6 +15,7 @@ extern crate hiro_system_kit;
 mod macros;
 
 pub mod analysis;
+#[cfg(feature = "cli")]
 pub mod codec;
 pub mod repl;
 pub mod utils;

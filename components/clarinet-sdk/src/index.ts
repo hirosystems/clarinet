@@ -107,21 +107,23 @@ export type GetContractsInterfaces = () => Map<string, ContractInterface>;
 export type Simnet = {
   [K in keyof SDK]: K extends "callReadOnlyFn" | "callPublicFn"
     ? CallFn
-    : K extends "deployContract"
-    ? DeployContract
-    : K extends "transferSTX"
-    ? TransferSTX
-    : K extends "mineBlock"
-    ? MineBlock
-    : K extends "getDataVar"
-    ? GetDataVar
-    : K extends "getMapEntry"
-    ? GetMapEntry
-    : K extends "getContractAST"
-    ? GetContractAST
-    : K extends "getContractsInterfaces"
-    ? GetContractsInterfaces
-    : SDK[K];
+    : K extends "runSnippet"
+      ? ClarityValue
+      : K extends "deployContract"
+        ? DeployContract
+        : K extends "transferSTX"
+          ? TransferSTX
+          : K extends "mineBlock"
+            ? MineBlock
+            : K extends "getDataVar"
+              ? GetDataVar
+              : K extends "getMapEntry"
+                ? GetMapEntry
+                : K extends "getContractAST"
+                  ? GetContractAST
+                  : K extends "getContractsInterfaces"
+                    ? GetContractsInterfaces
+                    : SDK[K];
 };
 
 function parseEvents(events: string): ClarityEvent[] {
@@ -169,6 +171,17 @@ const getSessionProxy = () => ({
         return parseTxResponse(response);
       };
       return callFn;
+    }
+
+    if (prop === "runSnippet") {
+      return (snippet: string) => {
+        const response = session[prop](snippet);
+        if (response.startsWith("0x")) {
+          return Cl.deserialize(response);
+        } else {
+          return response;
+        }
+      };
     }
 
     if (prop === "deployContract") {
