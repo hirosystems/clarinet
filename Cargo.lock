@@ -6394,6 +6394,8 @@ dependencies = [
 [[package]]
 name = "wsts"
 version = "7.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c398736468f3322a43b6419be5315e68ae035e6565628603503c2a62ad726f36"
 dependencies = [
  "aes-gcm",
  "bs58 0.5.0",

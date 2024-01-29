@@ -57,7 +57,7 @@ reqwest = { version = "0.11", default-features = false, features = [
     "json",
     "rustls-tls",
 ] }
-wsts = { path= "../../../wsts", optional = true }
+wsts = { version = "7.0.0", optional = true }
 
 # WASM
 wasm-bindgen = { version = "0.2", optional = true }
