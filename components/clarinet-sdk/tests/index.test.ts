@@ -20,41 +20,41 @@ describe("basic simnet interactions", async () => {
   it("initialize simnet", async () => {
     expect(simnet.blockHeight).toBe(1);
   });
-});
 
-it("can mine empty blocks", async () => {
-  simnet.mineEmptyBlock();
-  expect(simnet.blockHeight).toBe(2);
-  simnet.mineEmptyBlocks(4);
-  expect(simnet.blockHeight).toBe(6);
-});
+  it("can mine empty blocks", async () => {
+    simnet.mineEmptyBlock();
+    expect(simnet.blockHeight).toBe(2);
+    simnet.mineEmptyBlocks(4);
+    expect(simnet.blockHeight).toBe(6);
+  });
 
-it("exposes devnet stacks accounts", async () => {
-  const accounts = simnet.getAccounts();
+  it("exposes devnet stacks accounts", async () => {
+    const accounts = simnet.getAccounts();
 
-  expect(accounts).toHaveLength(4);
-  expect(accounts.get("deployer")).toBe(deployerAddr);
-  expect(accounts.get("wallet_1")).toBe(address1);
-});
+    expect(accounts).toHaveLength(4);
+    expect(accounts.get("deployer")).toBe(deployerAddr);
+    expect(accounts.get("wallet_1")).toBe(address1);
+  });
 
-it("expose assets maps", async () => {
-  const assets = simnet.getAssetsMap();
-  expect(assets.get("STX")).toHaveLength(4);
-  expect(assets.get("STX")?.get(address1)).toBe(100000000000000n);
-});
+  it("expose assets maps", async () => {
+    const assets = simnet.getAssetsMap();
+    expect(assets.get("STX")).toHaveLength(4);
+    expect(assets.get("STX")?.get(address1)).toBe(100000000000000n);
+  });
 
-it("can get and set epoch", async () => {
-  // should be 2.4 by default
-  expect(simnet.currentEpoch).toBe("2.4");
+  it("can get and set epoch", async () => {
+    // should be 2.4 by default
+    expect(simnet.currentEpoch).toBe("2.4");
 
-  simnet.setEpoch("2.0");
-  expect(simnet.currentEpoch).toBe("2.0");
+    simnet.setEpoch("2.0");
+    expect(simnet.currentEpoch).toBe("2.0");
 
-  // @ts-ignore
-  // "0" is an invalid epoch
-  // it logs that 0 is invalid and defaults to 2.4
-  simnet.setEpoch("0");
-  expect(simnet.currentEpoch).toBe("2.4");
+    // @ts-ignore
+    // "0" is an invalid epoch
+    // it logs that 0 is invalid and defaults to 2.4
+    simnet.setEpoch("0");
+    expect(simnet.currentEpoch).toBe("2.4");
+  });
 });
 
 describe("simnet can run arbitrary snippets", async () => {
