@@ -102,13 +102,14 @@ export type GetDataVar = (contract: string, dataVar: string) => ClarityValue;
 export type GetMapEntry = (contract: string, mapName: string, mapKey: ClarityValue) => ClarityValue;
 export type GetContractAST = (contractId: string) => ContractAST;
 export type GetContractsInterfaces = () => Map<string, ContractInterface>;
+export type RunSnippet = (snippet: string) => ClarityValue | string;
 
 // because the session is wrapped in a proxy the types need to be hardcoded
 export type Simnet = {
   [K in keyof SDK]: K extends "callReadOnlyFn" | "callPublicFn"
     ? CallFn
     : K extends "runSnippet"
-      ? ClarityValue
+      ? RunSnippet
       : K extends "deployContract"
         ? DeployContract
         : K extends "transferSTX"
@@ -174,7 +175,7 @@ const getSessionProxy = () => ({
     }
 
     if (prop === "runSnippet") {
-      return (snippet: string) => {
+      const runSnippet: RunSnippet = (snippet) => {
         const response = session[prop](snippet);
         if (response.startsWith("0x")) {
           return Cl.deserialize(response);
@@ -182,6 +183,7 @@ const getSessionProxy = () => ({
           return response;
         }
       };
+      return runSnippet;
     }
 
     if (prop === "deployContract") {
