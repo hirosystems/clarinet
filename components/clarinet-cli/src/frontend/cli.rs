@@ -1779,7 +1779,7 @@ fn display_deploy_hint() {
     );
     println!(
         "{}",
-        yellow!("Find more information on the DevNet here: https://docs.hiro.so/clarinet/guides/how-to-run-integration-environment")
+        yellow!("Find more information on the devnet here: https://docs.hiro.so/clarinet/guides/how-to-run-integration-environment")
     );
     display_hint_footer();
 }
