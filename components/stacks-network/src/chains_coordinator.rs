@@ -23,6 +23,7 @@ use clarinet_deployments::onchain::{
     apply_on_chain_deployment, DeploymentCommand, DeploymentEvent,
 };
 use clarinet_deployments::types::DeploymentSpecification;
+use clarinet_files::PoxStackingOrder;
 use clarinet_files::DEFAULT_FIRST_BURN_HEADER_HEIGHT;
 use clarinet_files::{self, AccountConfig, DevnetConfig, NetworkManifest, ProjectManifest};
 use clarity_repl::clarity::address::AddressHashMode;
@@ -528,7 +529,7 @@ pub fn relay_devnet_protocol_deployment(
 }
 
 pub async fn publish_stacking_orders(
-    devnet_config: &mut DevnetConfig,
+    devnet_config: &DevnetConfig,
     devnet_event_tx: &Sender<DevnetEvent>,
     accounts: &[AccountConfig],
     services_map_hosts: &ServicesMapHosts,
@@ -572,10 +573,17 @@ pub async fn publish_stacking_orders(
     }
 
     let mut transactions = 0;
-    for (i, pox_stacking_order) in devnet_config.pox_stacking_orders.iter_mut().enumerate() {
-        if (pox_stacking_order.start_at_cycle - 1) as u64 != reward_cycle_id {
+    for (i, pox_stacking_order) in devnet_config.pox_stacking_orders.iter().enumerate() {
+        let PoxStackingOrder {
+            duration,
+            start_at_cycle,
+            ..
+        } = pox_stacking_order;
+
+        if (reward_cycle_id as u32 % duration) != (start_at_cycle - 1) {
             continue;
         }
+        let extend_stacking = reward_cycle_id as u32 != start_at_cycle - 1;
         let account = accounts
             .iter()
             .find(|e| e.label == pox_stacking_order.wallet);
@@ -592,7 +600,6 @@ pub async fn publish_stacking_orders(
             .btc_address
             .from_base58()
             .expect("Unable to get bytes from btc address");
-        let duration = pox_stacking_order.duration.into();
         let node_url = stacks_node_rpc_url.clone();
         let pox_contract_id = pox_info.contract_id.clone();
         let pox_version = pox_contract_id
@@ -601,18 +608,7 @@ pub async fn publish_stacking_orders(
             .and_then(|version| version.parse::<u32>().ok())
             .unwrap();
 
-        let has_stacked_previous_cycle = pox_stacking_order.cycles_stacked.is_some();
-        if let Some(auto_extend) = pox_stacking_order.auto_extend {
-            if auto_extend {
-                let _ = devnet_event_tx.send(DevnetEvent::success(format!(
-                    "Extending stacking order {}. Will re-stack at cycle {}.",
-                    i + 1,
-                    pox_stacking_order.start_at_cycle + pox_stacking_order.duration
-                )));
-                pox_stacking_order.start_at_cycle += pox_stacking_order.duration;
-                pox_stacking_order.update_cycles_stacked();
-            }
-        }
+        let duration = *duration;
         let stacking_result =
             hiro_system_kit::thread_named("Stacking orders handler").spawn(move || {
                 let default_fee = fee_rate * 1000;
@@ -625,82 +621,57 @@ pub async fn publish_stacking_orders(
                     &StacksNetwork::Devnet.get_networks(),
                 );
 
-                let addr_bytes = Hash160::from_bytes(&addr_bytes[1..21]).unwrap();
-                let addr_version = AddressHashMode::SerializeP2PKH;
+                let pox_addr_arg = ClarityValue::Tuple(
+                    TupleData::from_data(vec![
+                        (
+                            ClarityName::try_from("version".to_owned()).unwrap(),
+                            ClarityValue::buff_from_byte(AddressHashMode::SerializeP2PKH as u8),
+                        ),
+                        (
+                            ClarityName::try_from("hashbytes".to_owned()).unwrap(),
+                            ClarityValue::Sequence(SequenceData::Buffer(BuffData {
+                                data: Hash160::from_bytes(&addr_bytes[1..21])
+                                    .unwrap()
+                                    .as_bytes()
+                                    .to_vec(),
+                            })),
+                        ),
+                    ])
+                    .unwrap(),
+                );
 
-                let tx = match has_stacked_previous_cycle {
-                    false => {
-                        let mut arguments = vec![
+                let (method, mut arguments) = match extend_stacking {
+                    false => (
+                        "stack-stx",
+                        vec![
                             ClarityValue::UInt(stx_amount.into()),
-                            ClarityValue::Tuple(
-                                TupleData::from_data(vec![
-                                    (
-                                        ClarityName::try_from("version".to_owned()).unwrap(),
-                                        ClarityValue::buff_from_byte(addr_version as u8),
-                                    ),
-                                    (
-                                        ClarityName::try_from("hashbytes".to_owned()).unwrap(),
-                                        ClarityValue::Sequence(SequenceData::Buffer(BuffData {
-                                            data: addr_bytes.as_bytes().to_vec(),
-                                        })),
-                                    ),
-                                ])
-                                .unwrap(),
-                            ),
+                            pox_addr_arg,
                             ClarityValue::UInt((bitcoin_block_height - 1).into()),
-                            ClarityValue::UInt(duration),
-                        ];
-                        if pox_version >= 4 {
-                            let mut signer_key = vec![0; 33];
-                            signer_key[0] = i as u8;
-                            signer_key[1] = nonce as u8;
-                            arguments.push(ClarityValue::buff_from(signer_key).unwrap());
-                        };
-
-                        codec::build_contrat_call_transaction(
-                            pox_contract_id,
-                            "stack-stx".into(),
-                            arguments,
-                            nonce,
-                            default_fee,
-                            &hex_bytes(&account_secret_key).unwrap(),
-                        )
-                    }
-                    true => {
-                        let mut arguments = vec![
-                            ClarityValue::UInt(duration),
-                            ClarityValue::Tuple(
-                                TupleData::from_data(vec![
-                                    (
-                                        ClarityName::try_from("version".to_owned()).unwrap(),
-                                        ClarityValue::buff_from_byte(addr_version as u8),
-                                    ),
-                                    (
-                                        ClarityName::try_from("hashbytes".to_owned()).unwrap(),
-                                        ClarityValue::Sequence(SequenceData::Buffer(BuffData {
-                                            data: addr_bytes.as_bytes().to_vec(),
-                                        })),
-                                    ),
-                                ])
-                                .unwrap(),
-                            ),
-                        ];
-                        if pox_version >= 4 {
-                            let mut signer_key = vec![0; 33];
-                            signer_key[0] = i as u8;
-                            signer_key[1] = nonce as u8;
-                            arguments.push(ClarityValue::buff_from(signer_key).unwrap());
-                        };
-                        codec::build_contrat_call_transaction(
-                            pox_contract_id,
-                            "stack-extend".into(),
-                            arguments,
-                            nonce,
-                            default_fee,
-                            &hex_bytes(&account_secret_key).unwrap(),
-                        )
-                    }
+                            ClarityValue::UInt(duration.into()),
+                        ],
+                    ),
+                    true => (
+                        "stack-extend",
+                        vec![ClarityValue::UInt(duration.into()), pox_addr_arg],
+                    ),
                 };
+
+                if pox_version >= 4 {
+                    let mut signer_key = vec![0; 33];
+                    signer_key[0] = i as u8;
+                    signer_key[1] = nonce as u8;
+                    arguments.push(ClarityValue::buff_from(signer_key).unwrap());
+                };
+
+                let tx = codec::build_contrat_call_transaction(
+                    pox_contract_id,
+                    method.into(),
+                    arguments,
+                    nonce,
+                    default_fee,
+                    &hex_bytes(&account_secret_key).unwrap(),
+                );
+
                 stacks_rpc.post_transaction(&tx)
             });
 

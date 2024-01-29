@@ -112,7 +112,7 @@ impl Default for PoxInfo {
             current_burnchain_block_height: 100,
             first_burnchain_block_height: 100,
             prepare_phase_block_length: 4,
-            reward_phase_block_length: 6, // todo: can we update this to 10 without side effects?
+            reward_phase_block_length: 10,
             reward_slots: 10,
             total_liquid_supply_ustx: 1000000000000000,
             reward_cycle_id: 0,
