@@ -290,7 +290,6 @@ pub async fn start_chains_coordinator(
                         let status =
                             format!("mining blocks (chaintip = #{})", bitcoin_block_height);
 
-                        // todo: before, we were validating that we only published stacking orders during tenure change blocks
                         if bitcoin_block_height > DEFAULT_FIRST_BURN_HEADER_HEIGHT + 1 {
                             let res = publish_stacking_orders(
                                 config.devnet_config.borrow_mut(),
