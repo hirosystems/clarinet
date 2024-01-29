@@ -800,11 +800,7 @@ impl NetworkManifest {
                         .iter()
                         .any(|(account_name, _)| wallet_name == account_name);
                     if !wallet_is_in_accounts {
-                        return Err(format!(
-                                        "Account data was not provided for the wallet ({}) listed in stacking order {}.",
-                                        wallet_name,
-                                        i + 1
-                                    ));
+                        return Err(format!("Account data was not provided for the wallet ({}) listed in stacking order {}.", wallet_name, i + 1));
                     };
                 }
 
