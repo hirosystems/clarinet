@@ -123,11 +123,14 @@ impl ClarityInterpreter {
         cost_track: bool,
         eval_hooks: Option<Vec<&mut dyn EvalHook>>,
     ) -> Result<ExecutionResult, Vec<Diagnostic>> {
+        #[cfg(feature = "cli")]
         if self.repl_settings.clarity_wasm_mode {
             self.run_wasm(&contract.clone(), &mut ast.clone(), cost_track, None)
         } else {
             self.run_interpreter(&contract.clone(), &mut ast.clone(), cost_track, eval_hooks)
         }
+        #[cfg(not(feature = "cli"))]
+        self.run_interpreter(&contract.clone(), &mut ast.clone(), cost_track, eval_hooks)
     }
 
     pub fn run_interpreter(
@@ -422,6 +425,16 @@ impl ClarityInterpreter {
         analysis_db.commit();
     }
 
+    pub fn get_block_time(&mut self) -> u64 {
+        let block_height = self.get_block_height();
+        let mut conn = ClarityDatabase::new(
+            &mut self.datastore,
+            &self.burn_datastore,
+            &self.burn_datastore,
+        );
+        conn.get_block_time(block_height)
+    }
+
     pub fn get_data_var(
         &mut self,
         contract_id: &QualifiedContractIdentifier,
@@ -488,6 +501,7 @@ impl ClarityInterpreter {
             global_context.eval_hooks = Some(hooks);
         }
 
+        #[cfg(not(feature = "wasm"))]
         let show_timings = self.repl_settings.show_timings;
 
         global_context.begin();
@@ -524,23 +538,31 @@ impl ClarityInterpreter {
                                 args.push(evaluated_arg);
                             }
 
+                            #[cfg(not(feature = "wasm"))]
                             let start = std::time::Instant::now();
+
                             let args: Vec<SymbolicExpression> = args
                                 .iter()
                                 .map(|a| SymbolicExpression::atom_value(a.clone()))
                                 .collect();
                             let res = env.execute_contract(&contract_id, &method, &args, false)?;
 
+                            #[cfg(not(feature = "wasm"))]
                             if show_timings {
                                 println!("execution time: {:?}μs", start.elapsed().as_micros());
                             }
+
                             return Ok(Some(res));
                         }
                     }
                 };
 
+                #[cfg(not(feature = "wasm"))]
                 let start = std::time::Instant::now();
+
                 let result = eval(&contract_ast.expressions[0], &mut env, &context);
+
+                #[cfg(not(feature = "wasm"))]
                 if show_timings {
                     println!("execution time: {:?}μs", start.elapsed().as_micros());
                 }
@@ -1136,6 +1158,14 @@ mod tests {
         let tx_sender = StandardPrincipalData::from(addr);
         interpreter.set_tx_sender(tx_sender.clone());
         assert_eq!(interpreter.get_tx_sender(), tx_sender);
+    }
+
+    #[test]
+    fn test_get_block_time() {
+        let mut interpreter =
+            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let bt = interpreter.get_block_time();
+        assert_ne!(bt, 0); // TODO placeholder
     }
 
     #[test]

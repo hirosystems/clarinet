@@ -53,7 +53,9 @@ export type StacksEpochId =
   | "Epoch21"
   | "Epoch22"
   | "Epoch23"
-  | "Epoch24";
+  | "Epoch24"
+  | "Epoch25"
+  | "Epoch30";
 
 export type ClarityVersion = "Clarity1" | "Clarity2";
 

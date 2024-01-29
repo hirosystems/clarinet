@@ -223,13 +223,10 @@ pub struct SessionReport {
 pub fn execution_result_to_transaction_res(execution: &ExecutionResult) -> TransactionRes {
     let result = match &execution.result {
         EvaluationResult::Snippet(result) => clarity_values::to_raw_value(&result.result),
-        EvaluationResult::Contract(ref contract) => {
-            // contract.;
-            match contract.result {
-                Some(ref result) => clarity_values::to_raw_value(result),
-                _ => "0x03".into(),
-            }
-        }
+        EvaluationResult::Contract(ref contract) => match contract.result {
+            Some(ref result) => clarity_values::to_raw_value(result),
+            _ => "0x03".into(),
+        },
     };
     let events_as_strings = execution
         .events
@@ -698,14 +695,23 @@ impl SDK {
     }
 
     #[wasm_bindgen(js_name=runSnippet)]
-    pub fn run_snippet(&mut self, snippet: String) -> js_sys::Array {
+    pub fn run_snippet(&mut self, snippet: String) -> String {
         let session = self.get_session_mut();
-        let (_, output) = session.handle_command(&snippet);
-        let output_as_array = js_sys::Array::new_with_length(output.len() as u32);
-        for string in output {
-            output_as_array.push(&JsValue::from_str(&string));
+        match session.eval(snippet.clone(), None, false) {
+            Ok(res) => match res.result {
+                EvaluationResult::Snippet(result) => clarity_values::to_raw_value(&result.result),
+                EvaluationResult::Contract(_) => unreachable!(
+                    "Contract evaluation result should not be returned from eval_snippet",
+                ),
+            },
+            Err(diagnostics) => {
+                let mut message = "error:".to_string();
+                diagnostics.iter().for_each(|d| {
+                    message = format!("{message}\n{}", d.message);
+                });
+                message
+            }
         }
-        output_as_array
     }
 
     #[wasm_bindgen(js_name=setCurrentTestName)]

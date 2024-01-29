@@ -102,26 +102,29 @@ export type GetDataVar = (contract: string, dataVar: string) => ClarityValue;
 export type GetMapEntry = (contract: string, mapName: string, mapKey: ClarityValue) => ClarityValue;
 export type GetContractAST = (contractId: string) => ContractAST;
 export type GetContractsInterfaces = () => Map<string, ContractInterface>;
+export type RunSnippet = (snippet: string) => ClarityValue | string;
 
 // because the session is wrapped in a proxy the types need to be hardcoded
 export type Simnet = {
   [K in keyof SDK]: K extends "callReadOnlyFn" | "callPublicFn"
     ? CallFn
-    : K extends "deployContract"
-    ? DeployContract
-    : K extends "transferSTX"
-    ? TransferSTX
-    : K extends "mineBlock"
-    ? MineBlock
-    : K extends "getDataVar"
-    ? GetDataVar
-    : K extends "getMapEntry"
-    ? GetMapEntry
-    : K extends "getContractAST"
-    ? GetContractAST
-    : K extends "getContractsInterfaces"
-    ? GetContractsInterfaces
-    : SDK[K];
+    : K extends "runSnippet"
+      ? RunSnippet
+      : K extends "deployContract"
+        ? DeployContract
+        : K extends "transferSTX"
+          ? TransferSTX
+          : K extends "mineBlock"
+            ? MineBlock
+            : K extends "getDataVar"
+              ? GetDataVar
+              : K extends "getMapEntry"
+                ? GetMapEntry
+                : K extends "getContractAST"
+                  ? GetContractAST
+                  : K extends "getContractsInterfaces"
+                    ? GetContractsInterfaces
+                    : SDK[K];
 };
 
 function parseEvents(events: string): ClarityEvent[] {
@@ -169,6 +172,18 @@ const getSessionProxy = () => ({
         return parseTxResponse(response);
       };
       return callFn;
+    }
+
+    if (prop === "runSnippet") {
+      const runSnippet: RunSnippet = (snippet) => {
+        const response = session[prop](snippet);
+        if (response.startsWith("0x")) {
+          return Cl.deserialize(response);
+        } else {
+          return response;
+        }
+      };
+      return runSnippet;
     }
 
     if (prop === "deployContract") {
