@@ -324,13 +324,6 @@ pub struct PoxStackingOrder {
     pub slots: u64,
     pub btc_address: String,
     pub auto_extend: Option<bool>,
-    pub cycles_stacked: Option<u32>,
-}
-// todo: I don't love this solution and would like to do something more robust, and with better variable names
-impl PoxStackingOrder {
-    pub fn update_cycles_stacked(&mut self) {
-        self.cycles_stacked = Some(self.cycles_stacked.unwrap_or(0) + self.duration);
-    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
