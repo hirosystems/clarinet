@@ -289,7 +289,8 @@ pub async fn start_chains_coordinator(
                         let status =
                             format!("mining blocks (chaintip = #{})", bitcoin_block_height);
 
-                        if bitcoin_block_height > DEFAULT_FIRST_BURN_HEADER_HEIGHT + 1 {
+                        // Stacking orders can't be published until devnet is ready
+                        if bitcoin_block_height >= DEFAULT_FIRST_BURN_HEADER_HEIGHT + 10 {
                             let res = publish_stacking_orders(
                                 &config.devnet_config,
                                 &devnet_event_tx,
@@ -537,13 +538,11 @@ pub async fn publish_stacking_orders(
         Ok(result) => match result.json().await {
             Ok(pox_info) => Some(pox_info),
             Err(e) => {
-                // Ignore errors for the first blocks, the api is not ready yet
-                if bitcoin_block_height < 110 {
-                    let _ = devnet_event_tx.send(DevnetEvent::warning(format!(
-                        "Unable to parse pox info: {}",
-                        e
-                    )));
-                };
+                let _ = devnet_event_tx.send(DevnetEvent::warning(format!(
+                    "Unable to parse pox info: {}",
+                    e
+                )));
+
                 None
             }
         },
