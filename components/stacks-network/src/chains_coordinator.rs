@@ -37,7 +37,6 @@ use hiro_system_kit::slog;
 use hiro_system_kit::yellow;
 use stacks_rpc_client::PoxInfo;
 use stacks_rpc_client::StacksRpc;
-use std::borrow::BorrowMut;
 use std::convert::TryFrom;
 use std::str;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -152,7 +151,7 @@ impl DevnetEventObserverConfig {
 }
 
 pub async fn start_chains_coordinator(
-    mut config: DevnetEventObserverConfig,
+    config: DevnetEventObserverConfig,
     devnet_event_tx: Sender<DevnetEvent>,
     chains_coordinator_commands_rx: crossbeam_channel::Receiver<ChainsCoordinatorCommand>,
     _chains_coordinator_commands_tx: crossbeam_channel::Sender<ChainsCoordinatorCommand>,
@@ -292,7 +291,7 @@ pub async fn start_chains_coordinator(
 
                         if bitcoin_block_height > DEFAULT_FIRST_BURN_HEADER_HEIGHT + 1 {
                             let res = publish_stacking_orders(
-                                config.devnet_config.borrow_mut(),
+                                &config.devnet_config,
                                 &devnet_event_tx,
                                 &config.accounts,
                                 &config.services_map_hosts,
