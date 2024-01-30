@@ -746,6 +746,7 @@ impl StacksDevnet {
                     wallet,
                     slots,
                     btc_address,
+                    auto_extend: Some(false),
                 });
             }
             overrides.pox_stacking_orders = Some(stacking_orders);
