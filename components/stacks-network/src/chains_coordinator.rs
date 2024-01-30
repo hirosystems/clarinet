@@ -540,10 +540,13 @@ pub async fn publish_stacking_orders(
         Ok(result) => match result.json().await {
             Ok(pox_info) => Some(pox_info),
             Err(e) => {
-                let _ = devnet_event_tx.send(DevnetEvent::warning(format!(
-                    "Unable to parse pox info: {}",
-                    e
-                )));
+                // Ignore errors for the first blocks, the api is not ready yet
+                if bitcoin_block_height < 110 {
+                    let _ = devnet_event_tx.send(DevnetEvent::warning(format!(
+                        "Unable to parse pox info: {}",
+                        e
+                    )));
+                };
                 None
             }
         },
@@ -579,10 +582,13 @@ pub async fn publish_stacking_orders(
             ..
         } = pox_stacking_order;
 
-        if (reward_cycle_id as u32 % duration) != (start_at_cycle - 1) {
+        if ((reward_cycle_id as u32) % duration) != (start_at_cycle - 1) {
             continue;
         }
         let extend_stacking = reward_cycle_id as u32 != start_at_cycle - 1;
+        if extend_stacking && !pox_stacking_order.auto_extend.unwrap_or_default() {
+            continue;
+        }
         let account = accounts
             .iter()
             .find(|e| e.label == pox_stacking_order.wallet);
