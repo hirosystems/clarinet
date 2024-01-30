@@ -186,6 +186,7 @@ impl Session {
         }
     }
 
+    #[cfg(feature = "cli")]
     pub fn handle_command(
         &mut self,
         command: &str,
@@ -1036,9 +1037,9 @@ impl Session {
     #[cfg(not(feature = "cli"))]
     fn run_snippet(&mut self, output: &mut Vec<String>, cost_track: bool, cmd: &str) {
         let (mut result, cost) =
-            match self.formatted_interpretation(cmd.to_string(), None, cost_track, None, None) {
+            match self.formatted_interpretation(cmd.to_string(), None, cost_track, None) {
                 Ok((output, result)) => (output, result.cost.clone()),
-                Err(output) => (output, None),
+                Err((output, _)) => (output, None),
             };
 
         if let Some(cost) = cost {
