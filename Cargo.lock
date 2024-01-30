@@ -323,9 +323,9 @@ checksum = "9e1b586273c5702936fe7b7d6896644d8be71e6314cfe09d3167c95f712589e8"
 
 [[package]]
 name = "base64"
-version = "0.21.3"
+version = "0.21.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "414dcefbc63d77c526a76b3afcf6fbb9b5e2791c19c3aa2297733208750c6e53"
+checksum = "9d297deb1925b89f2ccc13d7635fa0714f12c87adce1c75356b39ca9b7178567"
 
 [[package]]
 name = "base64-compat"
@@ -347,6 +347,12 @@ name = "bech32"
 version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d86b93f97252c47b41663388e6d155714a9d0c398b99f1005cbc5f978b29f445"
+
+[[package]]
+name = "bech32"
+version = "0.10.0-beta"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "98f7eed2b2781a6f0b5c903471d48e15f56fb4e1165df8a9a2337fd1a59d45ea"
 
 [[package]]
 name = "binascii"
@@ -401,7 +407,7 @@ version = "0.29.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0694ea59225b0c5f3cb405ff3f670e4828358ed26aec49dc352f730f0cb1a8a3"
 dependencies = [
- "bech32",
+ "bech32 0.9.1",
  "bitcoin_hashes 0.11.0",
  "secp256k1 0.24.3",
  "serde",
@@ -409,22 +415,27 @@ dependencies = [
 
 [[package]]
 name = "bitcoin"
-version = "0.30.2"
+version = "0.31.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1945a5048598e4189e239d3f809b19bdad4845c4b2ba400d304d2dcf26d2c462"
+checksum = "fd00f3c09b5f21fb357abe32d29946eb8bb7a0862bae62c0b5e4a692acbbe73c"
 dependencies = [
- "bech32",
- "bitcoin-private",
- "bitcoin_hashes 0.12.0",
+ "bech32 0.10.0-beta",
+ "bitcoin-internals",
+ "bitcoin_hashes 0.13.0",
+ "hex-conservative",
  "hex_lit",
- "secp256k1 0.27.0",
+ "secp256k1 0.28.1",
+ "serde",
 ]
 
 [[package]]
-name = "bitcoin-private"
-version = "0.1.0"
+name = "bitcoin-internals"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "73290177011694f38ec25e165d0387ab7ea749a4b81cd4c80dae5988229f7a57"
+checksum = "9425c3bf7089c983facbae04de54513cce73b41c7f9ff8c845b54e7bc64ebbfb"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "bitcoin_hashes"
@@ -443,11 +454,13 @@ dependencies = [
 
 [[package]]
 name = "bitcoin_hashes"
-version = "0.12.0"
+version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5d7066118b13d4b20b23645932dfb3a81ce7e29f95726c2036fa33cd7b092501"
+checksum = "1930a4dabfebb8d7d9992db18ebe3ae2876f0a305fab206fd168df931ede293b"
 dependencies = [
- "bitcoin-private",
+ "bitcoin-internals",
+ "hex-conservative",
+ "serde",
 ]
 
 [[package]]
@@ -456,8 +469,21 @@ version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0261b2bb7617e0c91b452a837bbd1291fd34ad6990cb8e3ffc28239cc045b5ca"
 dependencies = [
- "bitcoincore-rpc-json",
- "jsonrpc",
+ "bitcoincore-rpc-json 0.16.0",
+ "jsonrpc 0.12.1",
+ "log",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "bitcoincore-rpc"
+version = "0.18.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8eb70725a621848c83b3809913d5314c0d20ca84877d99dd909504b564edab00"
+dependencies = [
+ "bitcoincore-rpc-json 0.18.0",
+ "jsonrpc 0.14.1",
  "log",
  "serde",
  "serde_json",
@@ -470,6 +496,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c231bea28e314879c5aef240f6052e8a72a369e3c9f9b20d9bfbb33ad18029b2"
 dependencies = [
  "bitcoin 0.29.2",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "bitcoincore-rpc-json"
+version = "0.18.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "856ffbee2e492c23bca715d72ea34aae80d58400f2bda26a82015d6bc2ec3662"
+dependencies = [
+ "bitcoin 0.31.1",
  "serde",
  "serde_json",
 ]
@@ -543,7 +580,7 @@ version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f03db470b3c0213c47e978da93200259a1eb4dae2e5512cba9955e2b540a6fc6"
 dependencies = [
- "base64 0.21.3",
+ "base64 0.21.7",
  "bollard-stubs",
  "bytes",
  "futures-core",
@@ -660,15 +697,14 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "chainhook-sdk"
-version = "0.12.0"
-source = "git+https://github.com/hirosystems/chainhook.git?rev=a938e61846a430750ad31d84b2032efabf6d039f#a938e61846a430750ad31d84b2032efabf6d039f"
+version = "0.12.1"
+source = "git+https://github.com/hirosystems/chainhook.git?rev=c6c905ec732b6c72815901851337f2625e2f9518#c6c905ec732b6c72815901851337f2625e2f9518"
 dependencies = [
  "base58 0.2.0",
- "base64 0.13.1",
- "bitcoincore-rpc",
- "bitcoincore-rpc-json",
+ "base64 0.21.7",
+ "bitcoincore-rpc 0.18.0",
+ "bitcoincore-rpc-json 0.18.0",
  "chainhook-types",
- "clarinet-utils 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "crossbeam-channel",
  "dashmap",
  "futures",
@@ -694,8 +730,8 @@ dependencies = [
 
 [[package]]
 name = "chainhook-types"
-version = "1.3.0"
-source = "git+https://github.com/hirosystems/chainhook.git?rev=a938e61846a430750ad31d84b2032efabf6d039f#a938e61846a430750ad31d84b2032efabf6d039f"
+version = "1.3.1"
+source = "git+https://github.com/hirosystems/chainhook.git?rev=c6c905ec732b6c72815901851337f2625e2f9518#c6c905ec732b6c72815901851337f2625e2f9518"
 dependencies = [
  "hex 0.4.3",
  "schemars",
@@ -816,7 +852,7 @@ dependencies = [
  "clap_complete",
  "clarinet-deployments",
  "clarinet-files",
- "clarinet-utils 1.0.0",
+ "clarinet-utils",
  "clarity-lsp",
  "clarity-repl 2.2.0",
  "crossbeam-channel",
@@ -837,7 +873,7 @@ dependencies = [
  "mio",
  "nix 0.24.2",
  "num_cpus",
- "pbkdf2 0.12.2",
+ "pbkdf2",
  "percent-encoding",
  "pin-project",
  "ratatui",
@@ -868,12 +904,12 @@ name = "clarinet-deployments"
 version = "2.2.0"
 dependencies = [
  "base58 0.2.0",
- "base64 0.21.3",
+ "base64 0.21.7",
  "bitcoin 0.29.2",
- "bitcoincore-rpc",
- "bitcoincore-rpc-json",
+ "bitcoincore-rpc 0.16.0",
+ "bitcoincore-rpc-json 0.16.0",
  "clarinet-files",
- "clarinet-utils 1.0.0",
+ "clarinet-utils",
  "clarity-repl 2.2.0",
  "colored 2.0.4",
  "libsecp256k1 0.7.1",
@@ -893,7 +929,7 @@ dependencies = [
  "bip39",
  "bitcoin 0.29.2",
  "chainhook-types",
- "clarinet-utils 1.0.0",
+ "clarinet-utils",
  "clarity-repl 2.2.0",
  "js-sys",
  "libsecp256k1 0.7.1",
@@ -931,19 +967,7 @@ name = "clarinet-utils"
 version = "1.0.0"
 dependencies = [
  "hmac 0.12.1",
- "pbkdf2 0.12.2",
- "sha2 0.10.6",
-]
-
-[[package]]
-name = "clarinet-utils"
-version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f19b3340d53afe73fb175052ab09aec54b6e3076afd30d6b907b401cb6eecf3c"
-dependencies = [
- "hmac 0.12.1",
- "pbkdf2 0.11.0",
- "serde",
+ "pbkdf2",
  "sha2 0.10.6",
 ]
 
@@ -1026,14 +1050,14 @@ dependencies = [
 [[package]]
 name = "clarity-repl"
 version = "2.1.0"
-source = "git+https://github.com/hirosystems/clarinet.git?branch=chore/upgrade-clarity-vm#96eada8d55b3738d68e437c1d8474e1a247ed3f8"
+source = "git+https://github.com/hirosystems/clarinet.git?rev=53a6d8ed#53a6d8ed65bd31aadd2cad691230a801f15f47b1"
 dependencies = [
  "ansi_term",
  "atty",
  "chrono",
  "clarity",
  "getrandom 0.2.8",
- "hiro-system-kit 0.1.0 (git+https://github.com/hirosystems/clarinet.git?branch=chore/upgrade-clarity-vm)",
+ "hiro-system-kit 0.1.0 (git+https://github.com/hirosystems/clarinet.git?rev=53a6d8ed)",
  "integer-sqrt",
  "lazy_static",
  "regex",
@@ -2203,6 +2227,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 
 [[package]]
+name = "hex-conservative"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "30ed443af458ccb6d81c1e7e661545f94d3176752fb1df2f543b902a1e0f51e2"
+
+[[package]]
 name = "hex_lit"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2227,7 +2257,7 @@ dependencies = [
 [[package]]
 name = "hiro-system-kit"
 version = "0.1.0"
-source = "git+https://github.com/hirosystems/clarinet.git?branch=chore/upgrade-clarity-vm#96eada8d55b3738d68e437c1d8474e1a247ed3f8"
+source = "git+https://github.com/hirosystems/clarinet.git?rev=53a6d8ed#53a6d8ed65bd31aadd2cad691230a801f15f47b1"
 dependencies = [
  "ansi_term",
  "atty",
@@ -2349,9 +2379,9 @@ checksum = "c4a1e36c821dbe04574f602848a19f742f4fb3c98d40449f11bcad18d6b17421"
 
 [[package]]
 name = "hyper"
-version = "0.14.24"
+version = "0.14.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5e011372fa0b68db8350aa7a248930ecc7839bf46d8485577d69f117a75f164c"
+checksum = "ffb1cfd654a8219eaef89881fdb3bb3b1cdc5fa75ded05d6933b2b382e395468"
 dependencies = [
  "bytes",
  "futures-channel",
@@ -2615,6 +2645,17 @@ dependencies = [
  "base64-compat",
  "serde",
  "serde_derive",
+ "serde_json",
+]
+
+[[package]]
+name = "jsonrpc"
+version = "0.14.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8128f36b47411cd3f044be8c1f5cc0c9e24d1d1bfdc45f0a57897b32513053f2"
+dependencies = [
+ "base64 0.13.1",
+ "serde",
  "serde_json",
 ]
 
@@ -2976,12 +3017,13 @@ checksum = "68354c5c6bd36d73ff3feceb05efa59b6acb7626617f4962be322a825e61f79a"
 
 [[package]]
 name = "miniscript"
-version = "10.0.0"
+version = "11.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1eb102b66b2127a872dbcc73095b7b47aeb9d92f7b03c2b2298253ffc82c7594"
+checksum = "86a23dd3ad145a980e231185d114399f25a0a307d2cd918010ddda6334323df9"
 dependencies = [
- "bitcoin 0.30.2",
- "bitcoin-private",
+ "bech32 0.10.0-beta",
+ "bitcoin 0.31.1",
+ "bitcoin-internals",
 ]
 
 [[package]]
@@ -3340,17 +3382,6 @@ dependencies = [
 
 [[package]]
 name = "password-hash"
-version = "0.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7676374caaee8a325c9e7a2ae557f216c5563a171d6997b0ef8a65af35147700"
-dependencies = [
- "base64ct",
- "rand_core 0.6.4",
- "subtle 2.4.1",
-]
-
-[[package]]
-name = "password-hash"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "346f04948ba92c43e8469c1ee6736c7563d71012b17d40745260fe106aac2166"
@@ -3368,25 +3399,13 @@ checksum = "de3145af08024dea9fa9914f381a17b8fc6034dfb00f3a84013f7ff43f29ed4c"
 
 [[package]]
 name = "pbkdf2"
-version = "0.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "83a0692ec44e4cf1ef28ca317f14f8f07da2d95ec3fa01f86e4467b725e60917"
-dependencies = [
- "digest 0.10.7",
- "hmac 0.12.1",
- "password-hash 0.4.2",
- "sha2 0.10.6",
-]
-
-[[package]]
-name = "pbkdf2"
 version = "0.12.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8ed6a7761f76e3b9f92dfb0a60a6a6477c61024b775147ff0973a02653abaf2"
 dependencies = [
  "digest 0.10.7",
  "hmac 0.12.1",
- "password-hash 0.5.0",
+ "password-hash",
  "sha2 0.10.6",
 ]
 
@@ -3845,7 +3864,7 @@ version = "0.11.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "37b1ae8d9ac08420c66222fb9096fc5de435c3c48542bc5336c51892cffafb41"
 dependencies = [
- "base64 0.21.3",
+ "base64 0.21.7",
  "bytes",
  "encoding_rs",
  "futures-core",
@@ -4110,7 +4129,7 @@ version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d194b56d58803a43635bdc398cd17e383d6f71f9182b9a192c127ca42494a59b"
 dependencies = [
- "base64 0.21.3",
+ "base64 0.21.7",
 ]
 
 [[package]]
@@ -4231,12 +4250,14 @@ dependencies = [
 
 [[package]]
 name = "secp256k1"
-version = "0.27.0"
+version = "0.28.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "25996b82292a7a57ed3508f052cfff8640d38d32018784acd714758b43da9c8f"
+checksum = "3f622567e3b4b38154fb8190bcf6b160d7a4301d70595a49195b48c116007a27"
 dependencies = [
- "bitcoin_hashes 0.12.0",
- "secp256k1-sys 0.8.1",
+ "bitcoin_hashes 0.13.0",
+ "rand 0.8.5",
+ "secp256k1-sys 0.9.2",
+ "serde",
 ]
 
 [[package]]
@@ -4250,9 +4271,9 @@ dependencies = [
 
 [[package]]
 name = "secp256k1-sys"
-version = "0.8.1"
+version = "0.9.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "70a129b9e9efbfb223753b9163c4ab3b13cff7fd9c7f010fbac25ab4099fa07e"
+checksum = "e5d1746aae42c19d583c3c1a8c646bfad910498e2051c551a7f2e3c0c9fbb7eb"
 dependencies = [
  "cc",
 ]
@@ -4405,7 +4426,7 @@ version = "3.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f58c3a1b3e418f61c25b2aeb43fc6c95eaa252b8cecdda67f401943e9e08d33f"
 dependencies = [
- "base64 0.21.3",
+ "base64 0.21.7",
  "chrono",
  "hex 0.4.3",
  "indexmap 1.9.2",
@@ -4767,7 +4788,7 @@ version = "2.2.0"
 dependencies = [
  "clarinet-deployments",
  "clarinet-files",
- "clarinet-utils 1.0.0",
+ "clarinet-utils",
  "crossbeam-channel",
  "error-chain 0.12.4",
  "hiro-system-kit 0.1.0",
@@ -4785,7 +4806,7 @@ dependencies = [
  "atty",
  "base58 0.2.0",
  "bitcoin 0.29.2",
- "bitcoincore-rpc",
+ "bitcoincore-rpc 0.16.0",
  "bollard",
  "bytes",
  "chainhook-sdk",
@@ -4793,7 +4814,7 @@ dependencies = [
  "clap",
  "clarinet-deployments",
  "clarinet-files",
- "clarinet-utils 1.0.0",
+ "clarinet-utils",
  "clarity-repl 2.2.0",
  "crossbeam-channel",
  "crossterm",
@@ -4817,12 +4838,12 @@ dependencies = [
 [[package]]
 name = "stacks-rpc-client"
 version = "2.1.0"
-source = "git+https://github.com/hirosystems/clarinet.git?branch=chore/upgrade-clarity-vm#96eada8d55b3738d68e437c1d8474e1a247ed3f8"
+source = "git+https://github.com/hirosystems/clarinet.git?rev=53a6d8ed#53a6d8ed65bd31aadd2cad691230a801f15f47b1"
 dependencies = [
  "clarity-repl 2.1.0",
  "hmac 0.12.1",
  "libsecp256k1 0.7.1",
- "pbkdf2 0.12.2",
+ "pbkdf2",
  "reqwest",
  "serde",
  "serde_derive",
@@ -4838,7 +4859,7 @@ dependencies = [
  "clarity-repl 2.2.0",
  "hmac 0.12.1",
  "libsecp256k1 0.7.1",
- "pbkdf2 0.12.2",
+ "pbkdf2",
  "reqwest",
  "serde",
  "serde_derive",
@@ -5859,7 +5880,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "aba5bf44d044d25892c03fb3534373936ee204141ff92bac8297787ac7f22318"
 dependencies = [
  "anyhow",
- "base64 0.21.3",
+ "base64 0.21.7",
  "bincode",
  "directories-next",
  "log",
