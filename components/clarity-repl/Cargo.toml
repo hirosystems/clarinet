@@ -93,6 +93,7 @@ sdk = [
     "clarity/developer-mode",
     "clarity/log",
     "hiro_system_kit/tokio_helpers",
+    "wsts"
 ]
 dap = [
     "tokio",

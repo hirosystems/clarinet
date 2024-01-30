@@ -15,7 +15,7 @@ extern crate hiro_system_kit;
 mod macros;
 
 pub mod analysis;
-#[cfg(feature = "cli")]
+#[cfg(not(feature = "wasm"))]
 pub mod codec;
 pub mod repl;
 pub mod utils;
