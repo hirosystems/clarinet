@@ -19,10 +19,6 @@ This new version allows to preview the Nakamoto release and to run ClarityWasm l
 
 #### [2.1.0](https://github.com/hirosystems/clarinet/compare/v2.0.0...v2.1.0) (2023-12-13)
 
-##### Documentation Changes
-
-*  Change `contract publish` -> `deployments apply` (#1287) (f9a55262)
-*  Improve clarinet-sdk contributing section (#1281) (3c85bd85)
 
 ##### New Features
 
@@ -50,6 +46,11 @@ This new version allows to preview the Nakamoto release and to run ClarityWasm l
 
 *  Implement nextest and improve caching (#1258) (d77d27e2)
 *  Add coverage (#1241) (6a72d54f)
+
+##### Documentation Changes
+
+*  Change `contract publish` -> `deployments apply` (#1287) (f9a55262)
+*  Improve clarinet-sdk contributing section (#1281) (3c85bd85)
 
 #### [2.0.0](https://github.com/hirosystems/clarinet/compare/v1.8.0...v2.0.0) (2023-10-26)
 
