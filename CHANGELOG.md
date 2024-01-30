@@ -1,6 +1,6 @@
 #### [2.2.0](https://github.com/hirosystems/clarinet/compare/v2.1.0...v2.2.0) (2024-01-30)
 
-This new version allows to preview the Nakamoto release and to run ClarityWasm locally.
+This new version allows to preview the Nakamoto release and to run clarity-wasm locally.
 
 ##### New Features
 
