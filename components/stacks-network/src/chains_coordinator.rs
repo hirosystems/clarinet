@@ -308,8 +308,6 @@ pub async fn start_chains_coordinator(
                             }
                         }
 
-                        // }
-
                         (log, status)
                     }
                     BitcoinChainEvent::ChainUpdatedWithReorg(events) => {
