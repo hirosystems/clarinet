@@ -398,7 +398,7 @@ struct Console {
         conflicts_with = "use_on_disk_deployment_plan"
     )]
     pub use_computed_deployment_plan: bool,
-    /// Allow the Clarity Wasm preview ot run in parallel of the Clarity interpreter (beta)
+    /// Allow the Clarity Wasm preview to run in parallel with the Clarity interpreter (beta)
     #[clap(long = "enable-clarity-wasm")]
     pub enable_clarity_wasm: bool,
 }
