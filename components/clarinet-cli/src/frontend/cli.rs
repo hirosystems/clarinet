@@ -398,9 +398,9 @@ struct Console {
         conflicts_with = "use_on_disk_deployment_plan"
     )]
     pub use_computed_deployment_plan: bool,
-    /// Prevent the Clarity Wasm preview from running in parallel of the Clarity interpreter
-    #[clap(long = "disable-clarity-wasm")]
-    pub disable_clarity_wasm: bool,
+    /// Allow the Clarity Wasm preview to run in parallel with the Clarity interpreter (beta)
+    #[clap(long = "enable-clarity-wasm")]
+    pub enable_clarity_wasm: bool,
 }
 
 #[derive(Parser, PartialEq, Clone, Debug)]
@@ -1026,9 +1026,7 @@ pub fn main() {
                             std::process::exit(1);
                         }
 
-                        if cmd.disable_clarity_wasm {
-                            Terminal::load(artifacts.session, None)
-                        } else {
+                        if cmd.enable_clarity_wasm {
                             let mut manifest_wasm = manifest.clone();
                             manifest_wasm.repl_settings.clarity_wasm_mode = true;
                             let (_, _, artifacts_wasm) = load_deployment_and_artifacts_or_exit(
@@ -1058,16 +1056,18 @@ pub fn main() {
                             }
 
                             Terminal::load(artifacts.session, Some(artifacts_wasm.session))
+                        } else {
+                            Terminal::load(artifacts.session, None)
                         }
                     }
                     None => {
                         let settings = repl::SessionSettings::default();
-                        if cmd.disable_clarity_wasm {
-                            Terminal::new(settings, None)
-                        } else {
+                        if cmd.enable_clarity_wasm {
                             let mut settings_wasm = repl::SessionSettings::default();
                             settings_wasm.repl_settings.clarity_wasm_mode = true;
                             Terminal::new(settings, Some(settings_wasm))
+                        } else {
+                            Terminal::new(settings, None)
                         }
                     }
                 };
