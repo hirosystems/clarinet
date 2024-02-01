@@ -32,7 +32,7 @@ futures = "0.3.12"
 base58 = "0.2.0"
 tokio = { version = "1.35.1", features = ["full"] }
 
-chainhook-sdk = { default-features = true, git = "https://github.com/hirosystems/chainhook.git", rev = "3a53611" }
+chainhook-sdk = { default-features = true, git = "https://github.com/hirosystems/chainhook.git", rev = "efba5b0" }
 # chainhook-sdk = { version = "=0.11", default-features = true }
 stacks-rpc-client = { path = "../stacks-rpc-client" }
 clarinet-files = { path = "../clarinet-files", features = ["cli"] }
