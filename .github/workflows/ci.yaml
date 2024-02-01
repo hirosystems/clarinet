@@ -354,17 +354,15 @@ jobs:
 
     steps:
       - name: Configure git to use LF (Windows)
-        if: matrix.os == 'windows-latest' && github.event_name != 'pull_request'
+        if: matrix.os == 'windows-latest'
         run: |
           git config --global core.autocrlf false
           git config --global core.eol lf
 
       - name: Checkout repository
-        if: github.event_name != 'pull_request' || matrix.target == 'x86_64-unknown-linux-gnu'
         uses: actions/checkout@v4
 
       - name: Install Rust toolchain
-        if: github.event_name != 'pull_request' || matrix.target == 'x86_64-unknown-linux-gnu'
         run: rustup toolchain install stable --profile minimal --target ${{ matrix.target }}
 
       - name: "Get Rust version (unix)"
@@ -377,7 +375,7 @@ jobs:
         run: echo "RUST_VERSION_HASH=$(rustc --version | sha256sum | awk '{print $1}')" >> $GITHUB_ENV
 
       - name: Install and cache Node
-        if: github.event_name != 'pull_request' && matrix.target != 'x86_64-unknown-linux-musl'
+        if: matrix.target != 'x86_64-unknown-linux-musl'
         uses: actions/setup-node@v4
         with:
           node-version: "18"
@@ -388,7 +386,6 @@ jobs:
           cache-dependency-path: components/stacks-devnet-js/package-lock.json
 
       - name: Cache cargo
-        if: github.event_name != 'pull_request' || matrix.target == 'x86_64-unknown-linux-gnu'
         uses: actions/cache@v3
         with:
           path: |
@@ -398,42 +395,42 @@ jobs:
 
       # Set environment variables required from cross compiling from macos-x86_64 to macos-arm64
       - name: Configure macos-arm64 cross compile config
-        if: github.event_name != 'pull_request' && matrix.target == 'aarch64-apple-darwin'
+        if: matrix.target == 'aarch64-apple-darwin'
         run: |
           echo "SDKROOT=$(xcrun -sdk macosx --show-sdk-path)" >> $GITHUB_ENV
           echo "MACOSX_DEPLOYMENT_TARGET=$(xcrun -sdk macosx --show-sdk-platform-version)" >> $GITHUB_ENV
 
       - name: Configure artifact names (libc)
-        if: (github.event_name != 'pull_request' || matrix.target == 'x86_64-unknown-linux-gnu') && matrix.libc
+        if: ${{ matrix.libc }}
         shell: bash
         run: |
           echo "SHORT_TARGET_NAME=${{ matrix.platform }}-${{ matrix.architecture }}-${{ matrix.libc }}" >> $GITHUB_ENV
           echo "PRE_GYP_TARGET_NAME=${{ matrix.platform }}-${{ matrix.architecture }}-${{ matrix.libc }}" >> $GITHUB_ENV
 
       - name: Configure artifact names (not libc)
-        if: github.event_name != 'pull_request' && ! matrix.libc
+        if: ${{ ! matrix.libc }}
         shell: bash
         run: |
           echo "SHORT_TARGET_NAME=${{ matrix.platform }}-${{ matrix.architecture }}" >> $GITHUB_ENV
           echo "PRE_GYP_TARGET_NAME=${{ matrix.platform }}-${{ matrix.architecture }}-unknown" >> $GITHUB_ENV
 
       - name: Build - Node
-        if: (github.event_name != 'pull_request' || matrix.target == 'x86_64-unknown-linux-gnu') && matrix.target != 'x86_64-unknown-linux-musl'
+        if: matrix.target != 'x86_64-unknown-linux-musl'
         working-directory: components/stacks-devnet-js
         run: |
           npm install --ignore-scripts
           npm run build-${{ env.SHORT_TARGET_NAME }}
 
       - name: Build - Node (linux-musl)
-        if: github.event_name != 'pull_request' && matrix.target == 'x86_64-unknown-linux-musl'
-        uses: docker://rust:alpine3.15
+        if: matrix.target == 'x86_64-unknown-linux-musl'
+        uses: docker://rust:alpine3.19
         env:
           RUSTFLAGS: -C target-feature=-crt-static
         with:
           entrypoint: /bin/sh
           args: -c "
             cd components/stacks-devnet-js &&
-            apk add alpine-sdk nodejs npm git &&
+            apk add --update alpine-sdk musl-dev clang-dev llvm openssl-dev clang-static nodejs npm git &&
             npm install --ignore-scripts &&
             npm run build-${{ env.SHORT_TARGET_NAME }}"
 
