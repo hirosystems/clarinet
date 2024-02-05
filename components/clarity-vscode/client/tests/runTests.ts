@@ -17,7 +17,11 @@ function isValidBrowserType(browserType: unknown): browserType is BrowserType {
 }
 
 async function main() {
+  console.log("__dirname", __dirname);
   const extensionDevelopmentPath = path.resolve(__dirname, "../../../");
+  console.log("-".repeat(200));
+  console.log("-".repeat(200));
+  console.log("extensionDevelopmentPath", extensionDevelopmentPath);
   const extensionTestsPath = path.resolve(__dirname, "./suite/index");
   const folderPath = path.resolve(__dirname, "../../../test-data");
 

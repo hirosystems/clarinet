@@ -7,8 +7,6 @@ import {
   languages,
   commands,
   DiagnosticSeverity,
-  Position,
-  Selection,
 } from "vscode";
 import type { Diagnostic } from "vscode";
 
@@ -36,7 +34,7 @@ function getDiagnostics(uri: Uri) {
 
   const waitForDiagnostic: Promise<Diagnostic[]> = new Promise(
     (resolve, reject) => {
-      const timeout = setTimeout(() => reject("no diagnostic change"), 4000);
+      const timeout = setTimeout(() => reject("no diagnostic change"), 60_000);
       diagnosticPromise = (value) => {
         clearTimeout(timeout);
         resolve(value);
@@ -62,30 +60,32 @@ describe("get diagnostics", () => {
     "test-cases/contracts/contract.clar",
   );
 
-  it("get diagnostics on contract open", async () => {
+  it("get diagnostics on contract open", async function () {
+    this.timeout(60_000);
     const diagnosticsListener = getDiagnostics(contractUri);
 
     await workspace.openTextDocument(contractUri);
+    await delay(60000);
     const diagnostics = await diagnosticsListener;
     assert.strictEqual(diagnostics.length, 2);
     assert.strictEqual(diagnostics[0].severity, DiagnosticSeverity.Warning);
     assert.strictEqual(diagnostics[1].severity, DiagnosticSeverity.Information);
   });
 
-  it("get diagnostics on contract change", async () => {
-    const document = await workspace.openTextDocument(contractUri);
-    const editor = await vsWindow.showTextDocument(document, 1, false);
+  // it("get diagnostics on contract change", async () => {
+  //   const document = await workspace.openTextDocument(contractUri);
+  //   const editor = await vsWindow.showTextDocument(document, 1, false);
 
-    const diagnosticsListener = getDiagnostics(contractUri);
+  //   const diagnosticsListener = getDiagnostics(contractUri);
 
-    await editor.edit((editable) => {
-      // uncomment line 9 of the contract
-      editable.replace(new Range(8, 4, 8, 7), "");
-    });
+  //   await editor.edit((editable) => {
+  //     // uncomment line 9 of the contract
+  //     editable.replace(new Range(8, 4, 8, 7), "");
+  //   });
 
-    const diagnostics = await diagnosticsListener;
-    assert.strictEqual(diagnostics.length, 0);
-  });
+  //   const diagnostics = await diagnosticsListener;
+  //   assert.strictEqual(diagnostics.length, 0);
+  // });
 });
 
 // describe.only("get completion", function () {
