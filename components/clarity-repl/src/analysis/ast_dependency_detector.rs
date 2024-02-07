@@ -14,14 +14,13 @@ use clarity::vm::types::{
 };
 use clarity::vm::{ClarityName, ClarityVersion, SymbolicExpressionType};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
-use std::convert::TryFrom;
 use std::iter::FromIterator;
 use std::ops::{Deref, DerefMut};
 
 use super::ast_visitor::TypedVar;
 
 lazy_static! {
-    pub static ref DEFAULT_NAME: ClarityName = ClarityName::try_from("placeholder").unwrap();
+    pub static ref DEFAULT_NAME: ClarityName = ClarityName::from("placeholder");
 }
 
 pub struct ASTDependencyDetector<'a> {
@@ -119,7 +118,7 @@ fn deep_check_callee_type(
                 for key_value in tuple.iter().skip(1) {
                     if let Some((arg_type, expr)) = key_value
                         .match_list()
-                        .and_then(|kv| Some((type_map.get(kv.get(0)?.match_atom()?)?, kv.get(1)?)))
+                        .and_then(|kv| Some((type_map.get(kv.first()?.match_atom()?)?, kv.get(1)?)))
                     {
                         deep_check_callee_type(arg_type, expr, dependencies);
                     }

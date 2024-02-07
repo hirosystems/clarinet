@@ -1,5 +1,3 @@
-use std::convert::TryFrom;
-
 use crate::repl::debug::extract_watch_variable;
 use clarity::vm::contexts::{Environment, LocalContext};
 use clarity::vm::errors::Error;
@@ -279,7 +277,7 @@ impl CLIDebugger {
                         if contract_parts[0].is_empty() {
                             QualifiedContractIdentifier::new(
                                 env.contract_context.contract_identifier.issuer.clone(),
-                                ContractName::try_from(contract_parts[1]).unwrap(),
+                                ContractName::from(contract_parts[1]),
                             )
                         } else {
                             match QualifiedContractIdentifier::parse(parts[0]) {
@@ -345,7 +343,7 @@ impl CLIDebugger {
                             let contract_id = if parts[0].is_empty() {
                                 QualifiedContractIdentifier::new(
                                     env.contract_context.contract_identifier.issuer.clone(),
-                                    ContractName::try_from(parts[1]).unwrap(),
+                                    ContractName::from(parts[1]),
                                 )
                             } else {
                                 match QualifiedContractIdentifier::parse(
