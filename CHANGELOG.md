@@ -1,3 +1,14 @@
+#### [2.2.1](https://github.com/hirosystems/clarinet/compare/v2.2.0...v2.2.1)
+
+##### Bug Fixes
+
+*  Devnet pox and stacking (#1350) (bc74e5a6)
+*  Wasm build (#1343) (8789d10d)
+
+##### Other Changes
+
+*  Clippy warnings (#1351) (2497b4c9)
+
 #### [2.2.0](https://github.com/hirosystems/clarinet/compare/v2.1.0...v2.2.0) (2024-01-30)
 
 This new version allows to preview the Nakamoto release and to run clarity-wasm locally.
