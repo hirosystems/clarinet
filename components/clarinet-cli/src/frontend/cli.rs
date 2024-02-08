@@ -73,6 +73,9 @@ enum Command {
     /// Interact with contracts deployed on Mainnet
     #[clap(subcommand, name = "requirements", aliases = &["requirement"])]
     Requirements(Requirements),
+    /// Subcommands for working with chainhooks
+    #[clap(name = "chainhooks", aliases = &["chainhook"])]
+    Chainhooks,
     /// Manage contracts deployments on Simnet/Devnet/Testnet/Mainnet
     #[clap(subcommand, name = "deployments", aliases = &["deployment"])]
     Deployments(Deployments),
@@ -1139,6 +1142,13 @@ pub fn main() {
                 format_warn!("This command is deprecated. Use 'clarinet devnet start' instead"),
             );
             devnet_start(cmd, global_settings)
+        }
+        Command::Chainhooks => {
+            println!(
+                "{}",
+                format_err!("This command is deprecated. Use the chainhooks library instead (https://github.com/hirosystems/chainhook)"),
+            );
+            process::exit(1);
         }
         Command::LSP => run_lsp(),
         Command::DAP => match super::dap::run_dap() {
