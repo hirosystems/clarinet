@@ -1,5 +1,4 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
-use std::convert::TryFrom;
 use std::fmt::Display;
 
 use crate::repl::diagnostic::output_diagnostic;
@@ -568,14 +567,11 @@ pub fn extract_watch_variable<'a>(
         3 => {
             let contract_id = if parts[0].is_empty() {
                 if let Some(sender) = default_sender {
-                    QualifiedContractIdentifier::new(
-                        sender.clone(),
-                        ContractName::try_from(parts[1]).unwrap(),
-                    )
+                    QualifiedContractIdentifier::new(sender.clone(), ContractName::from(parts[1]))
                 } else {
                     QualifiedContractIdentifier::new(
                         env.contract_context.contract_identifier.issuer.clone(),
-                        ContractName::try_from(parts[1]).unwrap(),
+                        ContractName::from(parts[1]),
                     )
                 }
             } else {

@@ -218,7 +218,7 @@ impl CoverageReporter {
                     DefineFunctionsParsed::PrivateFunction { signature, body: _ }
                     | DefineFunctionsParsed::PublicFunction { signature, body: _ }
                     | DefineFunctionsParsed::ReadOnlyFunction { signature, body: _ } => {
-                        let expr = signature.get(0).expect("Invalid function signature");
+                        let expr = signature.first().expect("Invalid function signature");
                         let function_name = expr.match_atom().expect("Invalid function signature");
 
                         functions.push((

@@ -1,4 +1,15 @@
-#### [2.2.0](https://github.com/hirosystems/clarinet/compare/v2.1.0...v2.2.0) (2024-01-30)
+# [2.2.1](https://github.com/hirosystems/clarinet/compare/v2.2.0...v2.2.1) (2024-02-08)
+
+##### Bug Fixes
+
+*  Devnet pox and stacking (#1350) (bc74e5a6)
+*  Wasm build (#1343) (8789d10d)
+
+##### Other Changes
+
+*  Clippy warnings (#1351) (2497b4c9)
+
+# [2.2.0](https://github.com/hirosystems/clarinet/compare/v2.1.0...v2.2.0) (2024-01-30)
 
 This new version allows to preview the Nakamoto release and to run clarity-wasm locally.
 
@@ -17,7 +28,7 @@ This new version allows to preview the Nakamoto release and to run clarity-wasm 
 *  Fix docs url in messaging (#1335) (763f6f99)
 *  Update GitHub action format for Clarinet 2.x (#1332) (b3feafbf)
 
-#### [2.1.0](https://github.com/hirosystems/clarinet/compare/v2.0.0...v2.1.0) (2023-12-13)
+# [2.1.0](https://github.com/hirosystems/clarinet/compare/v2.0.0...v2.1.0) (2023-12-13)
 
 
 ##### New Features
@@ -52,7 +63,7 @@ This new version allows to preview the Nakamoto release and to run clarity-wasm 
 *  Change `contract publish` -> `deployments apply` (#1287) (f9a55262)
 *  Improve clarinet-sdk contributing section (#1281) (3c85bd85)
 
-#### [2.0.0](https://github.com/hirosystems/clarinet/compare/v1.8.0...v2.0.0) (2023-10-26)
+# [2.0.0](https://github.com/hirosystems/clarinet/compare/v1.8.0...v2.0.0) (2023-10-26)
 
 ##### New Features
 
@@ -87,7 +98,7 @@ This new version allows to preview the Nakamoto release and to run clarity-wasm 
 *  Udpate hints (#1227) (763b4b64)
 *  Deprecation warnings for clarinet test and clarinet run (#1157) (edf98aa3)
 
-#### [1.8.0](https://github.com/hirosystems/clarinet/compare/v1.7.1...v1.8.0) (2023-09-12)
+# [1.8.0](https://github.com/hirosystems/clarinet/compare/v1.7.1...v1.8.0) (2023-09-12)
 
 ##### Continuous Integration
 
@@ -105,7 +116,7 @@ This new version allows to preview the Nakamoto release and to run clarity-wasm 
 *  Clarinet-deployments wasm build (#1144) (1ab57028)
 *  Command splits once and picks everything after as the expression to get costs from (#1112) (6b35ed75)
 
-#### [1.7.1](https://github.com/hirosystems/clarinet/compare/v1.7.0...v1.7.1) (2023-07-19)
+# [1.7.1](https://github.com/hirosystems/clarinet/compare/v1.7.0...v1.7.1) (2023-07-19)
 
 ##### Chores
 
