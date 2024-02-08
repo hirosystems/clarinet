@@ -36,7 +36,7 @@ use clarity_repl::frontend::terminal::print_clarity_wasm_warning;
 use clarity_repl::repl::diagnostic::output_diagnostic;
 use clarity_repl::repl::{ClarityCodeSource, ClarityContract, ContractDeployer, DEFAULT_EPOCH};
 use clarity_repl::{analysis, repl, Terminal};
-use stacks_network::{self, DevnetOrchestrator};
+use stacks_network::{self, check_chainhooks, DevnetOrchestrator};
 use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::prelude::*;
@@ -74,8 +74,8 @@ enum Command {
     #[clap(subcommand, name = "requirements", aliases = &["requirement"])]
     Requirements(Requirements),
     /// Subcommands for working with chainhooks
-    #[clap(name = "chainhooks", aliases = &["chainhook"])]
-    Chainhooks,
+    #[clap(subcommand, name = "chainhooks", aliases = &["chainhook"])]
+    Chainhooks(Chainhooks),
     /// Manage contracts deployments on Simnet/Devnet/Testnet/Mainnet
     #[clap(subcommand, name = "deployments", aliases = &["deployment"])]
     Deployments(Deployments),
@@ -139,6 +139,20 @@ enum Deployments {
     /// Apply deployment
     #[clap(name = "apply", bin_name = "apply")]
     ApplyDeployment(ApplyDeployment),
+}
+
+#[allow(clippy::enum_variant_names)]
+#[derive(Subcommand, PartialEq, Clone, Debug)]
+enum Chainhooks {
+    /// Generate files and settings for a new hook (deprecated)
+    #[clap(name = "new", bin_name = "new")]
+    NewChainhook,
+    /// Check hooks format
+    #[clap(name = "check", bin_name = "check")]
+    CheckChainhooks(CheckChainhooks),
+    /// Publish contracts on chain
+    #[clap(name = "deploy", bin_name = "deploy")]
+    DeployChainhook(DeployChainhook),
 }
 
 #[derive(Parser, PartialEq, Clone, Debug)]
@@ -270,6 +284,23 @@ struct GenerateDeployment {
         long = "manual-cost"
     )]
     pub manual_cost: bool,
+}
+
+#[derive(Parser, PartialEq, Clone, Debug)]
+struct CheckChainhooks {
+    /// Path to Clarinet.toml
+    #[clap(long = "manifest-path")]
+    pub manifest_path: Option<String>,
+    /// Display chainhooks JSON representation
+    #[clap(long = "output-json")]
+    pub output_json: bool,
+}
+
+#[derive(Parser, PartialEq, Clone, Debug)]
+struct DeployChainhook {
+    /// Path to Clarinet.toml
+    #[clap(long = "manifest-path")]
+    pub manifest_path: Option<String>,
 }
 
 #[derive(Parser, PartialEq, Clone, Debug)]
@@ -825,6 +856,23 @@ pub fn main() {
                 }
             }
         },
+        Command::Chainhooks(subcommand) => match subcommand {
+            Chainhooks::NewChainhook => {
+                let message = "This command is deprecated. Use the chainhooks library instead (https://github.com/hirosystems/chainhook)";
+                println!("{}", format_err!(message));
+                std::process::exit(1);
+            }
+            Chainhooks::CheckChainhooks(cmd) => {
+                let manifest_location = get_manifest_location_or_exit(cmd.manifest_path);
+                // Ensure that all the hooks can correctly be deserialized.
+                println!("Checking chainhooks");
+                let _ = check_chainhooks(&manifest_location, cmd.output_json);
+            }
+            Chainhooks::DeployChainhook(_cmd) => {
+                // TODO(lgalabru): follow-up on this implementation
+                unimplemented!()
+            }
+        },
         Command::Contracts(subcommand) => match subcommand {
             Contracts::NewContract(cmd) => {
                 let manifest = load_manifest_or_exit(cmd.manifest_path);
@@ -1142,13 +1190,6 @@ pub fn main() {
                 format_warn!("This command is deprecated. Use 'clarinet devnet start' instead"),
             );
             devnet_start(cmd, global_settings)
-        }
-        Command::Chainhooks => {
-            println!(
-                "{}",
-                format_err!("This command is deprecated. Use the chainhooks library instead (https://github.com/hirosystems/chainhook)"),
-            );
-            process::exit(1);
         }
         Command::LSP => run_lsp(),
         Command::DAP => match super::dap::run_dap() {
@@ -1666,7 +1707,7 @@ fn display_contract_new_hint(project_name: Option<&str>) {
         yellow!("    Check contract syntax for all files in ./contracts.\n")
     );
 
-    println!("{}", yellow!("Find more information on writing contracts with Clarinet here: https://docs.hiro.so/clarinet/guides/how-to-set-up-local-development-environment#developing-a-clarity-smart-contract"));
+    println!("{}", yellow!("Find more information on writing contracts with Clarinet here: https://docs.hiro.so/clarinet/how-to-guides/how-to-set-up-local-development-environment#developing-a-clarity-smart-contract"));
     display_hint_footer();
 }
 
@@ -1696,7 +1737,7 @@ fn display_deploy_hint() {
     );
     println!(
         "{}",
-        yellow!("Find more information on the DevNet here: https://docs.hiro.so/clarinet/guides/how-to-run-integration-environment")
+        yellow!("Find more information on the devnet here: https://docs.hiro.so/clarinet/guides/how-to-run-integration-environment")
     );
     display_hint_footer();
 }

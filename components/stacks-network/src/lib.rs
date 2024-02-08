@@ -3,6 +3,7 @@ extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 
+mod chainhooks;
 pub mod chains_coordinator;
 mod event;
 mod log;
@@ -11,6 +12,7 @@ mod ui;
 
 pub use chainhook_sdk::observer::MempoolAdmissionData;
 pub use chainhook_sdk::{self, utils::Context};
+pub use chainhooks::{check_chainhooks, load_chainhooks, parse_chainhook_full_specification};
 use chains_coordinator::BitcoinMiningCommand;
 use clarinet_files::NetworkManifest;
 pub use event::DevnetEvent;
@@ -27,6 +29,7 @@ use std::{
     time::Duration,
 };
 
+use chainhook_sdk::chainhooks::types::ChainhookConfig;
 use chains_coordinator::start_chains_coordinator;
 use clarinet_deployments::types::DeploymentSpecification;
 use hiro_system_kit::slog;
@@ -49,6 +52,7 @@ where
 async fn do_run_devnet(
     mut devnet: DevnetOrchestrator,
     deployment: DeploymentSpecification,
+    chainhooks: &mut Option<ChainhookConfig>,
     log_tx: Option<Sender<LogData>>,
     display_dashboard: bool,
     ctx: Context,
@@ -96,12 +100,17 @@ async fn do_run_devnet(
 
     // The event observer should be able to send some events to the UI thread,
     // and should be able to be terminated
+    let hooks = match chainhooks.take() {
+        Some(hooks) => hooks,
+        _ => ChainhookConfig::new(),
+    };
     let devnet_path = devnet_config.working_dir.clone();
     let config = DevnetEventObserverConfig::new(
         devnet_config.clone(),
         devnet.manifest.clone(),
         network_manifest,
         deployment,
+        hooks,
         &ctx,
         ip_address_setup,
     );
@@ -251,6 +260,7 @@ async fn do_run_devnet(
 pub async fn do_run_chain_coordinator(
     mut devnet: DevnetOrchestrator,
     deployment: DeploymentSpecification,
+    chainhooks: &mut Option<ChainhookConfig>,
     log_tx: Option<Sender<LogData>>,
     ctx: Context,
     orchestrator_terminated_tx: Sender<bool>,
@@ -268,6 +278,7 @@ pub async fn do_run_chain_coordinator(
     do_run_devnet(
         devnet,
         deployment,
+        chainhooks,
         log_tx,
         false,
         ctx,
@@ -283,6 +294,7 @@ pub async fn do_run_chain_coordinator(
 pub async fn do_run_local_devnet(
     mut devnet: DevnetOrchestrator,
     deployment: DeploymentSpecification,
+    chainhooks: &mut Option<ChainhookConfig>,
     log_tx: Option<Sender<LogData>>,
     display_dashboard: bool,
     ctx: Context,
@@ -300,6 +312,7 @@ pub async fn do_run_local_devnet(
     do_run_devnet(
         devnet,
         deployment,
+        chainhooks,
         log_tx,
         display_dashboard,
         ctx,
