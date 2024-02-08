@@ -103,15 +103,6 @@ impl<'a> App<'a> {
     }
 
     pub fn display_block(&mut self, block: StacksBlockData) {
-        let (start, end) =
-            if block.metadata.pox_cycle_position == (block.metadata.pox_cycle_length - 1) {
-                ("", "<")
-            } else if block.metadata.pox_cycle_position == 0 {
-                (">", "")
-            } else {
-                ("", "")
-            };
-
         let has_tenure_change_tx = block
             .transactions
             .iter()
@@ -121,6 +112,16 @@ impl<'a> App<'a> {
             .transactions
             .iter()
             .any(|tx| tx.metadata.kind == StacksTransactionKind::Coinbase);
+
+        let (start, end) = if !has_coinbase_tx {
+            ("", "")
+        } else if block.metadata.pox_cycle_position == (block.metadata.pox_cycle_length - 1) {
+            ("", "<")
+        } else if block.metadata.pox_cycle_position == 0 {
+            (">", "")
+        } else {
+            ("", "")
+        };
 
         let has_tx = if (block.transactions.len()
             - has_coinbase_tx as usize

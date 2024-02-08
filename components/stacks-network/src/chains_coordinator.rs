@@ -525,6 +525,119 @@ pub fn relay_devnet_protocol_deployment(
     });
 }
 
+fn should_publish_stacking_orders(
+    current_cycle: &u32,
+    pox_stacking_order: &PoxStackingOrder,
+) -> bool {
+    let PoxStackingOrder {
+        duration,
+        start_at_cycle,
+        ..
+    } = pox_stacking_order;
+
+    let is_higher_than_start_cycle = *current_cycle >= (start_at_cycle - 1);
+    if !is_higher_than_start_cycle {
+        return false;
+    }
+
+    let offset = (current_cycle + duration).saturating_sub(*start_at_cycle);
+    let should_stack = (offset % duration) == (duration - 1);
+    if !should_stack {
+        return false;
+    }
+
+    true
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn build_pox_stacking_order(duration: u32, start_at_cycle: u32) -> PoxStackingOrder {
+        PoxStackingOrder {
+            duration,
+            start_at_cycle,
+            wallet: "wallet_1".to_string(),
+            slots: 1,
+            btc_address: "address_1".to_string(),
+            auto_extend: Some(true),
+        }
+    }
+
+    #[test]
+    fn test_should_publish_stacking_orders_basic() {
+        let pox_stacking_order = build_pox_stacking_order(12, 6);
+
+        // cycle just before start_at_cycle
+        assert_eq!(
+            should_publish_stacking_orders(&5, &pox_stacking_order),
+            true
+        );
+
+        // cycle before start_at_cycle + duration
+        assert_eq!(
+            should_publish_stacking_orders(&17, &pox_stacking_order),
+            true
+        );
+
+        // cycle before start_at_cycle + duration * 42
+        assert_eq!(
+            should_publish_stacking_orders(&509, &pox_stacking_order),
+            true
+        );
+
+        // cycle equal to start_at_cycle
+        assert_eq!(
+            should_publish_stacking_orders(&6, &pox_stacking_order),
+            false
+        );
+
+        // cycle after to start_at_cycle
+        assert_eq!(
+            should_publish_stacking_orders(&8, &pox_stacking_order),
+            false
+        );
+    }
+
+    #[test]
+    fn test_should_publish_stacking_orders_edge_cases() {
+        // duration is one cycle
+        let pox_stacking_order = build_pox_stacking_order(1, 4);
+        assert_eq!(
+            should_publish_stacking_orders(&2, &pox_stacking_order),
+            false
+        );
+
+        for i in 3..=20 {
+            assert_eq!(
+                should_publish_stacking_orders(&i, &pox_stacking_order),
+                true
+            );
+        }
+
+        // duration is low and start_at_cycle is high
+        let pox_stacking_order = build_pox_stacking_order(2, 100);
+        for i in 0..=98 {
+            assert_eq!(
+                should_publish_stacking_orders(&i, &pox_stacking_order),
+                false
+            );
+        }
+        assert_eq!(
+            should_publish_stacking_orders(&99, &pox_stacking_order),
+            true
+        );
+        assert_eq!(
+            should_publish_stacking_orders(&100, &pox_stacking_order),
+            false
+        );
+        assert_eq!(
+            should_publish_stacking_orders(&101, &pox_stacking_order),
+            true
+        );
+    }
+}
+
 pub async fn publish_stacking_orders(
     devnet_config: &DevnetConfig,
     devnet_event_tx: &Sender<DevnetEvent>,
@@ -555,15 +668,12 @@ pub async fn publish_stacking_orders(
         }
     }?;
 
-    let effective_height = u64::saturating_sub(
-        bitcoin_block_height.into(),
-        pox_info.first_burnchain_block_height,
-    );
-    let pox_cycle_length: u64 =
-        (pox_info.prepare_phase_block_length + pox_info.reward_phase_block_length).into();
-    let reward_cycle_id = effective_height / pox_cycle_length;
+    let effective_height =
+        u32::saturating_sub(bitcoin_block_height, pox_info.first_burnchain_block_height);
 
-    let pox_cycle_position = (effective_height % pox_cycle_length) as u32;
+    let current_cycle = effective_height / pox_info.reward_cycle_length;
+    let pox_cycle_length = pox_info.reward_cycle_length;
+    let pox_cycle_position = effective_height % pox_cycle_length;
 
     let should_submit_pox_orders = pox_cycle_position == 1;
     if !should_submit_pox_orders {
@@ -572,19 +682,22 @@ pub async fn publish_stacking_orders(
 
     let mut transactions = 0;
     for (i, pox_stacking_order) in devnet_config.pox_stacking_orders.iter().enumerate() {
+        if !should_publish_stacking_orders(&current_cycle, pox_stacking_order) {
+            continue;
+        }
+
         let PoxStackingOrder {
             duration,
             start_at_cycle,
             ..
         } = pox_stacking_order;
 
-        if ((reward_cycle_id as u32) % duration) != (start_at_cycle - 1) {
-            continue;
-        }
-        let extend_stacking = reward_cycle_id as u32 != start_at_cycle - 1;
+        // if the is not the first cycle of this stacker, then stacking order will be extended
+        let extend_stacking = current_cycle != start_at_cycle - 1;
         if extend_stacking && !pox_stacking_order.auto_extend.unwrap_or_default() {
             continue;
         }
+
         let account = accounts
             .iter()
             .find(|e| e.label == pox_stacking_order.wallet);
