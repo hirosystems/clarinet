@@ -1,4 +1,5 @@
 #![allow(unused_variables)]
+#![allow(clippy::get_first)]
 
 use clarity::vm::functions::define::DefineFunctions;
 use clarity::vm::functions::NativeFunctions;
