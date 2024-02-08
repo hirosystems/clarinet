@@ -54,13 +54,13 @@ fn main() {
                 }
             };
 
-            let (_, output) = session.handle_command(&code_str);
+            let (_, output, _) = session.handle_command(&code_str);
             for line in output {
                 println!("{}", line);
             }
         }
         None => loop {
-            let mut terminal = Terminal::new(settings.clone());
+            let mut terminal = Terminal::new(settings.clone(), None);
             if !terminal.start() {
                 break;
             }

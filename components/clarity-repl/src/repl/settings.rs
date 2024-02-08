@@ -54,21 +54,8 @@ pub struct SessionSettings {
 #[derive(Debug, Default, Clone, Deserialize, Serialize)]
 pub struct Settings {
     pub analysis: analysis::Settings,
-    enable_clarity_wasm: bool,
-}
-
-impl Settings {
-    pub fn enable_clarity_wasm(&mut self) {
-        self.enable_clarity_wasm = true;
-    }
-
-    pub fn disable_clarity_wasm(&mut self) {
-        self.enable_clarity_wasm = false;
-    }
-
-    pub fn is_clarity_wasm_enabled(&self) -> bool {
-        self.enable_clarity_wasm
-    }
+    pub clarity_wasm_mode: bool,
+    pub show_timings: bool,
 }
 
 #[derive(Debug, Default, Clone, Deserialize, Serialize)]
@@ -85,7 +72,8 @@ impl From<SettingsFile> for Settings {
         };
         Self {
             analysis,
-            enable_clarity_wasm: true,
+            clarity_wasm_mode: false,
+            show_timings: false,
         }
     }
 }

@@ -546,13 +546,22 @@ jobs:
     name: "Test contracts with Clarinet"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - name: "Execute unit tests"
+      - name: "Checkout code"
+        uses: actions/checkout@v3
+      - name: "Check contract syntax"
         uses: docker://hirosystems/clarinet:latest
         with:
-          args: test --coverage --manifest-path=./Clarinet.toml
-      - name: "Export code coverage"
-        uses: codecov/codecov-action@v1
+          args: check
+      - name: "Setup Node.js"
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18.x"
+      - name: "Prep CI"
+        run: npm ci
+      - name: "Execute unit tests"
+        run: npm run test:report
+      - name: "Upload code coverage"
+        uses: codecov/codecov-action@v3
         with:
           files: ./coverage.lcov
           verbose: true

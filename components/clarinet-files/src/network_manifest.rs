@@ -17,7 +17,7 @@ pub const DEFAULT_DERIVATION_PATH: &str = "m/44'/5757'/0'/0/0";
 pub const DEFAULT_STACKS_NODE_IMAGE: &str = "quay.io/hirosystems/stacks-node:devnet-2.4.0.0.0";
 pub const DEFAULT_STACKS_API_IMAGE: &str = "hirosystems/stacks-blockchain-api:latest";
 // Nakamoto images overrides
-pub const DEFAULT_STACKS_NODE_IMAGE_NAKA: &str = "blockstack/stacks-blockchain:feat-devnet-tweaks";
+pub const DEFAULT_STACKS_NODE_IMAGE_NAKA: &str = "blockstack/stacks-blockchain:devnet-next-stable";
 pub const DEFAULT_STACKS_API_IMAGE_NAKA: &str = "hirosystems/stacks-blockchain-api:nakamoto";
 
 pub const DEFAULT_BITCOIN_NODE_IMAGE: &str = "quay.io/hirosystems/bitcoind:26.0";
@@ -47,6 +47,13 @@ pub const DEFAULT_EPOCH_2_3: u64 = 103;
 pub const DEFAULT_EPOCH_2_4: u64 = 104;
 pub const DEFAULT_EPOCH_2_5: u64 = 105;
 pub const DEFAULT_EPOCH_3_0: u64 = 121;
+
+// Currently, the pox-4 contract has these values hardcoded:
+// https://github.com/stacks-network/stacks-core/blob/e09ab931e2f15ff70f3bb5c2f4d7afb[…]42bd7bec6/stackslib/src/chainstate/stacks/boot/pox-testnet.clar
+// but they may be configurable in the future.
+pub const DEFAULT_POX_PREPARE_LENGTH: u64 = 4;
+pub const DEFAULT_POX_REWARD_LENGTH: u64 = 10;
+pub const DEFAULT_FIRST_BURN_HEADER_HEIGHT: u64 = 100;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct NetworkManifestFile {
@@ -316,6 +323,7 @@ pub struct PoxStackingOrder {
     pub wallet: String,
     pub slots: u64,
     pub btc_address: String,
+    pub auto_extend: Option<bool>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -770,6 +778,34 @@ impl NetworkManifest {
             let remapped_subnet_contract_id =
                 format!("{}.{}", default_deployer.stx_address, contract_id.name);
 
+            // validate that epoch 3.0 is started in a reward phase
+            let epoch_3_0 = devnet_config.epoch_3_0.unwrap_or(DEFAULT_EPOCH_3_0);
+            if !is_in_reward_phase(
+                DEFAULT_FIRST_BURN_HEADER_HEIGHT,
+                DEFAULT_POX_REWARD_LENGTH,
+                DEFAULT_POX_PREPARE_LENGTH,
+                &epoch_3_0,
+            ) {
+                return Err(format!(
+                    "Epoch 3.0 must start *during* a reward phase, not a prepare phase. Epoch 3.0 start set to: {}. Reward Cycle Length: {}. Prepare Phase Length: {}",
+                    epoch_3_0, DEFAULT_POX_REWARD_LENGTH, DEFAULT_POX_PREPARE_LENGTH
+                ));
+            }
+
+            // for stacking orders, we validate that wallet names match one of the provided accounts
+            if let Some(ref val) = devnet_config.pox_stacking_orders {
+                for (i, stacking_order) in val.iter().enumerate() {
+                    let wallet_name = &stacking_order.wallet;
+                    let wallet_is_in_accounts = accounts
+                        .iter()
+                        .any(|(account_name, _)| wallet_name == account_name);
+                    if !wallet_is_in_accounts {
+                        return Err(format!("Account data was not provided for the wallet ({}) listed in stacking order {}.", wallet_name, i + 1));
+                    };
+                }
+
+                devnet_config.pox_stacking_orders = Some(val.clone());
+            }
             let config = DevnetConfig {
                 name: devnet_config.name.take().unwrap_or("devnet".into()),
                 network_id: devnet_config.network_id,
@@ -1006,6 +1042,27 @@ fn compute_btc_address(public_key: &PublicKey, network: &BitcoinNetwork) -> Stri
         },
     );
     btc_address.to_string()
+}
+
+// This logic was taken from stacks-core:
+// https://github.com/stacks-network/stacks-core/blob/524b0e1ae9ad3c8d2d2ac37e72be4aee2c045ef8/src/burnchains/mod.rs#L513C30-L530
+pub fn is_in_reward_phase(
+    first_block_height: u64,
+    reward_cycle_length: u64,
+    prepare_length: u64,
+    block_height: &u64,
+) -> bool {
+    if block_height <= &first_block_height {
+        // not a reward cycle start if we're the first block after genesis.
+        false
+    } else {
+        let effective_height = block_height - first_block_height;
+        let reward_index = effective_height % reward_cycle_length;
+
+        // NOTE: first block in reward cycle is mod 1, so mod 0 is the last block in the
+        // prepare phase.
+        !(reward_index == 0 || reward_index > (reward_cycle_length - prepare_length))
+    }
 }
 
 #[cfg(feature = "wasm")]

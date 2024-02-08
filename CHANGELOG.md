@@ -1,9 +1,24 @@
-#### #### [2.1.0](https://github.com/hirosystems/clarinet/compare/v2.0.0...v2.1.0) (2023-12-13)
+#### [2.2.0](https://github.com/hirosystems/clarinet/compare/v2.1.0...v2.2.0) (2024-01-30)
+
+This new version allows to preview the Nakamoto release and to run clarity-wasm locally.
+
+##### New Features
+
+*  Upgrade clarity-vm to the Nakamoto version including epoch 2.5 and epoch 3.0 (#1266) (e3ce0c2d)
+*  Run clarity-wasm in a separate session in `clarinet console` (#1330) (fdf400b7)
+*  Improved stacking orders (#1331) (b05d453b)
+
+##### Chores
+
+*  Update bitcoin image to 26.0 (#1315) (39c536a4)
 
 ##### Documentation Changes
 
-*  Change `contract publish` -> `deployments apply` (#1287) (f9a55262)
-*  Improve clarinet-sdk contributing section (#1281) (3c85bd85)
+*  Fix docs url in messaging (#1335) (763f6f99)
+*  Update GitHub action format for Clarinet 2.x (#1332) (b3feafbf)
+
+#### [2.1.0](https://github.com/hirosystems/clarinet/compare/v2.0.0...v2.1.0) (2023-12-13)
+
 
 ##### New Features
 
@@ -31,6 +46,11 @@
 
 *  Implement nextest and improve caching (#1258) (d77d27e2)
 *  Add coverage (#1241) (6a72d54f)
+
+##### Documentation Changes
+
+*  Change `contract publish` -> `deployments apply` (#1287) (f9a55262)
+*  Improve clarinet-sdk contributing section (#1281) (3c85bd85)
 
 #### [2.0.0](https://github.com/hirosystems/clarinet/compare/v1.8.0...v2.0.0) (2023-10-26)
 

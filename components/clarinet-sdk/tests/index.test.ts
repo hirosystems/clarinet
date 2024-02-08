@@ -57,6 +57,19 @@ describe("basic simnet interactions", async () => {
   });
 });
 
+describe("simnet can run arbitrary snippets", async () => {
+  it("can run simple snippets", () => {
+    const res = simnet.runSnippet("(+ 1 2)");
+    expect(res).toStrictEqual(Cl.int(3));
+  });
+
+  it("show diagnostic in case of error", () => {
+    const res = simnet.runSnippet("(+ 1 u2)");
+    console.log("res", res);
+    expect(res).toBe("error:\nexpecting expression of type 'int', found 'uint'");
+  });
+});
+
 describe("simnet can call contracts function", async () => {
   it("can call read only functions", async () => {
     const res = simnet.callReadOnlyFn("counter", "get-count", [], address1);

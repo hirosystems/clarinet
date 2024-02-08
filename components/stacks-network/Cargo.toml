@@ -1,6 +1,6 @@
 [package]
 name = "stacks-network"
-version = "2.1.0"
+version = "2.2.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -32,7 +32,7 @@ futures = "0.3.12"
 base58 = "0.2.0"
 tokio = { version = "1.35.1", features = ["full"] }
 
-chainhook-sdk = { default-features = true, git = "https://github.com/hirosystems/chainhook.git", rev = "a938e61846a430750ad31d84b2032efabf6d039f"}
+chainhook-sdk = { default-features = true, git = "https://github.com/hirosystems/chainhook.git", rev = "efba5b0" }
 # chainhook-sdk = { version = "=0.11", default-features = true }
 stacks-rpc-client = { path = "../stacks-rpc-client" }
 clarinet-files = { path = "../clarinet-files", features = ["cli"] }
