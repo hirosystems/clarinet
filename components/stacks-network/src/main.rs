@@ -82,7 +82,7 @@ fn main() {
     let res = hiro_system_kit::nestable_block_on(do_run_chain_coordinator(
         orchestrator,
         deployment,
-        &mut Some(hooks),
+        &mut Some(chainhooks),
         None,
         ctx,
         orchestrator_terminated_tx,

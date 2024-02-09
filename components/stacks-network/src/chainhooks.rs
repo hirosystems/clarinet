@@ -1,7 +1,6 @@
 use chainhook_sdk::chainhooks::types::{ChainhookConfig, ChainhookFullSpecification};
 use chainhook_sdk::types::{BitcoinNetwork, StacksNetwork};
 use clarinet_files::FileLocation;
-use hiro_system_kit::{green, red};
 use std::fs::File;
 use std::io::BufReader;
 use std::path::PathBuf;
@@ -54,25 +53,6 @@ pub fn load_chainhooks(
         stacks_chainhooks,
         bitcoin_chainhooks,
     })
-}
-
-pub fn check_chainhooks(manifest_location: &FileLocation, output_json: bool) -> Result<(), String> {
-    let hook_files = get_chainhooks_files(manifest_location)?;
-    for (path, relative_path) in hook_files.into_iter() {
-        let _hook = match parse_chainhook_full_specification(&path) {
-            Ok(hook) => hook,
-            Err(msg) => {
-                println!("{} {} syntax incorrect\n{}", red!("x"), relative_path, msg);
-                continue;
-            }
-        };
-        println!("{} {} succesfully checked", green!("✔"), relative_path);
-        if output_json {
-            let body = serde_json::to_string_pretty(&_hook).unwrap();
-            println!("{}", body);
-        }
-    }
-    Ok(())
 }
 
 fn get_chainhooks_files(

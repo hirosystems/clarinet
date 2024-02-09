@@ -12,7 +12,7 @@ mod ui;
 
 pub use chainhook_sdk::observer::MempoolAdmissionData;
 pub use chainhook_sdk::{self, utils::Context};
-pub use chainhooks::{check_chainhooks, load_chainhooks, parse_chainhook_full_specification};
+pub use chainhooks::{load_chainhooks, parse_chainhook_full_specification};
 use chains_coordinator::BitcoinMiningCommand;
 use clarinet_files::NetworkManifest;
 pub use event::DevnetEvent;
