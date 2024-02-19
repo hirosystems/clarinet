@@ -782,7 +782,7 @@ Please read our [Code of conduct](../../../.github/blob/main/CODE_OF_CONDUCT.md)
 
 Join our community and stay connected with the latest updates and discussions:
 
-- [Join our Discord community chat](https://discord.gg/ZQR6cyZC) to engage with other users, ask questions, and participate in discussions.
+- [Join our Discord community chat](https://discord.com/invite/pPwMzMx9k8) to engage with other users, ask questions, and participate in discussions.
 
 - [Visit hiro.so](https://www.hiro.so/) for updates and subcribing to the mailing list.
 
