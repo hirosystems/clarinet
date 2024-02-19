@@ -800,7 +800,7 @@ dependencies = [
 
 [[package]]
 name = "clarinet-cli"
-version = "2.3.0-rc1"
+version = "2.2.1"
 dependencies = [
  "ansi_term",
  "atty",
