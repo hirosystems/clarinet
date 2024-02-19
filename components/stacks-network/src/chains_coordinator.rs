@@ -131,6 +131,7 @@ impl DevnetEventObserverConfig {
             bitcoin_network: BitcoinNetwork::Regtest,
             stacks_network: StacksNetwork::Devnet,
             data_handler_tx: None,
+            prometheus_monitoring_port: None,
         };
 
         DevnetEventObserverConfig {

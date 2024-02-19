@@ -667,7 +667,7 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 [[package]]
 name = "chainhook-sdk"
 version = "0.12.1"
-source = "git+https://github.com/hirosystems/chainhook.git?rev=6c8a834#6c8a834a19384e8c5b4be4724ca7fcef7b43f605"
+source = "git+https://github.com/hirosystems/chainhook.git?rev=570ceb7#570ceb7a6602fa5e18188fecb5bb28d64a53634f"
 dependencies = [
  "base58 0.2.0",
  "base64 0.21.7",
@@ -683,6 +683,7 @@ dependencies = [
  "hyper",
  "lazy_static",
  "miniscript",
+ "prometheus",
  "rand 0.8.5",
  "regex",
  "reqwest",
@@ -692,7 +693,7 @@ dependencies = [
  "serde-hex",
  "serde_derive",
  "serde_json",
- "stacks-rpc-client 2.2.0",
+ "stacks-rpc-client 2.2.1 (git+https://github.com/hirosystems/clarinet.git?rev=32cc9aa8)",
  "threadpool",
  "tokio",
 ]
@@ -700,7 +701,7 @@ dependencies = [
 [[package]]
 name = "chainhook-types"
 version = "1.3.1"
-source = "git+https://github.com/hirosystems/chainhook.git?rev=6c8a834#6c8a834a19384e8c5b4be4724ca7fcef7b43f605"
+source = "git+https://github.com/hirosystems/chainhook.git?rev=570ceb7#570ceb7a6602fa5e18188fecb5bb28d64a53634f"
 dependencies = [
  "hex 0.4.3",
  "schemars",
@@ -787,7 +788,7 @@ checksum = "702fc72eb24e5a1e48ce58027a675bc24edd52096d5397d4aea7c6dd9eca0bd1"
 [[package]]
 name = "clar2wasm"
 version = "0.1.0"
-source = "git+https://github.com/stacks-network/clarity-wasm.git?rev=2a28698#2a28698afa8bd23cc45700051ed33ed73035ab23"
+source = "git+https://github.com/stacks-network/clarity-wasm.git?rev=e7f63c2#e7f63c23d3bfce0d98edd0f9aeeff5a751bcfb1c"
 dependencies = [
  "clap",
  "clarity",
@@ -799,7 +800,7 @@ dependencies = [
 
 [[package]]
 name = "clarinet-cli"
-version = "2.2.1"
+version = "2.3.0-rc1"
 dependencies = [
  "ansi_term",
  "atty",
@@ -932,7 +933,7 @@ dependencies = [
 [[package]]
 name = "clarity"
 version = "2.2.0"
-source = "git+https://github.com/stacks-network/stacks-core.git?rev=45843513a#45843513a18a44f7dd90f9dfb2756f6313249db1"
+source = "git+https://github.com/stacks-network/stacks-core.git?rev=345553357be556fe53474071d09cd453549ed02e#345553357be556fe53474071d09cd453549ed02e"
 dependencies = [
  "integer-sqrt",
  "lazy_static",
@@ -1007,28 +1008,6 @@ dependencies = [
 
 [[package]]
 name = "clarity-repl"
-version = "2.2.0"
-source = "git+https://github.com/hirosystems/clarinet.git?rev=d577252c#d577252ce1047f44771aea59404ffc9d992a024f"
-dependencies = [
- "ansi_term",
- "atty",
- "chrono",
- "clarity",
- "getrandom 0.2.8",
- "hiro-system-kit 0.1.0 (git+https://github.com/hirosystems/clarinet.git?rev=d577252c)",
- "integer-sqrt",
- "lazy_static",
- "regex",
- "reqwest",
- "serde",
- "serde_derive",
- "serde_json",
- "sha2 0.10.6",
- "wsts 7.0.0",
-]
-
-[[package]]
-name = "clarity-repl"
 version = "2.2.1"
 dependencies = [
  "ansi_term",
@@ -1059,6 +1038,28 @@ dependencies = [
  "tokio-util",
  "wasm-bindgen",
  "wasm-bindgen-futures",
+ "wsts 7.0.0",
+]
+
+[[package]]
+name = "clarity-repl"
+version = "2.2.1"
+source = "git+https://github.com/hirosystems/clarinet.git?rev=32cc9aa8#32cc9aa83afb6d5f0ccbbdef0d34076d9bee9476"
+dependencies = [
+ "ansi_term",
+ "atty",
+ "chrono",
+ "clarity",
+ "getrandom 0.2.8",
+ "hiro-system-kit 0.1.0 (git+https://github.com/hirosystems/clarinet.git?rev=32cc9aa8)",
+ "integer-sqrt",
+ "lazy_static",
+ "regex",
+ "reqwest",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "sha2 0.10.6",
  "wsts 7.0.0",
 ]
 
@@ -2215,7 +2216,7 @@ dependencies = [
 [[package]]
 name = "hiro-system-kit"
 version = "0.1.0"
-source = "git+https://github.com/hirosystems/clarinet.git?rev=d577252c#d577252ce1047f44771aea59404ffc9d992a024f"
+source = "git+https://github.com/hirosystems/clarinet.git?rev=32cc9aa8#32cc9aa83afb6d5f0ccbbdef0d34076d9bee9476"
 dependencies = [
  "ansi_term",
  "atty",
@@ -3522,6 +3523,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "prometheus"
+version = "0.13.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "449811d15fbdf5ceb5c1144416066429cf82316e2ec8ce0c1f6f8a02e7bbcf8c"
+dependencies = [
+ "cfg-if",
+ "fnv",
+ "lazy_static",
+ "memchr",
+ "parking_lot",
+ "protobuf",
+ "thiserror",
+]
+
+[[package]]
+name = "protobuf"
+version = "2.28.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "106dd99e98437432fed6519dedecfade6a06a73bb7b2a1e019fdd2bee5778d94"
+
+[[package]]
 name = "psm"
 version = "0.1.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4668,7 +4690,7 @@ dependencies = [
 [[package]]
 name = "stacks-common"
 version = "0.0.2"
-source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-next#45843513a18a44f7dd90f9dfb2756f6313249db1"
+source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-next#345553357be556fe53474071d09cd453549ed02e"
 dependencies = [
  "chrono",
  "curve25519-dalek",
@@ -4750,10 +4772,9 @@ dependencies = [
 
 [[package]]
 name = "stacks-rpc-client"
-version = "2.2.0"
-source = "git+https://github.com/hirosystems/clarinet.git?rev=d577252c#d577252ce1047f44771aea59404ffc9d992a024f"
+version = "2.2.1"
 dependencies = [
- "clarity-repl 2.2.0",
+ "clarity-repl 2.2.1",
  "hmac 0.12.1",
  "libsecp256k1 0.7.1",
  "pbkdf2",
@@ -4768,8 +4789,9 @@ dependencies = [
 [[package]]
 name = "stacks-rpc-client"
 version = "2.2.1"
+source = "git+https://github.com/hirosystems/clarinet.git?rev=32cc9aa8#32cc9aa83afb6d5f0ccbbdef0d34076d9bee9476"
 dependencies = [
- "clarity-repl 2.2.1",
+ "clarity-repl 2.2.1 (git+https://github.com/hirosystems/clarinet.git?rev=32cc9aa8)",
  "hmac 0.12.1",
  "libsecp256k1 0.7.1",
  "pbkdf2",
