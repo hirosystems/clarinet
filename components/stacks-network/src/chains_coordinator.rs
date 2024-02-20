@@ -159,6 +159,8 @@ pub async fn start_chains_coordinator(
     orchestrator_terminator_tx: Sender<bool>,
     observer_command_tx: Sender<ObserverCommand>,
     observer_command_rx: Receiver<ObserverCommand>,
+    mining_command_tx: Sender<BitcoinMiningCommand>,
+    mining_command_rx: Receiver<BitcoinMiningCommand>,
     ctx: Context,
 ) -> Result<(), String> {
     let mut should_deploy_protocol = true; // Will change when `stacks-network` components becomes compatible with Testnet / Mainnet setups
@@ -166,7 +168,6 @@ pub async fn start_chains_coordinator(
 
     let (deployment_commands_tx, deployments_command_rx) = channel();
     let (deployment_events_tx, deployment_events_rx) = channel();
-    let (mining_command_tx, mining_command_rx) = channel();
 
     // Set-up the background task in charge of serializing / signing / publishing the contracts.
     // This tasks can take several seconds to minutes, depending on the complexity of the project.
@@ -897,11 +898,11 @@ async fn handle_bitcoin_mining(
                             &config_moved.devnet_config.miner_btc_address,
                         );
                         let res = hiro_system_kit::nestable_block_on(future);
-                        if let Err(e) = res {
-                            let _ = devnet_event_tx_moved.send(DevnetEvent::error(e));
-                        }
                         if stop_miner_reader.load(Ordering::SeqCst) {
                             break;
+                        }
+                        if let Err(e) = res {
+                            let _ = devnet_event_tx_moved.send(DevnetEvent::error(e));
                         }
                     });
             }

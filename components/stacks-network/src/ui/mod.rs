@@ -260,6 +260,9 @@ pub fn do_start_ui(
                 }
                 mining_command_tx = Some(bitcoin_mining_tx);
             }
+            DevnetEvent::Terminate => {
+                break;
+            }
         }
         if app.should_quit {
             break;

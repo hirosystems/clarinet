@@ -23,6 +23,7 @@ pub enum DevnetEvent {
     BitcoinChainEvent(BitcoinChainEvent),
     MempoolAdmission(MempoolAdmissionData),
     FatalError(String),
+    Terminate,
 }
 
 #[allow(dead_code)]
