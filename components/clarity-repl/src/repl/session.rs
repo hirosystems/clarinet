@@ -55,16 +55,12 @@ lazy_static! {
             ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
         for (deployer, boot_code) in deploy.iter() {
             for (name, code) in boot_code.iter() {
-                let (epoch, clarity_version) = if (*name).eq("pox-4") {
-                    (StacksEpochId::Epoch25, ClarityVersion::Clarity2)
-                } else if (*name).eq("pox-3") {
-                    (StacksEpochId::Epoch24, ClarityVersion::Clarity2)
-                } else if (*name).eq("pox-2") || (*name).eq("costs-3") {
-                    (StacksEpochId::Epoch21, ClarityVersion::Clarity2)
-                } else if (*name).eq("cost-2") {
-                    (StacksEpochId::Epoch2_05, ClarityVersion::Clarity1)
-                } else {
-                    (StacksEpochId::Epoch20, ClarityVersion::Clarity1)
+                let (epoch, clarity_version) = match *name {
+                    "pox-4" => (StacksEpochId::Epoch25, ClarityVersion::Clarity2),
+                    "pox-3" => (StacksEpochId::Epoch24, ClarityVersion::Clarity2),
+                    "pox-2" | "costs-3" => (StacksEpochId::Epoch21, ClarityVersion::Clarity2),
+                    "cost-2" => (StacksEpochId::Epoch2_05, ClarityVersion::Clarity1),
+                    _ => (StacksEpochId::Epoch20, ClarityVersion::Clarity1),
                 };
 
                 let boot_contract = ClarityContract {

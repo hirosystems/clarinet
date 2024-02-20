@@ -414,6 +414,9 @@ struct Check {
         conflicts_with = "use_on_disk_deployment_plan"
     )]
     pub use_computed_deployment_plan: bool,
+    /// Allow the Clarity Wasm preview to run in parallel with the Clarity interpreter (beta)
+    #[clap(long = "enable-clarity-wasm")]
+    pub enable_clarity_wasm: bool,
 }
 
 #[derive(Parser, PartialEq, Clone, Debug)]
@@ -944,33 +947,16 @@ pub fn main() {
                         if cmd.enable_clarity_wasm {
                             let mut manifest_wasm = manifest.clone();
                             manifest_wasm.repl_settings.clarity_wasm_mode = true;
-                            let (_, _, artifacts_wasm) = load_deployment_and_artifacts_or_exit(
+                            let (_, _, wasm_artifacts) = load_deployment_and_artifacts_or_exit(
                                 &manifest_wasm,
                                 &cmd.deployment_plan_path,
                                 cmd.use_on_disk_deployment_plan,
                                 cmd.use_computed_deployment_plan,
                             );
-                            if artifacts.success != artifacts_wasm.success {
-                                for contract in deployment.contracts.keys() {
-                                    let empty_diag = vec![];
-                                    let diag = artifacts
-                                        .diags
-                                        .get(contract)
-                                        .unwrap_or(empty_diag.as_ref());
-                                    let diag_wasm = artifacts_wasm
-                                        .diags
-                                        .get(contract)
-                                        .unwrap_or(empty_diag.as_ref());
 
-                                    if diag.len() != diag_wasm.len() {
-                                        dbg!(&diag);
-                                        dbg!(&diag_wasm);
-                                    }
-                                }
-                                print_clarity_wasm_warning();
-                            }
+                            compare_wasm_artifacts(&deployment, &artifacts, &wasm_artifacts);
 
-                            Terminal::load(artifacts.session, Some(artifacts_wasm.session))
+                            Terminal::load(artifacts.session, Some(wasm_artifacts.session))
                         } else {
                             Terminal::load(artifacts.session, None)
                         }
@@ -1093,14 +1079,26 @@ pub fn main() {
         }
         Command::Check(cmd) => {
             let manifest = load_manifest_or_exit(cmd.manifest_path);
-            let (deployment, _, results) = load_deployment_and_artifacts_or_exit(
+            let (deployment, _, artifacts) = load_deployment_and_artifacts_or_exit(
                 &manifest,
                 &cmd.deployment_plan_path,
                 cmd.use_on_disk_deployment_plan,
                 cmd.use_computed_deployment_plan,
             );
 
-            let diags_digest = DiagnosticsDigest::new(&results.diags, &deployment);
+            if cmd.enable_clarity_wasm {
+                let mut manifest_wasm = manifest.clone();
+                manifest_wasm.repl_settings.clarity_wasm_mode = true;
+                let (_, _, wasm_artifacts) = load_deployment_and_artifacts_or_exit(
+                    &manifest_wasm,
+                    &cmd.deployment_plan_path,
+                    cmd.use_on_disk_deployment_plan,
+                    cmd.use_computed_deployment_plan,
+                );
+                compare_wasm_artifacts(&deployment, &artifacts, &wasm_artifacts);
+            }
+
+            let diags_digest = DiagnosticsDigest::new(&artifacts.diags, &deployment);
             if diags_digest.has_feedbacks() {
                 println!("{}", diags_digest.message);
             }
@@ -1125,7 +1123,7 @@ pub fn main() {
                     pluralize!(diags_digest.contracts_checked, "contract"),
                 );
             }
-            let exit_code = match results.success {
+            let exit_code = match artifacts.success {
                 true => 0,
                 false => 1,
             };
@@ -1423,6 +1421,29 @@ pub fn load_deployment_if_exists(
         }
     } else {
         Some(load_deployment(manifest, &default_deployment_location))
+    }
+}
+
+fn compare_wasm_artifacts(
+    deployment: &DeploymentSpecification,
+    artifacts: &DeploymentGenerationArtifacts,
+    wasm_artifacts: &DeploymentGenerationArtifacts,
+) {
+    if artifacts.success != wasm_artifacts.success {
+        for contract in deployment.contracts.keys() {
+            let empty_diag = vec![];
+            let diag = artifacts.diags.get(contract).unwrap_or(empty_diag.as_ref());
+            let diag_wasm = wasm_artifacts
+                .diags
+                .get(contract)
+                .unwrap_or(empty_diag.as_ref());
+
+            if diag.len() != diag_wasm.len() {
+                dbg!(&diag);
+                dbg!(&diag_wasm);
+            }
+        }
+        print_clarity_wasm_warning();
     }
 }
 

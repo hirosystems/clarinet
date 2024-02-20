@@ -133,7 +133,7 @@ impl ClarityInterpreter {
         self.run_interpreter(&contract.clone(), &mut ast.clone(), cost_track, eval_hooks)
     }
 
-    pub fn run_interpreter(
+    fn run_interpreter(
         &mut self,
         contract: &ClarityContract,
         ast: &mut Option<ContractAST>,
@@ -182,7 +182,7 @@ impl ClarityInterpreter {
     }
 
     #[cfg(feature = "cli")]
-    pub fn run_wasm(
+    fn run_wasm(
         &mut self,
         contract: &ClarityContract,
         ast: &mut Option<ContractAST>,
@@ -1134,7 +1134,9 @@ impl ClarityInterpreter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_fixtures::clarity_contract::ClarityContractBuilder;
+    use crate::{
+        repl::session::BOOT_CONTRACTS_DATA, test_fixtures::clarity_contract::ClarityContractBuilder,
+    };
     use clarity::{
         types::{chainstate::StacksAddress, Address},
         vm::{self},
@@ -1592,5 +1594,23 @@ mod tests {
             events[3],
             StacksTransactionEvent::NFTEvent(NFTEventType::NFTTransferEvent(_))
         ));
+    }
+
+    #[test]
+    fn can_run_boot_contracts() {
+        let mut repl_settings = Settings::default();
+        repl_settings.clarity_wasm_mode = true;
+        let mut interpreter =
+            ClarityInterpreter::new(StandardPrincipalData::transient(), repl_settings);
+
+        let boot_contracts_data = BOOT_CONTRACTS_DATA.clone();
+
+        for (_, (boot_contract, ast)) in boot_contracts_data {
+            let res = interpreter
+                .run(&boot_contract, &mut Some(ast), false, None)
+                .expect("failed to interprete boot contract");
+
+            assert!(res.diagnostics.is_empty());
+        }
     }
 }

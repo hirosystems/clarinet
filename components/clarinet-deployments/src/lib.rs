@@ -122,7 +122,7 @@ pub fn update_session_with_contracts_executions(
     for (_, (boot_contract, ast)) in boot_contracts_data {
         session
             .interpreter
-            .run_interpreter(&boot_contract, &mut Some(ast), false, None)
+            .run(&boot_contract, &mut Some(ast), false, None)
             .expect("failed to interprete boot contract");
     }
 
