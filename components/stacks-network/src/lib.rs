@@ -242,9 +242,7 @@ async fn do_run_devnet(
                         }
                     }
                     Ok(DevnetEvent::FatalError(e)) => return Err(e),
-                    Ok(DevnetEvent::Terminate) => {
-                        break;
-                    }
+                    Ok(DevnetEvent::Terminate) => return Ok((None, None, None)),
                     _ => {}
                 }
             }
