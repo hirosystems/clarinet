@@ -82,7 +82,7 @@ pub fn start(
     ));
     println!(
         "{} logs and chainstate available at location {}",
-        yellow!("terminating devnet network:"),
+        yellow!("\nterminating devnet network:"),
         working_dir
     );
 
