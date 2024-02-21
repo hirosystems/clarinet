@@ -9,7 +9,7 @@ use clarity_repl::clarity::vm::types::{
 };
 
 use clarity_repl::analysis::ast_dependency_detector::DependencySet;
-use clarity_repl::clarity::{ClarityName, ClarityVersion, ContractName, StacksEpochId};
+use clarity_repl::clarity::{ClarityName, ClarityVersion, ContractName, StacksEpochId, Value};
 use clarity_repl::repl::{Session, DEFAULT_CLARITY_VERSION};
 use serde::{Deserialize, Serialize};
 use serde_yaml;
@@ -73,6 +73,7 @@ pub struct DeploymentGenerationArtifacts {
     pub deps: BTreeMap<QualifiedContractIdentifier, DependencySet>,
     pub diags: HashMap<QualifiedContractIdentifier, Vec<Diagnostic>>,
     pub analysis: HashMap<QualifiedContractIdentifier, ContractAnalysis>,
+    pub results_values: HashMap<QualifiedContractIdentifier, Option<Value>>,
     pub session: Session,
     pub success: bool,
 }
