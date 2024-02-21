@@ -54,6 +54,7 @@ pub fn setup_session_with_deployment(
 
     let deps = BTreeMap::new();
     let mut diags = HashMap::new();
+    let mut results_values = HashMap::new();
     let mut asts = BTreeMap::new();
     let mut contracts_analysis = HashMap::new();
     let mut success = true;
@@ -62,6 +63,7 @@ pub fn setup_session_with_deployment(
             Ok(execution_result) => {
                 diags.insert(contract_id.clone(), execution_result.diagnostics);
                 if let EvaluationResult::Contract(contract_result) = execution_result.result {
+                    results_values.insert(contract_id.clone(), contract_result.result);
                     asts.insert(contract_id.clone(), contract_result.contract.ast);
                     contracts_analysis.insert(contract_id, contract_result.contract.analysis);
                 }
@@ -77,6 +79,7 @@ pub fn setup_session_with_deployment(
         asts,
         deps,
         diags,
+        results_values,
         success,
         session,
         analysis: contracts_analysis,
@@ -787,6 +790,7 @@ pub async fn generate_default_deployment(
         deps: dependencies,
         diags: contract_diags,
         success: asts_success,
+        results_values: HashMap::new(),
         analysis: HashMap::new(),
         session,
     };

@@ -1429,20 +1429,28 @@ fn compare_wasm_artifacts(
     artifacts: &DeploymentGenerationArtifacts,
     wasm_artifacts: &DeploymentGenerationArtifacts,
 ) {
-    if artifacts.success != wasm_artifacts.success {
-        for contract in deployment.contracts.keys() {
-            let empty_diag = vec![];
-            let diag = artifacts.diags.get(contract).unwrap_or(empty_diag.as_ref());
-            let diag_wasm = wasm_artifacts
-                .diags
-                .get(contract)
-                .unwrap_or(empty_diag.as_ref());
-
-            if diag.len() != diag_wasm.len() {
-                dbg!(&diag);
-                dbg!(&diag_wasm);
-            }
+    let mut print_warning = false;
+    for contract in deployment.contracts.keys() {
+        let diags = artifacts.diags.get(contract);
+        let wasm_diags = wasm_artifacts.diags.get(contract);
+        if diags != wasm_diags {
+            print_warning = true;
+            println!("Diagnostics of contract {contract} differs between clarity and clarity-wasm");
+            dbg!(diags);
+            dbg!(wasm_diags);
         }
+        let value = artifacts.results_values.get(contract);
+        let wasm_value = wasm_artifacts.results_values.get(contract);
+        if (diags.is_some() && wasm_diags.is_some()) && (value != wasm_value) {
+            print_warning = true;
+            println!(
+                "Evaluation value of contract {contract} differs between clarity and clarity-wasm"
+            );
+            dbg!(value);
+            dbg!(wasm_value);
+        };
+    }
+    if print_warning {
         print_clarity_wasm_warning();
     }
 }
