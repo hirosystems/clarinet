@@ -618,21 +618,16 @@ pub fn main() {
                 }
 
                 let write_plan = if default_deployment_path.exists() {
-                    let existing_deployment =
-                        match load_deployment(&manifest, &default_deployment_path) {
-                            Ok(deployment) => deployment,
-                            Err(message) => {
-                                println!(
-                                    "{}",
-                                    format_err!(format!(
-                                        "unable to load {}\n{}",
-                                        default_deployment_path.to_string(),
-                                        message
-                                    ))
-                                );
-                                process::exit(1);
-                            }
-                        };
+                    let existing_deployment = load_deployment(&manifest, &default_deployment_path)
+                        .unwrap_or_else(|message| {
+                            println!(
+                                "{}",
+                                format_err!(format!(
+                                    "unable to load {default_deployment_path}\n{message}",
+                                ))
+                            );
+                            process::exit(1);
+                        });
                     should_existing_plan_be_replaced(&existing_deployment, &deployment)
                 } else {
                     true
@@ -1300,15 +1295,18 @@ fn load_deployment_and_artifacts_or_exit(
     }
 }
 
-pub fn should_existing_plan_be_replaced(
+fn should_existing_plan_be_replaced(
     existing_plan: &DeploymentSpecification,
     new_plan: &DeploymentSpecification,
 ) -> bool {
     use similar::{ChangeTag, TextDiff};
 
-    let existing_file = serde_yaml::to_string(&existing_plan.to_specification_file()).unwrap();
-
-    let new_file = serde_yaml::to_string(&new_plan.to_specification_file()).unwrap();
+    let existing_file = existing_plan
+        .to_file_content()
+        .expect("unable to serialize deployment");
+    let new_file = new_plan
+        .to_file_content()
+        .expect("unable to serialize deployment");
 
     if existing_file == new_file {
         return false;
@@ -1316,7 +1314,10 @@ pub fn should_existing_plan_be_replaced(
 
     println!("{}", blue!("A new deployment plan was computed and differs from the default deployment plan currently saved on disk:"));
 
-    let diffs = TextDiff::from_lines(&existing_file, &new_file);
+    let diffs = TextDiff::from_lines(
+        std::str::from_utf8(&existing_file).unwrap(),
+        std::str::from_utf8(&new_file).unwrap(),
+    );
 
     for change in diffs.iter_all_changes() {
         let formatted_change = match change.tag() {
@@ -1338,7 +1339,7 @@ pub fn should_existing_plan_be_replaced(
     !buffer.starts_with('n')
 }
 
-pub fn load_deployment_if_exists(
+fn load_deployment_if_exists(
     manifest: &ProjectManifest,
     network: &StacksNetwork,
     force_on_disk: bool,
@@ -1357,13 +1358,12 @@ pub fn load_deployment_if_exists(
             Ok((deployment, _)) => {
                 use similar::{ChangeTag, TextDiff};
 
-                let current_version = match default_deployment_location.read_content_as_utf8() {
+                let current_version = match default_deployment_location.read_content() {
                     Ok(content) => content,
                     Err(message) => return Some(Err(message)),
                 };
 
-                let file = deployment.to_specification_file();
-                let updated_version = match serde_yaml::to_string(&file) {
+                let updated_version = match deployment.to_file_content() {
                     Ok(res) => res,
                     Err(err) => {
                         return Some(Err(format!("failed serializing deployment\n{}", err)))
@@ -1377,7 +1377,10 @@ pub fn load_deployment_if_exists(
                 if !force_computed {
                     println!("{}", blue!("A new deployment plan was computed and differs from the default deployment plan currently saved on disk:"));
 
-                    let diffs = TextDiff::from_lines(&current_version, &updated_version);
+                    let diffs = TextDiff::from_lines(
+                        std::str::from_utf8(&current_version).unwrap(),
+                        std::str::from_utf8(&updated_version).unwrap(),
+                    );
 
                     for change in diffs.iter_all_changes() {
                         let formatted_change = match change.tag() {
@@ -1399,13 +1402,13 @@ pub fn load_deployment_if_exists(
                         Some(load_deployment(manifest, &default_deployment_location))
                     } else {
                         default_deployment_location
-                            .write_content(updated_version.as_bytes())
+                            .write_content(&updated_version)
                             .ok()?;
                         Some(Ok(deployment))
                     }
                 } else {
                     default_deployment_location
-                        .write_content(updated_version.as_bytes())
+                        .write_content(&updated_version)
                         .ok()?;
                     Some(Ok(deployment))
                 }

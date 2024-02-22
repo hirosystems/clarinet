@@ -71,13 +71,14 @@ impl FileAccessor for WASMFileSystemAccessor {
             self.get_request_promise("vfs/readFile".into(), &WFSRequest { path });
 
         Box::pin(async move {
-            read_file_promise
-                .await
-                .and_then(|r| decode_from_js(r).map_err(|err| err.to_string()))
+            read_file_promise.await.and_then(|r| {
+                let file: Vec<u8> = decode_from_js(r).map_err(|err| err.to_string())?;
+                String::from_utf8(file).map_err(|err| err.to_string())
+            })
         })
     }
 
-    fn read_contracts_content(
+    fn read_files(
         &self,
         contracts_paths: Vec<String>,
     ) -> FileAccessorResult<HashMap<String, String>> {
@@ -89,9 +90,14 @@ impl FileAccessor for WASMFileSystemAccessor {
         );
 
         Box::pin(async move {
-            read_contract_promise
-                .await
-                .and_then(|r| decode_from_js(r).map_err(|err| err.to_string()))
+            read_contract_promise.await.and_then(|r| {
+                let files: HashMap<String, Vec<u8>> =
+                    decode_from_js(r).map_err(|err| err.to_string())?;
+                Ok(files
+                    .into_iter()
+                    .map(|(k, v)| (k, String::from_utf8(v).expect("failed to decode string")))
+                    .collect())
+            })
         })
     }
 

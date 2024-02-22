@@ -1,5 +1,5 @@
 import { Cl } from "@stacks/transactions";
-import { describe, expect, it, beforeEach, beforeAll } from "vitest";
+import { describe, expect, it, beforeEach } from "vitest";
 
 // test the built package and not the source code
 // makes it simpler to handle wasm build
@@ -22,10 +22,11 @@ describe("basic simnet interactions", async () => {
   });
 
   it("can mine empty blocks", async () => {
+    const blockHeight = simnet.blockHeight;
     simnet.mineEmptyBlock();
-    expect(simnet.blockHeight).toBe(2);
+    expect(simnet.blockHeight).toBe(blockHeight + 1);
     simnet.mineEmptyBlocks(4);
-    expect(simnet.blockHeight).toBe(6);
+    expect(simnet.blockHeight).toBe(blockHeight + 5);
   });
 
   it("exposes devnet stacks accounts", async () => {

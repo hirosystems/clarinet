@@ -1,7 +1,10 @@
 use clarinet_deployments::diagnostic_digest::DiagnosticsDigest;
-use clarinet_deployments::types::{DeploymentGenerationArtifacts, DeploymentSpecification};
+use clarinet_deployments::types::{
+    DeploymentGenerationArtifacts, DeploymentSpecification, DeploymentSpecificationFile,
+    TransactionSpecificationFile,
+};
 use clarinet_deployments::{
-    generate_default_deployment, initiate_session_from_deployment,
+    generate_default_deployment, initiate_session_from_deployment, setup_session_with_deployment,
     update_session_with_contracts_executions, update_session_with_genesis_accounts,
 };
 use clarinet_files::chainhook_types::StacksNetwork;
@@ -253,6 +256,7 @@ pub struct SDK {
     current_test_name: String,
 }
 
+#[allow(non_snake_case)]
 #[wasm_bindgen]
 impl SDK {
     #[wasm_bindgen(constructor)]
@@ -284,32 +288,89 @@ impl SDK {
     }
 
     #[wasm_bindgen(js_name=initSession)]
-    pub async fn init_session(
-        &mut self,
-        root: String,
-        manifest_path: String,
-    ) -> Result<(), String> {
-        let mut root_path = PathBuf::new();
-        root_path.push(root);
-        let project_root = FileLocation::FileSystem { path: root_path };
-        let manifest_location = FileLocation::try_parse(&manifest_path, Some(&project_root))
+    pub async fn init_session(&mut self, cwd: String, manifest_path: String) -> Result<(), String> {
+        let cwd_path = PathBuf::from(cwd);
+        let cwd_root = FileLocation::FileSystem { path: cwd_path };
+        let manifest_location = FileLocation::try_parse(&manifest_path, Some(&cwd_root))
             .ok_or("Failed to parse manifest location")?;
+        let project_root = manifest_location.get_parent_location()?;
+        let deployment_plan_location =
+            FileLocation::try_parse("deployments/default.simnet-plan.yaml", Some(&project_root))
+                .ok_or("Failed to parse default deployment location")?;
+
         let manifest =
             ProjectManifest::from_file_accessor(&manifest_location, &*self.file_accessor).await?;
 
         let (deployment, artifacts) = match self.cache.get(&manifest_location) {
             Some(cache) => cache.clone(),
             None => {
-                let cache = generate_default_deployment(
-                    &manifest,
-                    &StacksNetwork::Simnet,
-                    false,
-                    Some(&*self.file_accessor),
-                    Some(StacksEpochId::Epoch21),
-                )
-                .await?;
-                self.cache.insert(manifest_location, cache.clone());
-                cache
+                if self
+                    .file_accessor
+                    .file_exists(deployment_plan_location.to_string())
+                    .await?
+                {
+                    let spec_file = DeploymentSpecificationFile::from_file_accessor(
+                        &deployment_plan_location,
+                        &*self.file_accessor,
+                    )
+                    .await?;
+
+                    let contracts_paths = match spec_file.plan {
+                        Some(ref plan) => plan
+                            .batches
+                            .iter()
+                            .flat_map(|b| {
+                                b.transactions
+                                    .iter()
+                                    .filter_map(|t| match t {
+                                        TransactionSpecificationFile::EmulatedContractPublish(
+                                            ref deploy,
+                                        ) => deploy.path.clone(),
+                                        _ => None,
+                                    })
+                                    .collect::<Vec<String>>()
+                            })
+                            .collect::<Vec<String>>(),
+                        None => {
+                            vec![]
+                        }
+                    };
+
+                    let contracts_sources = self.file_accessor.read_files(contracts_paths).await?;
+
+                    let deployment = DeploymentSpecification::from_specifications(
+                        &spec_file,
+                        &StacksNetwork::Simnet,
+                        &project_root,
+                        Some(&contracts_sources),
+                    )
+                    .map_err(|e| e.to_string())?;
+
+                    let artifacts = setup_session_with_deployment(&manifest, &deployment, None);
+
+                    let cache = (deployment, artifacts);
+                    self.cache.insert(manifest_location, cache.clone());
+                    cache
+                } else {
+                    let (deployment, artifacts) = generate_default_deployment(
+                        &manifest,
+                        &StacksNetwork::Simnet,
+                        false,
+                        Some(&*self.file_accessor),
+                        Some(StacksEpochId::Epoch21),
+                    )
+                    .await?;
+
+                    let cache = (deployment.clone(), artifacts.clone());
+                    self.cache.insert(manifest_location, cache.clone());
+
+                    let deployment_file = deployment.to_file_content()?;
+                    self.file_accessor
+                        .write_file(deployment_plan_location.to_string(), &deployment_file)
+                        .await?;
+
+                    cache
+                }
             }
         };
 

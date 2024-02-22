@@ -31,7 +31,7 @@ async function exists(event: unknown) {
 
 async function readFile(event: unknown) {
   if (!isValidReadEvent(event)) throw new Error("invalid read event");
-  return fileArrayToString(await fs.readFile(event.path));
+  return fs.readFile(event.path);
 }
 
 async function readFiles(event: any) {
@@ -39,22 +39,14 @@ async function readFiles(event: any) {
   const files = await Promise.all(
     event.paths.map(async (p) => {
       try {
-        return fs.readFile(p);
+        return [p, await fs.readFile(p)];
       } catch (err) {
         console.warn(err);
-        return null;
+        return [p, null];
       }
     }),
   );
-  return Object.fromEntries(
-    files.reduce(
-      (acc, f, i) => {
-        if (f === null) return acc;
-        return acc.concat([[event.paths[i], fileArrayToString(f)]]);
-      },
-      [] as [string, string][],
-    ),
-  );
+  return Object.fromEntries(files.filter(([, content]) => content !== null));
 }
 
 async function writeFile(event: unknown) {
