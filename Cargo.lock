@@ -788,10 +788,10 @@ checksum = "702fc72eb24e5a1e48ce58027a675bc24edd52096d5397d4aea7c6dd9eca0bd1"
 [[package]]
 name = "clar2wasm"
 version = "0.1.0"
-source = "git+https://github.com/stacks-network/clarity-wasm.git?rev=e7f63c2#e7f63c23d3bfce0d98edd0f9aeeff5a751bcfb1c"
+source = "git+https://github.com/stacks-network/clarity-wasm.git?rev=b12002d#b12002d9576a9ebf90e5ddca3bf2fffb2bf12975"
 dependencies = [
  "clap",
- "clarity",
+ "clarity 2.2.0 (git+https://github.com/stacks-network/stacks-core.git?rev=1e9df56b255247928679961d0a7c2541ad127f59)",
  "lazy_static",
  "regex",
  "walrus",
@@ -932,6 +932,27 @@ dependencies = [
 [[package]]
 name = "clarity"
 version = "2.2.0"
+source = "git+https://github.com/stacks-network/stacks-core.git?rev=1e9df56b255247928679961d0a7c2541ad127f59#1e9df56b255247928679961d0a7c2541ad127f59"
+dependencies = [
+ "integer-sqrt",
+ "lazy_static",
+ "rand 0.7.3",
+ "rand_chacha 0.2.2",
+ "regex",
+ "rusqlite",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "serde_stacker",
+ "sha2-asm",
+ "slog",
+ "stacks-common",
+ "wasmtime",
+]
+
+[[package]]
+name = "clarity"
+version = "2.2.0"
 source = "git+https://github.com/stacks-network/stacks-core.git?rev=345553357be556fe53474071d09cd453549ed02e#345553357be556fe53474071d09cd453549ed02e"
 dependencies = [
  "integer-sqrt",
@@ -1014,7 +1035,7 @@ dependencies = [
  "bytes",
  "chrono",
  "clar2wasm",
- "clarity",
+ "clarity 2.2.0 (git+https://github.com/stacks-network/stacks-core.git?rev=1e9df56b255247928679961d0a7c2541ad127f59)",
  "debug_types",
  "futures",
  "getrandom 0.2.8",
@@ -1048,7 +1069,7 @@ dependencies = [
  "ansi_term",
  "atty",
  "chrono",
- "clarity",
+ "clarity 2.2.0 (git+https://github.com/stacks-network/stacks-core.git?rev=345553357be556fe53474071d09cd453549ed02e)",
  "getrandom 0.2.8",
  "hiro-system-kit 0.1.0 (git+https://github.com/hirosystems/clarinet.git?rev=32cc9aa8)",
  "integer-sqrt",
