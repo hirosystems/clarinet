@@ -343,6 +343,38 @@ describe("tests tuple", () => {
       expect(e.expected).toBe("{\n  a: 2,\n  b: 1,\n  c: 1\n}");
     }
   });
+
+  it("properly orders tuple keys even in nested types", () => {
+    // keys in non-alphabetical order
+    const value = Cl.some(
+      Cl.tuple({
+        b: Cl.int(1),
+        a: Cl.int(1),
+        c: Cl.int(1),
+      }),
+    );
+
+    try {
+      const failingTest = () =>
+        // keys in non-alphabetical order
+        expect(value).toBeSome(
+          Cl.tuple({
+            c: Cl.int(1),
+            b: Cl.int(1),
+            // different value here
+            a: Cl.int(2),
+          }),
+        );
+      expect(failingTest).toThrow();
+      failingTest();
+    } catch (e: any) {
+      expect(e.message).toStrictEqual(
+        "expected (some { a: 1, b: 1, c: 1 }) to be (some { a: 2, b: 1, c: 1 })",
+      );
+      expect(e.actual).toBe("(some {\n  a: 1,\n  b: 1,\n  c: 1\n})");
+      expect(e.expected).toBe("(some {\n  a: 2,\n  b: 1,\n  c: 1\n})");
+    }
+  });
 });
 
 describe("test nested types", () => {
