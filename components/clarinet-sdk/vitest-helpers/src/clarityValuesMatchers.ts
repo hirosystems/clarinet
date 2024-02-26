@@ -351,28 +351,14 @@ expect.extend({
       return errorToAssertionResult.call(this, e);
     }
 
-    // to properly display the diff, the keys of actual and expected tuples must be sorted
-    const orderedActual = Cl.tuple(
-      Object.fromEntries(Object.entries(actual.data).toSorted((a, b) => a[0].localeCompare(b[0]))),
-    );
-
     const isTupleData = checkIsTupleData(expectedData);
-    const expected = isTupleData
-      ? Cl.prettyPrint(
-          Cl.tuple(
-            Object.fromEntries(
-              Object.entries(expectedData).toSorted((a, b) => a[0].localeCompare(b[0])),
-            ),
-          ),
-          2,
-        )
-      : expectedData;
+    const expected = isTupleData ? Cl.prettyPrint(Cl.tuple(expectedData), 2) : expectedData;
 
     return {
       pass: this.equals(actual.data, expectedData, undefined, true),
       // note: throw a simple message and rely on `actual` and `expected` to display the diff
       message: () => `the received Tuple does ${this.isNot ? "" : "not "}match the expected one`,
-      actual: Cl.prettyPrint(orderedActual, 2),
+      actual: Cl.prettyPrint(actual, 2),
       expected,
     };
   },
