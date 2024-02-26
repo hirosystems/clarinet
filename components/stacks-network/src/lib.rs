@@ -11,6 +11,7 @@ mod orchestrator;
 mod ui;
 
 pub use chainhook_sdk::observer::MempoolAdmissionData;
+use chainhook_sdk::observer::ObserverCommand;
 pub use chainhook_sdk::{self, utils::Context};
 pub use chainhooks::{load_chainhooks, parse_chainhook_full_specification};
 use chains_coordinator::BitcoinMiningCommand;
@@ -20,11 +21,7 @@ pub use log::{LogData, LogLevel};
 pub use orchestrator::DevnetOrchestrator;
 use orchestrator::ServicesMapHosts;
 use std::{
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        mpsc::{self, channel, Receiver, Sender},
-        Arc,
-    },
+    sync::mpsc::{self, channel, Receiver, Sender},
     thread::sleep,
     time::Duration,
 };
@@ -120,8 +117,11 @@ async fn do_run_devnet(
         crossbeam_channel::unbounded();
     let (orchestrator_terminator_tx, terminator_rx) = channel();
     let (observer_command_tx, observer_command_rx) = channel();
+    let (mining_command_tx, mining_command_rx) = channel();
+    let moved_mining_command_tx = mining_command_tx.clone();
     let moved_orchestrator_terminator_tx = orchestrator_terminator_tx.clone();
     let moved_chains_coordinator_commands_tx = chains_coordinator_commands_tx.clone();
+    let moved_observer_command_tx = observer_command_tx.clone();
 
     let ctx_moved = ctx.clone();
     let chains_coordinator_handle = hiro_system_kit::thread_named("Chains coordinator")
@@ -132,8 +132,10 @@ async fn do_run_devnet(
                 chains_coordinator_commands_rx,
                 moved_chains_coordinator_commands_tx,
                 moved_orchestrator_terminator_tx,
-                observer_command_tx,
+                moved_observer_command_tx,
                 observer_command_rx,
+                moved_mining_command_tx,
+                mining_command_rx,
                 ctx_moved,
             );
             let rt = hiro_system_kit::create_basic_runtime();
@@ -200,14 +202,15 @@ async fn do_run_devnet(
             }
         }
     } else {
-        let termination_reader = Arc::new(AtomicBool::new(false));
-        let termination_writer = termination_reader.clone();
         let moved_orchestrator_terminator_tx = orchestrator_terminator_tx.clone();
-        let moved_events_observer_commands_tx = chains_coordinator_commands_tx.clone();
+        let moved_observer_command_tx = observer_command_tx.clone();
+        let moved_mining_command_tx = mining_command_tx.clone();
         let _ = ctrlc::set_handler(move || {
-            let _ = moved_events_observer_commands_tx.send(ChainsCoordinatorCommand::Terminate);
             let _ = moved_orchestrator_terminator_tx.send(true);
-            termination_writer.store(true, Ordering::SeqCst);
+            let _ = moved_observer_command_tx.send(ObserverCommand::Terminate);
+            let _ = moved_mining_command_tx.send(BitcoinMiningCommand::Pause);
+            sleep(Duration::from_secs(3));
+            let _ = devnet_events_tx.send(DevnetEvent::Terminate);
         });
 
         if log_tx.is_none() {
@@ -238,11 +241,9 @@ async fn do_run_devnet(
                             let _ = bitcoin_mining_tx.send(BitcoinMiningCommand::Start);
                         }
                     }
+                    Ok(DevnetEvent::FatalError(e)) => return Err(e),
+                    Ok(DevnetEvent::Terminate) => return Ok((None, None, None)),
                     _ => {}
-                }
-                if termination_reader.load(Ordering::SeqCst) {
-                    sleep(Duration::from_secs(3));
-                    std::process::exit(0);
                 }
             }
         } else {

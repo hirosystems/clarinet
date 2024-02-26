@@ -1821,12 +1821,17 @@ fn devnet_start(cmd: DevnetStart, global_settings: GlobalSettings) {
             ),
         ));
     }
-    if let Err(e) = start(orchestrator, deployment, None, !cmd.no_dashboard) {
-        println!("{}", format_err!(e));
-        process::exit(1);
-    }
-    if global_settings.enable_hints.unwrap_or(true) {
-        display_deploy_hint();
+    match start(orchestrator, deployment, None, !cmd.no_dashboard) {
+        Err(e) => {
+            println!("{}", format_err!(e));
+            process::exit(1);
+        }
+        Ok(_) => {
+            if global_settings.enable_hints.unwrap_or(true) {
+                display_deploy_hint();
+            }
+            process::exit(0);
+        }
     }
 }
 
