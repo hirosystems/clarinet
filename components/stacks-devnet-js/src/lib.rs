@@ -10,17 +10,21 @@ use clarinet_files::{
     compute_addresses, AccountConfig, DevnetConfigFile, FileLocation, PoxStackingOrder,
     ProjectManifest, DEFAULT_DERIVATION_PATH,
 };
+use hiro_system_kit::{o, slog, slog_async, slog_term, Drain};
+use neon::context::Context as NeonContext;
 use stacks_network::chainhook_sdk::types::{
     BitcoinChainEvent, BitcoinChainUpdatedWithBlocksData, StacksChainEvent,
     StacksChainUpdatedWithBlocksData, StacksNetwork,
 };
 use stacks_network::chains_coordinator::BitcoinMiningCommand;
-use stacks_network::{self, DevnetEvent, DevnetOrchestrator};
+use stacks_network::{self, Context, DevnetEvent, DevnetOrchestrator, LogLevel};
 
 use core::panic;
 use neon::prelude::*;
 use std::collections::BTreeMap;
+use std::fs::OpenOptions;
 use std::path::PathBuf;
+use std::str::FromStr;
 use std::sync::mpsc;
 use std::thread;
 use std::{env, process};
@@ -87,7 +91,7 @@ impl StacksDevnet {
         devnet_overrides: DevnetConfigFile,
     ) -> Self
     where
-        C: Context<'a>,
+        C: NeonContext<'a>,
     {
         let network_id = devnet_overrides.network_id;
         let (tx, rx) = mpsc::channel::<DevnetCommand>();
@@ -110,6 +114,7 @@ impl StacksDevnet {
         let (deployment, _) =
             read_deployment_or_generate_default(&manifest, &StacksNetwork::Devnet)
                 .expect("Unable to generate deployment");
+        let working_dir = devnet_overrides.working_dir.clone();
         let devnet = match DevnetOrchestrator::new(manifest, None, Some(devnet_overrides), true) {
             Ok(devnet) => devnet,
             Err(message) => {
@@ -118,6 +123,48 @@ impl StacksDevnet {
                 }
                 std::process::exit(1);
             }
+        };
+        let ctx: Option<Context> = match working_dir {
+            Some(working_dir) => match PathBuf::from_str(&working_dir) {
+                Ok(mut log_path) => {
+                    log_path.push("devnet.log");
+                    match OpenOptions::new()
+                        .create(true)
+                        .write(true)
+                        .truncate(true)
+                        .open(log_path)
+                    {
+                        Ok(file) => {
+                            let decorator = slog_term::PlainDecorator::new(file);
+                            let drain = slog_term::FullFormat::new(decorator).build().fuse();
+                            let drain = slog_async::Async::new(drain).build().fuse();
+                            let logger = slog::Logger::root(drain, o!());
+
+                            let ctx = Context {
+                                logger: Some(logger),
+                                tracer: false,
+                            };
+                            Some(ctx)
+                        }
+                        Err(e) => {
+                            if logs_enabled {
+                                println!("unable to create log file {}", e);
+                            }
+                            None
+                        }
+                    }
+                }
+                Err(e) => {
+                    if logs_enabled {
+                        println!(
+                            "incorrectly formatted working_dir {}. error: {}",
+                            working_dir, e
+                        )
+                    }
+                    None
+                }
+            },
+            None => None,
         };
 
         let (
@@ -221,46 +268,71 @@ impl StacksDevnet {
 
         thread::spawn(move || {
             if let Ok(ref devnet_rx) = meta_devnet_command_rx.recv() {
-                while let Ok(event) = devnet_rx.recv() {
-                    match event {
-                        DevnetEvent::BitcoinChainEvent(
-                            BitcoinChainEvent::ChainUpdatedWithBlocks(update),
-                        ) => {
-                            bitcoin_block_tx
-                                .send(update)
-                                .expect("Unable to transmit bitcoin block");
-                        }
-                        DevnetEvent::StacksChainEvent(
-                            StacksChainEvent::ChainUpdatedWithBlocks(update),
-                        ) => {
-                            stacks_block_tx
-                                .send(update)
-                                .expect("Unable to transmit stacks block");
-                        }
-                        DevnetEvent::Log(log) => {
-                            if logs_enabled {
-                                println!(
-                                    "{} {}",
-                                    log,
-                                    match network_id {
-                                        Some(network_id) => format!("(network #{})", network_id),
-                                        None => "".into(),
+                loop {
+                    match devnet_rx.recv() {
+                        Ok(event) => match event {
+                            DevnetEvent::BitcoinChainEvent(
+                                BitcoinChainEvent::ChainUpdatedWithBlocks(update),
+                            ) => {
+                                bitcoin_block_tx
+                                    .send(update)
+                                    .expect("Unable to transmit bitcoin block");
+                            }
+                            DevnetEvent::StacksChainEvent(
+                                StacksChainEvent::ChainUpdatedWithBlocks(update),
+                            ) => {
+                                stacks_block_tx
+                                    .send(update)
+                                    .expect("Unable to transmit stacks block");
+                            }
+                            DevnetEvent::Log(log) => {
+                                if logs_enabled {
+                                    println!(
+                                        "{} {}",
+                                        log,
+                                        match network_id {
+                                            Some(network_id) =>
+                                                format!("(network #{})", network_id),
+                                            None => "".into(),
+                                        }
+                                    );
+                                }
+                                if let Some(ctx) = &ctx {
+                                    match log.level {
+                                        LogLevel::Debug => ctx.try_log(|logger| {
+                                            slog::debug!(logger, "{}", log.message)
+                                        }),
+                                        LogLevel::Info | LogLevel::Success => {
+                                            ctx.try_log(|logger| {
+                                                slog::info!(logger, "{}", log.message)
+                                            })
+                                        }
+                                        LogLevel::Warning => ctx.try_log(|logger| {
+                                            slog::warn!(logger, "{}", log.message)
+                                        }),
+                                        LogLevel::Error => ctx.try_log(|logger| {
+                                            slog::error!(logger, "{}", log.message)
+                                        }),
                                     }
-                                );
+                                }
                             }
-                        }
-                        DevnetEvent::BootCompleted(mining_tx) => {
-                            let _ = meta_mining_command_tx.send(mining_tx);
-                            let _ = devnet_ready_tx.send(Ok(()));
-                        }
-                        DevnetEvent::FatalError(error) => {
-                            let _ = devnet_ready_tx.send(Err(error.clone()));
-                            if logs_enabled {
-                                println!("[erro] {}", error);
+                            DevnetEvent::BootCompleted(mining_tx) => {
+                                let _ = meta_mining_command_tx.send(mining_tx);
+                                let _ = devnet_ready_tx.send(Ok(()));
                             }
+                            DevnetEvent::FatalError(error) => {
+                                let _ = devnet_ready_tx.send(Err(error.clone()));
+                                if logs_enabled {
+                                    println!("[erro] {}", error);
+                                }
+                                break;
+                            }
+                            _ => {}
+                        },
+                        Err(e) => {
+                            println!("devnet event thread failed: {e}");
                             break;
                         }
-                        _ => {}
                     }
                 }
             }
