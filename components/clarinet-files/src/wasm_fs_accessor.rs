@@ -69,10 +69,10 @@ impl FileAccessor for WASMFileSystemAccessor {
     fn read_file(&self, path: String) -> FileAccessorResult<String> {
         let read_file_promise =
             self.get_request_promise("vfs/readFile".into(), &WFSRequest { path });
-
         Box::pin(async move {
             read_file_promise.await.and_then(|r| {
-                let file: Vec<u8> = decode_from_js(r).map_err(|err| err.to_string())?;
+                let file: Vec<u8> = decode_from_js(r)
+                    .map_err(|err| format!("failed to decode file\nErr: {:?}", err))?;
                 String::from_utf8(file).map_err(|err| err.to_string())
             })
         })
@@ -91,8 +91,8 @@ impl FileAccessor for WASMFileSystemAccessor {
 
         Box::pin(async move {
             read_contract_promise.await.and_then(|r| {
-                let files: HashMap<String, Vec<u8>> =
-                    decode_from_js(r).map_err(|err| err.to_string())?;
+                let files: HashMap<String, Vec<u8>> = decode_from_js(r.clone())
+                    .map_err(|err| format!("failed to decode file for\nError: {err}"))?;
                 Ok(files
                     .into_iter()
                     .map(|(k, v)| (k, String::from_utf8(v).expect("failed to decode string")))

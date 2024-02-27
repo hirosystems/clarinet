@@ -1,12 +1,6 @@
 import * as fs from "node:fs/promises";
 import path from "node:path";
 
-function fileArrayToString(bufferArray: Uint8Array) {
-  return Array.from(bufferArray)
-    .map((item) => String.fromCharCode(item))
-    .join("");
-}
-
 function isValidReadEvent(e: any): e is { path: string } {
   return typeof e?.path === "string";
 }

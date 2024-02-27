@@ -17,9 +17,9 @@ gloo-utils = { version = "0.2", features = ["serde"] }
 js-sys = { version = "0.3", optional = true }
 serde = { version = "1.0.136", features = ["derive"] }
 serde_json = "1.0"
-serde-wasm-bindgen = { version = "0.6.0", optional = true }
-wasm-bindgen = { version = "0.2", optional = true }
-wasm-bindgen-futures = { version = "0.4", optional = true }
+serde-wasm-bindgen = { version = "0.6.4", optional = true }
+wasm-bindgen = { version = "0.2.91", optional = true }
+wasm-bindgen-futures = { version = "0.4.41", optional = true }
 web-sys = { version = "0.3", features = ["console"], optional = true }
 
 clarinet-files = { path = "../clarinet-files", default-features = false }

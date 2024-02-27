@@ -5,6 +5,7 @@ import { describe, expect, it, beforeEach } from "vitest";
 // makes it simpler to handle wasm build
 import { Simnet, initSimnet, tx } from "../";
 import path from "node:path";
+import { assert } from "node:console";
 
 const deployerAddr = "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM";
 const address1 = "ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5";
@@ -19,6 +20,6 @@ beforeEach(async () => {
 describe("basic simnet interactions", async () => {
   it("initialize simnet", async () => {
     const { result } = simnet.callReadOnlyFn("counter", "get-count", [], address1);
-    console.log("count", Cl.prettyPrint(result, 2));
+    expect(result).toBeDefined();
   });
 });
