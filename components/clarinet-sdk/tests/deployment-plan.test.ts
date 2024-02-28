@@ -1,25 +1,54 @@
+import fs from "node:fs";
+import path from "node:path";
 import { Cl } from "@stacks/transactions";
-import { describe, expect, it, beforeEach } from "vitest";
+import { describe, expect, it, beforeEach, afterEach, assert } from "vitest";
 
 // test the built package and not the source code
 // makes it simpler to handle wasm build
-import { Simnet, initSimnet, tx } from "../";
-import path from "node:path";
-import { assert } from "node:console";
+import { initSimnet } from "../";
 
-const deployerAddr = "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM";
-const address1 = "ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5";
-const address2 = "ST2CY5V39NHDPWSXMW9QDT3HC3GD6Q6XX4CFRK9AG";
+const deploymentPlan = path.join(
+  process.cwd(),
+  "tests/fixtures/deployments/default.simnet-plan.yaml",
+);
+const customDeploymentPlan = path.join(
+  process.cwd(),
+  "tests/fixtures/deployments/custom.simnet-plan.yaml",
+);
 
-let simnet: Simnet;
+function deleteExistingDeploymentPlan() {
+  if (fs.existsSync(deploymentPlan)) {
+    fs.unlinkSync(deploymentPlan);
+  }
+}
 
 beforeEach(async () => {
-  simnet = await initSimnet("tests/fixtures/Clarinet.toml");
+  deleteExistingDeploymentPlan();
 });
 
-describe("basic simnet interactions", async () => {
-  it("initialize simnet", async () => {
-    const { result } = simnet.callReadOnlyFn("counter", "get-count", [], address1);
-    expect(result).toBeDefined();
+afterEach(() => {
+  deleteExistingDeploymentPlan();
+});
+
+describe("deployment plans test", async () => {
+  it("simnet deployment plan is created if it does not exist", async () => {
+    assert(!fs.existsSync(deploymentPlan));
+    const simnet = await initSimnet("tests/fixtures/Clarinet.toml");
+    // make sure the simnet is running
+    expect(simnet.blockHeight).toBe(1);
+    assert(fs.existsSync(deploymentPlan));
+  });
+
+  it("handle custom deployment plan", async () => {
+    deleteExistingDeploymentPlan();
+    fs.copyFileSync(customDeploymentPlan, deploymentPlan);
+    assert(fs.existsSync(deploymentPlan));
+
+    // init simnet with no cache to load the new deployment plan
+    const simnet = await initSimnet("tests/fixtures/Clarinet.toml", true);
+    const result = simnet.getDataVar("counter", "count");
+
+    // the count is 2 because the custom deployment plan calls (add u2)
+    expect(result).toMatchObject(Cl.uint(2));
   });
 });
