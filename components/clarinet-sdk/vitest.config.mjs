@@ -3,7 +3,11 @@ import { defineConfig } from "vite";
 
 export default defineConfig({
   test: {
-    singleThread: true,
+    poolOptions: {
+      threads: {
+        singleThread: true,
+      },
+    },
     include: ["./tests/**/*.test.ts", "./vitest-helpers/tests/**/*.test.ts"],
   },
 });

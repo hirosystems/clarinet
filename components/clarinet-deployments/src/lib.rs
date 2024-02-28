@@ -13,6 +13,9 @@ pub mod onchain;
 pub mod requirements;
 pub mod types;
 
+#[cfg(test)]
+mod deployment_plan_test;
+
 use self::types::{
     DeploymentSpecification, EmulatedContractPublishSpecification, GenesisSpecification,
     TransactionPlanSpecification, TransactionsBatchSpecification, WalletSpecification,

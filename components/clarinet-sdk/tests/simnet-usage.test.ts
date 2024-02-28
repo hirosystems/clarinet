@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { Cl } from "@stacks/transactions";
-import { describe, expect, it, beforeEach, afterEach } from "vitest";
+import { describe, expect, it, beforeEach, afterEach, assert } from "vitest";
 
 // test the built package and not the source code
 // makes it simpler to handle wasm build
@@ -13,13 +13,19 @@ const address2 = "ST2CY5V39NHDPWSXMW9QDT3HC3GD6Q6XX4CFRK9AG";
 
 let simnet: Simnet;
 
+const deploymentPlanPath = path.join(
+  process.cwd(),
+  "tests/fixtures/deployments/default.simnet-plan.yaml",
+);
+
+const customDeploymentPlanPath = path.join(
+  process.cwd(),
+  "tests/fixtures/deployments/custom.simnet-plan.yaml",
+);
+
 function deleteExistingDeploymentPlan() {
-  const deploymentPlan = path.join(
-    process.cwd(),
-    "tests/fixtures/deployments/default.simnet-plan.yaml",
-  );
-  if (fs.existsSync(deploymentPlan)) {
-    fs.unlinkSync(deploymentPlan);
+  if (fs.existsSync(deploymentPlanPath)) {
+    fs.unlinkSync(deploymentPlanPath);
   }
 }
 
@@ -32,12 +38,12 @@ afterEach(() => {
   deleteExistingDeploymentPlan();
 });
 
-describe("basic simnet interactions", async () => {
-  it("initialize simnet", async () => {
+describe("basic simnet interactions", () => {
+  it("initialize simnet", () => {
     expect(simnet.blockHeight).toBe(1);
   });
 
-  it("can mine empty blocks", async () => {
+  it("can mine empty blocks", () => {
     const blockHeight = simnet.blockHeight;
     simnet.mineEmptyBlock();
     expect(simnet.blockHeight).toBe(blockHeight + 1);
@@ -45,7 +51,7 @@ describe("basic simnet interactions", async () => {
     expect(simnet.blockHeight).toBe(blockHeight + 5);
   });
 
-  it("exposes devnet stacks accounts", async () => {
+  it("exposes devnet stacks accounts", () => {
     const accounts = simnet.getAccounts();
 
     expect(accounts).toHaveLength(4);
@@ -53,13 +59,13 @@ describe("basic simnet interactions", async () => {
     expect(accounts.get("wallet_1")).toBe(address1);
   });
 
-  it("expose assets maps", async () => {
+  it("expose assets maps", () => {
     const assets = simnet.getAssetsMap();
     expect(assets.get("STX")).toHaveLength(4);
     expect(assets.get("STX")?.get(address1)).toBe(100000000000000n);
   });
 
-  it("can get and set epoch", async () => {
+  it("can get and set epoch", () => {
     // should be 2.4 by default
     expect(simnet.currentEpoch).toBe("2.4");
 
@@ -74,7 +80,7 @@ describe("basic simnet interactions", async () => {
   });
 });
 
-describe("simnet can run arbitrary snippets", async () => {
+describe("simnet can run arbitrary snippets", () => {
   it("can run simple snippets", () => {
     const res = simnet.runSnippet("(+ 1 2)");
     expect(res).toStrictEqual(Cl.int(3));
@@ -87,8 +93,8 @@ describe("simnet can run arbitrary snippets", async () => {
   });
 });
 
-describe("simnet can call contracts function", async () => {
-  it("can call read only functions", async () => {
+describe("simnet can call contracts function", () => {
+  it("can call read only functions", () => {
     const res = simnet.callReadOnlyFn("counter", "get-count", [], address1);
 
     expect(res).toHaveProperty("result");
@@ -96,7 +102,7 @@ describe("simnet can call contracts function", async () => {
     expect(res.result).toStrictEqual(Cl.ok(Cl.tuple({ count: Cl.uint(0) })));
   });
 
-  it("does not increase block height when calling read-only functions", async () => {
+  it("does not increase block height when calling read-only functions", () => {
     const initalBH = simnet.blockHeight;
 
     simnet.callReadOnlyFn("counter", "get-count", [], address1);
@@ -104,7 +110,7 @@ describe("simnet can call contracts function", async () => {
     expect(simnet.blockHeight).toBe(initalBH);
   });
 
-  it("can call public functions", async () => {
+  it("can call public functions", () => {
     const res = simnet.callPublicFn("counter", "increment", [], address1);
 
     expect(res).toHaveProperty("result");
@@ -117,7 +123,7 @@ describe("simnet can call contracts function", async () => {
     expect(printEvent.data.value).toStrictEqual(Cl.stringAscii("call increment"));
   });
 
-  it("can call public functions with arguments", async () => {
+  it("can call public functions with arguments", () => {
     const res = simnet.callPublicFn("counter", "add", [Cl.uint(2)], address1);
 
     expect(res).toHaveProperty("result");
@@ -125,7 +131,7 @@ describe("simnet can call contracts function", async () => {
     expect(res.result).toStrictEqual(Cl.ok(Cl.bool(true)));
   });
 
-  it("increases block height when calling public functions", async () => {
+  it("increases block height when calling public functions", () => {
     const initalBH = simnet.blockHeight;
 
     simnet.callPublicFn("counter", "increment", [], address1);
@@ -133,7 +139,7 @@ describe("simnet can call contracts function", async () => {
     expect(simnet.blockHeight).toBe(initalBH + 2);
   });
 
-  it("can call public functions in the same block", async () => {
+  it("can call public functions in the same block", () => {
     const initalBH = simnet.blockHeight;
 
     const res = simnet.mineBlock([
@@ -153,7 +159,7 @@ describe("simnet can call contracts function", async () => {
     expect(simnet.blockHeight).toStrictEqual(initalBH + 1);
   });
 
-  it("can get updated assets map", async () => {
+  it("can get updated assets map", () => {
     simnet.callPublicFn("counter", "increment", [], address1);
     simnet.callPublicFn("counter", "increment", [], address1);
 
@@ -164,30 +170,30 @@ describe("simnet can call contracts function", async () => {
     expect(STX.get(`${deployerAddr}.counter`)).toStrictEqual(2000000n);
   });
 
-  it("can pass principals as arguments", async () => {
+  it("can pass principals as arguments", () => {
     const to = Cl.standardPrincipal(address2);
     const { result } = simnet.callPublicFn("counter", "transfer-100", [to], address1);
     expect(result).toStrictEqual(Cl.ok(Cl.bool(true)));
   });
 
-  it("can pass traits as arguments", async () => {
+  it("can pass traits as arguments", () => {
     const trait = Cl.contractPrincipal(simnet.deployer, "multiplier-contract");
     const { result } = simnet.callPublicFn("counter", "call-multiply", [trait], address1);
     expect(result).toStrictEqual(Cl.ok(Cl.uint(4)));
   });
 });
 
-describe("simnet can read contracts data vars and maps", async () => {
-  it("can get data-vars", async () => {
+describe("simnet can read contracts data vars and maps", () => {
+  it("can get data-vars", () => {
     const counter = simnet.getDataVar("counter", "count");
     expect(counter).toStrictEqual(Cl.uint(0));
   });
-  it("can get block time", async () => {
+  it("can get block time", () => {
     const bt = simnet.getBlockTime();
     expect(bt).toBeDefined();
   });
 
-  it("can get map entry", async () => {
+  it("can get map entry", () => {
     // add a participant in the map
     simnet.callPublicFn("counter", "increment", [], address1);
 
@@ -196,8 +202,8 @@ describe("simnet can read contracts data vars and maps", async () => {
   });
 });
 
-describe("simnet can get contracts info and deploy contracts", async () => {
-  it("can get contract interfaces", async () => {
+describe("simnet can get contracts info and deploy contracts", () => {
+  it("can get contract interfaces", () => {
     const contractInterfaces = simnet.getContractsInterfaces();
     expect(contractInterfaces).toHaveLength(3);
 
@@ -208,7 +214,7 @@ describe("simnet can get contracts info and deploy contracts", async () => {
     expect(counterInterface?.maps).toHaveLength(1);
   });
 
-  it("can get contract source", async () => {
+  it("can get contract source", () => {
     const counterSource = simnet.getContractSource(`${deployerAddr}.counter`);
     expect(counterSource?.startsWith("(define-data-var count")).toBe(true);
 
@@ -219,7 +225,7 @@ describe("simnet can get contracts info and deploy contracts", async () => {
     expect(noSource).toBeUndefined();
   });
 
-  it("can get contract ast", async () => {
+  it("can get contract ast", () => {
     const counterAst = simnet.getContractAST(`${deployerAddr}.counter`);
     expect(counterAst).toBeDefined();
     expect(counterAst.expressions).toHaveLength(10);
@@ -228,7 +234,7 @@ describe("simnet can get contracts info and deploy contracts", async () => {
     expect(getWithShortAddr).toBeDefined();
   });
 
-  it("can deploy contracts as snippets", async () => {
+  it("can deploy contracts as snippets", () => {
     const res = simnet.deployContract("temp", "(+ 24 18)", null, deployerAddr);
     expect(res.result).toStrictEqual(Cl.int(42));
 
@@ -236,7 +242,7 @@ describe("simnet can get contracts info and deploy contracts", async () => {
     expect(contractInterfaces).toHaveLength(3);
   });
 
-  it("can deploy contracts", async () => {
+  it("can deploy contracts", () => {
     const source = "(define-public (add (a uint) (b uint)) (ok (+ a b)))\n";
     const deployRes = simnet.deployContract("op", source, null, deployerAddr);
     expect(deployRes.result).toStrictEqual(Cl.bool(true));
@@ -255,7 +261,7 @@ describe("simnet can get contracts info and deploy contracts", async () => {
     expect(opASt.expressions).toHaveLength(1);
   });
 
-  it("can deploy contract with a given clarity_version", async () => {
+  it("can deploy contract with a given clarity_version", () => {
     const source = "(define-public (add (a uint) (b uint)) (ok (+ a b)))\n";
 
     simnet.deployContract("contract1", source, { clarityVersion: 1 }, deployerAddr);
@@ -277,7 +283,7 @@ describe("simnet can get contracts info and deploy contracts", async () => {
 });
 
 describe("simnet can transfer stx", () => {
-  it("can transfer stx", async () => {
+  it("can transfer stx", () => {
     simnet.transferSTX(1000, address2, address1);
     const stxBalances = simnet.getAssetsMap().get("STX");
     const stxAddress1 = stxBalances?.get(address1);
@@ -287,8 +293,8 @@ describe("simnet can transfer stx", () => {
   });
 });
 
-describe("simnet can get session reports", async () => {
-  it("can get line coverage", async () => {
+describe("simnet can get session reports", () => {
+  it("can get line coverage", () => {
     simnet.callPublicFn("counter", "increment", [], address1);
     simnet.callPublicFn("counter", "increment", [], address1);
 
@@ -297,7 +303,7 @@ describe("simnet can get session reports", async () => {
     expect(reports.coverage.endsWith("end_of_record\n")).toBe(true);
   });
 
-  it("can get costs", async () => {
+  it("can get costs", () => {
     simnet.callPublicFn("counter", "increment", [], address1);
 
     const reports = simnet.collectReport();
@@ -321,5 +327,30 @@ describe("the sdk handles multiple manifests project", () => {
     expect(async () => {
       await initSimnet("tests/fixtures/InvalidManifest.toml");
     }).rejects.toThrow(expectedErr);
+  });
+});
+
+describe("deployment plans test", () => {
+  it("simnet deployment plan is created if it does not exist", async () => {
+    // deleteExistingDeploymentPlan();
+    assert(!fs.existsSync(deploymentPlanPath));
+    // load a new simnet with no cache
+    const simnet = await initSimnet("tests/fixtures/Clarinet.toml", true);
+    // make sure the simnet is running
+    expect(simnet.blockHeight).toBe(1);
+    assert(fs.existsSync(deploymentPlanPath));
+  });
+
+  it("handle custom deployment plan", async () => {
+    assert(!fs.existsSync(deploymentPlanPath));
+    fs.copyFileSync(customDeploymentPlanPath, deploymentPlanPath);
+    assert(fs.existsSync(deploymentPlanPath));
+
+    // init simnet with no cache to load the new deployment plan
+    simnet = await initSimnet("tests/fixtures/Clarinet.toml", true);
+    const result = simnet.getDataVar("counter", "count");
+
+    // the count is 2 because the custom deployment plan calls (add u2)
+    expect(result).toMatchObject(Cl.uint(2));
   });
 });

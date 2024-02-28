@@ -876,7 +876,7 @@ impl EmulatedContractPublishSpecification {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct DeploymentSpecification {
     pub id: u32,
     pub name: String,
@@ -1150,6 +1150,55 @@ impl DeploymentSpecification {
     pub fn to_file_content(&self) -> Result<Vec<u8>, String> {
         serde_yaml::to_vec(&self.to_specification_file())
             .map_err(|err| format!("failed to serialize deployment\n{}", err))
+    }
+
+    pub fn sort_batches_by_epoch(&mut self) {
+        self.plan.batches.sort_by(|a, b| a.epoch.cmp(&b.epoch));
+        for (i, batch) in self.plan.batches.iter_mut().enumerate() {
+            batch.id = i;
+        }
+    }
+
+    pub fn extract_no_contract_publish_txs(&self) -> (Self, Vec<TransactionsBatchSpecification>) {
+        let mut deployment_only_contract_publish_txs = self.clone();
+        let mut custom_txs_batches = vec![];
+
+        for batch in deployment_only_contract_publish_txs.plan.batches.iter_mut() {
+            let (ref contract_publish_txs, custom_txs): (
+                Vec<TransactionSpecification>,
+                Vec<TransactionSpecification>,
+            ) = batch.transactions.clone().into_iter().partition(|tx| {
+                matches!(tx, TransactionSpecification::ContractPublish(_))
+                    || matches!(tx, TransactionSpecification::EmulatedContractPublish(_))
+            });
+
+            batch.transactions = contract_publish_txs.clone();
+            if !custom_txs.is_empty() {
+                custom_txs_batches.push(TransactionsBatchSpecification {
+                    id: batch.id,
+                    transactions: custom_txs,
+                    epoch: batch.epoch,
+                });
+            }
+        }
+
+        (deployment_only_contract_publish_txs, custom_txs_batches)
+    }
+
+    pub fn merge_batches(&mut self, custom_batches: Vec<TransactionsBatchSpecification>) {
+        for custom_batch in custom_batches {
+            if let Some(batch) = self
+                .plan
+                .batches
+                .iter_mut()
+                .find(|b| b.id == custom_batch.id && b.epoch == custom_batch.epoch)
+            {
+                batch.transactions.extend(custom_batch.transactions);
+            } else {
+                self.plan.batches.push(custom_batch);
+            }
+        }
+        self.sort_batches_by_epoch();
     }
 }
 

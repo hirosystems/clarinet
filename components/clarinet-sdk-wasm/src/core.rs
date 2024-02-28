@@ -21,6 +21,7 @@ use clarity_repl::repl::{
     ClarityCodeSource, ClarityContract, ContractDeployer, Session, DEFAULT_CLARITY_VERSION,
     DEFAULT_EPOCH,
 };
+use colored::*;
 use gloo_utils::format::JsValueSerdeExt;
 use js_sys::Function as JsFunction;
 use serde::{Deserialize, Serialize};
@@ -301,6 +302,15 @@ impl SDK {
         let manifest =
             ProjectManifest::from_file_accessor(&manifest_location, &*self.file_accessor).await?;
 
+        let (mut default_deployment, default_artifacts) = generate_default_deployment(
+            &manifest,
+            &StacksNetwork::Simnet,
+            false,
+            Some(&*self.file_accessor),
+            Some(StacksEpochId::Epoch21),
+        )
+        .await?;
+
         let (deployment, artifacts) = match self.cache.get(&manifest_location) {
             Some(cache) => cache.clone(),
             None => {
@@ -338,7 +348,7 @@ impl SDK {
 
                     let contracts_sources = self.file_accessor.read_files(contracts_paths).await?;
 
-                    let deployment = DeploymentSpecification::from_specifications(
+                    let existing_deployment = DeploymentSpecification::from_specifications(
                         &spec_file,
                         &StacksNetwork::Simnet,
                         &project_root,
@@ -346,25 +356,35 @@ impl SDK {
                     )
                     .map_err(|e| e.to_string())?;
 
-                    let artifacts = setup_session_with_deployment(&manifest, &deployment, None);
+                    let (deployment_with_only_contract_publish_txs, custom_batches) =
+                        existing_deployment.extract_no_contract_publish_txs();
+
+                    let (deployment, artifacts) = if deployment_with_only_contract_publish_txs
+                        == default_deployment
+                    {
+                        log!("{}", "using existing deployment plan".yellow().bold());
+                        let artifacts =
+                            setup_session_with_deployment(&manifest, &existing_deployment, None);
+                        (existing_deployment, artifacts)
+                    } else {
+                        log!("{}", "using updated deployment plan".yellow().bold());
+                        default_deployment.merge_batches(custom_batches);
+                        let deployment_file = default_deployment.to_file_content()?;
+                        self.file_accessor
+                            .write_file(deployment_plan_location.to_string(), &deployment_file)
+                            .await?;
+                        (default_deployment, default_artifacts)
+                    };
 
                     let cache = (deployment, artifacts);
                     self.cache.insert(manifest_location, cache.clone());
                     cache
                 } else {
-                    let (deployment, artifacts) = generate_default_deployment(
-                        &manifest,
-                        &StacksNetwork::Simnet,
-                        false,
-                        Some(&*self.file_accessor),
-                        Some(StacksEpochId::Epoch21),
-                    )
-                    .await?;
-
-                    let cache = (deployment.clone(), artifacts.clone());
+                    log!("{}", "generated a new deployment plan".green().bold());
+                    let cache = (default_deployment.clone(), default_artifacts.clone());
                     self.cache.insert(manifest_location, cache.clone());
 
-                    let deployment_file = deployment.to_file_content()?;
+                    let deployment_file = default_deployment.to_file_content()?;
                     self.file_accessor
                         .write_file(deployment_plan_location.to_string(), &deployment_file)
                         .await?;
