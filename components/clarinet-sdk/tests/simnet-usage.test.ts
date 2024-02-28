@@ -18,11 +18,6 @@ const deploymentPlanPath = path.join(
   "tests/fixtures/deployments/default.simnet-plan.yaml",
 );
 
-const customDeploymentPlanPath = path.join(
-  process.cwd(),
-  "tests/fixtures/deployments/custom.simnet-plan.yaml",
-);
-
 function deleteExistingDeploymentPlan() {
   if (fs.existsSync(deploymentPlanPath)) {
     fs.unlinkSync(deploymentPlanPath);
@@ -327,30 +322,5 @@ describe("the sdk handles multiple manifests project", () => {
     expect(async () => {
       await initSimnet("tests/fixtures/InvalidManifest.toml");
     }).rejects.toThrow(expectedErr);
-  });
-});
-
-describe("deployment plans test", () => {
-  it("simnet deployment plan is created if it does not exist", async () => {
-    // deleteExistingDeploymentPlan();
-    assert(!fs.existsSync(deploymentPlanPath));
-    // load a new simnet with no cache
-    const simnet = await initSimnet("tests/fixtures/Clarinet.toml", true);
-    // make sure the simnet is running
-    expect(simnet.blockHeight).toBe(1);
-    assert(fs.existsSync(deploymentPlanPath));
-  });
-
-  it("handle custom deployment plan", async () => {
-    assert(!fs.existsSync(deploymentPlanPath));
-    fs.copyFileSync(customDeploymentPlanPath, deploymentPlanPath);
-    assert(fs.existsSync(deploymentPlanPath));
-
-    // init simnet with no cache to load the new deployment plan
-    simnet = await initSimnet("tests/fixtures/Clarinet.toml", true);
-    const result = simnet.getDataVar("counter", "count");
-
-    // the count is 2 because the custom deployment plan calls (add u2)
-    expect(result).toMatchObject(Cl.uint(2));
   });
 });

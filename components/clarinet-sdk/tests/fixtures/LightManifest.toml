@@ -1,0 +1,19 @@
+# this manifest is a copy of Clarinet.toml without the multiplier-contract
+# it's use to simulate a manifest update when testing deployment plan handling
+
+[project]
+name = 'fixtures'
+description = 'sample project to test clarinet-sdk'
+telemetry = false
+cache_dir = './.cache'
+requirements = []
+
+[contracts.multiplier-trait]
+path = 'contracts/multiplier-trait.clar'
+clarity_version = 2
+epoch = 2.4
+
+[contracts.counter]
+path = 'contracts/counter.clar'
+clarity_version = 2
+epoch = 2.4
