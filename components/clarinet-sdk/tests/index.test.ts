@@ -306,3 +306,17 @@ describe("the sdk handles multiple manifests project", () => {
     }).rejects.toThrow(expectedErr);
   });
 });
+
+describe("simnet can get session reports across different paths", async () => {
+  it("can report", async () => {
+    await initSimnet("tests/fixtures/with-parent-path/Clarinet.toml");
+
+    simnet.callPublicFn("counter", "increment", [], address1);
+    simnet.callPublicFn("counter", "increment", [], address1);
+
+    const reports = simnet.collectReport();
+    console.log({ reports });
+    expect(reports.coverage.startsWith("TN:")).toBe(true);
+    expect(reports.coverage.endsWith("end_of_record\n")).toBe(true);
+  }, 50000);
+});
