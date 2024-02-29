@@ -1,6 +1,12 @@
 import * as fs from "node:fs/promises";
 import path from "node:path";
 
+function fileArrayToString(bufferArray: Uint8Array) {
+  return Array.from(bufferArray)
+    .map((item) => String.fromCharCode(item))
+    .join("");
+}
+
 function isValidReadEvent(e: any): e is { path: string } {
   return typeof e?.path === "string";
 }
@@ -25,7 +31,7 @@ async function exists(event: unknown) {
 
 async function readFile(event: unknown) {
   if (!isValidReadEvent(event)) throw new Error("invalid read event");
-  return fs.readFile(event.path);
+  return fileArrayToString(await fs.readFile(event.path));
 }
 
 async function readFiles(event: any) {
@@ -33,14 +39,22 @@ async function readFiles(event: any) {
   const files = await Promise.all(
     event.paths.map(async (p) => {
       try {
-        return [p, await fs.readFile(p)];
+        return fs.readFile(p);
       } catch (err) {
         console.warn(err);
-        return [p, null];
+        return null;
       }
     }),
   );
-  return Object.fromEntries(files.filter(([, content]) => content !== null));
+  return Object.fromEntries(
+    files.reduce(
+      (acc, f, i) => {
+        if (f === null) return acc;
+        return acc.concat([[event.paths[i], fileArrayToString(f)]]);
+      },
+      [] as [string, string][],
+    ),
+  );
 }
 
 async function writeFile(event: unknown) {

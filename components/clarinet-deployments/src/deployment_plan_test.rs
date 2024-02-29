@@ -73,18 +73,11 @@ fn test_extract_no_contract_publish_txs() {
 
     assert_eq!(
         new_plan,
-        build_test_deployement_plan(vec![
-            TransactionsBatchSpecification {
-                id: 0,
-                transactions: vec![contract_publish_tx.clone()],
-                epoch: Some(EpochSpec::Epoch2_4),
-            },
-            TransactionsBatchSpecification {
-                id: 1,
-                transactions: vec![],
-                epoch: Some(EpochSpec::Epoch2_4),
-            },
-        ])
+        build_test_deployement_plan(vec![TransactionsBatchSpecification {
+            id: 0,
+            transactions: vec![contract_publish_tx.clone()],
+            epoch: Some(EpochSpec::Epoch2_4),
+        },])
     );
 
     assert_eq!(

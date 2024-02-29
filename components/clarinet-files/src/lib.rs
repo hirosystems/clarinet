@@ -45,7 +45,10 @@ pub type FileAccessorResult<T> = Pin<Box<dyn Future<Output = Result<T, String>>>
 pub trait FileAccessor {
     fn file_exists(&self, path: String) -> FileAccessorResult<bool>;
     fn read_file(&self, path: String) -> FileAccessorResult<String>;
-    fn read_files(&self, paths: Vec<String>) -> FileAccessorResult<HashMap<String, String>>;
+    fn read_files(
+        &self,
+        contracts_paths: Vec<String>,
+    ) -> FileAccessorResult<HashMap<String, String>>;
     fn write_file(&self, path: String, content: &[u8]) -> FileAccessorResult<()>;
 }
 

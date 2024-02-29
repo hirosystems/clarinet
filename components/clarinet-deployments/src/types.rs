@@ -1182,6 +1182,11 @@ impl DeploymentSpecification {
             }
         }
 
+        deployment_only_contract_publish_txs
+            .plan
+            .batches
+            .retain(|b| !b.transactions.is_empty());
+
         (deployment_only_contract_publish_txs, custom_txs_batches)
     }
 
