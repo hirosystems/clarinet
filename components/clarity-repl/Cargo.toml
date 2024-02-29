@@ -33,9 +33,11 @@ integer-sqrt = "0.1.3"
 getrandom = { version = "0.2.3", features = ["js"] }
 atty = "0.2.14"
 # clarity-vm = "2"
-clarity = { version = "2", default-features = false, optional = true, git = "https://github.com/stacks-network/stacks-core.git", rev ="1e9df56b255247928679961d0a7c2541ad127f59", package = "clarity" }
+clarity = { version = "2", default-features = false, optional = true, git = "https://github.com/stacks-network/stacks-core.git", rev ="de3e3c679e2db0336b95f1c188a3dae73b3b336f", package = "clarity" }
 # clarity = { version = "2", default-features = false, optional = true, path ="../../../clarity-wasm/stacks-core/clarity" }
-clar2wasm = { git = "https://github.com/stacks-network/clarity-wasm.git", rev = "b12002d", optional = true }
+# this pox-locking dep has a dependency on clarity as well. The above clarity rev we specify has to match the rev that the pox-locking package uses
+pox-locking = { default-features = false, optional = true, git = "https://github.com/stacks-network/stacks-core.git", rev ="22344bb5f54a27f26e17d7b713d9f2177aa23ecd" }
+clar2wasm = { git = "https://github.com/stacks-network/clarity-wasm.git", rev = "3708339cf10188d4aeb5bf18a99200607f1a913f", optional = true }
 # clar2wasm = { path="../../../clarity-wasm/clar2wasm", optional = true }
 
 # DAP Debugger
@@ -86,14 +88,16 @@ cli = [
     "clarity/log",
     "hiro_system_kit/tokio_helpers",
     "clar2wasm",
-    "wsts"
+    "wsts",
+    "pox-locking"
 ]
 sdk = [
     "clarity/canonical",
     "clarity/developer-mode",
     "clarity/log",
     "hiro_system_kit/tokio_helpers",
-    "wsts"
+    "wsts",
+    "pox-locking"
 ]
 dap = [
     "tokio",
