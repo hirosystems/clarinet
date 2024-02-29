@@ -898,7 +898,7 @@ dependencies = [
 
 [[package]]
 name = "clarinet-sdk-wasm"
-version = "2.3.0-rc2"
+version = "2.3.0-rc3"
 dependencies = [
  "clarinet-deployments",
  "clarinet-files",
