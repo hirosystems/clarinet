@@ -16,6 +16,7 @@ use clarity::vm::errors::InterpreterResult as Result;
 use clarity::vm::types::QualifiedContractIdentifier;
 use clarity::vm::types::TupleData;
 use clarity::vm::StacksEpoch;
+use pox_locking::handle_contract_call_special_cases;
 use std::collections::HashMap;
 
 #[derive(Clone, Debug)]
@@ -286,6 +287,10 @@ impl ClarityBackingStore for Datastore {
     #[cfg(not(feature = "wasm"))]
     fn get_side_store(&mut self) -> &::clarity::rusqlite::Connection {
         panic!("Datastore cannot get_side_store")
+    }
+
+    fn get_cc_special_cases_handler(&self) -> Option<clarity::vm::database::SpecialCaseHandler> {
+        Some(&handle_contract_call_special_cases)
     }
 }
 
