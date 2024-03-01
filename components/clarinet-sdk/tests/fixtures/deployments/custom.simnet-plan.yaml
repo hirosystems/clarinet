@@ -1,0 +1,58 @@
+---
+id: 0
+name: "Simulated deployment, used as a default for `clarinet console`, `clarinet test` and `clarinet check`"
+network: simnet
+genesis:
+  wallets:
+    - name: deployer
+      address: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM
+      balance: "100000000000000"
+    - name: faucet
+      address: STNHKEPYEPJ8ET55ZZ0M5A34J0R3N5FM2CMMMAZ6
+      balance: "100000000000000"
+    - name: wallet_1
+      address: ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5
+      balance: "100000000000000"
+    - name: wallet_2
+      address: ST2CY5V39NHDPWSXMW9QDT3HC3GD6Q6XX4CFRK9AG
+      balance: "100000000000000"
+  contracts:
+    - costs
+    - pox
+    - pox-2
+    - pox-3
+    - pox-4
+    - lockup
+    - costs-2
+    - costs-3
+    - cost-voting
+    - bns
+plan:
+  batches:
+    - id: 0
+      transactions:
+        - emulated-contract-publish:
+            contract-name: multiplier-trait
+            emulated-sender: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM
+            path: /Users/hugo/Sites/hiro/clarinet/components/clarinet-sdk/tests/fixtures/contracts/multiplier-trait.clar
+            clarity-version: 2
+        - emulated-contract-publish:
+            contract-name: counter
+            emulated-sender: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM
+            path: /Users/hugo/Sites/hiro/clarinet/components/clarinet-sdk/tests/fixtures/contracts/counter.clar
+            clarity-version: 2
+        - emulated-contract-publish:
+            contract-name: multiplier-contract
+            emulated-sender: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM
+            path: /Users/hugo/Sites/hiro/clarinet/components/clarinet-sdk/tests/fixtures/contracts/multiplier-contract.clar
+            clarity-version: 2
+      epoch: "2.4"
+    - id: 1
+      transactions:
+        - emulated-contract-call:
+            contract-id: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.counter
+            emulated-sender: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM
+            method: add
+            parameters:
+              - u2
+      epoch: "3.0"

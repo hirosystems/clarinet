@@ -29,15 +29,16 @@ impl DeploymentSynthesis {
                 }
             }
         }
-        let file = deployment.to_specification_file();
-        let content = match serde_yaml::to_string(&file) {
+
+        let content = match deployment.to_file_content() {
             Ok(res) => res,
             Err(err) => panic!("unable to serialize deployment {}", err),
         };
+
         DeploymentSynthesis {
             total_cost,
             blocks_count,
-            content,
+            content: std::str::from_utf8(&content).unwrap().to_string(),
         }
     }
 }

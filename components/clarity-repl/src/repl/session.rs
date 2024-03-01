@@ -4,7 +4,6 @@ use super::{ClarityCodeSource, ClarityContract, ClarityInterpreter, ContractDepl
 use crate::analysis::coverage::TestCoverageReport;
 use crate::repl::Settings;
 use crate::utils;
-use ansi_term::Colour;
 use clarity::codec::StacksMessageCodec;
 use clarity::types::chainstate::StacksAddress;
 use clarity::types::StacksEpochId;
@@ -22,6 +21,8 @@ use std::collections::{BTreeMap, HashMap};
 use std::fmt;
 use std::num::ParseIntError;
 
+#[cfg(feature = "cli")]
+use ansi_term::Colour;
 #[cfg(feature = "cli")]
 use clarity::vm::analysis::ContractAnalysis;
 #[cfg(feature = "cli")]
@@ -676,6 +677,7 @@ impl Session {
         keys
     }
 
+    #[cfg(feature = "cli")]
     fn display_help(&self, output: &mut Vec<String>) {
         let help_colour = Colour::Yellow;
         output.push(format!(
@@ -766,16 +768,14 @@ impl Session {
         ));
     }
 
-    #[cfg(not(feature = "wasm"))]
+    #[cfg(feature = "cli")]
     fn easter_egg(&self, _output: &mut [String]) {
         let result = hiro_system_kit::nestable_block_on(fetch_message());
         let message = result.unwrap_or("You found it!".to_string());
         println!("{}", message);
     }
 
-    #[cfg(feature = "wasm")]
-    fn easter_egg(&self, _output: &mut [String]) {}
-
+    #[cfg(feature = "cli")]
     fn parse_and_advance_chain_tip(&mut self, output: &mut Vec<String>, command: &str) {
         let args: Vec<_> = command.split(' ').collect();
 
@@ -803,6 +803,7 @@ impl Session {
         self.interpreter.advance_chain_tip(count)
     }
 
+    #[cfg(feature = "cli")]
     fn parse_and_set_tx_sender(&mut self, output: &mut Vec<String>, command: &str) {
         let args: Vec<_> = command.split(' ').collect();
 
@@ -833,6 +834,7 @@ impl Session {
         self.interpreter.get_tx_sender().to_address()
     }
 
+    #[cfg(feature = "cli")]
     fn get_block_height(&mut self, output: &mut Vec<String>) {
         let height = self.interpreter.get_block_height();
         output.push(green!(format!("Current height: {}", height)));
@@ -1072,6 +1074,7 @@ impl Session {
         }
     }
 
+    #[cfg(feature = "cli")]
     fn mint_stx(&mut self, output: &mut Vec<String>, command: &str) {
         let args: Vec<_> = command.split(' ').collect();
 
@@ -1102,6 +1105,7 @@ impl Session {
         };
     }
 
+    #[cfg(feature = "cli")]
     fn display_functions(&self, output: &mut Vec<String>) {
         let help_colour = Colour::Yellow;
         let api_reference_index = self.get_api_reference_index();
@@ -1111,6 +1115,7 @@ impl Session {
         ));
     }
 
+    #[cfg(feature = "cli")]
     fn display_doc(&self, output: &mut Vec<String>, command: &str) {
         let help_colour = Colour::Yellow;
         let keyword = {
@@ -1137,6 +1142,7 @@ impl Session {
         Ok(output.join("\n"))
     }
 
+    #[cfg(feature = "cli")]
     fn keywords(&self, output: &mut Vec<String>) {
         let help_colour = Colour::Yellow;
         let keywords = self.get_clarity_keywords();

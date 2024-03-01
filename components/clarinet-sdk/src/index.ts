@@ -254,8 +254,8 @@ const getSessionProxy = () => ({
 function memoizedInit() {
   let simnet: Simnet | null = null;
 
-  return async (manifestPath = "./Clarinet.toml") => {
-    if (!simnet) {
+  return async (manifestPath = "./Clarinet.toml", noCache = false) => {
+    if (noCache || !simnet) {
       const module = await wasmModule;
       simnet = new Proxy(new module.SDK(vfs), getSessionProxy()) as unknown as Simnet;
     }

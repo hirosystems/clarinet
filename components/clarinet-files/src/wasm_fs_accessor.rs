@@ -77,7 +77,7 @@ impl FileAccessor for WASMFileSystemAccessor {
         })
     }
 
-    fn read_contracts_content(
+    fn read_files(
         &self,
         contracts_paths: Vec<String>,
     ) -> FileAccessorResult<HashMap<String, String>> {

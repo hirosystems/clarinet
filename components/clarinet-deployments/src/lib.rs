@@ -13,6 +13,9 @@ pub mod onchain;
 pub mod requirements;
 pub mod types;
 
+#[cfg(test)]
+mod deployment_plan_test;
+
 use self::types::{
     DeploymentSpecification, EmulatedContractPublishSpecification, GenesisSpecification,
     TransactionPlanSpecification, TransactionsBatchSpecification, WalletSpecification,
@@ -564,9 +567,7 @@ pub async fn generate_default_deployment(
                     contract_location.to_string()
                 })
                 .collect();
-            file_accessor
-                .read_contracts_content(contracts_location)
-                .await?
+            file_accessor.read_files(contracts_location).await?
         }
     };
 

@@ -2,7 +2,6 @@ import * as vscode from "vscode";
 import { Uri } from "vscode";
 
 import { LanguageClient } from "./types";
-import { fileArrayToString } from "./utils/files";
 
 const { fs } = vscode.workspace;
 
@@ -34,7 +33,7 @@ export function initVFS(client: LanguageClient) {
 
   client.onRequest("vfs/readFile", async (event: unknown) => {
     if (!isValidReadEvent(event)) throw new Error("invalid read event");
-    return fileArrayToString(await fs.readFile(Uri.parse(event.path)));
+    return await fs.readFile(Uri.parse(event.path));
   });
 
   client.onRequest("vfs/readFiles", async (event: any) => {
@@ -42,20 +41,15 @@ export function initVFS(client: LanguageClient) {
     const files = await Promise.all(
       event.paths.map(async (p) => {
         try {
-          const contract = await fs.readFile(Uri.parse(p));
+          const contract = [p, await fs.readFile(Uri.parse(p))];
           return contract;
         } catch (err) {
           console.warn(err);
-          return null;
+          return [p, null];
         }
       }),
     );
-    return Object.fromEntries(
-      files.reduce((acc, f, i) => {
-        if (f === null) return acc;
-        return acc.concat([[event.paths[i], fileArrayToString(f)]]);
-      }, [] as [string, string][]),
-    );
+    return Object.fromEntries(files.filter(([, content]) => content !== null));
   });
 
   client.onRequest("vfs/writeFile", async (event: unknown) => {

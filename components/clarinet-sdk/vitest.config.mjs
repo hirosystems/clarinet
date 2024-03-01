@@ -3,7 +3,13 @@ import { defineConfig } from "vite";
 
 export default defineConfig({
   test: {
-    singleThread: true,
+    // https://vitest.dev/guide/common-errors.html#failed-to-terminate-worker
+    pool: "forks",
+    poolOptions: {
+      threads: {
+        singleThread: true,
+      },
+    },
     include: ["./tests/**/*.test.ts", "./vitest-helpers/tests/**/*.test.ts"],
   },
 });

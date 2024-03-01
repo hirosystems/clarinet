@@ -1,5 +1,5 @@
 use clarinet_files::chainhook_types::StacksNetwork;
-use clarinet_files::FileLocation;
+use clarinet_files::{FileAccessor, FileLocation};
 use clarity_repl::clarity::util::hash::{hex_bytes, to_hex};
 use clarity_repl::clarity::vm::analysis::ContractAnalysis;
 use clarity_repl::clarity::vm::ast::ContractAST;
@@ -817,6 +817,7 @@ impl EmulatedContractPublishSpecification {
     pub fn from_specifications(
         specs: &EmulatedContractPublishSpecificationFile,
         project_root_location: &FileLocation,
+        source: Option<String>,
     ) -> Result<EmulatedContractPublishSpecification, String> {
         let contract_name = match ContractName::try_from(specs.contract_name.to_string()) {
             Ok(res) => res,
@@ -860,7 +861,10 @@ impl EmulatedContractPublishSpecification {
             _ => Ok(DEFAULT_CLARITY_VERSION),
         }?;
 
-        let source = location.read_content_as_utf8()?;
+        let source = match source {
+            Some(source) => source,
+            None => location.read_content_as_utf8()?,
+        };
 
         Ok(EmulatedContractPublishSpecification {
             contract_name,
@@ -872,7 +876,7 @@ impl EmulatedContractPublishSpecification {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct DeploymentSpecification {
     pub id: u32,
     pub name: String,
@@ -995,6 +999,7 @@ impl DeploymentSpecification {
             &specification_file,
             &network,
             project_root_location,
+            None,
         )?;
 
         Ok(deployment_spec)
@@ -1004,6 +1009,7 @@ impl DeploymentSpecification {
         specs: &DeploymentSpecificationFile,
         network: &StacksNetwork,
         project_root_location: &FileLocation,
+        contracts_sources: Option<&HashMap<String, String>>,
     ) -> Result<DeploymentSpecification, String> {
         let mut contracts = BTreeMap::new();
         let (plan, genesis) = match network {
@@ -1019,7 +1025,14 @@ impl DeploymentSpecification {
                                     TransactionSpecification::EmulatedContractCall(EmulatedContractCallSpecification::from_specifications(spec)?)
                                 }
                                 TransactionSpecificationFile::EmulatedContractPublish(spec) => {
-                                    let spec = EmulatedContractPublishSpecification::from_specifications(spec, project_root_location)?;
+                                    let source = contracts_sources.as_ref().map(|contracts_sources|
+                                        contracts_sources
+                                            .get(spec.path.as_ref().expect("missing path"))
+                                            .cloned()
+                                            .expect("missing contract source")
+                                    );
+
+                                    let spec = EmulatedContractPublishSpecification::from_specifications(spec, project_root_location, source)?;
                                     let contract_id = QualifiedContractIdentifier::new(spec.emulated_sender.clone(), spec.contract_name.clone());
                                     contracts.insert(contract_id, (spec.source.clone(), spec.location.clone()));
                                     TransactionSpecification::EmulatedContractPublish(spec)
@@ -1116,7 +1129,7 @@ impl DeploymentSpecification {
         })
     }
 
-    pub fn to_specification_file(&self) -> DeploymentSpecificationFile {
+    fn to_specification_file(&self) -> DeploymentSpecificationFile {
         DeploymentSpecificationFile {
             id: Some(self.id),
             name: self.name.clone(),
@@ -1132,6 +1145,65 @@ impl DeploymentSpecification {
             genesis: self.genesis.as_ref().map(|g| g.to_specification_file()),
             plan: Some(self.plan.to_specification_file()),
         }
+    }
+
+    pub fn to_file_content(&self) -> Result<Vec<u8>, String> {
+        serde_yaml::to_vec(&self.to_specification_file())
+            .map_err(|err| format!("failed to serialize deployment\n{}", err))
+    }
+
+    pub fn sort_batches_by_epoch(&mut self) {
+        self.plan.batches.sort_by(|a, b| a.epoch.cmp(&b.epoch));
+        for (i, batch) in self.plan.batches.iter_mut().enumerate() {
+            batch.id = i;
+        }
+    }
+
+    pub fn extract_no_contract_publish_txs(&self) -> (Self, Vec<TransactionsBatchSpecification>) {
+        let mut deployment_only_contract_publish_txs = self.clone();
+        let mut custom_txs_batches = vec![];
+
+        for batch in deployment_only_contract_publish_txs.plan.batches.iter_mut() {
+            let (ref contract_publish_txs, custom_txs): (
+                Vec<TransactionSpecification>,
+                Vec<TransactionSpecification>,
+            ) = batch.transactions.clone().into_iter().partition(|tx| {
+                matches!(tx, TransactionSpecification::ContractPublish(_))
+                    || matches!(tx, TransactionSpecification::EmulatedContractPublish(_))
+            });
+
+            batch.transactions = contract_publish_txs.clone();
+            if !custom_txs.is_empty() {
+                custom_txs_batches.push(TransactionsBatchSpecification {
+                    id: batch.id,
+                    transactions: custom_txs,
+                    epoch: batch.epoch,
+                });
+            }
+        }
+
+        deployment_only_contract_publish_txs
+            .plan
+            .batches
+            .retain(|b| !b.transactions.is_empty());
+
+        (deployment_only_contract_publish_txs, custom_txs_batches)
+    }
+
+    pub fn merge_batches(&mut self, custom_batches: Vec<TransactionsBatchSpecification>) {
+        for custom_batch in custom_batches {
+            if let Some(batch) = self
+                .plan
+                .batches
+                .iter_mut()
+                .find(|b| b.id == custom_batch.id && b.epoch == custom_batch.epoch)
+            {
+                batch.transactions.extend(custom_batch.transactions);
+            } else {
+                self.plan.batches.push(custom_batch);
+            }
+        }
+        self.sort_batches_by_epoch();
     }
 }
 
@@ -1150,6 +1222,18 @@ pub struct DeploymentSpecificationFile {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub genesis: Option<GenesisSpecificationFile>,
     pub plan: Option<TransactionPlanSpecificationFile>,
+}
+
+impl DeploymentSpecificationFile {
+    pub async fn from_file_accessor(
+        path: &FileLocation,
+        file_accesor: &dyn FileAccessor,
+    ) -> Result<DeploymentSpecificationFile, String> {
+        let spec_file_content = file_accesor.read_file(path.to_string()).await?;
+
+        serde_yaml::from_str(&spec_file_content)
+            .map_err(|msg| format!("unable to read file {}", msg))
+    }
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]

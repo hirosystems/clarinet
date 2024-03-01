@@ -58,7 +58,6 @@ segment = { version = "0.1.2", optional = true }
 mac_address = { version = "1.1.2", optional = true }
 tower-lsp = { version = "0.19.0", optional = true }
 hex = "0.4.3"
-serde_yaml = "0.8.23"
 num_cpus = "1.13.1"
 mio = "0.8"
 similar = "2.1.0"
