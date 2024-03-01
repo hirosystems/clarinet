@@ -1,3 +1,25 @@
+# [2.3.0](https://github.com/hirosystems/clarinet/compare/v2.2.1...v2.3.0) (2024-03-01)
+
+##### Chores
+
+*  Update clarinet new project template (#1367) (80be7030)
+*  Remove chainhook subcommands (#1328) (1d084ef3)
+
+##### New Features
+
+*  Handle deployment plans in simnet (clarinet-sdk only) (#1360) (a340d48a)
+*  Improve clarity-wasm results comparison (#1358) (0f9e612a)
+*  Enable clarity-wasm in clarity check (#1355) (abc34585)
+
+##### Bug Fixes
+
+*  Log to devnet.log file when running js devnet (#1363) (388c5018)
+*  Reemove errors on exit when running devnet with `--no-dashboard` (#1357) (fad5c763)
+
+##### Refactors
+
+*  Let @stacks/transactions handle tuple items sorting in tests diff (#1362) (d3138915)
+
 # [2.2.1](https://github.com/hirosystems/clarinet/compare/v2.2.0...v2.2.1) (2024-02-08)
 
 ##### Bug Fixes

@@ -491,13 +491,13 @@ btc_address = "mvZtbibDAAA3WLpY7zXXFqRa3T4XSknBX7"
   "author": "",
   "license": "ISC",
   "dependencies": {{
-    "@hirosystems/clarinet-sdk": "^1.0.0",
-    "@stacks/transactions": "^6.9.0",
+    "@hirosystems/clarinet-sdk": "^2.3.0",
+    "@stacks/transactions": "^6.12.0",
     "chokidar-cli": "^3.0.0",
-    "typescript": "^5.2.2",
-    "vite": "^5.0.6",
-    "vitest": "^1.0.1",
-    "vitest-environment-clarinet": "^1.1.0"
+    "typescript": "^5.3.3",
+    "vite": "^5.1.4",
+    "vitest": "^1.3.1",
+    "vitest-environment-clarinet": "^2.0.0"
   }}
 }}
 "#,
@@ -580,7 +580,12 @@ import { vitestSetupFilePath, getClarinetVitestsArgv } from "@hirosystems/clarin
 export default defineConfig({
   test: {
     environment: "clarinet", // use vitest-environment-clarinet
-    singleThread: true,
+    pool: "forks",
+    poolOptions: {
+      threads: {
+        singleThread: true,
+      },
+    },
     setupFiles: [
       vitestSetupFilePath,
       // custom setup files can be added here
@@ -593,6 +598,7 @@ export default defineConfig({
     },
   },
 });
+
 "#.into();
         let name = "vitest.config.js".into();
         let path = format!("{}/{}/{}", self.project_path, self.project_name, name);
