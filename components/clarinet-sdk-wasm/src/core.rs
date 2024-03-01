@@ -408,9 +408,9 @@ impl SDK {
                                     *location = FileLocation::from_path_string(
                                         &location
                                             .get_relative_path_from_base(&project_root)
-                                            .unwrap(),
+                                            .expect("failed to retrieve relative path"),
                                     )
-                                    .unwrap();
+                                    .expect("failed to get file location");
                                 }
                             });
                         });
