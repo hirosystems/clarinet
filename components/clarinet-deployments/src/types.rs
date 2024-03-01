@@ -1025,11 +1025,14 @@ impl DeploymentSpecification {
                                     TransactionSpecification::EmulatedContractCall(EmulatedContractCallSpecification::from_specifications(spec)?)
                                 }
                                 TransactionSpecificationFile::EmulatedContractPublish(spec) => {
-                                    let source = contracts_sources.as_ref().map(|contracts_sources|
+                                    let source = contracts_sources.as_ref().map(|contracts_sources| {
+                                        let contract_path = FileLocation::try_parse(spec.path.as_ref().expect("missing path"), Some(project_root_location))
+                                            .expect("failed to get contract path").to_string();
                                         contracts_sources
-                                            .get(spec.path.as_ref().expect("missing path"))
+                                            .get(&contract_path)
                                             .cloned()
-                                            .expect("missing contract source")
+                                            .unwrap_or_else(|| panic!("missing contract source for {}", spec.path.clone().unwrap_or_default()))
+                                    }
                                     );
 
                                     let spec = EmulatedContractPublishSpecification::from_specifications(spec, project_root_location, source)?;

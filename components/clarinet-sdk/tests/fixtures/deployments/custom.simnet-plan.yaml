@@ -34,17 +34,17 @@ plan:
         - emulated-contract-publish:
             contract-name: multiplier-trait
             emulated-sender: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM
-            path: /Users/hugo/Sites/hiro/clarinet/components/clarinet-sdk/tests/fixtures/contracts/multiplier-trait.clar
+            path: contracts/multiplier-trait.clar
             clarity-version: 2
         - emulated-contract-publish:
             contract-name: counter
             emulated-sender: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM
-            path: /Users/hugo/Sites/hiro/clarinet/components/clarinet-sdk/tests/fixtures/contracts/counter.clar
+            path: contracts/counter.clar
             clarity-version: 2
         - emulated-contract-publish:
             contract-name: multiplier-contract
             emulated-sender: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM
-            path: /Users/hugo/Sites/hiro/clarinet/components/clarinet-sdk/tests/fixtures/contracts/multiplier-contract.clar
+            path: contracts/multiplier-contract.clar
             clarity-version: 2
       epoch: "2.4"
     - id: 1
