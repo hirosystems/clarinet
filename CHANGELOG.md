@@ -1,3 +1,9 @@
+# [2.3.1](https://github.com/hirosystems/clarinet/compare/v2.3.0...v2.3.1) (2024-03-04)
+
+##### Bug Fixes
+
+*  Set relative path in simnet deployment plan and fix Vitest templates (#1370) (80abad3c)
+
 # [2.3.0](https://github.com/hirosystems/clarinet/compare/v2.2.1...v2.3.0) (2024-03-01)
 
 ##### Chores
