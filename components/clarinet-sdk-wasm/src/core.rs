@@ -1,7 +1,8 @@
 use clarinet_deployments::diagnostic_digest::DiagnosticsDigest;
 use clarinet_deployments::types::{
     DeploymentGenerationArtifacts, DeploymentSpecification, DeploymentSpecificationFile,
-    TransactionSpecificationFile,
+    EmulatedContractPublishSpecification, EmulatedContractPublishSpecificationFile,
+    TransactionSpecification, TransactionSpecificationFile,
 };
 use clarinet_deployments::{
     generate_default_deployment, initiate_session_from_deployment, setup_session_with_deployment,
@@ -334,8 +335,15 @@ impl SDK {
                                     .iter()
                                     .filter_map(|t| match t {
                                         TransactionSpecificationFile::EmulatedContractPublish(
-                                            ref deploy,
-                                        ) => deploy.path.clone(),
+                                            EmulatedContractPublishSpecificationFile {
+                                                path: Some(ref path),
+                                                ..
+                                            },
+                                        ) => {
+                                            let contract_path =
+                                                FileLocation::try_parse(path, Some(&project_root));
+                                            contract_path.map(|p| p.to_string())
+                                        }
                                         _ => None,
                                     })
                                     .collect::<Vec<String>>()
@@ -347,7 +355,6 @@ impl SDK {
                     };
 
                     let contracts_sources = self.file_accessor.read_files(contracts_paths).await?;
-
                     let existing_deployment = DeploymentSpecification::from_specifications(
                         &spec_file,
                         &StacksNetwork::Simnet,
@@ -369,10 +376,12 @@ impl SDK {
                     } else {
                         log!("{}", "using updated deployment plan".yellow().bold());
                         default_deployment.merge_batches(custom_batches);
-                        let deployment_file = default_deployment.to_file_content()?;
-                        self.file_accessor
-                            .write_file(deployment_plan_location.to_string(), &deployment_file)
-                            .await?;
+                        self.write_deployment_plan(
+                            &default_deployment,
+                            &project_root,
+                            &deployment_plan_location,
+                        )
+                        .await?;
                         (default_deployment, default_artifacts)
                     };
 
@@ -384,10 +393,12 @@ impl SDK {
                     let cache = (default_deployment.clone(), default_artifacts.clone());
                     self.cache.insert(manifest_location, cache.clone());
 
-                    let deployment_file = default_deployment.to_file_content()?;
-                    self.file_accessor
-                        .write_file(deployment_plan_location.to_string(), &deployment_file)
-                        .await?;
+                    self.write_deployment_plan(
+                        &default_deployment,
+                        &project_root,
+                        &deployment_plan_location,
+                    )
+                    .await?;
 
                     cache
                 }
@@ -439,6 +450,43 @@ impl SDK {
         }
 
         self.session = Some(session);
+        Ok(())
+    }
+
+    async fn write_deployment_plan(
+        &self,
+        deployment_plan: &DeploymentSpecification,
+        project_root: &FileLocation,
+        deployment_plan_location: &FileLocation,
+    ) -> Result<(), String> {
+        // we must manually update the location of the contracts in the deployment plan to be relative to the project root
+        // because the serialize function is not able to get project_root location in wasm, so it falls back to the full path
+        // https://github.com/hirosystems/clarinet/blob/7a41c0c312148b3a5f0eee28a95bebf2766d2e8d/components/clarinet-files/src/lib.rs#L379
+        let mut deployment_plan_with_relative_paths = deployment_plan.clone();
+        deployment_plan_with_relative_paths
+            .plan
+            .batches
+            .iter_mut()
+            .for_each(|batch| {
+                batch.transactions.iter_mut().for_each(|tx| {
+                    if let TransactionSpecification::EmulatedContractPublish(
+                        EmulatedContractPublishSpecification { location, .. },
+                    ) = tx
+                    {
+                        *location = FileLocation::from_path_string(
+                            &location
+                                .get_relative_path_from_base(project_root)
+                                .expect("failed to retrieve relative path"),
+                        )
+                        .expect("failed to get file location");
+                    }
+                });
+            });
+
+        let deployment_file = deployment_plan_with_relative_paths.to_file_content()?;
+        self.file_accessor
+            .write_file(deployment_plan_location.to_string(), &deployment_file)
+            .await?;
         Ok(())
     }
 
