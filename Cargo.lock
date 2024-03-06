@@ -1034,13 +1034,13 @@ dependencies = [
  "tokio-util",
  "wasm-bindgen",
  "wasm-bindgen-futures",
- "wsts 8.1.0",
+ "wsts",
 ]
 
 [[package]]
 name = "clarity-repl"
 version = "2.3.1"
-source = "git+https://github.com/hirosystems/clarinet.git?branch=feat/update-stacks-core#205b655f43d11cb65b85bda193931ecc49287f4c"
+source = "git+https://github.com/hirosystems/clarinet.git?branch=feat/update-stacks-core#11f77eebff53776838c3f64308423f531b5468c3"
 dependencies = [
  "ansi_term",
  "atty",
@@ -1056,7 +1056,7 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "sha2 0.10.6",
- "wsts 7.0.0",
+ "wsts",
 ]
 
 [[package]]
@@ -2263,7 +2263,7 @@ dependencies = [
 [[package]]
 name = "hiro-system-kit"
 version = "0.1.0"
-source = "git+https://github.com/hirosystems/clarinet.git?branch=feat/update-stacks-core#205b655f43d11cb65b85bda193931ecc49287f4c"
+source = "git+https://github.com/hirosystems/clarinet.git?branch=feat/update-stacks-core#11f77eebff53776838c3f64308423f531b5468c3"
 dependencies = [
  "ansi_term",
  "atty",
@@ -3287,28 +3287,6 @@ name = "overload"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b15813163c1d831bf4a13c3610c05c0d03b39feb07f7e09fa234dac9b15aaf39"
-
-[[package]]
-name = "p256k1"
-version = "6.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5afcf536d20c074ef45371ee9a654dcfc46fb2dde18ecc54ec30c936eb850fa2"
-dependencies = [
- "bitvec",
- "bs58 0.4.0",
- "cc",
- "hex 0.4.3",
- "itertools 0.10.5",
- "num-traits",
- "primitive-types",
- "proc-macro2",
- "quote",
- "rand_core 0.6.4",
- "rustfmt-wrapper",
- "serde",
- "sha2 0.10.6",
- "syn 2.0.50",
-]
 
 [[package]]
 name = "p256k1"
@@ -4811,7 +4789,7 @@ dependencies = [
  "slog-term",
  "time",
  "winapi",
- "wsts 8.1.0",
+ "wsts",
 ]
 
 [[package]]
@@ -4886,7 +4864,7 @@ dependencies = [
 [[package]]
 name = "stacks-rpc-client"
 version = "2.3.1"
-source = "git+https://github.com/hirosystems/clarinet.git?branch=feat/update-stacks-core#205b655f43d11cb65b85bda193931ecc49287f4c"
+source = "git+https://github.com/hirosystems/clarinet.git?branch=feat/update-stacks-core#11f77eebff53776838c3f64308423f531b5468c3"
 dependencies = [
  "clarity-repl 2.3.1 (git+https://github.com/hirosystems/clarinet.git?branch=feat/update-stacks-core)",
  "hmac 0.12.1",
@@ -6298,28 +6276,6 @@ dependencies = [
 
 [[package]]
 name = "wsts"
-version = "7.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c398736468f3322a43b6419be5315e68ae035e6565628603503c2a62ad726f36"
-dependencies = [
- "aes-gcm",
- "bs58 0.5.0",
- "hashbrown 0.14.3",
- "hex 0.4.3",
- "num-traits",
- "p256k1 6.0.0",
- "polynomial",
- "primitive-types",
- "rand_core 0.6.4",
- "serde",
- "sha2 0.10.6",
- "thiserror",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
-name = "wsts"
 version = "8.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "467aa8e40ed0277d19922fd0e7357c16552cb900e5138f61a48ac23c4b7878e0"
@@ -6329,7 +6285,7 @@ dependencies = [
  "hashbrown 0.14.3",
  "hex 0.4.3",
  "num-traits",
- "p256k1 7.0.0",
+ "p256k1",
  "polynomial",
  "primitive-types",
  "rand_core 0.6.4",
