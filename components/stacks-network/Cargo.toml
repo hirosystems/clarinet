@@ -12,7 +12,7 @@ bollard = "0.15.0"
 bytes = "1.4.0"
 bitcoin = "0.29.2"
 bitcoincore-rpc = "0.16.0"
-serde = { version = "1.0.136", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1.0.79", features = ["preserve_order"] }
 serde_derive = "1"
 tracing = "0.1"
@@ -32,7 +32,7 @@ futures = "0.3.12"
 base58 = "0.2.0"
 tokio = { version = "1.35.1", features = ["full"] }
 
-chainhook-sdk = { default-features = true, git = "https://github.com/hirosystems/chainhook.git", rev = "ac59025" }
+chainhook-sdk = { default-features = true, git = "https://github.com/hirosystems/chainhook.git", rev = "c47c806" }
 # chainhook-sdk = { version = "=0.11", default-features = true }
 stacks-rpc-client = { path = "../stacks-rpc-client" }
 clarinet-files = { path = "../clarinet-files", features = ["cli"] }

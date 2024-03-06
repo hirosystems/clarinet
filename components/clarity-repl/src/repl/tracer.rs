@@ -159,7 +159,7 @@ impl EvalHook for Tracer {
                     "│   ".repeat(self.stack.len() - self.pending_call_string.len() - 1),
                     black!(format!(
                         "✸ {}",
-                        event.json_serialize(0, &Txid([0u8; 32]), true)
+                        event.json_serialize(0, &Txid([0u8; 32]), true).unwrap()
                     )),
                 )
             }

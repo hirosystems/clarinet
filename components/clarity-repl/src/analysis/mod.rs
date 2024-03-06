@@ -134,10 +134,10 @@ pub fn run_analysis(
         }
     }
 
-    analysis_db.execute(|db| {
+    execute(analysis_db, |database| {
         for pass in passes {
             // Collect warnings and continue, or if there is an error, return.
-            match pass(contract_analysis, db, annotations, settings) {
+            match pass(contract_analysis, database, annotations, settings) {
                 Ok(mut w) => errors.append(&mut w),
                 Err(mut e) => {
                     errors.append(&mut e);
@@ -147,4 +147,17 @@ pub fn run_analysis(
         }
         Ok(errors)
     })
+}
+
+pub fn execute<F, T, E>(conn: &mut AnalysisDatabase, f: F) -> std::result::Result<T, E>
+where
+    F: FnOnce(&mut AnalysisDatabase) -> std::result::Result<T, E>,
+{
+    conn.begin();
+    let result = f(conn).map_err(|e| {
+        conn.roll_back().expect("Failed to roll back");
+        e
+    })?;
+    conn.commit().expect("Failed to commit");
+    Ok(result)
 }

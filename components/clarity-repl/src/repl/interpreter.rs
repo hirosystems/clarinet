@@ -348,7 +348,7 @@ impl ClarityInterpreter {
         // Run standard clarity analyses
         let mut contract_analysis = clarity::vm::analysis::run_analysis(
             &contract.expect_resolved_contract_identifier(Some(&self.tx_sender)),
-            &mut contract_ast.expressions,
+            &contract_ast.expressions,
             &mut analysis_db,
             false,
             LimitedCostTracker::new_free(),
@@ -409,7 +409,8 @@ impl ClarityInterpreter {
             let contract = Contract { contract_context };
             global_context
                 .database
-                .insert_contract(&contract_id, contract);
+                .insert_contract(&contract_id, contract)
+                .expect("failed to insert contract");
             global_context
                 .database
                 .set_contract_data_size(&contract_id, 0)
@@ -422,7 +423,7 @@ impl ClarityInterpreter {
         analysis_db
             .insert_contract(&contract_id, &contract_analysis)
             .unwrap();
-        analysis_db.commit();
+        analysis_db.commit().expect("unable to save data");
     }
 
     pub fn get_block_time(&mut self) -> u64 {
@@ -432,7 +433,7 @@ impl ClarityInterpreter {
             &self.burn_datastore,
             &self.burn_datastore,
         );
-        conn.get_block_time(block_height)
+        conn.get_block_time(block_height).unwrap()
     }
 
     pub fn get_data_var(
@@ -441,7 +442,7 @@ impl ClarityInterpreter {
         var_name: &str,
     ) -> Option<String> {
         let key = ClarityDatabase::make_key_for_trip(contract_id, StoreType::Variable, var_name);
-        let value_hex = self.datastore.get(&key)?;
+        let value_hex = self.datastore.get(&key).unwrap()?;
         Some(format!("0x{value_hex}"))
     }
 
@@ -451,8 +452,9 @@ impl ClarityInterpreter {
         map_name: &str,
         map_key: &Value,
     ) -> Option<String> {
-        let key = ClarityDatabase::make_key_for_data_map_entry(contract_id, map_name, map_key);
-        let value_hex = self.datastore.get(&key)?;
+        let key =
+            ClarityDatabase::make_key_for_data_map_entry(contract_id, map_name, map_key).unwrap();
+        let value_hex = self.datastore.get(&key).unwrap()?;
         Some(format!("0x{value_hex}"))
     }
 
@@ -476,8 +478,9 @@ impl ClarityInterpreter {
         );
         let tx_sender: PrincipalData = self.tx_sender.clone().into();
         conn.begin();
-        conn.set_clarity_epoch_version(contract.epoch);
-        conn.commit();
+        conn.set_clarity_epoch_version(contract.epoch)
+            .map_err(|e| e.to_string())?;
+        conn.commit().map_err(|e| e.to_string())?;
         let cost_tracker = if cost_track {
             LimitedCostTracker::new(
                 false,
@@ -528,7 +531,7 @@ impl ClarityInterpreter {
                                 .clone()
                                 .expect_principal()
                             {
-                                PrincipalData::Contract(contract_id) => contract_id,
+                                Ok(PrincipalData::Contract(contract_id)) => contract_id,
                                 _ => unreachable!(),
                             };
                             let method = expression[2].match_atom().unwrap().to_string();
@@ -630,7 +633,8 @@ impl ClarityInterpreter {
             let contract = Contract { contract_context };
             global_context
                 .database
-                .insert_contract(&contract_id, contract);
+                .insert_contract(&contract_id, contract)
+                .expect("failed to insert contract");
             global_context
                 .database
                 .set_contract_data_size(&contract_id, 0)
@@ -703,8 +707,9 @@ impl ClarityInterpreter {
         );
         let tx_sender: PrincipalData = self.tx_sender.clone().into();
         conn.begin();
-        conn.set_clarity_epoch_version(contract.epoch);
-        conn.commit();
+        conn.set_clarity_epoch_version(contract.epoch)
+            .expect("failed to set epoch");
+        conn.commit().expect("failed to commit");
         let cost_tracker = if cost_track {
             LimitedCostTracker::new(
                 false,
@@ -754,7 +759,7 @@ impl ClarityInterpreter {
                                 .clone()
                                 .expect_principal()
                             {
-                                PrincipalData::Contract(contract_id) => contract_id,
+                                Ok(PrincipalData::Contract(contract_id)) => contract_id,
                                 _ => unreachable!(),
                             };
                             let method = expression[2].match_atom().unwrap().to_string();
@@ -868,7 +873,8 @@ impl ClarityInterpreter {
             let contract = Contract { contract_context };
             global_context
                 .database
-                .insert_contract(&contract_id, contract);
+                .insert_contract(&contract_id, contract)
+                .expect("failed to insert contract");
             global_context
                 .database
                 .set_contract_data_size(&contract_id, 0)
@@ -1040,10 +1046,15 @@ impl ClarityInterpreter {
                 DEFAULT_EPOCH,
             );
             global_context.begin();
-            let mut cur_balance = global_context.database.get_stx_balance_snapshot(&recipient);
-            cur_balance.credit(amount as u128);
-            let final_balance = cur_balance.get_available_balance();
-            cur_balance.save();
+            let mut cur_balance = global_context
+                .database
+                .get_stx_balance_snapshot(&recipient)
+                .unwrap();
+            cur_balance
+                .credit(amount as u128)
+                .expect("failed to credit balance");
+            let final_balance = cur_balance.get_available_balance().unwrap();
+            cur_balance.save().expect("failed to save balance");
             global_context
                 .database
                 .increment_ustx_liquid_supply(amount as u128)
