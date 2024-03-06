@@ -1034,13 +1034,13 @@ dependencies = [
  "tokio-util",
  "wasm-bindgen",
  "wasm-bindgen-futures",
- "wsts 7.0.0",
+ "wsts 8.1.0",
 ]
 
 [[package]]
 name = "clarity-repl"
 version = "2.3.1"
-source = "git+https://github.com/hirosystems/clarinet.git?branch=feat/update-stacks-core#6268024c9a3e277a643c8c86d630eabf63791642"
+source = "git+https://github.com/hirosystems/clarinet.git?branch=feat/update-stacks-core#205b655f43d11cb65b85bda193931ecc49287f4c"
 dependencies = [
  "ansi_term",
  "atty",
@@ -2263,7 +2263,7 @@ dependencies = [
 [[package]]
 name = "hiro-system-kit"
 version = "0.1.0"
-source = "git+https://github.com/hirosystems/clarinet.git?branch=feat/update-stacks-core#6268024c9a3e277a643c8c86d630eabf63791642"
+source = "git+https://github.com/hirosystems/clarinet.git?branch=feat/update-stacks-core#205b655f43d11cb65b85bda193931ecc49287f4c"
 dependencies = [
  "ansi_term",
  "atty",
@@ -4886,7 +4886,7 @@ dependencies = [
 [[package]]
 name = "stacks-rpc-client"
 version = "2.3.1"
-source = "git+https://github.com/hirosystems/clarinet.git?branch=feat/update-stacks-core#6268024c9a3e277a643c8c86d630eabf63791642"
+source = "git+https://github.com/hirosystems/clarinet.git?branch=feat/update-stacks-core#205b655f43d11cb65b85bda193931ecc49287f4c"
 dependencies = [
  "clarity-repl 2.3.1 (git+https://github.com/hirosystems/clarinet.git?branch=feat/update-stacks-core)",
  "hmac 0.12.1",
