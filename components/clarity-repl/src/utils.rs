@@ -191,7 +191,10 @@ mod tests {
         ))));
         assert_eq!(s, "\"Hello, \"world\"\n\"");
 
-        s = value_to_string(&UTF8Data::to_value(&"Hello, 'world'\n".as_bytes().to_vec()));
+        s = value_to_string(
+            &UTF8Data::to_value(&"Hello, 'world'\n".as_bytes().to_vec())
+                .expect("failed to convert to value"),
+        );
         assert_eq!(s, "u\"Hello, 'world'\n\"");
 
         s = value_to_string(&Value::Sequence(SequenceData::List(ListData {
