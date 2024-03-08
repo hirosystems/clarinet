@@ -42,7 +42,7 @@ macro_rules! impl_byte_array_newtype {
 
             /// Instantiates from a vector of bytes
             #[allow(dead_code)]
-            pub fn from_vec(inp: &Vec<u8>) -> Option<$thing> {
+            pub fn from_vec(inp: &[u8]) -> Option<$thing> {
                 match inp.len() {
                     $len => {
                         let mut ret = [0; $len];
@@ -56,7 +56,7 @@ macro_rules! impl_byte_array_newtype {
 
             /// Instantiates from a big-endian vector of bytes, converting to host byte order
             #[allow(dead_code)]
-            pub fn from_vec_be(b: &Vec<u8>) -> Option<$thing> {
+            pub fn from_vec_be(b: &[u8]) -> Option<$thing> {
                 match b.len() {
                     $len => {
                         let mut ret = [0; $len];
