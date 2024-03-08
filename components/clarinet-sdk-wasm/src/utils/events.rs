@@ -53,19 +53,19 @@ pub fn serialize_event(event: &StacksTransactionEvent) -> StacksEvent {
             event: "nft_transfer_event".into(),
             data: data
                 .json_serialize()
-                .expect("failed to serialize nft event"),
+                .expect("failed to serialize nft transfer event"),
         },
         StacksTransactionEvent::NFTEvent(NFTEventType::NFTMintEvent(data)) => StacksEvent {
             event: "nft_mint_event".into(),
             data: data
                 .json_serialize()
-                .expect("failed to serialize nft event"),
+                .expect("failed to serialize nft mint event"),
         },
         StacksTransactionEvent::NFTEvent(NFTEventType::NFTBurnEvent(data)) => StacksEvent {
             event: "nft_burn_event".into(),
             data: data
                 .json_serialize()
-                .expect("failed to serialize nft event"),
+                .expect("failed to serialize nft burn event"),
         },
         StacksTransactionEvent::FTEvent(FTEventType::FTTransferEvent(data)) => StacksEvent {
             event: "ft_transfer_event".into(),
