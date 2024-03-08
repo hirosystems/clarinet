@@ -35,7 +35,7 @@ atty = "0.2.14"
 # clarity-vm = "2"
 clarity = { git = "https://github.com/stacks-network/stacks-core.git", branch="feat/clarity-wasm-next", package = "clarity", optional = true, default-features = false }
 # clarity = { version = "2", default-features = false, optional = true, path ="../../../clarity-wasm/stacks-core/clarity" }
-clar2wasm = { git = "https://github.com/stacks-network/clarity-wasm.git", branch="chore/update-clarity", optional = true }
+clar2wasm = { git = "https://github.com/stacks-network/clarity-wasm.git", optional = true }
 # clar2wasm = { path="../../../clarity-wasm/clar2wasm", optional = true }
 
 # DAP Debugger

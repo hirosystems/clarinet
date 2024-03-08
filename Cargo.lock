@@ -782,7 +782,7 @@ checksum = "702fc72eb24e5a1e48ce58027a675bc24edd52096d5397d4aea7c6dd9eca0bd1"
 [[package]]
 name = "clar2wasm"
 version = "0.1.0"
-source = "git+https://github.com/stacks-network/clarity-wasm.git?branch=chore/update-clarity#d08b7628206b36f6d7a5e7a92a786ac007c8e7e6"
+source = "git+https://github.com/stacks-network/clarity-wasm.git#bcda26f40779ddb8222687a1bbc4e7a53ff02924"
 dependencies = [
  "clap",
  "clarity",
