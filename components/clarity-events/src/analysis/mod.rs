@@ -538,7 +538,7 @@ pub fn serialize_type_signature(
             SymbolicExpressionType::LiteralValue(value),
         ) => {
             json!({
-                "value": value.clone().expect_ascii(),
+                "value": value.clone().expect_ascii().expect("failed to parse ascii"),
                 "type": "string",
             })
         }
@@ -656,14 +656,19 @@ impl ASTVisitor<'_> for EventCollector<'_, '_> {
         match &amount.expr {
             SymbolicExpressionType::AtomValue(value)
             | SymbolicExpressionType::LiteralValue(value) => {
-                data.amount = Some(value.clone().expect_u128());
+                data.amount = Some(value.clone().expect_u128().expect("failed to parse u128"));
             }
             _ => {}
         }
         match &sender.expr {
             SymbolicExpressionType::AtomValue(value)
             | SymbolicExpressionType::LiteralValue(value) => {
-                data.sender = Some(value.clone().expect_principal());
+                data.sender = Some(
+                    value
+                        .clone()
+                        .expect_principal()
+                        .expect("failed to parse principal"),
+                );
             }
             _ => {}
         }
@@ -685,21 +690,31 @@ impl ASTVisitor<'_> for EventCollector<'_, '_> {
         match &amount.expr {
             SymbolicExpressionType::AtomValue(value)
             | SymbolicExpressionType::LiteralValue(value) => {
-                data.amount = Some(value.clone().expect_u128());
+                data.amount = Some(value.clone().expect_u128().expect("failed to parse u128"));
             }
             _ => {}
         }
         match &sender.expr {
             SymbolicExpressionType::AtomValue(value)
             | SymbolicExpressionType::LiteralValue(value) => {
-                data.sender = Some(value.clone().expect_principal());
+                data.sender = Some(
+                    value
+                        .clone()
+                        .expect_principal()
+                        .expect("failed to parse principal"),
+                );
             }
             _ => {}
         }
         match &recipient.expr {
             SymbolicExpressionType::AtomValue(value)
             | SymbolicExpressionType::LiteralValue(value) => {
-                data.recipient = Some(value.clone().expect_principal());
+                data.recipient = Some(
+                    value
+                        .clone()
+                        .expect_principal()
+                        .expect("failed to parse principal"),
+                );
             }
             _ => {}
         }
@@ -720,14 +735,19 @@ impl ASTVisitor<'_> for EventCollector<'_, '_> {
         match &amount.expr {
             SymbolicExpressionType::AtomValue(value)
             | SymbolicExpressionType::LiteralValue(value) => {
-                data.amount = Some(value.clone().expect_u128());
+                data.amount = Some(value.clone().expect_u128().expect("failed to parse u128"));
             }
             _ => {}
         }
         match &sender.expr {
             SymbolicExpressionType::AtomValue(value)
             | SymbolicExpressionType::LiteralValue(value) => {
-                data.sender = Some(value.clone().expect_principal());
+                data.sender = Some(
+                    value
+                        .clone()
+                        .expect_principal()
+                        .expect("failed to parse principal"),
+                );
             }
             _ => {}
         }
@@ -749,21 +769,31 @@ impl ASTVisitor<'_> for EventCollector<'_, '_> {
         match &amount.expr {
             SymbolicExpressionType::AtomValue(value)
             | SymbolicExpressionType::LiteralValue(value) => {
-                data.amount = Some(value.clone().expect_u128());
+                data.amount = Some(value.clone().expect_u128().expect("failed to parse u128"));
             }
             _ => {}
         }
         match &sender.expr {
             SymbolicExpressionType::AtomValue(value)
             | SymbolicExpressionType::LiteralValue(value) => {
-                data.sender = Some(value.clone().expect_principal());
+                data.sender = Some(
+                    value
+                        .clone()
+                        .expect_principal()
+                        .expect("failed to parse principal"),
+                );
             }
             _ => {}
         }
         match &recipient.expr {
             SymbolicExpressionType::AtomValue(value)
             | SymbolicExpressionType::LiteralValue(value) => {
-                data.recipient = Some(value.clone().expect_principal());
+                data.recipient = Some(
+                    value
+                        .clone()
+                        .expect_principal()
+                        .expect("failed to parse principal"),
+                );
             }
             _ => {}
         }
@@ -784,14 +814,19 @@ impl ASTVisitor<'_> for EventCollector<'_, '_> {
         match &amount.expr {
             SymbolicExpressionType::AtomValue(value)
             | SymbolicExpressionType::LiteralValue(value) => {
-                data.amount = Some(value.clone().expect_u128());
+                data.amount = Some(value.clone().expect_u128().expect("failed to parse u128"));
             }
             _ => {}
         }
         match &recipient.expr {
             SymbolicExpressionType::AtomValue(value)
             | SymbolicExpressionType::LiteralValue(value) => {
-                data.recipient = Some(value.clone().expect_principal());
+                data.recipient = Some(
+                    value
+                        .clone()
+                        .expect_principal()
+                        .expect("failed to parse principal"),
+                );
             }
             _ => {}
         }
@@ -825,7 +860,12 @@ impl ASTVisitor<'_> for EventCollector<'_, '_> {
         match &sender.expr {
             SymbolicExpressionType::AtomValue(value)
             | SymbolicExpressionType::LiteralValue(value) => {
-                data.sender = Some(value.clone().expect_principal());
+                data.sender = Some(
+                    value
+                        .clone()
+                        .expect_principal()
+                        .expect("failed to parse principal"),
+                );
             }
             _ => {}
         }
@@ -861,14 +901,24 @@ impl ASTVisitor<'_> for EventCollector<'_, '_> {
         match &sender.expr {
             SymbolicExpressionType::AtomValue(value)
             | SymbolicExpressionType::LiteralValue(value) => {
-                data.sender = Some(value.clone().expect_principal());
+                data.sender = Some(
+                    value
+                        .clone()
+                        .expect_principal()
+                        .expect("failed to parse principal"),
+                );
             }
             _ => {}
         }
         match &recipient.expr {
             SymbolicExpressionType::AtomValue(value)
             | SymbolicExpressionType::LiteralValue(value) => {
-                data.recipient = Some(value.clone().expect_principal());
+                data.recipient = Some(
+                    value
+                        .clone()
+                        .expect_principal()
+                        .expect("failed to parse principal"),
+                );
             }
             _ => {}
         }
@@ -903,7 +953,12 @@ impl ASTVisitor<'_> for EventCollector<'_, '_> {
         match &recipient.expr {
             SymbolicExpressionType::AtomValue(value)
             | SymbolicExpressionType::LiteralValue(value) => {
-                data.recipient = Some(value.clone().expect_principal());
+                data.recipient = Some(
+                    value
+                        .clone()
+                        .expect_principal()
+                        .expect("failed to parse principal"),
+                );
             }
             _ => {}
         }

@@ -896,7 +896,7 @@ impl GraphWalker {
     fn get_cycling_dependencies(
         &mut self,
         graph: &Graph,
-        sorted_indexes: &Vec<usize>,
+        sorted_indexes: &[usize],
     ) -> Option<Vec<usize>> {
         let mut tainted: HashSet<usize> = HashSet::new();
 
