@@ -1146,8 +1146,18 @@ fn type_for_value(value: &Value) -> String {
         Value::Bool(_) => "bool".to_string(),
         Value::Tuple(data) => format!("{}", data.type_signature),
         Value::Principal(_) => "principal".to_string(),
-        Value::Optional(opt_data) => format!("{}", opt_data.type_signature().unwrap()),
-        Value::Response(res_data) => format!("{}", res_data.type_signature().unwrap()),
+        Value::Optional(opt_data) => format!(
+            "{}",
+            opt_data
+                .type_signature()
+                .expect("failed to format optional value")
+        ),
+        Value::Response(res_data) => format!(
+            "{}",
+            res_data
+                .type_signature()
+                .expect("failed to format response value")
+        ),
         Value::Sequence(SequenceData::Buffer(_)) => "buff".to_string(),
         Value::Sequence(SequenceData::String(_)) => "string".to_string(),
         Value::Sequence(SequenceData::List(_)) => "list".to_string(),

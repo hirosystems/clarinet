@@ -291,7 +291,7 @@ impl StacksRpc {
 
         let arguments = args
             .iter()
-            .map(|a| bytes_to_hex(&a.serialize_to_vec().unwrap()))
+            .map(|a| bytes_to_hex(&a.serialize_to_vec().expect("failed to serialize value")))
             .collect::<Vec<_>>();
         let res = self
             .client

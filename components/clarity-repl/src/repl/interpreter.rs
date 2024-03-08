@@ -433,7 +433,8 @@ impl ClarityInterpreter {
             &self.burn_datastore,
             &self.burn_datastore,
         );
-        conn.get_block_time(block_height).unwrap()
+        conn.get_block_time(block_height)
+            .expect("unable to get block time")
     }
 
     pub fn get_data_var(
@@ -442,7 +443,10 @@ impl ClarityInterpreter {
         var_name: &str,
     ) -> Option<String> {
         let key = ClarityDatabase::make_key_for_trip(contract_id, StoreType::Variable, var_name);
-        let value_hex = self.datastore.get(&key).unwrap()?;
+        let value_hex = self
+            .datastore
+            .get(&key)
+            .expect("failed to get key from datastore")?;
         Some(format!("0x{value_hex}"))
     }
 
@@ -454,7 +458,10 @@ impl ClarityInterpreter {
     ) -> Option<String> {
         let key =
             ClarityDatabase::make_key_for_data_map_entry(contract_id, map_name, map_key).unwrap();
-        let value_hex = self.datastore.get(&key).unwrap()?;
+        let value_hex = self
+            .datastore
+            .get(&key)
+            .expect("failed to get map entry from datastore")?;
         Some(format!("0x{value_hex}"))
     }
 
@@ -1049,11 +1056,13 @@ impl ClarityInterpreter {
             let mut cur_balance = global_context
                 .database
                 .get_stx_balance_snapshot(&recipient)
-                .unwrap();
+                .expect("failed to get balance snapshot");
             cur_balance
                 .credit(amount as u128)
                 .expect("failed to credit balance");
-            let final_balance = cur_balance.get_available_balance().unwrap();
+            let final_balance = cur_balance
+                .get_available_balance()
+                .expect("failed to get balance");
             cur_balance.save().expect("failed to save balance");
             global_context
                 .database
