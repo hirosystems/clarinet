@@ -13,6 +13,8 @@ const address2 = "ST2CY5V39NHDPWSXMW9QDT3HC3GD6Q6XX4CFRK9AG";
 
 let simnet: Simnet;
 
+const nbOfBootContracts = 20;
+
 const deploymentPlanPath = path.join(
   process.cwd(),
   "tests/fixtures/deployments/default.simnet-plan.yaml",
@@ -200,7 +202,7 @@ describe("simnet can read contracts data vars and maps", () => {
 describe("simnet can get contracts info and deploy contracts", () => {
   it("can get contract interfaces", () => {
     const contractInterfaces = simnet.getContractsInterfaces();
-    expect(contractInterfaces).toHaveLength(3);
+    expect(contractInterfaces).toHaveLength(nbOfBootContracts + 3);
 
     const counterInterface = contractInterfaces.get(`${deployerAddr}.counter`);
     expect(counterInterface).not.toBeNull();
@@ -234,7 +236,7 @@ describe("simnet can get contracts info and deploy contracts", () => {
     expect(res.result).toStrictEqual(Cl.int(42));
 
     const contractInterfaces = simnet.getContractsInterfaces();
-    expect(contractInterfaces).toHaveLength(3);
+    expect(contractInterfaces).toHaveLength(nbOfBootContracts + 3);
   });
 
   it("can deploy contracts", () => {
@@ -243,7 +245,7 @@ describe("simnet can get contracts info and deploy contracts", () => {
     expect(deployRes.result).toStrictEqual(Cl.bool(true));
 
     const contractInterfaces = simnet.getContractsInterfaces();
-    expect(contractInterfaces).toHaveLength(4);
+    expect(contractInterfaces).toHaveLength(nbOfBootContracts + 4);
 
     const addRes = simnet.callPublicFn("op", "add", [Cl.uint(13), Cl.uint(29)], address1);
     expect(addRes.result).toStrictEqual(Cl.ok(Cl.uint(42)));

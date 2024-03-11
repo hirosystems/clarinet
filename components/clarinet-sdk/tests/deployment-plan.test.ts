@@ -7,6 +7,8 @@ import { describe, expect, it, beforeEach, afterEach, assert } from "vitest";
 import { initSimnet } from "../dist/esm";
 import { Cl } from "@stacks/transactions";
 
+const nbOfBootContracts = 20;
+
 const deploymentPlanPath = path.join(
   process.cwd(),
   "tests/fixtures/deployments/default.simnet-plan.yaml",
@@ -49,7 +51,7 @@ describe("deployment plans test", async () => {
 
     // test that all 3 contracts are deployed
     const contracts = simnet.getContractsInterfaces();
-    expect(contracts.size).toBe(3);
+    expect(contracts.size).toBe(nbOfBootContracts + 3);
 
     // the additional custom tx should have been applied
     const count = simnet.getDataVar("counter", "count");
@@ -63,7 +65,7 @@ describe("deployment plans test", async () => {
 
     // only two contract should be deployed with the light manifest
     const contracts = simnet.getContractsInterfaces();
-    expect(contracts.size).toBe(2);
+    expect(contracts.size).toBe(nbOfBootContracts + 2);
 
     // the additional custom tx should have been applied
     const count = simnet.getDataVar("counter", "count");

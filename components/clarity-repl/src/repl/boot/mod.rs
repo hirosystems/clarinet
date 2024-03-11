@@ -53,10 +53,6 @@ lazy_static! {
         format!("{}\n{}", BOOT_CODE_POX_MAINNET_CONSTS, POX_3_BODY);
     pub static ref POX_3_TESTNET_CODE: String =
         format!("{}\n{}", BOOT_CODE_POX_TESTNET_CONSTS, POX_3_BODY);
-    pub static ref POX_4_MAINNET_CODE: String =
-        format!("{}\n{}", BOOT_CODE_POX_MAINNET_CONSTS, POX_4_BODY);
-    pub static ref POX_4_TESTNET_CODE: String =
-        format!("{}\n{}", BOOT_CODE_POX_TESTNET_CONSTS, POX_4_BODY);
     pub static ref BOOT_CODE_COST_VOTING_TESTNET: String = make_testnet_cost_voting();
     pub static ref STACKS_BOOT_CODE_MAINNET: [(&'static str, &'static str); 11] = [
         ("pox", &BOOT_CODE_POX_MAINNET),
@@ -69,7 +65,7 @@ lazy_static! {
         ("pox-2", &POX_2_MAINNET_CODE),
         ("costs-3", &BOOT_CODE_COSTS_3),
         ("pox-3", &POX_3_MAINNET_CODE),
-        ("pox-4", &POX_4_MAINNET_CODE),
+        ("pox-4", &POX_4_BODY),
     ];
     pub static ref STACKS_BOOT_CODE_TESTNET: [(&'static str, &'static str); 11] = [
         ("pox", &BOOT_CODE_POX_TESTNET),
@@ -82,7 +78,7 @@ lazy_static! {
         ("pox-2", &POX_2_TESTNET_CODE),
         ("costs-3", &BOOT_CODE_COSTS_3_TESTNET),
         ("pox-3", &POX_3_TESTNET_CODE),
-        ("pox-4", &POX_4_TESTNET_CODE),
+        ("pox-4", &POX_4_BODY),
     ];
 }
 

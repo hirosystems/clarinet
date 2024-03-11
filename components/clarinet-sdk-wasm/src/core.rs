@@ -39,7 +39,7 @@ use crate::utils::events::serialize_event;
 
 #[wasm_bindgen(typescript_custom_section)]
 const SET_EPOCH: &'static str = r#"
-type EpochString = "2.0" | "2.05" | "2.1" | "2.2" | "2.3" | "2.4"
+type EpochString = "2.0" | "2.05" | "2.1" | "2.2" | "2.3" | "2.4" | "3.0"
 "#;
 
 #[wasm_bindgen]

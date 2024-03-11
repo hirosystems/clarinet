@@ -125,14 +125,14 @@ pub fn update_session_with_contracts_executions(
 ) -> BTreeMap<QualifiedContractIdentifier, Result<ExecutionResult, Vec<Diagnostic>>> {
     let boot_contracts_data = BOOT_CONTRACTS_DATA.clone();
 
-    for (_, (boot_contract, ast)) in boot_contracts_data {
-        session
+    let mut results = BTreeMap::new();
+    for (contract_id, (boot_contract, ast)) in boot_contracts_data {
+        let result = session
             .interpreter
-            .run(&boot_contract, &mut Some(ast), false, None)
-            .expect("failed to interprete boot contract");
+            .run(&boot_contract, &mut Some(ast), false, None);
+        results.insert(contract_id, result);
     }
 
-    let mut results = BTreeMap::new();
     for batch in deployment.plan.batches.iter() {
         let epoch: StacksEpochId = match (batch.epoch, forced_min_epoch) {
             (Some(epoch), _) => epoch.into(),

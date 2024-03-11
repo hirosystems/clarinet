@@ -1,4 +1,4 @@
-use sha2::{Digest, Sha512_256};
+use std::collections::HashMap;
 
 use clarity::types::chainstate::BlockHeaderHash;
 use clarity::types::chainstate::BurnchainHeaderHash;
@@ -16,7 +16,8 @@ use clarity::vm::errors::InterpreterResult as Result;
 use clarity::vm::types::QualifiedContractIdentifier;
 use clarity::vm::types::TupleData;
 use clarity::vm::StacksEpoch;
-use std::collections::HashMap;
+use pox_locking::handle_contract_call_special_cases;
+use sha2::{Digest, Sha512_256};
 
 #[derive(Clone, Debug)]
 pub struct Datastore {
@@ -288,6 +289,10 @@ impl ClarityBackingStore for Datastore {
         _key: &str,
     ) -> Result<Option<String>> {
         panic!("Datastore cannot get_metadata_manual")
+    }
+
+    fn get_cc_special_cases_handler(&self) -> Option<clarity::vm::database::SpecialCaseHandler> {
+        Some(&handle_contract_call_special_cases)
     }
 
     #[cfg(not(feature = "wasm"))]
