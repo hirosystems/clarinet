@@ -39,6 +39,8 @@ clar2wasm = { git = "https://github.com/stacks-network/clarity-wasm.git", option
 # clar2wasm = { path="../../../clarity-wasm/clar2wasm", optional = true }
 pox-locking = { git = "https://github.com/stacks-network/stacks-core.git", branch="feat/clarity-wasm-next",  optional = true, default-features = false }
 
+web-sys = { version = "0.3.69" }
+
 # DAP Debugger
 tokio = { version = "1.35.1", features = ["full"], optional = true }
 tokio-util = { version = "0.7.10", features = ["codec"], optional = true }

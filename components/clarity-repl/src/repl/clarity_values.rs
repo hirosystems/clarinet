@@ -1,4 +1,4 @@
-use clarity_repl::clarity::{
+use crate::clarity::{
     codec::StacksMessageCodec,
     util::hash,
     vm::types::{CharType, SequenceData},

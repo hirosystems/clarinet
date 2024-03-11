@@ -7,6 +7,7 @@ use crate::repl::datastore::BurnDatastore;
 use crate::repl::datastore::Datastore;
 use crate::repl::Settings;
 use clarity::consts::CHAIN_ID_TESTNET;
+use clarity::types::StacksEpochId;
 use clarity::vm::analysis::ContractAnalysis;
 use clarity::vm::ast::{build_ast_with_diagnostics, ContractAST};
 #[cfg(feature = "cli")]
@@ -16,7 +17,7 @@ use clarity::vm::contracts::Contract;
 use clarity::vm::costs::{ExecutionCost, LimitedCostTracker};
 use clarity::vm::database::{ClarityDatabase, StoreType};
 use clarity::vm::diagnostic::{Diagnostic, Level};
-use clarity::vm::events::*;
+use clarity::vm::errors::Error;
 use clarity::vm::representations::SymbolicExpressionType::{Atom, List};
 use clarity::vm::representations::{Span, SymbolicExpression};
 use clarity::vm::types::{
@@ -24,11 +25,18 @@ use clarity::vm::types::{
 };
 use clarity::vm::{analysis::AnalysisDatabase, database::ClarityBackingStore};
 use clarity::vm::{eval, eval_all, EvaluationResult, SnippetEvaluationResult};
+use clarity::vm::{events::*, ClarityVersion};
 use clarity::vm::{ContractEvaluationResult, EvalHook};
 use clarity::vm::{CostSynthesis, ExecutionResult, ParsedContract};
 
 use super::datastore::StacksConstants;
 use super::{ClarityContract, DEFAULT_EPOCH};
+
+macro_rules! log {
+    ( $( $t:tt )* ) => {
+        web_sys::console::log_1(&format!( $( $t )* ).into());
+    }
+}
 
 pub const BLOCK_LIMIT_MAINNET: ExecutionCost = ExecutionCost {
     write_length: 15_000_000,
@@ -932,6 +940,138 @@ impl ClarityInterpreter {
         Ok(execution_result)
     }
 
+    pub fn call_contract_fn(
+        &mut self,
+        contract_id: &QualifiedContractIdentifier,
+        method: &str,
+        args: &[Vec<u8>],
+        epoch: StacksEpochId,
+        clarity_version: ClarityVersion,
+        cost_track: bool,
+        eval_hooks: Option<Vec<&mut dyn EvalHook>>,
+    ) -> Result<ExecutionResult, String> {
+        let mut conn = ClarityDatabase::new(
+            &mut self.datastore,
+            &self.burn_datastore,
+            &self.burn_datastore,
+        );
+        let tx_sender: PrincipalData = self.tx_sender.clone().into();
+        conn.begin();
+        conn.set_clarity_epoch_version(epoch)
+            .map_err(|e| e.to_string())?;
+        conn.commit().map_err(|e| e.to_string())?;
+        let cost_tracker = if cost_track {
+            LimitedCostTracker::new(
+                false,
+                CHAIN_ID_TESTNET,
+                BLOCK_LIMIT_MAINNET.clone(),
+                &mut conn,
+                epoch,
+            )
+            .expect("failed to initialize cost tracker")
+        } else {
+            LimitedCostTracker::new_free()
+        };
+
+        let mut global_context =
+            GlobalContext::new(false, CHAIN_ID_TESTNET, conn, cost_tracker, epoch);
+
+        if let Some(mut in_hooks) = eval_hooks {
+            let mut hooks: Vec<&mut dyn EvalHook> = Vec::new();
+            for hook in in_hooks.drain(..) {
+                hooks.push(hook);
+            }
+            global_context.eval_hooks = Some(hooks);
+        }
+
+        let contract_context = ContractContext::new(contract_id.clone(), clarity_version);
+
+        global_context.begin();
+        let result = global_context.execute(|g| {
+            let mut call_stack = CallStack::new();
+            let mut env = Environment::new(
+                g,
+                &contract_context,
+                &mut call_stack,
+                Some(tx_sender.clone()),
+                Some(tx_sender.clone()),
+                None,
+            );
+
+            let mut args_expressions = vec![];
+            for arg in args {
+                let value =
+                    Value::deserialize_read(&mut arg.as_slice(), None, false).map_err(|e| {
+                        Error::Unchecked(clarity::vm::errors::CheckErrors::InvalidUTF8Encoding)
+                    })?;
+                // let value = Value::buff_from(arg.to_vec())?;
+                args_expressions.push(SymbolicExpression::atom_value(value));
+            }
+
+            let result =
+                env.execute_contract_allow_private(contract_id, method, &args_expressions, false);
+            log!(
+                "call_contract_fn: result: {:?}",
+                result.as_ref().map(|v| v.to_string())
+            );
+            match result {
+                Ok(value) => Value::okay(value),
+                Err(e) => Err(e),
+            }
+        });
+
+        let value = result.map_err(|e| {
+            let err = format!("Runtime error while interpreting {}: {:?}", contract_id, e);
+            if let Some(mut eval_hooks) = global_context.eval_hooks.take() {
+                for hook in eval_hooks.iter_mut() {
+                    hook.did_complete(Err(err.clone()));
+                }
+                global_context.eval_hooks = Some(eval_hooks);
+            }
+            err
+        })?;
+
+        let mut cost = None;
+        if cost_track {
+            cost = Some(CostSynthesis::from_cost_tracker(&global_context.cost_track));
+        }
+
+        let mut emitted_events = global_context
+            .event_batches
+            .iter()
+            .flat_map(|b| b.events.clone())
+            .collect::<Vec<_>>();
+
+        let eval_result = EvaluationResult::Snippet(SnippetEvaluationResult { result: value });
+        global_context.commit().unwrap();
+
+        let (events, mut accounts_to_credit, mut accounts_to_debit) =
+            Self::process_events(&mut emitted_events);
+
+        let mut execution_result = ExecutionResult {
+            result: eval_result,
+            events,
+            cost,
+            diagnostics: Vec::new(),
+        };
+
+        if let Some(mut eval_hooks) = global_context.eval_hooks {
+            for hook in eval_hooks.iter_mut() {
+                hook.did_complete(Ok(&mut execution_result));
+            }
+        }
+
+        for (account, token, value) in accounts_to_credit.drain(..) {
+            self.credit_token(account, token, value);
+        }
+
+        for (account, token, value) in accounts_to_debit.drain(..) {
+            self.debit_token(account, token, value);
+        }
+
+        Ok(execution_result)
+    }
+
     fn process_events(
         emitted_events: &mut Vec<StacksTransactionEvent>,
     ) -> (
@@ -1155,11 +1295,12 @@ impl ClarityInterpreter {
 mod tests {
     use super::*;
     use crate::{
-        repl::session::BOOT_CONTRACTS_DATA, test_fixtures::clarity_contract::ClarityContractBuilder,
+        repl::{interpreter, session::BOOT_CONTRACTS_DATA, ClarityCodeSource, ContractDeployer},
+        test_fixtures::clarity_contract::ClarityContractBuilder,
     };
     use clarity::{
         types::{chainstate::StacksAddress, Address},
-        vm::{self},
+        vm::{self, ClarityVersion},
     };
 
     #[test]
@@ -1632,5 +1773,36 @@ mod tests {
 
             assert!(res.diagnostics.is_empty());
         }
+    }
+
+    #[test]
+    fn can_call_private_function() {
+        let mut interpreter =
+            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+
+        let contract = ClarityContractBuilder::default()
+            .code_source("(define-private (private-func) true)".into())
+            .build();
+        let source = contract.expect_in_memory_code_source();
+        let (mut ast, ..) = interpreter.build_ast(&contract);
+        let (annotations, _) = interpreter.collect_annotations(source);
+
+        let (analysis, _) = interpreter
+            .run_analysis(&contract, &mut ast, &annotations)
+            .unwrap();
+
+        let result = interpreter.execute(&contract, &mut ast, analysis, false, None);
+
+        let contract_call =
+            "(contract-call? 'S1G2081040G2081040G2081040G208105NK8PE5.contract private-func)";
+        let contract_call = ClarityContract {
+            code_source: ClarityCodeSource::ContractInMemory(contract_call.to_string()),
+            name: "contract-call".to_string(),
+            deployer: ContractDeployer::DefaultDeployer,
+            epoch: contract.epoch,
+            clarity_version: ClarityVersion::default_for_epoch(contract.epoch),
+        };
+        let execution = interpreter.run(&contract_call, &mut None, false, None);
+        dbg!(execution);
     }
 }

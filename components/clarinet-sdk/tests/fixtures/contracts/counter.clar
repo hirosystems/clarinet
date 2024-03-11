@@ -9,6 +9,28 @@
   (ok { count: (var-get count) })
 )
 
+(define-private (test-priv
+  (a uint)
+  (b (optional uint))
+  (c (optional principal))
+  (d (optional (list 100 uint)))
+  (e (optional (list 100 (string-ascii 100))))
+  (f (optional (list 100 (string-utf8 100))))
+)
+  true
+)
+
+(define-public (test-pub
+  (a uint)
+  (b (optional uint))
+  (c (optional principal))
+  (d (optional (list 100 uint)))
+  (e (optional (list 100 (string-ascii 100))))
+  (f (optional (list 100 (string-utf8 100))))
+)
+  (ok true)
+)
+
 (define-public (increment)
   (begin
     (print "call increment")

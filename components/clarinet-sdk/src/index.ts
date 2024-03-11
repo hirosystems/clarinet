@@ -2,7 +2,7 @@ import { Cl, ClarityValue } from "@stacks/transactions";
 import {
   SDK,
   TransactionRes,
-  CallContractArgs,
+  CallFnArgs,
   DeployContractArgs,
   TransferSTXArgs,
   ContractOptions,
@@ -61,11 +61,24 @@ export type Tx =
         args: ClarityValue[];
         sender: string;
       };
+      callPrivateFn?: never;
       deployContract?: never;
       transferSTX?: never;
     }
   | {
       callPublicFn?: never;
+      callPrivateFn: {
+        contract: string;
+        method: string;
+        args: ClarityValue[];
+        sender: string;
+      };
+      deployContract?: never;
+      transferSTX?: never;
+    }
+  | {
+      callPublicFn?: never;
+      callPrivateFn?: never;
       deployContract: {
         name: string;
         content: string;
@@ -76,12 +89,16 @@ export type Tx =
     }
   | {
       callPublicFn?: never;
+      callPrivateFn?: never;
       deployContradct?: never;
       transferSTX: { amount: number; recipient: string; sender: string };
     };
 
 export const tx = {
   callPublicFn: (contract: string, method: string, args: ClarityValue[], sender: string): Tx => ({
+    callPublicFn: { contract, method, args, sender },
+  }),
+  callPrivateFn: (contract: string, method: string, args: ClarityValue[], sender: string): Tx => ({
     callPublicFn: { contract, method, args, sender },
   }),
   deployContract: (
@@ -162,7 +179,22 @@ const getSessionProxy = () => ({
     if (prop === "callReadOnlyFn" || prop === "callPublicFn") {
       const callFn: CallFn = (contract, method, args, sender) => {
         const response = session[prop](
-          new CallContractArgs(
+          new CallFnArgs(
+            contract,
+            method,
+            args.map((a) => Cl.serialize(a)),
+            sender,
+          ),
+        );
+        return parseTxResponse(response);
+      };
+      return callFn;
+    }
+
+    if (prop === "callPrivateFn") {
+      const callFn: CallFn = (contract, method, args, sender) => {
+        const response = session.callPrivateFn(
+          new CallFnArgs(
             contract,
             method,
             args.map((a) => Cl.serialize(a)),

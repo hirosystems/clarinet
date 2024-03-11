@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { Cl } from "@stacks/transactions";
+import { Cl, cvToValue } from "@stacks/transactions";
 import { describe, expect, it, beforeEach, afterEach, assert } from "vitest";
 
 // test the built package and not the source code
@@ -25,6 +25,42 @@ function deleteExistingDeploymentPlan() {
     fs.unlinkSync(deploymentPlanPath);
   }
 }
+
+describe.only("bench pub vs priv", () => {
+  // (a uint)
+  // (b (optional uint))
+  // (c (optional principal))
+  // (d (optional (list 100 uint)))
+  // (e (optional (list 100 (string-ascii 100))))
+  // (f (optional (list 100 (string-utf8 100))))
+  const args = () => [
+    Cl.uint(1111111),
+    Cl.some(Cl.uint(2222222)),
+    Cl.some(Cl.principal(address1)),
+    Cl.some(Cl.list(Array(100).fill(Cl.uint(3333333)))),
+    Cl.some(Cl.list(Array(100).fill(Cl.stringAscii("hello")))),
+    Cl.some(Cl.list(Array(100).fill(Cl.stringUtf8("hello world")))),
+  ];
+
+  it("can call both", () => {
+    simnet.callPrivateFn("counter", "test-priv", args(), address1);
+    simnet.callPublicFn("counter", "test-pub", args(), address1);
+  });
+
+  const j = 1;
+
+  it("calls private", () => {
+    for (let i = 0; i < j; i++) {
+      simnet.callPrivateFn("counter", "test-priv", args(), address1);
+    }
+  });
+
+  it("calls public", () => {
+    for (let i = 0; i < j; i++) {
+      simnet.callPublicFn("counter", "test-pub", args(), address1);
+    }
+  });
+});
 
 beforeEach(async () => {
   deleteExistingDeploymentPlan();
