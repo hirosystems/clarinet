@@ -1,7 +1,7 @@
 use crate::common::requests::completion::check_if_should_wrap;
 use clarinet_deployments::{
     generate_default_deployment, initiate_session_from_deployment,
-    update_session_with_contracts_executions, UpdateSessionExecutioResult,
+    update_session_with_contracts_executions, UpdateSessionExecutionResult,
 };
 use clarinet_files::chainhook_types::StacksNetwork;
 use clarinet_files::ProjectManifest;
@@ -662,7 +662,7 @@ pub async fn build_state(
     .await?;
 
     let mut session = initiate_session_from_deployment(&manifest);
-    let UpdateSessionExecutioResult { contracts, .. } = update_session_with_contracts_executions(
+    let UpdateSessionExecutionResult { contracts, .. } = update_session_with_contracts_executions(
         &mut session,
         &deployment,
         Some(&artifacts.asts),

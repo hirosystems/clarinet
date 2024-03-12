@@ -43,7 +43,7 @@ use types::{ContractPublishSpecification, EpochSpec};
 pub type ExecutionResultMap =
     BTreeMap<QualifiedContractIdentifier, Result<ExecutionResult, Vec<Diagnostic>>>;
 
-pub struct UpdateSessionExecutioResult {
+pub struct UpdateSessionExecutionResult {
     pub boot_contracts: ExecutionResultMap,
     pub contracts: ExecutionResultMap,
 }
@@ -55,7 +55,7 @@ pub fn setup_session_with_deployment(
 ) -> DeploymentGenerationArtifacts {
     let mut session = initiate_session_from_deployment(manifest);
     update_session_with_genesis_accounts(&mut session, deployment);
-    let UpdateSessionExecutioResult { contracts, .. } = update_session_with_contracts_executions(
+    let UpdateSessionExecutionResult { contracts, .. } = update_session_with_contracts_executions(
         &mut session,
         deployment,
         contracts_asts,
@@ -130,7 +130,7 @@ pub fn update_session_with_contracts_executions(
     contracts_asts: Option<&BTreeMap<QualifiedContractIdentifier, ContractAST>>,
     code_coverage_enabled: bool,
     forced_min_epoch: Option<StacksEpochId>,
-) -> UpdateSessionExecutioResult {
+) -> UpdateSessionExecutionResult {
     let boot_contracts_data = BOOT_CONTRACTS_DATA.clone();
 
     let mut boot_contracts = BTreeMap::new();
@@ -209,7 +209,7 @@ pub fn update_session_with_contracts_executions(
         }
         session.advance_chain_tip(1);
     }
-    UpdateSessionExecutioResult {
+    UpdateSessionExecutionResult {
         boot_contracts,
         contracts,
     }

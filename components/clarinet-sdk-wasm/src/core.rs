@@ -457,6 +457,8 @@ impl SDK {
         Ok(())
     }
 
+    // async fn get_deployment
+
     async fn write_deployment_plan(
         &self,
         deployment_plan: &DeploymentSpecification,
