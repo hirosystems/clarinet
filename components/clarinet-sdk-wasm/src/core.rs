@@ -442,7 +442,6 @@ impl SDK {
             .into_iter()
             .chain(executed_contracts.contracts.into_iter())
         {
-            // Iterate on merged boot_contracts and contracts
             match result {
                 Ok(execution_result) => {
                     self.add_contract(&execution_result);
@@ -452,7 +451,6 @@ impl SDK {
                     std::process::exit(1);
                 }
             }
-            // Your code here
         }
 
         self.session = Some(session);

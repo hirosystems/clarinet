@@ -136,11 +136,11 @@ impl ClarityInterpreter {
     fn run_interpreter(
         &mut self,
         contract: &ClarityContract,
-        ast: &mut Option<ContractAST>,
+        cached_ast: &mut Option<ContractAST>,
         cost_track: bool,
         eval_hooks: Option<Vec<&mut dyn EvalHook>>,
     ) -> Result<ExecutionResult, Vec<Diagnostic>> {
-        let (mut ast, mut diagnostics, success) = match ast.take() {
+        let (mut ast, mut diagnostics, success) = match cached_ast.take() {
             Some(ast) => (ast.clone(), vec![], true),
             None => self.build_ast(contract),
         };
