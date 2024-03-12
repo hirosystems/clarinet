@@ -114,7 +114,7 @@ describe("simnet can call contracts function", () => {
     expect(res).toHaveProperty("events");
     expect(res.result).toStrictEqual(Cl.ok(Cl.bool(true)));
 
-    expect(res.events).toHaveLength(2);
+    expect(res.events).toHaveLength(3);
     const printEvent = res.events[0];
     expect(printEvent.event).toBe("print_event");
     expect(printEvent.data.value).toStrictEqual(Cl.stringAscii("call increment"));
@@ -154,6 +154,43 @@ describe("simnet can call contracts function", () => {
     expect(counterVal.result).toStrictEqual(Cl.ok(Cl.tuple({ count: Cl.uint(2) })));
 
     expect(simnet.blockHeight).toStrictEqual(initalBH + 1);
+  });
+
+  it("can call private functions", () => {
+    const { result, events } = simnet.callPrivateFn("counter", "inner-increment", [], address1);
+    expect(events).toHaveLength(1);
+    expect(result).toStrictEqual(Cl.bool(true));
+  });
+
+  it("can call public and private functions in the same block", () => {
+    const initalBH = simnet.blockHeight;
+
+    const res = simnet.mineBlock([
+      tx.callPrivateFn("counter", "inner-increment", [], address1),
+      tx.callPublicFn("counter", "increment", [], address1),
+      tx.callPrivateFn("counter", "inner-increment", [], address1),
+    ]);
+
+    expect(res[0].result).toStrictEqual(Cl.bool(true));
+    expect(res[1].result).toStrictEqual(Cl.ok(Cl.bool(true)));
+    expect(res[2].result).toStrictEqual(Cl.bool(true));
+
+    const counterVal = simnet.callReadOnlyFn("counter", "get-count", [], address1);
+    expect(counterVal.result).toStrictEqual(Cl.ok(Cl.tuple({ count: Cl.uint(3) })));
+
+    expect(simnet.blockHeight).toStrictEqual(initalBH + 1);
+  });
+
+  it("can not call a public function with callPrivateFn", () => {
+    expect(() => {
+      simnet.callPrivateFn("counter", "increment", [], address1);
+    }).toThrow("increment is not a private function");
+  });
+
+  it("can not call a private function with callPublicFn", () => {
+    expect(() => {
+      simnet.callPublicFn("counter", "inner-increment", [], address1);
+    }).toThrow("increment is not a public function");
   });
 
   it("can get updated assets map", () => {
@@ -206,7 +243,7 @@ describe("simnet can get contracts info and deploy contracts", () => {
 
     const counterInterface = contractInterfaces.get(`${deployerAddr}.counter`);
     expect(counterInterface).not.toBeNull();
-    expect(counterInterface?.functions).toHaveLength(6);
+    expect(counterInterface?.functions).toHaveLength(7);
     expect(counterInterface?.variables).toHaveLength(2);
     expect(counterInterface?.maps).toHaveLength(1);
   });
@@ -225,7 +262,7 @@ describe("simnet can get contracts info and deploy contracts", () => {
   it("can get contract ast", () => {
     const counterAst = simnet.getContractAST(`${deployerAddr}.counter`);
     expect(counterAst).toBeDefined();
-    expect(counterAst.expressions).toHaveLength(10);
+    expect(counterAst.expressions).toHaveLength(11);
 
     const getWithShortAddr = simnet.getContractAST("counter");
     expect(getWithShortAddr).toBeDefined();
@@ -294,8 +331,17 @@ describe("simnet can get session reports", () => {
   it("can get line coverage", () => {
     simnet.callPublicFn("counter", "increment", [], address1);
     simnet.callPublicFn("counter", "increment", [], address1);
+    simnet.callPrivateFn("counter", "inner-increment", [], address1);
 
     const reports = simnet.collectReport();
+
+    console.log("reports.coverage", reports.coverage);
+
+    // increment is called twice
+    expect(reports.coverage.includes("FNDA:2,increment")).toBe(true);
+    // inner-increment is called one time directly and twice by `increment`
+    expect(reports.coverage.includes("FNDA:3,inner-increment")).toBe(true);
+
     expect(reports.coverage.startsWith("TN:")).toBe(true);
     expect(reports.coverage.endsWith("end_of_record\n")).toBe(true);
   });

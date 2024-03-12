@@ -9,37 +9,22 @@
   (ok { count: (var-get count) })
 )
 
-(define-private (test-priv
-  (a uint)
-  (b (optional uint))
-  (c (optional principal))
-  (d (optional (list 100 uint)))
-  (e (optional (list 100 (string-ascii 100))))
-  (f (optional (list 100 (string-utf8 100))))
-)
-  (ok true)
-)
-
-(define-public (test-pub
-  (a uint)
-  (b (optional uint))
-  (c (optional principal))
-  (d (optional (list 100 uint)))
-  (e (optional (list 100 (string-ascii 100))))
-  (f (optional (list 100 (string-utf8 100))))
-)
-  (ok true)
+(define-private (inner-increment)
+  (begin
+    (print "call inner-increment")
+    (if (is-none (map-get? participants tx-sender))
+      (map-insert participants tx-sender true)
+      (map-set participants tx-sender true)
+    )
+    (var-set count (+ (var-get count) u1))
+  )
 )
 
 (define-public (increment)
   (begin
     (print "call increment")
-    (if (is-none (map-get? participants tx-sender))
-      (map-insert participants tx-sender true)
-      (map-set participants tx-sender true)
-    )
     (try! (stx-transfer? u1000000 tx-sender (as-contract tx-sender)))
-    (ok (var-set count (+ (var-get count) u1)))
+    (ok (inner-increment))
   )
 )
 

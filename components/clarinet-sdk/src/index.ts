@@ -99,7 +99,7 @@ export const tx = {
     callPublicFn: { contract, method, args, sender },
   }),
   callPrivateFn: (contract: string, method: string, args: ClarityValue[], sender: string): Tx => ({
-    callPublicFn: { contract, method, args, sender },
+    callPrivateFn: { contract, method, args, sender },
   }),
   deployContract: (
     name: string,
@@ -176,24 +176,9 @@ const getSessionProxy = () => ({
     // - serialize clarity values input argument
     // - deserialize output into clarity values
 
-    if (prop === "callReadOnlyFn" || prop === "callPublicFn") {
+    if (prop === "callReadOnlyFn" || prop === "callPublicFn" || prop === "callPrivateFn") {
       const callFn: CallFn = (contract, method, args, sender) => {
         const response = session[prop](
-          new CallFnArgs(
-            contract,
-            method,
-            args.map((a) => Cl.serialize(a)),
-            sender,
-          ),
-        );
-        return parseTxResponse(response);
-      };
-      return callFn;
-    }
-
-    if (prop === "callPrivateFn") {
-      const callFn: CallFn = (contract, method, args, sender) => {
-        const response = session.callPrivateFn(
           new CallFnArgs(
             contract,
             method,
@@ -247,7 +232,15 @@ const getSessionProxy = () => ({
             return {
               callPublicFn: {
                 ...tx.callPublicFn,
-                args_maps: tx.callPublicFn.args.map((a) => Cl.serialize(a)),
+                args_maps: tx.callPublicFn.args.map(Cl.serialize),
+              },
+            };
+          }
+          if (tx.callPrivateFn) {
+            return {
+              callPrivateFn: {
+                ...tx.callPrivateFn,
+                args_maps: tx.callPrivateFn.args.map(Cl.serialize),
               },
             };
           }
