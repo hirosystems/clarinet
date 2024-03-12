@@ -39,7 +39,7 @@ use crate::utils::events::serialize_event;
 
 #[wasm_bindgen(typescript_custom_section)]
 const SET_EPOCH: &'static str = r#"
-type EpochString = "2.0" | "2.05" | "2.1" | "2.2" | "2.3" | "2.4"
+type EpochString = "2.0" | "2.05" | "2.1" | "2.2" | "2.3" | "2.4" | "3.0"
 "#;
 
 #[wasm_bindgen]
@@ -414,7 +414,7 @@ impl SDK {
 
         let mut session = initiate_session_from_deployment(&manifest);
         update_session_with_genesis_accounts(&mut session, &deployment);
-        let results = update_session_with_contracts_executions(
+        let executed_contracts = update_session_with_contracts_executions(
             &mut session,
             &deployment,
             Some(&artifacts.asts),
@@ -437,7 +437,11 @@ impl SDK {
                 .insert(contract_id, location.clone());
         }
 
-        for (_, result) in results.into_iter() {
+        for (_, result) in executed_contracts
+            .boot_contracts
+            .into_iter()
+            .chain(executed_contracts.contracts.into_iter())
+        {
             match result {
                 Ok(execution_result) => {
                     self.add_contract(&execution_result);

@@ -18,13 +18,6 @@ pub struct StacksEvent {
     pub data: serde_json::Value,
 }
 
-#[allow(unused_macros)]
-macro_rules! log {
-    ( $( $t:tt )* ) => {
-        web_sys::console::log_1(&format!( $( $t )* ).into());
-    }
-}
-
 pub fn serialize_event(event: &StacksTransactionEvent) -> StacksEvent {
     match event {
         StacksTransactionEvent::SmartContractEvent(data) => StacksEvent {
