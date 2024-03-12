@@ -620,7 +620,7 @@ impl Session {
         sender: &str,
         allow_private: bool,
         test_name: String,
-    ) -> Result<(ExecutionResult, QualifiedContractIdentifier), Vec<Diagnostic>> {
+    ) -> Result<ExecutionResult, Vec<Diagnostic>> {
         let initial_tx_sender = self.get_tx_sender();
         // Handle fully qualified contract_id and sugared syntax
         let contract_id_str = if contract.starts_with('S') {
@@ -634,7 +634,6 @@ impl Session {
         let mut coverage = TestCoverageReport::new(test_name.clone());
         hooks.push(&mut coverage);
 
-        // epoch: self.current_epoch,
         let clarity_version = ClarityVersion::default_for_epoch(self.current_epoch);
 
         self.set_tx_sender(sender.into());
@@ -653,7 +652,7 @@ impl Session {
                 self.set_tx_sender(initial_tx_sender);
                 return Err(vec![Diagnostic {
                     level: Level::Error,
-                    message: format!("Error calling contract function: {}", e),
+                    message: format!("Error calling contract function: {e}"),
                     spans: vec![],
                     suggestion: None,
                 }]);
@@ -672,7 +671,7 @@ impl Session {
             });
         }
 
-        Ok((execution, contract_id))
+        Ok(execution)
     }
 
     pub fn eval(

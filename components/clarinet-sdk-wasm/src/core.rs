@@ -635,30 +635,21 @@ impl SDK {
             .ok_or(format!("contract {contract} has no function {method}"))
     }
 
-    fn contract_fn_call(
+    fn call_contract_fn(
         &mut self,
-        call_fn_args: &CallFnArgs,
+        CallFnArgs {
+            contract,
+            method,
+            args,
+            sender,
+        }: &CallFnArgs,
         allow_private: bool,
     ) -> Result<TransactionRes, String> {
-        let CallFnArgs {
-            contract,
-            method,
-            args,
-            sender,
-        } = call_fn_args;
-
         let test_name = self.current_test_name.clone();
         let session = self.get_session_mut();
-        let (execution, _) = match session.call_contract_fn(
-            contract,
-            method,
-            args,
-            sender,
-            allow_private,
-            test_name,
-        ) {
-            Ok(res) => res,
-            Err(diagnostics) => {
+        let execution = session
+            .call_contract_fn(contract, method, args, sender, allow_private, test_name)
+            .map_err(|diagnostics| {
                 let mut message = format!(
                     "{}: {}::{}({})",
                     "Call contract function error",
@@ -672,9 +663,8 @@ impl SDK {
                 if let Some(diag) = diagnostics.last() {
                     message = format!("{} -> {}", message, diag.message);
                 }
-                return Err(message);
-            }
-        };
+                message
+            })?;
 
         Ok(execution_result_to_transaction_res(&execution))
     }
@@ -685,8 +675,7 @@ impl SDK {
         if interface.access != ContractInterfaceFunctionAccess::read_only {
             return Err(format!("{} is not a read-only function", &args.method));
         }
-
-        self.contract_fn_call(args, false)
+        self.call_contract_fn(args, false)
     }
 
     fn inner_call_public_fn(
@@ -698,13 +687,11 @@ impl SDK {
         if interface.access != ContractInterfaceFunctionAccess::public {
             return Err(format!("{} is not a public function", &args.method));
         }
-
         let session = self.get_session_mut();
         if advance_chain_tip {
             session.advance_chain_tip(1);
         }
-
-        self.contract_fn_call(args, false)
+        self.call_contract_fn(args, false)
     }
 
     fn inner_call_private_fn(
@@ -716,13 +703,11 @@ impl SDK {
         if interface.access != ContractInterfaceFunctionAccess::private {
             return Err(format!("{} is not a private function", &args.method));
         }
-
         let session = self.get_session_mut();
         if advance_chain_tip {
             session.advance_chain_tip(1);
         }
-
-        self.contract_fn_call(args, true)
+        self.call_contract_fn(args, true)
     }
 
     fn inner_transfer_stx(
