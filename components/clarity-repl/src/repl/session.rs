@@ -618,6 +618,7 @@ impl Session {
         method: &str,
         args: &[Vec<u8>],
         sender: &str,
+        allow_private: bool,
         test_name: String,
     ) -> Result<(ExecutionResult, QualifiedContractIdentifier), Vec<Diagnostic>> {
         let initial_tx_sender = self.get_tx_sender();
@@ -644,6 +645,7 @@ impl Session {
             self.current_epoch,
             clarity_version,
             true,
+            allow_private,
             Some(hooks),
         ) {
             Ok(result) => result,

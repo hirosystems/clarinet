@@ -18,7 +18,7 @@ use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
 use clarity_repl::clarity::{
     ClarityVersion, EvaluationResult, ExecutionResult, ParsedContract, StacksEpochId,
 };
-use clarity_repl::repl::clarity_values::{uint8_to_string, uint8_to_value};
+use clarity_repl::repl::clarity_values::uint8_to_value;
 use clarity_repl::repl::{
     clarity_values, ClarityCodeSource, ClarityContract, ContractDeployer, Session,
     DEFAULT_CLARITY_VERSION, DEFAULT_EPOCH,
@@ -635,36 +635,36 @@ impl SDK {
             .ok_or(format!("contract {contract} has no function {method}"))
     }
 
-    fn invoke_contract_call(
+    fn contract_fn_call(
         &mut self,
-        call_contract_args: &CallFnArgs,
-        test_name: &str,
+        call_fn_args: &CallFnArgs,
+        allow_private: bool,
     ) -> Result<TransactionRes, String> {
         let CallFnArgs {
             contract,
             method,
             args,
             sender,
-        } = call_contract_args;
+        } = call_fn_args;
 
-        let clarity_args: Vec<String> = args.iter().map(|a| uint8_to_string(a)).collect();
-
+        let test_name = self.current_test_name.clone();
         let session = self.get_session_mut();
-        let (execution, _) = match session.invoke_contract_call(
+        let (execution, _) = match session.call_contract_fn(
             contract,
             method,
-            &clarity_args,
+            args,
             sender,
-            test_name.into(),
+            allow_private,
+            test_name,
         ) {
             Ok(res) => res,
             Err(diagnostics) => {
                 let mut message = format!(
                     "{}: {}::{}({})",
-                    "Contract call error",
+                    "Call private fn error",
                     contract,
                     method,
-                    clarity_args.join(", ")
+                    "args" // clarity_args.join(", ")
                 );
                 if let Some(diag) = diagnostics.last() {
                     message = format!("{} -> {}", message, diag.message);
@@ -683,7 +683,7 @@ impl SDK {
             return Err(format!("{} is not a read-only function", &args.method));
         }
 
-        self.invoke_contract_call(args, &self.current_test_name.clone())
+        self.contract_fn_call(args, false)
     }
 
     fn inner_call_public_fn(
@@ -701,21 +701,17 @@ impl SDK {
             session.advance_chain_tip(1);
         }
 
-        self.invoke_contract_call(args, &self.current_test_name.clone())
+        self.contract_fn_call(args, false)
     }
 
     fn inner_call_private_fn(
         &mut self,
-        call_private_fn_args: &CallFnArgs,
+        args: &CallFnArgs,
         advance_chain_tip: bool,
     ) -> Result<TransactionRes, String> {
-        let interface = self
-            .get_function_interface(&call_private_fn_args.contract, &call_private_fn_args.method)?;
+        let interface = self.get_function_interface(&args.contract, &args.method)?;
         if interface.access != ContractInterfaceFunctionAccess::private {
-            return Err(format!(
-                "{} is not a private function",
-                &call_private_fn_args.method
-            ));
+            return Err(format!("{} is not a private function", &args.method));
         }
 
         let session = self.get_session_mut();
@@ -723,34 +719,7 @@ impl SDK {
             session.advance_chain_tip(1);
         }
 
-        let CallFnArgs {
-            contract,
-            method,
-            args,
-            sender,
-        } = call_private_fn_args;
-
-        let test_name = self.current_test_name.clone();
-        let session = self.get_session_mut();
-        let (execution, _) =
-            match session.call_contract_fn(contract, method, args, sender, test_name) {
-                Ok(res) => res,
-                Err(diagnostics) => {
-                    let mut message = format!(
-                        "{}: {}::{}({})",
-                        "Call private fn error",
-                        contract,
-                        method,
-                        "args" // clarity_args.join(", ")
-                    );
-                    if let Some(diag) = diagnostics.last() {
-                        message = format!("{} -> {}", message, diag.message);
-                    }
-                    return Err(message);
-                }
-            };
-
-        Ok(execution_result_to_transaction_res(&execution))
+        self.contract_fn_call(args, true)
     }
 
     fn inner_transfer_stx(

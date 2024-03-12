@@ -17,7 +17,7 @@
   (e (optional (list 100 (string-ascii 100))))
   (f (optional (list 100 (string-utf8 100))))
 )
-  true
+  (ok true)
 )
 
 (define-public (test-pub

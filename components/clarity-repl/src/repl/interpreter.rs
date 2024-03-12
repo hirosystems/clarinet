@@ -938,10 +938,11 @@ impl ClarityInterpreter {
         &mut self,
         contract_id: &QualifiedContractIdentifier,
         method: &str,
-        args: &[Vec<u8>],
+        raw_args: &[Vec<u8>],
         epoch: StacksEpochId,
         clarity_version: ClarityVersion,
         cost_track: bool,
+        allow_private: bool,
         eval_hooks: Option<Vec<&mut dyn EvalHook>>,
     ) -> Result<ExecutionResult, String> {
         let mut conn = ClarityDatabase::new(
@@ -992,22 +993,18 @@ impl ClarityInterpreter {
                 None,
             );
 
-            let mut args_expressions = vec![];
-            for arg in args {
+            let mut args = vec![];
+            for arg in raw_args {
                 let value =
-                    Value::deserialize_read(&mut arg.as_slice(), None, false).map_err(|e| {
+                    Value::deserialize_read(&mut arg.as_slice(), None, false).map_err(|_| {
                         Error::Unchecked(clarity::vm::errors::CheckErrors::InvalidUTF8Encoding)
                     })?;
-                // let value = Value::buff_from(arg.to_vec())?;
-                args_expressions.push(SymbolicExpression::atom_value(value));
+                args.push(SymbolicExpression::atom_value(value));
             }
 
-            let result =
-                env.execute_contract_allow_private(contract_id, method, &args_expressions, false);
-
-            match result {
-                Ok(value) => Value::okay(value),
-                Err(e) => Err(e),
+            match allow_private {
+                true => env.execute_contract_allow_private(contract_id, method, &args, false),
+                false => env.execute_contract(contract_id, method, &args, false),
             }
         });
 
