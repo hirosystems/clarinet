@@ -18,7 +18,7 @@ use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
 use clarity_repl::clarity::{
     ClarityVersion, EvaluationResult, ExecutionResult, ParsedContract, StacksEpochId,
 };
-use clarity_repl::repl::clarity_values::uint8_to_value;
+use clarity_repl::repl::clarity_values::{uint8_to_string, uint8_to_value};
 use clarity_repl::repl::{
     clarity_values, ClarityCodeSource, ClarityContract, ContractDeployer, Session,
     DEFAULT_CLARITY_VERSION, DEFAULT_EPOCH,
@@ -661,10 +661,13 @@ impl SDK {
             Err(diagnostics) => {
                 let mut message = format!(
                     "{}: {}::{}({})",
-                    "Call private fn error",
+                    "Call contract function error",
                     contract,
                     method,
-                    "args" // clarity_args.join(", ")
+                    args.iter()
+                        .map(|a| uint8_to_string(a))
+                        .collect::<Vec<String>>()
+                        .join(", ")
                 );
                 if let Some(diag) = diagnostics.last() {
                     message = format!("{} -> {}", message, diag.message);

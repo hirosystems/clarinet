@@ -335,8 +335,6 @@ describe("simnet can get session reports", () => {
 
     const reports = simnet.collectReport();
 
-    console.log("reports.coverage", reports.coverage);
-
     // increment is called twice
     expect(reports.coverage.includes("FNDA:2,increment")).toBe(true);
     // inner-increment is called one time directly and twice by `increment`
