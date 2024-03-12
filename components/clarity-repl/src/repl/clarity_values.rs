@@ -1,9 +1,8 @@
-use crate::clarity::{
-    codec::StacksMessageCodec,
-    util::hash,
-    vm::types::{CharType, SequenceData},
+use clarity::vm::{
+    types::{CharType, SequenceData},
     Value,
 };
+use clarity::{codec::StacksMessageCodec, util::hash};
 
 pub fn to_raw_value(value: &Value) -> String {
     let mut bytes = vec![];
