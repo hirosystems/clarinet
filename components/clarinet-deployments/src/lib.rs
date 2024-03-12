@@ -40,6 +40,14 @@ use types::RequirementPublishSpecification;
 use types::TransactionSpecification;
 use types::{ContractPublishSpecification, EpochSpec};
 
+pub type ExecutionResultMap =
+    BTreeMap<QualifiedContractIdentifier, Result<ExecutionResult, Vec<Diagnostic>>>;
+
+pub struct UpdateSessionExecutioResult {
+    pub boot_contracts: ExecutionResultMap,
+    pub contracts: ExecutionResultMap,
+}
+
 pub fn setup_session_with_deployment(
     manifest: &ProjectManifest,
     deployment: &DeploymentSpecification,
@@ -47,7 +55,7 @@ pub fn setup_session_with_deployment(
 ) -> DeploymentGenerationArtifacts {
     let mut session = initiate_session_from_deployment(manifest);
     update_session_with_genesis_accounts(&mut session, deployment);
-    let results = update_session_with_contracts_executions(
+    let UpdateSessionExecutioResult { contracts, .. } = update_session_with_contracts_executions(
         &mut session,
         deployment,
         contracts_asts,
@@ -61,7 +69,7 @@ pub fn setup_session_with_deployment(
     let mut asts = BTreeMap::new();
     let mut contracts_analysis = HashMap::new();
     let mut success = true;
-    for (contract_id, res) in results.into_iter() {
+    for (contract_id, res) in contracts.into_iter() {
         match res {
             Ok(execution_result) => {
                 diags.insert(contract_id.clone(), execution_result.diagnostics);
@@ -122,17 +130,18 @@ pub fn update_session_with_contracts_executions(
     contracts_asts: Option<&BTreeMap<QualifiedContractIdentifier, ContractAST>>,
     code_coverage_enabled: bool,
     forced_min_epoch: Option<StacksEpochId>,
-) -> BTreeMap<QualifiedContractIdentifier, Result<ExecutionResult, Vec<Diagnostic>>> {
+) -> UpdateSessionExecutioResult {
     let boot_contracts_data = BOOT_CONTRACTS_DATA.clone();
 
-    let mut results = BTreeMap::new();
+    let mut boot_contracts = BTreeMap::new();
     for (contract_id, (boot_contract, ast)) in boot_contracts_data {
         let result = session
             .interpreter
             .run(&boot_contract, &mut Some(ast), false, None);
-        results.insert(contract_id, result);
+        boot_contracts.insert(contract_id, result);
     }
 
+    let mut contracts = BTreeMap::new();
     for batch in deployment.plan.batches.iter() {
         let epoch: StacksEpochId = match (batch.epoch, forced_min_epoch) {
             (Some(epoch), _) => epoch.into(),
@@ -184,7 +193,7 @@ pub fn update_session_with_contracts_executions(
                         },
                         &mut contract_ast,
                     );
-                    results.insert(contract_id, result);
+                    contracts.insert(contract_id, result);
                     session.set_tx_sender(default_tx_sender);
                 }
                 TransactionSpecification::EmulatedContractCall(tx) => {
@@ -200,7 +209,10 @@ pub fn update_session_with_contracts_executions(
         }
         session.advance_chain_tip(1);
     }
-    results
+    UpdateSessionExecutioResult {
+        boot_contracts,
+        contracts,
+    }
 }
 
 pub async fn generate_default_deployment(

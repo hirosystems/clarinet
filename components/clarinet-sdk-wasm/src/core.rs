@@ -414,7 +414,7 @@ impl SDK {
 
         let mut session = initiate_session_from_deployment(&manifest);
         update_session_with_genesis_accounts(&mut session, &deployment);
-        let results = update_session_with_contracts_executions(
+        let executed_contracts = update_session_with_contracts_executions(
             &mut session,
             &deployment,
             Some(&artifacts.asts),
@@ -437,7 +437,12 @@ impl SDK {
                 .insert(contract_id, location.clone());
         }
 
-        for (_, result) in results.into_iter() {
+        for (_, result) in executed_contracts
+            .boot_contracts
+            .into_iter()
+            .chain(executed_contracts.contracts.into_iter())
+        {
+            // Iterate on merged boot_contracts and contracts
             match result {
                 Ok(execution_result) => {
                     self.add_contract(&execution_result);
@@ -447,6 +452,7 @@ impl SDK {
                     std::process::exit(1);
                 }
             }
+            // Your code here
         }
 
         self.session = Some(session);
