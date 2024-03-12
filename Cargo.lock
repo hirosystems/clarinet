@@ -928,6 +928,7 @@ dependencies = [
 [[package]]
 name = "clarity"
 version = "2.3.0"
+source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-next#2ab366d28d473f204b67a431ba8b522c0c9a8e78"
 dependencies = [
  "getrandom 0.2.8",
  "hashbrown 0.14.3",

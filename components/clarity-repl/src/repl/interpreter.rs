@@ -32,12 +32,6 @@ use clarity::vm::{CostSynthesis, ExecutionResult, ParsedContract};
 use super::datastore::StacksConstants;
 use super::{ClarityContract, DEFAULT_EPOCH};
 
-macro_rules! log {
-    ( $( $t:tt )* ) => {
-        web_sys::console::log_1(&format!( $( $t )* ).into());
-    }
-}
-
 pub const BLOCK_LIMIT_MAINNET: ExecutionCost = ExecutionCost {
     write_length: 15_000_000,
     write_count: 15_000,
@@ -1010,10 +1004,7 @@ impl ClarityInterpreter {
 
             let result =
                 env.execute_contract_allow_private(contract_id, method, &args_expressions, false);
-            log!(
-                "call_contract_fn: result: {:?}",
-                result.as_ref().map(|v| v.to_string())
-            );
+
             match result {
                 Ok(value) => Value::okay(value),
                 Err(e) => Err(e),
