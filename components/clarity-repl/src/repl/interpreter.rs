@@ -1283,8 +1283,7 @@ impl ClarityInterpreter {
 mod tests {
     use super::*;
     use crate::{
-        repl::{interpreter, session::BOOT_CONTRACTS_DATA, ClarityCodeSource, ContractDeployer},
-        test_fixtures::clarity_contract::ClarityContractBuilder,
+        repl::session::BOOT_CONTRACTS_DATA, test_fixtures::clarity_contract::ClarityContractBuilder,
     };
     use clarity::{
         types::{chainstate::StacksAddress, Address},
@@ -1481,6 +1480,31 @@ mod tests {
 
     #[test]
     fn test_execute() {
+        let mut interpreter =
+            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+
+        let contract = ClarityContract::fixture();
+        let source = contract.expect_in_memory_code_source();
+        let (mut ast, ..) = interpreter.build_ast(&contract);
+        let (annotations, _) = interpreter.collect_annotations(source);
+
+        let (analysis, _) = interpreter
+            .run_analysis(&contract, &mut ast, &annotations)
+            .unwrap();
+
+        let result = interpreter.execute(&contract, &mut ast, analysis, false, None);
+        assert!(result.is_ok());
+        let ExecutionResult {
+            diagnostics,
+            events,
+            ..
+        } = result.unwrap();
+        assert!(diagnostics.is_empty());
+        assert!(events.is_empty());
+    }
+
+    #[test]
+    fn test_call_contract_fn() {
         let mut interpreter =
             ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
 
@@ -1764,7 +1788,46 @@ mod tests {
     }
 
     #[test]
-    fn can_call_private_function() {
+    fn can_call_a_public_function() {
+        let mut interpreter =
+            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+
+        let contract = ClarityContractBuilder::default()
+            .code_source("(define-public (public-func) (ok true))".into())
+            .build();
+        let source = contract.expect_in_memory_code_source();
+        let (mut ast, ..) = interpreter.build_ast(&contract);
+        let (annotations, _) = interpreter.collect_annotations(source);
+
+        let (analysis, _) = interpreter
+            .run_analysis(&contract, &mut ast, &annotations)
+            .unwrap();
+
+        let _ = interpreter.execute(&contract, &mut ast, analysis, false, None);
+
+        let allow_private = false;
+        let result = interpreter.call_contract_fn(
+            &contract
+                .expect_resolved_contract_identifier(Some(&StandardPrincipalData::transient())),
+            "public-func",
+            &vec![],
+            StacksEpochId::Epoch24,
+            ClarityVersion::Clarity2,
+            false,
+            allow_private,
+            None,
+        );
+
+        assert!(result.is_ok());
+        let ExecutionResult { result, .. } = result.unwrap();
+
+        assert!(
+            matches!(result, EvaluationResult::Snippet(SnippetEvaluationResult { result }) if result == Value::okay_true())
+        );
+    }
+
+    #[test]
+    fn can_call_a_private_function() {
         let mut interpreter =
             ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
 
@@ -1779,18 +1842,65 @@ mod tests {
             .run_analysis(&contract, &mut ast, &annotations)
             .unwrap();
 
-        let result = interpreter.execute(&contract, &mut ast, analysis, false, None);
+        let _ = interpreter.execute(&contract, &mut ast, analysis, false, None);
 
-        let contract_call =
-            "(contract-call? 'S1G2081040G2081040G2081040G208105NK8PE5.contract private-func)";
-        let contract_call = ClarityContract {
-            code_source: ClarityCodeSource::ContractInMemory(contract_call.to_string()),
-            name: "contract-call".to_string(),
-            deployer: ContractDeployer::DefaultDeployer,
-            epoch: contract.epoch,
-            clarity_version: ClarityVersion::default_for_epoch(contract.epoch),
-        };
-        let execution = interpreter.run(&contract_call, &mut None, false, None);
-        dbg!(execution);
+        let allow_private = true;
+        let result = interpreter.call_contract_fn(
+            &contract
+                .expect_resolved_contract_identifier(Some(&StandardPrincipalData::transient())),
+            "private-func",
+            &vec![],
+            StacksEpochId::Epoch24,
+            ClarityVersion::Clarity2,
+            false,
+            allow_private,
+            None,
+        );
+
+        assert!(result.is_ok());
+        let ExecutionResult { result, .. } = result.unwrap();
+
+        assert!(
+            matches!(result, EvaluationResult::Snippet(SnippetEvaluationResult { result }) if result == Value::Bool(true))
+        );
+    }
+
+    #[test]
+    fn can_not_call_a_private_function_without_allow_private() {
+        let mut interpreter =
+            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+
+        let contract = ClarityContractBuilder::default()
+            .code_source("(define-private (private-func) true)".into())
+            .build();
+        let source = contract.expect_in_memory_code_source();
+        let (mut ast, ..) = interpreter.build_ast(&contract);
+        let (annotations, _) = interpreter.collect_annotations(source);
+
+        let (analysis, _) = interpreter
+            .run_analysis(&contract, &mut ast, &annotations)
+            .unwrap();
+
+        let _ = interpreter.execute(&contract, &mut ast, analysis, false, None);
+
+        let allow_private = false;
+        let result = interpreter.call_contract_fn(
+            &contract
+                .expect_resolved_contract_identifier(Some(&StandardPrincipalData::transient())),
+            "private-func",
+            &vec![],
+            StacksEpochId::Epoch24,
+            ClarityVersion::Clarity2,
+            false,
+            allow_private,
+            None,
+        );
+
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "Runtime error while interpreting S1G2081040G2081040G2081040G208105NK8PE5.contract: Unchecked(NoSuchPublicFunction(\"S1G2081040G2081040G2081040G208105NK8PE5.contract\", \"private-func\"))"
+        );
     }
 }
