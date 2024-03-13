@@ -498,7 +498,7 @@ impl ClarityInterpreter {
                 &mut conn,
                 contract.epoch,
             )
-            .expect("failed to initialize cost tracker")
+            .map_err(|e| format!("failed to initialize cost tracker: {e}"))?
         } else {
             LimitedCostTracker::new_free()
         };
@@ -727,7 +727,7 @@ impl ClarityInterpreter {
                 &mut conn,
                 contract.epoch,
             )
-            .expect("failed to initialize cost tracker")
+            .map_err(|e| format!("failed to initialize cost tracker: {e}"))?
         } else {
             LimitedCostTracker::new_free()
         };
@@ -963,7 +963,7 @@ impl ClarityInterpreter {
                 &mut conn,
                 epoch,
             )
-            .expect("failed to initialize cost tracker")
+            .map_err(|e| format!("failed to initialize cost tracker: {e}"))?
         } else {
             LimitedCostTracker::new_free()
         };
