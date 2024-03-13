@@ -1,9 +1,8 @@
-use clarity_repl::clarity::{
-    codec::StacksMessageCodec,
-    util::hash,
-    vm::types::{CharType, SequenceData},
+use clarity::vm::{
+    types::{CharType, SequenceData},
     Value,
 };
+use clarity::{codec::StacksMessageCodec, util::hash};
 
 pub fn to_raw_value(value: &Value) -> String {
     let mut bytes = vec![];
@@ -75,12 +74,12 @@ fn value_to_string(value: &Value) -> String {
 #[cfg(test)]
 mod tests {
     use super::value_to_string;
-    use clarity_repl::clarity::vm::types::{
+    use clarity::vm::types::{
         ASCIIData, CharType, ListData, ListTypeData, OptionalData, PrincipalData,
         QualifiedContractIdentifier, ResponseData, SequenceData, SequencedValue,
         StandardPrincipalData, TupleData, TypeSignature, UTF8Data, NONE,
     };
-    use clarity_repl::clarity::vm::{ClarityName, Value};
+    use clarity::vm::{ClarityName, Value};
     use std::convert::TryFrom;
 
     #[test]
@@ -150,7 +149,7 @@ mod tests {
         ))));
         assert_eq!(s, "\"Hello, \"world\"\n\"");
 
-        s = value_to_string(&UTF8Data::to_value(&"Hello, 'world'\n".as_bytes().to_vec()));
+        s = value_to_string(&UTF8Data::to_value(&"Hello, 'world'\n".as_bytes().to_vec()).unwrap());
         assert_eq!(s, "u\"Hello, 'world'\n\"");
 
         s = value_to_string(&Value::Sequence(SequenceData::List(ListData {

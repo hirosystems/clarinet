@@ -661,7 +661,7 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 [[package]]
 name = "chainhook-sdk"
 version = "0.12.5"
-source = "git+https://github.com/hirosystems/chainhook.git?branch=chore/update-clarinet-and-clarity#ccd1be54d401cec59ac2fb33a2510a3e06b17f6d"
+source = "git+https://github.com/hirosystems/chainhook.git?branch=chore/update-clarinet-and-clarity#e8e7e9e3840c9c10957168d14761abe55e0bb22c"
 dependencies = [
  "base58 0.2.0",
  "base64 0.21.7",
@@ -687,7 +687,7 @@ dependencies = [
  "serde-hex",
  "serde_derive",
  "serde_json",
- "stacks-rpc-client 2.3.1 (git+https://github.com/hirosystems/clarinet.git?branch=feat/update-stacks-core)",
+ "stacks-rpc-client 2.3.1 (git+https://github.com/hirosystems/clarinet.git)",
  "threadpool",
  "tokio",
 ]
@@ -695,7 +695,7 @@ dependencies = [
 [[package]]
 name = "chainhook-types"
 version = "1.3.3"
-source = "git+https://github.com/hirosystems/chainhook.git?branch=chore/update-clarinet-and-clarity#ccd1be54d401cec59ac2fb33a2510a3e06b17f6d"
+source = "git+https://github.com/hirosystems/chainhook.git?branch=chore/update-clarinet-and-clarity#e8e7e9e3840c9c10957168d14761abe55e0bb22c"
 dependencies = [
  "hex 0.4.3",
  "schemars",
@@ -898,7 +898,7 @@ dependencies = [
 
 [[package]]
 name = "clarinet-sdk-wasm"
-version = "2.4.0-beta2"
+version = "2.4.0-beta4"
 dependencies = [
  "clarinet-deployments",
  "clarinet-files",
@@ -928,7 +928,7 @@ dependencies = [
 [[package]]
 name = "clarity"
 version = "2.3.0"
-source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-next#2ab366d28d473f204b67a431ba8b522c0c9a8e78"
+source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-next#b006cd68da6124c29d48806cde6272a19efdd8ce"
 dependencies = [
  "getrandom 0.2.8",
  "hashbrown 0.14.3",
@@ -1041,16 +1041,17 @@ dependencies = [
 [[package]]
 name = "clarity-repl"
 version = "2.3.1"
-source = "git+https://github.com/hirosystems/clarinet.git?branch=feat/update-stacks-core#11f77eebff53776838c3f64308423f531b5468c3"
+source = "git+https://github.com/hirosystems/clarinet.git#dbc0178a1957eb507ac1979ffefb7798ddc6614c"
 dependencies = [
  "ansi_term",
  "atty",
  "chrono",
  "clarity",
  "getrandom 0.2.8",
- "hiro-system-kit 0.1.0 (git+https://github.com/hirosystems/clarinet.git?branch=feat/update-stacks-core)",
+ "hiro-system-kit 0.1.0 (git+https://github.com/hirosystems/clarinet.git)",
  "integer-sqrt",
  "lazy_static",
+ "pox-locking",
  "regex",
  "reqwest",
  "serde",
@@ -2264,7 +2265,7 @@ dependencies = [
 [[package]]
 name = "hiro-system-kit"
 version = "0.1.0"
-source = "git+https://github.com/hirosystems/clarinet.git?branch=feat/update-stacks-core#11f77eebff53776838c3f64308423f531b5468c3"
+source = "git+https://github.com/hirosystems/clarinet.git#dbc0178a1957eb507ac1979ffefb7798ddc6614c"
 dependencies = [
  "ansi_term",
  "atty",
@@ -2630,9 +2631,9 @@ dependencies = [
 
 [[package]]
 name = "js-sys"
-version = "0.3.68"
+version = "0.3.69"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "406cda4b368d531c842222cf9d2600a9a4acce8d29423695379c6868a143a9ee"
+checksum = "29c15563dc2726973df627357ce0c9ddddbea194836909d655df6a75d2cf296d"
 dependencies = [
  "wasm-bindgen",
 ]
@@ -3509,7 +3510,7 @@ checksum = "439ee305def115ba05938db6eb1644ff94165c5ab5e9420d1c1bcedbba909391"
 [[package]]
 name = "pox-locking"
 version = "2.4.0"
-source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-next#2ab366d28d473f204b67a431ba8b522c0c9a8e78"
+source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-next#b006cd68da6124c29d48806cde6272a19efdd8ce"
 dependencies = [
  "clarity",
  "slog",
@@ -4774,7 +4775,7 @@ dependencies = [
 [[package]]
 name = "stacks-common"
 version = "0.0.2"
-source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-next#2ab366d28d473f204b67a431ba8b522c0c9a8e78"
+source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-next#b006cd68da6124c29d48806cde6272a19efdd8ce"
 dependencies = [
  "chrono",
  "curve25519-dalek 2.0.0",
@@ -4875,9 +4876,9 @@ dependencies = [
 [[package]]
 name = "stacks-rpc-client"
 version = "2.3.1"
-source = "git+https://github.com/hirosystems/clarinet.git?branch=feat/update-stacks-core#11f77eebff53776838c3f64308423f531b5468c3"
+source = "git+https://github.com/hirosystems/clarinet.git#dbc0178a1957eb507ac1979ffefb7798ddc6614c"
 dependencies = [
- "clarity-repl 2.3.1 (git+https://github.com/hirosystems/clarinet.git?branch=feat/update-stacks-core)",
+ "clarity-repl 2.3.1 (git+https://github.com/hirosystems/clarinet.git)",
  "hmac 0.12.1",
  "libsecp256k1 0.7.1",
  "pbkdf2",
@@ -5649,9 +5650,9 @@ checksum = "9c8d87e72b64a3b4db28d11ce29237c246188f4f51057d65a7eab63b7987e423"
 
 [[package]]
 name = "wasm-bindgen"
-version = "0.2.91"
+version = "0.2.92"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c1e124130aee3fb58c5bdd6b639a0509486b0338acaaae0c84a5124b0f588b7f"
+checksum = "4be2531df63900aeb2bca0daaaddec08491ee64ceecbee5076636a3b026795a8"
 dependencies = [
  "cfg-if",
  "wasm-bindgen-macro",
@@ -5659,9 +5660,9 @@ dependencies = [
 
 [[package]]
 name = "wasm-bindgen-backend"
-version = "0.2.91"
+version = "0.2.92"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c9e7e1900c352b609c8488ad12639a311045f40a35491fb69ba8c12f758af70b"
+checksum = "614d787b966d3989fa7bb98a654e369c762374fd3213d212cfc0251257e747da"
 dependencies = [
  "bumpalo",
  "log",
@@ -5686,9 +5687,9 @@ dependencies = [
 
 [[package]]
 name = "wasm-bindgen-macro"
-version = "0.2.91"
+version = "0.2.92"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b30af9e2d358182b5c7449424f017eba305ed32a7010509ede96cdc4696c46ed"
+checksum = "a1f8823de937b71b9460c0c34e25f3da88250760bec0ebac694b49997550d726"
 dependencies = [
  "quote",
  "wasm-bindgen-macro-support",
@@ -5696,9 +5697,9 @@ dependencies = [
 
 [[package]]
 name = "wasm-bindgen-macro-support"
-version = "0.2.91"
+version = "0.2.92"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "642f325be6301eb8107a83d12a8ac6c1e1c54345a7ef1a9261962dfefda09e66"
+checksum = "e94f17b526d0a461a191c78ea52bbce64071ed5c04c9ffe424dcb38f74171bb7"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -5709,9 +5710,9 @@ dependencies = [
 
 [[package]]
 name = "wasm-bindgen-shared"
-version = "0.2.91"
+version = "0.2.92"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4f186bd2dcf04330886ce82d6f33dd75a7bfcf69ecf5763b89fcde53b6ac9838"
+checksum = "af190c94f2773fdb3729c55b007a722abb5384da03bc0986df4c289bf5567e96"
 
 [[package]]
 name = "wasm-encoder"
@@ -6063,9 +6064,9 @@ dependencies = [
 
 [[package]]
 name = "web-sys"
-version = "0.3.61"
+version = "0.3.69"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e33b99f4b23ba3eec1a53ac264e35a755f00e966e0065077d6027c0f575b0b97"
+checksum = "77afa9a11836342370f4817622a2f0f418b134426d91a82dfb48f532d2ec13ef"
 dependencies = [
  "js-sys",
  "wasm-bindgen",

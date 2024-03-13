@@ -7,6 +7,7 @@ use crate::repl::datastore::BurnDatastore;
 use crate::repl::datastore::Datastore;
 use crate::repl::Settings;
 use clarity::consts::CHAIN_ID_TESTNET;
+use clarity::types::StacksEpochId;
 use clarity::vm::analysis::ContractAnalysis;
 use clarity::vm::ast::{build_ast_with_diagnostics, ContractAST};
 #[cfg(feature = "cli")]
@@ -16,7 +17,7 @@ use clarity::vm::contracts::Contract;
 use clarity::vm::costs::{ExecutionCost, LimitedCostTracker};
 use clarity::vm::database::{ClarityDatabase, StoreType};
 use clarity::vm::diagnostic::{Diagnostic, Level};
-use clarity::vm::events::*;
+use clarity::vm::errors::Error;
 use clarity::vm::representations::SymbolicExpressionType::{Atom, List};
 use clarity::vm::representations::{Span, SymbolicExpression};
 use clarity::vm::types::{
@@ -24,6 +25,7 @@ use clarity::vm::types::{
 };
 use clarity::vm::{analysis::AnalysisDatabase, database::ClarityBackingStore};
 use clarity::vm::{eval, eval_all, EvaluationResult, SnippetEvaluationResult};
+use clarity::vm::{events::*, ClarityVersion};
 use clarity::vm::{ContractEvaluationResult, EvalHook};
 use clarity::vm::{CostSynthesis, ExecutionResult, ParsedContract};
 
@@ -496,7 +498,7 @@ impl ClarityInterpreter {
                 &mut conn,
                 contract.epoch,
             )
-            .expect("failed to initialize cost tracker")
+            .map_err(|e| format!("failed to initialize cost tracker: {e}"))?
         } else {
             LimitedCostTracker::new_free()
         };
@@ -725,7 +727,7 @@ impl ClarityInterpreter {
                 &mut conn,
                 contract.epoch,
             )
-            .expect("failed to initialize cost tracker")
+            .map_err(|e| format!("failed to initialize cost tracker: {e}"))?
         } else {
             LimitedCostTracker::new_free()
         };
@@ -927,6 +929,132 @@ impl ClarityInterpreter {
             analysis_db
                 .execute(|db| db.insert_contract(&contract_id, &analysis))
                 .expect("Unable to save data");
+        }
+
+        Ok(execution_result)
+    }
+
+    pub fn call_contract_fn(
+        &mut self,
+        contract_id: &QualifiedContractIdentifier,
+        method: &str,
+        raw_args: &[Vec<u8>],
+        epoch: StacksEpochId,
+        clarity_version: ClarityVersion,
+        cost_track: bool,
+        allow_private: bool,
+        eval_hooks: Option<Vec<&mut dyn EvalHook>>,
+    ) -> Result<ExecutionResult, String> {
+        let mut conn = ClarityDatabase::new(
+            &mut self.datastore,
+            &self.burn_datastore,
+            &self.burn_datastore,
+        );
+        let tx_sender: PrincipalData = self.tx_sender.clone().into();
+        conn.begin();
+        conn.set_clarity_epoch_version(epoch)
+            .map_err(|e| e.to_string())?;
+        conn.commit().map_err(|e| e.to_string())?;
+        let cost_tracker = if cost_track {
+            LimitedCostTracker::new(
+                false,
+                CHAIN_ID_TESTNET,
+                BLOCK_LIMIT_MAINNET.clone(),
+                &mut conn,
+                epoch,
+            )
+            .map_err(|e| format!("failed to initialize cost tracker: {e}"))?
+        } else {
+            LimitedCostTracker::new_free()
+        };
+
+        let mut global_context =
+            GlobalContext::new(false, CHAIN_ID_TESTNET, conn, cost_tracker, epoch);
+
+        if let Some(mut in_hooks) = eval_hooks {
+            let mut hooks: Vec<&mut dyn EvalHook> = Vec::new();
+            for hook in in_hooks.drain(..) {
+                hooks.push(hook);
+            }
+            global_context.eval_hooks = Some(hooks);
+        }
+
+        let contract_context = ContractContext::new(contract_id.clone(), clarity_version);
+
+        global_context.begin();
+        let result = global_context.execute(|g| {
+            let mut call_stack = CallStack::new();
+            let mut env = Environment::new(
+                g,
+                &contract_context,
+                &mut call_stack,
+                Some(tx_sender.clone()),
+                Some(tx_sender.clone()),
+                None,
+            );
+
+            let mut args = vec![];
+            for arg in raw_args {
+                let value =
+                    Value::deserialize_read(&mut arg.as_slice(), None, false).map_err(|_| {
+                        Error::Unchecked(clarity::vm::errors::CheckErrors::InvalidUTF8Encoding)
+                    })?;
+                args.push(SymbolicExpression::atom_value(value));
+            }
+
+            match allow_private {
+                true => env.execute_contract_allow_private(contract_id, method, &args, false),
+                false => env.execute_contract(contract_id, method, &args, false),
+            }
+        });
+
+        let value = result.map_err(|e| {
+            let err = format!("Runtime error while interpreting {}: {:?}", contract_id, e);
+            if let Some(mut eval_hooks) = global_context.eval_hooks.take() {
+                for hook in eval_hooks.iter_mut() {
+                    hook.did_complete(Err(err.clone()));
+                }
+                global_context.eval_hooks = Some(eval_hooks);
+            }
+            err
+        })?;
+
+        let mut cost = None;
+        if cost_track {
+            cost = Some(CostSynthesis::from_cost_tracker(&global_context.cost_track));
+        }
+
+        let mut emitted_events = global_context
+            .event_batches
+            .iter()
+            .flat_map(|b| b.events.clone())
+            .collect::<Vec<_>>();
+
+        let eval_result = EvaluationResult::Snippet(SnippetEvaluationResult { result: value });
+        global_context.commit().unwrap();
+
+        let (events, mut accounts_to_credit, mut accounts_to_debit) =
+            Self::process_events(&mut emitted_events);
+
+        let mut execution_result = ExecutionResult {
+            result: eval_result,
+            events,
+            cost,
+            diagnostics: Vec::new(),
+        };
+
+        if let Some(mut eval_hooks) = global_context.eval_hooks {
+            for hook in eval_hooks.iter_mut() {
+                hook.did_complete(Ok(&mut execution_result));
+            }
+        }
+
+        for (account, token, value) in accounts_to_credit.drain(..) {
+            self.credit_token(account, token, value);
+        }
+
+        for (account, token, value) in accounts_to_debit.drain(..) {
+            self.debit_token(account, token, value);
         }
 
         Ok(execution_result)
@@ -1159,7 +1287,7 @@ mod tests {
     };
     use clarity::{
         types::{chainstate::StacksAddress, Address},
-        vm::{self},
+        vm::{self, ClarityVersion},
     };
 
     #[test]
@@ -1352,6 +1480,31 @@ mod tests {
 
     #[test]
     fn test_execute() {
+        let mut interpreter =
+            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+
+        let contract = ClarityContract::fixture();
+        let source = contract.expect_in_memory_code_source();
+        let (mut ast, ..) = interpreter.build_ast(&contract);
+        let (annotations, _) = interpreter.collect_annotations(source);
+
+        let (analysis, _) = interpreter
+            .run_analysis(&contract, &mut ast, &annotations)
+            .unwrap();
+
+        let result = interpreter.execute(&contract, &mut ast, analysis, false, None);
+        assert!(result.is_ok());
+        let ExecutionResult {
+            diagnostics,
+            events,
+            ..
+        } = result.unwrap();
+        assert!(diagnostics.is_empty());
+        assert!(events.is_empty());
+    }
+
+    #[test]
+    fn test_call_contract_fn() {
         let mut interpreter =
             ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
 
@@ -1632,5 +1785,122 @@ mod tests {
 
             assert!(res.diagnostics.is_empty());
         }
+    }
+
+    #[test]
+    fn can_call_a_public_function() {
+        let mut interpreter =
+            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+
+        let contract = ClarityContractBuilder::default()
+            .code_source("(define-public (public-func) (ok true))".into())
+            .build();
+        let source = contract.expect_in_memory_code_source();
+        let (mut ast, ..) = interpreter.build_ast(&contract);
+        let (annotations, _) = interpreter.collect_annotations(source);
+
+        let (analysis, _) = interpreter
+            .run_analysis(&contract, &mut ast, &annotations)
+            .unwrap();
+
+        let _ = interpreter.execute(&contract, &mut ast, analysis, false, None);
+
+        let allow_private = false;
+        let result = interpreter.call_contract_fn(
+            &contract
+                .expect_resolved_contract_identifier(Some(&StandardPrincipalData::transient())),
+            "public-func",
+            &vec![],
+            StacksEpochId::Epoch24,
+            ClarityVersion::Clarity2,
+            false,
+            allow_private,
+            None,
+        );
+
+        assert!(result.is_ok());
+        let ExecutionResult { result, .. } = result.unwrap();
+
+        assert!(
+            matches!(result, EvaluationResult::Snippet(SnippetEvaluationResult { result }) if result == Value::okay_true())
+        );
+    }
+
+    #[test]
+    fn can_call_a_private_function() {
+        let mut interpreter =
+            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+
+        let contract = ClarityContractBuilder::default()
+            .code_source("(define-private (private-func) true)".into())
+            .build();
+        let source = contract.expect_in_memory_code_source();
+        let (mut ast, ..) = interpreter.build_ast(&contract);
+        let (annotations, _) = interpreter.collect_annotations(source);
+
+        let (analysis, _) = interpreter
+            .run_analysis(&contract, &mut ast, &annotations)
+            .unwrap();
+
+        let _ = interpreter.execute(&contract, &mut ast, analysis, false, None);
+
+        let allow_private = true;
+        let result = interpreter.call_contract_fn(
+            &contract
+                .expect_resolved_contract_identifier(Some(&StandardPrincipalData::transient())),
+            "private-func",
+            &vec![],
+            StacksEpochId::Epoch24,
+            ClarityVersion::Clarity2,
+            false,
+            allow_private,
+            None,
+        );
+
+        assert!(result.is_ok());
+        let ExecutionResult { result, .. } = result.unwrap();
+
+        assert!(
+            matches!(result, EvaluationResult::Snippet(SnippetEvaluationResult { result }) if result == Value::Bool(true))
+        );
+    }
+
+    #[test]
+    fn can_not_call_a_private_function_without_allow_private() {
+        let mut interpreter =
+            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+
+        let contract = ClarityContractBuilder::default()
+            .code_source("(define-private (private-func) true)".into())
+            .build();
+        let source = contract.expect_in_memory_code_source();
+        let (mut ast, ..) = interpreter.build_ast(&contract);
+        let (annotations, _) = interpreter.collect_annotations(source);
+
+        let (analysis, _) = interpreter
+            .run_analysis(&contract, &mut ast, &annotations)
+            .unwrap();
+
+        let _ = interpreter.execute(&contract, &mut ast, analysis, false, None);
+
+        let allow_private = false;
+        let result = interpreter.call_contract_fn(
+            &contract
+                .expect_resolved_contract_identifier(Some(&StandardPrincipalData::transient())),
+            "private-func",
+            &vec![],
+            StacksEpochId::Epoch24,
+            ClarityVersion::Clarity2,
+            false,
+            allow_private,
+            None,
+        );
+
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "Runtime error while interpreting S1G2081040G2081040G2081040G208105NK8PE5.contract: Unchecked(NoSuchPublicFunction(\"S1G2081040G2081040G2081040G208105NK8PE5.contract\", \"private-func\"))"
+        );
     }
 }

@@ -18,9 +18,10 @@ use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
 use clarity_repl::clarity::{
     ClarityVersion, EvaluationResult, ExecutionResult, ParsedContract, StacksEpochId,
 };
+use clarity_repl::repl::clarity_values::{uint8_to_string, uint8_to_value};
 use clarity_repl::repl::{
-    ClarityCodeSource, ClarityContract, ContractDeployer, Session, DEFAULT_CLARITY_VERSION,
-    DEFAULT_EPOCH,
+    clarity_values, ClarityCodeSource, ClarityContract, ContractDeployer, Session,
+    DEFAULT_CLARITY_VERSION, DEFAULT_EPOCH,
 };
 use colored::*;
 use gloo_utils::format::JsValueSerdeExt;
@@ -33,7 +34,6 @@ use std::{panic, path::PathBuf};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsValue;
 
-use crate::utils::clarity_values::{self, uint8_to_string, uint8_to_value};
 use crate::utils::costs::SerializableCostsReport;
 use crate::utils::events::serialize_event;
 
@@ -74,7 +74,7 @@ struct CallContractArgsJSON {
 
 #[derive(Debug, Deserialize)]
 #[wasm_bindgen]
-pub struct CallContractArgs {
+pub struct CallFnArgs {
     contract: String,
     method: String,
     args: Vec<Vec<u8>>,
@@ -82,7 +82,7 @@ pub struct CallContractArgs {
 }
 
 #[wasm_bindgen]
-impl CallContractArgs {
+impl CallFnArgs {
     #[wasm_bindgen(constructor)]
     pub fn new(
         contract: String,
@@ -200,6 +200,7 @@ impl TransferSTXArgs {
 #[serde(rename_all = "camelCase")]
 #[wasm_bindgen]
 pub struct TxArgs {
+    call_private_fn: Option<CallContractArgsJSON>,
     call_public_fn: Option<CallContractArgsJSON>,
     deploy_contract: Option<DeployContractArgs>,
     #[serde(rename(serialize = "transfer_stx", deserialize = "transferSTX"))]
@@ -634,76 +635,82 @@ impl SDK {
             .ok_or(format!("contract {contract} has no function {method}"))
     }
 
-    fn invoke_contract_call(
+    fn call_contract_fn(
         &mut self,
-        call_contract_args: &CallContractArgs,
-        test_name: &str,
-    ) -> Result<TransactionRes, String> {
-        let CallContractArgs {
+        CallFnArgs {
             contract,
             method,
             args,
             sender,
-        } = call_contract_args;
-
-        let clarity_args: Vec<String> = args.iter().map(|a| uint8_to_string(a)).collect();
-
+        }: &CallFnArgs,
+        allow_private: bool,
+    ) -> Result<TransactionRes, String> {
+        let test_name = self.current_test_name.clone();
         let session = self.get_session_mut();
-        let (execution, _) = match session.invoke_contract_call(
-            contract,
-            method,
-            &clarity_args,
-            sender,
-            test_name.into(),
-        ) {
-            Ok(res) => res,
-            Err(diagnostics) => {
+        let execution = session
+            .call_contract_fn(contract, method, args, sender, allow_private, test_name)
+            .map_err(|diagnostics| {
                 let mut message = format!(
                     "{}: {}::{}({})",
-                    "Contract call error",
+                    "Call contract function error",
                     contract,
                     method,
-                    clarity_args.join(", ")
+                    args.iter()
+                        .map(|a| uint8_to_string(a))
+                        .collect::<Vec<String>>()
+                        .join(", ")
                 );
                 if let Some(diag) = diagnostics.last() {
                     message = format!("{} -> {}", message, diag.message);
                 }
-                return Err(message);
-            }
-        };
+                message
+            })?;
 
         Ok(execution_result_to_transaction_res(&execution))
     }
 
     #[wasm_bindgen(js_name=callReadOnlyFn)]
-    pub fn call_read_only_fn(&mut self, args: &CallContractArgs) -> Result<TransactionRes, String> {
+    pub fn call_read_only_fn(&mut self, args: &CallFnArgs) -> Result<TransactionRes, String> {
         let interface = self.get_function_interface(&args.contract, &args.method)?;
         if interface.access != ContractInterfaceFunctionAccess::read_only {
             return Err(format!("{} is not a read-only function", &args.method));
         }
-
-        self.invoke_contract_call(args, &self.current_test_name.clone())
+        self.call_contract_fn(args, false)
     }
 
-    fn call_public_fn_private(
+    fn inner_call_public_fn(
         &mut self,
-        args: &CallContractArgs,
+        args: &CallFnArgs,
         advance_chain_tip: bool,
     ) -> Result<TransactionRes, String> {
         let interface = self.get_function_interface(&args.contract, &args.method)?;
         if interface.access != ContractInterfaceFunctionAccess::public {
             return Err(format!("{} is not a public function", &args.method));
         }
-
         let session = self.get_session_mut();
         if advance_chain_tip {
             session.advance_chain_tip(1);
         }
-
-        self.invoke_contract_call(args, &self.current_test_name.clone())
+        self.call_contract_fn(args, false)
     }
 
-    fn transfer_stx_private(
+    fn inner_call_private_fn(
+        &mut self,
+        args: &CallFnArgs,
+        advance_chain_tip: bool,
+    ) -> Result<TransactionRes, String> {
+        let interface = self.get_function_interface(&args.contract, &args.method)?;
+        if interface.access != ContractInterfaceFunctionAccess::private {
+            return Err(format!("{} is not a private function", &args.method));
+        }
+        let session = self.get_session_mut();
+        if advance_chain_tip {
+            session.advance_chain_tip(1);
+        }
+        self.call_contract_fn(args, true)
+    }
+
+    fn inner_transfer_stx(
         &mut self,
         args: &TransferSTXArgs,
         advance_chain_tip: bool,
@@ -730,7 +737,7 @@ impl SDK {
         Ok(execution_result_to_transaction_res(&execution))
     }
 
-    fn deploy_contract_private(
+    fn inner_deploy_contract(
         &mut self,
         args: &DeployContractArgs,
         advance_chain_tip: bool,
@@ -775,17 +782,22 @@ impl SDK {
 
     #[wasm_bindgen(js_name=deployContract)]
     pub fn deploy_contract(&mut self, args: &DeployContractArgs) -> Result<TransactionRes, String> {
-        self.deploy_contract_private(args, true)
+        self.inner_deploy_contract(args, true)
     }
 
     #[wasm_bindgen(js_name = "transferSTX")]
     pub fn transfer_stx(&mut self, args: &TransferSTXArgs) -> Result<TransactionRes, String> {
-        self.transfer_stx_private(args, true)
+        self.inner_transfer_stx(args, true)
     }
 
     #[wasm_bindgen(js_name = "callPublicFn")]
-    pub fn call_public_fn(&mut self, args: &CallContractArgs) -> Result<TransactionRes, String> {
-        self.call_public_fn_private(args, true)
+    pub fn call_public_fn(&mut self, args: &CallFnArgs) -> Result<TransactionRes, String> {
+        self.inner_call_public_fn(args, true)
+    }
+
+    #[wasm_bindgen(js_name = "callPrivateFn")]
+    pub fn call_private_fn(&mut self, args: &CallFnArgs) -> Result<TransactionRes, String> {
+        self.inner_call_private_fn(args, true)
     }
 
     #[wasm_bindgen(js_name=mineBlock)]
@@ -797,12 +809,14 @@ impl SDK {
             .map_err(|e| format!("Failed to parse js txs: {:}", e))?;
 
         for tx in txs {
-            let result = if let Some(args) = tx.call_public_fn {
-                self.call_public_fn_private(&CallContractArgs::from_json_args(args), false)
+            let result = if let Some(call_public) = tx.call_public_fn {
+                self.inner_call_public_fn(&CallFnArgs::from_json_args(call_public), false)
+            } else if let Some(call_private) = tx.call_private_fn {
+                self.inner_call_private_fn(&CallFnArgs::from_json_args(call_private), false)
             } else if let Some(transfer_stx) = tx.transfer_stx {
-                self.transfer_stx_private(&transfer_stx, false)
+                self.inner_transfer_stx(&transfer_stx, false)
             } else if let Some(deploy_contract) = tx.deploy_contract {
-                self.deploy_contract_private(&deploy_contract, false)
+                self.inner_deploy_contract(&deploy_contract, false)
             } else {
                 return Err("Invalid tx arguments".into());
             }?;

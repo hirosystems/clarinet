@@ -1,4 +1,5 @@
 use super::boot::{STACKS_BOOT_CODE_MAINNET, STACKS_BOOT_CODE_TESTNET};
+use super::clarity_values::uint8_to_string;
 use super::diagnostic::output_diagnostic;
 use super::{ClarityCodeSource, ClarityContract, ClarityInterpreter, ContractDeployer};
 use crate::analysis::coverage::TestCoverageReport;
@@ -562,7 +563,7 @@ impl Session {
         let contract_id = if contract.starts_with('S') {
             contract.to_string()
         } else {
-            format!("{}.{}", initial_tx_sender, contract,)
+            format!("{}.{}", initial_tx_sender, contract)
         };
 
         let mut hooks: Vec<&mut dyn EvalHook> = vec![];
@@ -609,6 +610,68 @@ impl Session {
         }
 
         Ok((execution, contract_identifier))
+    }
+
+    pub fn call_contract_fn(
+        &mut self,
+        contract: &str,
+        method: &str,
+        args: &[Vec<u8>],
+        sender: &str,
+        allow_private: bool,
+        test_name: String,
+    ) -> Result<ExecutionResult, Vec<Diagnostic>> {
+        let initial_tx_sender = self.get_tx_sender();
+        // Handle fully qualified contract_id and sugared syntax
+        let contract_id_str = if contract.starts_with('S') {
+            contract.to_string()
+        } else {
+            format!("{}.{}", initial_tx_sender, contract)
+        };
+        let contract_id = QualifiedContractIdentifier::parse(&contract_id_str).unwrap();
+
+        let mut hooks: Vec<&mut dyn EvalHook> = vec![];
+        let mut coverage = TestCoverageReport::new(test_name.clone());
+        hooks.push(&mut coverage);
+
+        let clarity_version = ClarityVersion::default_for_epoch(self.current_epoch);
+
+        self.set_tx_sender(sender.into());
+        let execution = match self.interpreter.call_contract_fn(
+            &contract_id,
+            method,
+            args,
+            self.current_epoch,
+            clarity_version,
+            true,
+            allow_private,
+            Some(hooks),
+        ) {
+            Ok(result) => result,
+            Err(e) => {
+                self.set_tx_sender(initial_tx_sender);
+                return Err(vec![Diagnostic {
+                    level: Level::Error,
+                    message: format!("Error calling contract function: {e}"),
+                    spans: vec![],
+                    suggestion: None,
+                }]);
+            }
+        };
+        self.set_tx_sender(initial_tx_sender);
+        self.coverage_reports.push(coverage);
+
+        if let Some(ref cost) = execution.cost {
+            self.costs_reports.push(CostsReport {
+                test_name,
+                contract_id: contract_id_str,
+                method: method.to_string(),
+                args: args.iter().map(|a| uint8_to_string(a)).collect(),
+                cost_result: cost.clone(),
+            });
+        }
+
+        Ok(execution)
     }
 
     pub fn eval(

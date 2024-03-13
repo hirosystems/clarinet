@@ -108,7 +108,13 @@ dap = [
     "memchr",
     "log",
 ]
-wasm = ["wasm-bindgen", "wasm-bindgen-futures", "clarity/wasm", "pox-locking/wasm"]
+wasm = [
+    "wasm-bindgen",
+    "wasm-bindgen-futures",
+    "clarity/wasm",
+    "clarity/developer-mode",
+    "pox-locking/wasm"
+]
 
 [package.metadata.wasm-pack.profile.release.wasm-bindgen]
 debug-js-glue = false

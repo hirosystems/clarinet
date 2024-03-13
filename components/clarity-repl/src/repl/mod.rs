@@ -1,4 +1,5 @@
 pub mod boot;
+pub mod clarity_values;
 pub mod datastore;
 pub mod diagnostic;
 pub mod interpreter;
