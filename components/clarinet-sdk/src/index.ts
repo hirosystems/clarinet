@@ -123,7 +123,7 @@ export type RunSnippet = (snippet: string) => ClarityValue | string;
 
 // because the session is wrapped in a proxy the types need to be hardcoded
 export type Simnet = {
-  [K in keyof SDK]: K extends "callReadOnlyFn" | "callPublicFn"
+  [K in keyof SDK]: K extends "callReadOnlyFn" | "callPublicFn" | "callPrivateFn"
     ? CallFn
     : K extends "runSnippet"
       ? RunSnippet
