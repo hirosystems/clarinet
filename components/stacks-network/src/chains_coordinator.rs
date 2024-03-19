@@ -31,12 +31,23 @@ use clarity_repl::clarity::util::hash::{hex_bytes, Hash160};
 use clarity_repl::clarity::vm::types::{BuffData, SequenceData, TupleData};
 use clarity_repl::clarity::vm::ClarityName;
 use clarity_repl::clarity::vm::Value as ClarityValue;
+use clarity_repl::clarity::PublicKey;
 use clarity_repl::codec;
 use hiro_system_kit;
 use hiro_system_kit::slog;
 use hiro_system_kit::yellow;
 use stacks_rpc_client::PoxInfo;
 use stacks_rpc_client::StacksRpc;
+use stackslib::chainstate::stacks::address::PoxAddress;
+use stackslib::core::CHAIN_ID_TESTNET;
+use stackslib::types::chainstate::StacksPrivateKey;
+use stackslib::types::chainstate::StacksPublicKey;
+use stackslib::types::PrivateKey;
+use stackslib::util::hash::Sha256Sum;
+use stackslib::util::secp256k1::MessageSignature;
+use stackslib::util_lib::signed_structured_data::pox4::make_pox_4_signed_data_domain;
+use stackslib::util_lib::signed_structured_data::pox4::Pox4SignatureTopic;
+use stackslib::util_lib::signed_structured_data::structured_data_message_hash;
 use std::convert::TryFrom;
 use std::str;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -648,8 +659,8 @@ pub async fn publish_stacking_orders(
     fee_rate: u64,
     bitcoin_block_height: u32,
 ) -> Option<usize> {
-    let stacks_node_rpc_url = format!("http://{}", &services_map_hosts.stacks_node_host);
-    let pox_info: PoxInfo = match reqwest::get(format!("{}/v2/pox", stacks_node_rpc_url)).await {
+    let node_rpc_url = format!("http://{}", &services_map_hosts.stacks_node_host);
+    let pox_info: PoxInfo = match reqwest::get(format!("{}/v2/pox", node_rpc_url)).await {
         Ok(result) => match result.json().await {
             Ok(pox_info) => Some(pox_info),
             Err(e) => {
@@ -682,53 +693,52 @@ pub async fn publish_stacking_orders(
         return None;
     }
 
+    let pox_contract_id = pox_info.contract_id;
+    let pox_version = pox_contract_id
+        .rsplit('-')
+        .next()
+        .and_then(|version| version.parse::<u32>().ok())
+        .unwrap();
+
+    let signer_key = StacksPrivateKey::from_hex(
+        "1b9397438f32b0d8ad27340e76e35354087b30bec8d335506f5395f7abd139e101",
+    )
+    .unwrap();
+
     let mut transactions = 0;
     for (i, pox_stacking_order) in devnet_config.pox_stacking_orders.iter().enumerate() {
         if !should_publish_stacking_orders(&current_cycle, pox_stacking_order) {
             continue;
         }
 
-        let PoxStackingOrder {
-            duration,
-            start_at_cycle,
-            ..
-        } = pox_stacking_order;
-
         // if the is not the first cycle of this stacker, then stacking order will be extended
-        let extend_stacking = current_cycle != start_at_cycle - 1;
+        let extend_stacking = current_cycle != pox_stacking_order.start_at_cycle - 1;
         if extend_stacking && !pox_stacking_order.auto_extend.unwrap_or_default() {
             continue;
         }
 
-        let account = accounts
+        let account = match accounts
             .iter()
-            .find(|e| e.label == pox_stacking_order.wallet);
-
-        let account = match account {
-            Some(account) => account.clone(),
+            .find(|e| e.label == pox_stacking_order.wallet)
+            .cloned()
+        {
+            Some(account) => account,
             _ => continue,
         };
 
         transactions += 1;
 
         let stx_amount = pox_info.next_cycle.min_threshold_ustx * pox_stacking_order.slots;
-        let addr_bytes = pox_stacking_order
-            .btc_address
-            .from_base58()
-            .expect("Unable to get bytes from btc address");
-        let node_url = stacks_node_rpc_url.clone();
-        let pox_contract_id = pox_info.contract_id.clone();
-        let pox_version = pox_contract_id
-            .rsplit('-')
-            .next()
-            .and_then(|version| version.parse::<u32>().ok())
-            .unwrap();
 
-        let duration = *duration;
+        let node_rpc_url_moved = node_rpc_url.clone();
+        let pox_contract_id_moved = pox_contract_id.clone();
+        let btc_address_moved = pox_stacking_order.btc_address.clone();
+        let duration = pox_stacking_order.duration;
+
         let stacking_result =
             hiro_system_kit::thread_named("Stacking orders handler").spawn(move || {
                 let default_fee = fee_rate * 1000;
-                let stacks_rpc = StacksRpc::new(&node_url);
+                let stacks_rpc = StacksRpc::new(&node_rpc_url_moved);
                 let nonce = stacks_rpc.get_nonce(&account.stx_address)?;
 
                 let (_, _, account_secret_key) = clarinet_files::compute_addresses(
@@ -737,51 +747,21 @@ pub async fn publish_stacking_orders(
                     &StacksNetwork::Devnet.get_networks(),
                 );
 
-                let pox_addr_arg = ClarityValue::Tuple(
-                    TupleData::from_data(vec![
-                        (
-                            ClarityName::try_from("version".to_owned()).unwrap(),
-                            ClarityValue::buff_from_byte(AddressHashMode::SerializeP2PKH as u8),
-                        ),
-                        (
-                            ClarityName::try_from("hashbytes".to_owned()).unwrap(),
-                            ClarityValue::Sequence(SequenceData::Buffer(BuffData {
-                                data: Hash160::from_bytes(&addr_bytes[1..21])
-                                    .unwrap()
-                                    .as_bytes()
-                                    .to_vec(),
-                            })),
-                        ),
-                    ])
-                    .unwrap(),
+                let (method, arguments) = get_stacking_tx_method_and_args(
+                    pox_version,
+                    bitcoin_block_height,
+                    current_cycle.into(),
+                    &signer_key,
+                    extend_stacking,
+                    &btc_address_moved,
+                    stx_amount,
+                    duration,
+                    i.try_into().unwrap(),
                 );
 
-                let (method, mut arguments) = match extend_stacking {
-                    false => (
-                        "stack-stx",
-                        vec![
-                            ClarityValue::UInt(stx_amount.into()),
-                            pox_addr_arg,
-                            ClarityValue::UInt((bitcoin_block_height - 1).into()),
-                            ClarityValue::UInt(duration.into()),
-                        ],
-                    ),
-                    true => (
-                        "stack-extend",
-                        vec![ClarityValue::UInt(duration.into()), pox_addr_arg],
-                    ),
-                };
-
-                if pox_version >= 4 {
-                    let mut signer_key = vec![0; 33];
-                    signer_key[0] = i as u8;
-                    signer_key[1] = nonce as u8;
-                    arguments.push(ClarityValue::buff_from(signer_key).unwrap());
-                };
-
                 let tx = codec::build_contrat_call_transaction(
-                    pox_contract_id,
-                    method.into(),
+                    pox_contract_id_moved,
+                    method,
                     arguments,
                     nonce,
                     default_fee,
@@ -929,5 +909,211 @@ async fn handle_bitcoin_mining(
                 );
             }
         }
+    }
+}
+
+fn get_stacking_tx_method_and_args(
+    pox_version: u32,
+    bitcoin_block_height: u32,
+    cycle: u128,
+    signer_key: &StacksPrivateKey,
+    extend_stacking: bool,
+    btc_address: &str,
+    stx_amount: u64,
+    duration: u32,
+    auth_id: u128,
+) -> (String, Vec<ClarityValue>) {
+    let addr_bytes = btc_address
+        .from_base58()
+        .expect("Unable to get bytes from btc address");
+    let pox_addr_tuple = ClarityValue::Tuple(
+        TupleData::from_data(vec![
+            (
+                ClarityName::try_from("version".to_owned()).unwrap(),
+                ClarityValue::buff_from_byte(AddressHashMode::SerializeP2PKH as u8),
+            ),
+            (
+                ClarityName::try_from("hashbytes".to_owned()).unwrap(),
+                ClarityValue::Sequence(SequenceData::Buffer(BuffData {
+                    data: Hash160::from_bytes(&addr_bytes[1..21])
+                        .unwrap()
+                        .as_bytes()
+                        .to_vec(),
+                })),
+            ),
+        ])
+        .unwrap(),
+    );
+    let pox_addr = PoxAddress::try_from_pox_tuple(false, &pox_addr_tuple).unwrap();
+
+    let burn_block_height: u128 = (bitcoin_block_height - 1).into();
+    let (method, topic, mut arguments) = match extend_stacking {
+        false => (
+            "stack-stx",
+            Pox4SignatureTopic::StackStx,
+            vec![
+                ClarityValue::UInt(stx_amount.into()),
+                pox_addr_tuple,
+                ClarityValue::UInt(burn_block_height),
+                ClarityValue::UInt(duration.into()),
+            ],
+        ),
+        true => (
+            "stack-extend",
+            Pox4SignatureTopic::StackExtend,
+            vec![ClarityValue::UInt(duration.into()), pox_addr_tuple],
+        ),
+    };
+
+    // extra arguments for pox-4
+    //   (signer-sig (optional (buff 65)))
+    //   (signer-key (buff 33))
+    //   (max-amount uint)
+    //   (auth-id uint)
+    if pox_version >= 4 {
+        let signer_sig = make_signer_key_signature(
+            &pox_addr,
+            signer_key,
+            cycle,
+            &topic,
+            duration.into(),
+            stx_amount.into(),
+            auth_id,
+        );
+        let pub_key = StacksPublicKey::from_private(signer_key);
+        arguments.push(ClarityValue::some(ClarityValue::buff_from(signer_sig).unwrap()).unwrap());
+        arguments.push(ClarityValue::buff_from(pub_key.to_bytes()).unwrap());
+        arguments.push(ClarityValue::UInt(stx_amount.into()));
+        arguments.push(ClarityValue::UInt(auth_id));
+    };
+
+    (method.to_string(), arguments)
+}
+
+// The current version of stackslib we are using (from feat/clarity-wasm-next) does not have the latest version of make_pox_4_signer_key_signature
+// This is a temporary fix until feat/clarity-wasm-next catches up with the branch next
+
+fn make_pox_4_signer_key_message_hash(
+    pox_addr: &PoxAddress,
+    reward_cycle: u128,
+    topic: &Pox4SignatureTopic,
+    chain_id: u32,
+    period: u128,
+    max_amount: u128,
+    auth_id: u128,
+) -> Sha256Sum {
+    let domain_tuple = make_pox_4_signed_data_domain(chain_id);
+    let data_tuple = ClarityValue::Tuple(
+        TupleData::from_data(vec![
+            (
+                "pox-addr".into(),
+                pox_addr.clone().as_clarity_tuple().unwrap().into(),
+            ),
+            ("reward-cycle".into(), ClarityValue::UInt(reward_cycle)),
+            ("period".into(), ClarityValue::UInt(period)),
+            (
+                "topic".into(),
+                ClarityValue::string_ascii_from_bytes(topic.get_name_str().into()).unwrap(),
+            ),
+            ("auth-id".into(), ClarityValue::UInt(auth_id)),
+            ("max-amount".into(), ClarityValue::UInt(max_amount)),
+        ])
+        .unwrap(),
+    );
+    structured_data_message_hash(data_tuple, domain_tuple)
+}
+
+fn make_pox_4_signer_key_signature(
+    pox_addr: &PoxAddress,
+    signer_key: &StacksPrivateKey,
+    reward_cycle: u128,
+    topic: &Pox4SignatureTopic,
+    chain_id: u32,
+    period: u128,
+    max_amount: u128,
+    auth_id: u128,
+) -> Result<MessageSignature, &'static str> {
+    let msg_hash = make_pox_4_signer_key_message_hash(
+        pox_addr,
+        reward_cycle,
+        topic,
+        chain_id,
+        period,
+        max_amount,
+        auth_id,
+    );
+    signer_key.sign(msg_hash.as_bytes())
+}
+
+fn make_signer_key_signature(
+    pox_addr: &PoxAddress,
+    signer_key: &StacksPrivateKey,
+    reward_cycle: u128,
+    topic: &Pox4SignatureTopic,
+    period: u128,
+    max_amount: u128,
+    auth_id: u128,
+) -> Vec<u8> {
+    let signature = make_pox_4_signer_key_signature(
+        pox_addr,
+        signer_key,
+        reward_cycle,
+        topic,
+        CHAIN_ID_TESTNET,
+        period,
+        max_amount,
+        auth_id,
+    )
+    .unwrap();
+
+    signature.to_rsv()
+}
+
+#[cfg(test)]
+mod key_tests {
+    use super::*;
+    use clarinet_files::DEFAULT_DERIVATION_PATH;
+    use stackslib::{net::stackerdb::db, util::hash::bytes_to_hex};
+    #[test]
+    fn test_make_signer_key_signature() {
+        let label = "wallet_1".to_string();
+        let mnemonic = "sell invite acquire kitten bamboo drastic jelly vivid peace spawn twice guilt pave pen trash pretty park cube fragile unaware remain midnight betray rebuild".to_string();
+
+        let account = AccountConfig {
+            label,
+            mnemonic,
+            derivation: DEFAULT_DERIVATION_PATH.into(),
+            balance: 100000,
+            stx_address: "ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5".into(),
+            btc_address: "mr1iPkD9N3RJZZxXRk7xF9d36gffa6exNC".into(),
+            is_mainnet: false,
+        };
+
+        let addr_bytes = account
+            .btc_address
+            .from_base58()
+            .expect("Unable to get bytes from btc address");
+
+        let pox_addr_tuple = ClarityValue::Tuple(
+            TupleData::from_data(vec![
+                (
+                    ClarityName::try_from("version".to_owned()).unwrap(),
+                    ClarityValue::buff_from_byte(AddressHashMode::SerializeP2PKH as u8),
+                ),
+                (
+                    ClarityName::try_from("hashbytes".to_owned()).unwrap(),
+                    ClarityValue::Sequence(SequenceData::Buffer(BuffData {
+                        data: Hash160::from_bytes(&addr_bytes[1..21])
+                            .unwrap()
+                            .as_bytes()
+                            .to_vec(),
+                    })),
+                ),
+            ])
+            .unwrap(),
+        );
+
+        let pox_addr = PoxAddress::try_from_pox_tuple(false, &pox_addr_tuple).unwrap();
+        dbg!(pox_addr);
     }
 }

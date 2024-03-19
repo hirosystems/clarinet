@@ -1181,7 +1181,8 @@ start_height = {epoch_3_0}
             entrypoint: Some(vec![
                 "stacks-node".into(),
                 "start".into(),
-                "--config=/src/stacks-node/Stacks.toml".into(),
+                "--config".into(),
+                "/src/stacks-node/Stacks.toml".into(),
             ]),
             env: Some(env),
             host_config: Some(HostConfig {
