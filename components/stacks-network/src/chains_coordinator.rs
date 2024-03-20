@@ -700,10 +700,16 @@ pub async fn publish_stacking_orders(
         .and_then(|version| version.parse::<u32>().ok())
         .unwrap();
 
-    let signer_key = StacksPrivateKey::from_hex(
-        "1b9397438f32b0d8ad27340e76e35354087b30bec8d335506f5395f7abd139e101",
-    )
-    .unwrap();
+    let signer_private_keys = [
+        StacksPrivateKey::from_hex(
+            "7287ba251d44a4d3fd9276c88ce34c5c52a038955511cccaf77e61068649c17801",
+        )
+        .unwrap(),
+        StacksPrivateKey::from_hex(
+            "530d9f61984c888536871c6573073bdfc0058896dc1adfe9a6a10dfacadc209101",
+        )
+        .unwrap(),
+    ];
 
     let mut transactions = 0;
     for (i, pox_stacking_order) in devnet_config.pox_stacking_orders.iter().enumerate() {
@@ -751,7 +757,7 @@ pub async fn publish_stacking_orders(
                     pox_version,
                     bitcoin_block_height,
                     current_cycle.into(),
-                    &signer_key,
+                    &signer_private_keys[i],
                     extend_stacking,
                     &btc_address_moved,
                     stx_amount,

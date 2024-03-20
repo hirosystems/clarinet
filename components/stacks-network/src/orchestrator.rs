@@ -34,7 +34,8 @@ pub struct DevnetOrchestrator {
     pub termination_success_tx: Option<Sender<bool>>,
     pub can_exit: bool,
     stacks_node_container_id: Option<String>,
-    stacks_signer_container_id: Option<String>,
+    stacks_signer_1_container_id: Option<String>,
+    stacks_signer_2_container_id: Option<String>,
     stacks_api_container_id: Option<String>,
     stacks_explorer_container_id: Option<String>,
     bitcoin_node_container_id: Option<String>,
@@ -153,7 +154,8 @@ impl DevnetOrchestrator {
             can_exit: true,
             termination_success_tx: None,
             stacks_node_container_id: None,
-            stacks_signer_container_id: None,
+            stacks_signer_1_container_id: None,
+            stacks_signer_2_container_id: None,
             stacks_api_container_id: None,
             stacks_explorer_container_id: None,
             bitcoin_node_container_id: None,
@@ -331,7 +333,7 @@ impl DevnetOrchestrator {
         let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
             order: 2,
             status: Status::Red,
-            name: "stacks-signer".into(),
+            name: "stacks-signer-1".into(),
             comment: "initializing".into(),
         }));
 
@@ -568,15 +570,18 @@ impl DevnetOrchestrator {
             }
         };
 
-        // Start stacks-signer
-        let _ = event_tx.send(DevnetEvent::info("Starting stacks-signer".to_string()));
+        // Start stacks-signer-1
+        let _ = event_tx.send(DevnetEvent::info("Starting stacks-signer-1".to_string()));
         let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
             order: 2,
             status: Status::Yellow,
-            name: "stacks-signer".into(),
+            name: "stacks-signer-1".into(),
             comment: "updating image".into(),
         }));
-        match self.prepare_stacks_signer_container(boot_index, ctx).await {
+        match self
+            .prepare_stacks_signer_container(boot_index, ctx, 1)
+            .await
+        {
             Ok(_) => {}
             Err(message) => {
                 let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
@@ -587,10 +592,10 @@ impl DevnetOrchestrator {
         let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
             order: 2,
             status: Status::Yellow,
-            name: "stacks-signer".into(),
+            name: "stacks-signer-1".into(),
             comment: "booting".into(),
         }));
-        match self.boot_stacks_signer_container().await {
+        match self.boot_stacks_signer_container(1).await {
             Ok(_) => {}
             Err(message) => {
                 let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
@@ -601,9 +606,31 @@ impl DevnetOrchestrator {
         let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
             order: 2,
             status: Status::Green,
-            name: "stacks-signer".into(),
+            name: "stacks-signer-1".into(),
             comment: "Waiting for messages".into(),
         }));
+
+        // Start stacks-signer-2
+        let _ = event_tx.send(DevnetEvent::info("Starting stacks-signer-2".to_string()));
+        match self
+            .prepare_stacks_signer_container(boot_index, ctx, 2)
+            .await
+        {
+            Ok(_) => {}
+            Err(message) => {
+                let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
+                self.kill(ctx, Some(&message)).await;
+                return Err(message);
+            }
+        };
+        match self.boot_stacks_signer_container(2).await {
+            Ok(_) => {}
+            Err(message) => {
+                let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
+                self.kill(ctx, Some(&message)).await;
+                return Err(message);
+            }
+        };
 
         // Start stacks-explorer
         if !disable_stacks_explorer {
@@ -1005,6 +1032,7 @@ disable_block_download = true
 disable_inbound_handshakes = true
 disable_inbound_walks = true
 public_ip_address = "1.1.1.1:1234"
+block_proposal_token = "12345"
 
 [miner]
 min_tx_fee = 1
@@ -1039,7 +1067,18 @@ amount = {}
         stacks_conf.push_str(&format!(
             r#"
 [[events_observer]]
-endpoint = "stacks-signer.{}:30002"
+endpoint = "stacks-signer-1.{}:30000"
+retry_count = 255
+include_data_events = false
+events_keys = ["stackerdb", "block_proposal", "burn_blocks"]
+"#,
+            self.network_name
+        ));
+
+        stacks_conf.push_str(&format!(
+            r#"
+[[events_observer]]
+endpoint = "stacks-signer-2.{}:30000"
 retry_count = 255
 include_data_events = false
 events_keys = ["stackerdb", "block_proposal", "burn_blocks"]
@@ -1321,7 +1360,11 @@ start_height = {epoch_3_0}
         Ok(())
     }
 
-    pub fn prepare_stacks_signer_config(&self, boot_index: u32) -> Result<Config<String>, String> {
+    pub fn prepare_stacks_signer_config(
+        &self,
+        boot_index: u32,
+        signer_id: u32,
+    ) -> Result<Config<String>, String> {
         let (_, devnet_config) = match &self.network_config {
             Some(ref network_config) => match network_config.devnet {
                 Some(ref devnet_config) => (network_config, devnet_config),
@@ -1330,25 +1373,28 @@ start_height = {epoch_3_0}
             _ => return Err("unable to get Docker client".into()),
         };
 
-        let signer_private_key =
-            "1b9397438f32b0d8ad27340e76e35354087b30bec8d335506f5395f7abd139e101";
+        let signer_private_keys = [
+            "7287ba251d44a4d3fd9276c88ce34c5c52a038955511cccaf77e61068649c17801",
+            "530d9f61984c888536871c6573073bdfc0058896dc1adfe9a6a10dfacadc209101",
+        ];
+
         let signer_conf = format!(
             r#"
 stacks_private_key = "{signer_private_key}"
 node_host = "stacks-node.{network_name}:{stacks_node_rpc_port}" # eg "127.0.0.1:20443"
 # must be added as event_observer in node config:
-endpoint = "0.0.0.0:30002" # e.g 127.0.0.1:30000
+endpoint = "0.0.0.0:30000" # e.g 127.0.0.1:30000
 network = "testnet"
 auth_password = "12345"
-db_path = "stacks-signer-0.sqlite"
+db_path = "stacks-signer-{signer_id}.sqlite"
 "#,
-            signer_private_key = signer_private_key,
+            signer_private_key = signer_private_keys[(signer_id - 1) as usize],
             // signer_private_key = devnet_config.signer_private_key,
             network_name = self.network_name,
             stacks_node_rpc_port = devnet_config.stacks_node_rpc_port
         );
         let mut signer_conf_path = PathBuf::from(&devnet_config.working_dir);
-        signer_conf_path.push("conf/Signer.toml");
+        signer_conf_path.push(format!("conf/Signer-{signer_id}.toml"));
         let mut file = File::create(signer_conf_path)
             .map_err(|e| format!("unable to create Signer.toml: {:?}", e))?;
         file.write_all(signer_conf.as_bytes())
@@ -1387,7 +1433,7 @@ db_path = "stacks-signer-0.sqlite"
                 "stacks-signer".into(),
                 "run".into(),
                 "--config".into(),
-                "/src/stacks-signer/Signer.toml".into(),
+                format!("/src/stacks-signer/Signer-{signer_id}.toml"),
             ]),
             env: None,
             host_config: Some(HostConfig {
@@ -1408,6 +1454,7 @@ db_path = "stacks-signer-0.sqlite"
         &mut self,
         boot_index: u32,
         ctx: &Context,
+        signer_id: u32,
     ) -> Result<(), String> {
         let (docker, devnet_config) = match (&self.docker_client, &self.network_config) {
             (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
@@ -1431,10 +1478,10 @@ db_path = "stacks-signer-0.sqlite"
             .await
             .map_err(|e| format!("unable to create image: {}", e))?;
 
-        let config = self.prepare_stacks_signer_config(boot_index)?;
+        let config = self.prepare_stacks_signer_config(boot_index, signer_id)?;
 
         let options = CreateContainerOptions {
-            name: format!("stacks-signer.{}", self.network_name),
+            name: format!("stacks-signer-{signer_id}.{}", self.network_name),
             platform: Some(devnet_config.docker_platform.to_string()),
         };
 
@@ -1444,16 +1491,34 @@ db_path = "stacks-signer-0.sqlite"
             .map_err(|e| format!("unable to create container: {}", e))?
             .id;
 
-        ctx.try_log(|logger| slog::info!(logger, "Created container stacks-signer: {}", container));
-        self.stacks_signer_container_id = Some(container.clone());
+        ctx.try_log(|logger| {
+            slog::info!(
+                logger,
+                "Created container stacks-signer-{signer_id}: {}",
+                container
+            )
+        });
+        if signer_id == 1 {
+            self.stacks_signer_1_container_id = Some(container.clone());
+        } else {
+            self.stacks_signer_2_container_id = Some(container.clone());
+        }
+        // self.stacks_signer_container_id = Some(container.clone());
 
         Ok(())
     }
 
-    pub async fn boot_stacks_signer_container(&mut self) -> Result<(), String> {
-        let container = match &self.stacks_signer_container_id {
-            Some(container) => container.clone(),
-            _ => return Err("unable to boot container".to_string()),
+    pub async fn boot_stacks_signer_container(&mut self, signer_id: u32) -> Result<(), String> {
+        let container = match signer_id {
+            1 => match &self.stacks_signer_1_container_id {
+                Some(container) => container.clone(),
+                _ => return Err("unable to boot container".to_string()),
+            },
+            2 => match &self.stacks_signer_2_container_id {
+                Some(container) => container.clone(),
+                _ => return Err("unable to boot container".to_string()),
+            },
+            _ => return Err("invalid signer_id".to_string()),
         };
 
         let docker = match &self.docker_client {
@@ -2343,21 +2408,23 @@ events_keys = ["*"]
     pub async fn stop_containers(&self) -> Result<(), String> {
         let containers_ids = match (
             &self.stacks_node_container_id,
-            &self.stacks_signer_container_id,
+            &self.stacks_signer_1_container_id,
+            &self.stacks_signer_2_container_id,
             &self.stacks_api_container_id,
             &self.stacks_explorer_container_id,
             &self.bitcoin_node_container_id,
             &self.bitcoin_explorer_container_id,
             &self.postgres_container_id,
         ) {
-            (Some(c1), Some(c2), Some(c3), Some(c4), Some(c5), Some(c6), Some(c7)) => {
-                (c1, c2, c3, c4, c5, c6, c7)
+            (Some(c1), Some(c2), Some(c3), Some(c4), Some(c5), Some(c6), Some(c7), Some(c8)) => {
+                (c1, c2, c3, c4, c5, c6, c7, c8)
             }
             _ => return Err("unable to boot container".to_string()),
         };
         let (
             stacks_node_c_id,
-            stacks_signer_c_id,
+            stacks_signer_1_c_id,
+            stacks_signer_2_c_id,
             stacks_api_c_id,
             stacks_explorer_c_id,
             bitcoin_node_c_id,
@@ -2377,7 +2444,11 @@ events_keys = ["*"]
             .await;
 
         let _ = docker
-            .kill_container(stacks_signer_c_id, Some(options.clone()))
+            .kill_container(stacks_signer_1_c_id, Some(options.clone()))
+            .await;
+
+        let _ = docker
+            .kill_container(stacks_signer_2_c_id, Some(options.clone()))
             .await;
 
         let _ = docker
@@ -2517,7 +2588,8 @@ events_keys = ["*"]
             self.stacks_api_container_id.clone(),
             self.postgres_container_id.clone(),
             self.stacks_node_container_id.clone(),
-            self.stacks_signer_container_id.clone(),
+            self.stacks_signer_1_container_id.clone(),
+            self.stacks_signer_2_container_id.clone(),
             self.subnet_node_container_id.clone(),
             self.subnet_api_container_id.clone(),
         ];
