@@ -25,8 +25,8 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         .split(page_components[1]);
 
     let service_len = match app.subnet_enabled {
-        false => 7,
-        true => 9,
+        false => 8,
+        true => 10,
     };
 
     let top_right_components = Layout::default()

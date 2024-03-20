@@ -453,7 +453,7 @@ pub async fn start_chains_coordinator(
                             if tx.tx_description.contains("::commit-block") {
                                 let _ = devnet_event_tx.send(DevnetEvent::ServiceStatus(
                                     ServiceStatusData {
-                                        order: 5,
+                                        order: 6,
                                         status: Status::Green,
                                         name: "subnet-node".into(),
                                         comment: "⚡️".to_string(),

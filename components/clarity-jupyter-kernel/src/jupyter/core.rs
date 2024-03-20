@@ -155,13 +155,10 @@ impl Server {
                 .send(&mut *self.iopub.lock().unwrap())?;
             let mut has_error = false;
             for code in split_code_and_command(src) {
-                match self.session.formatted_interpretation(
-                    code.to_string(),
-                    None,
-                    false,
-                    None,
-                    None,
-                ) {
+                match self
+                    .session
+                    .formatted_interpretation(code.to_string(), None, false, None)
+                {
                     Ok((result, _)) => {
                         let res = result.join("\n");
                         let mut data: HashMap<String, JsonValue> = HashMap::new();

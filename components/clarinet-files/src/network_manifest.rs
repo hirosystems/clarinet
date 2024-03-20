@@ -116,6 +116,7 @@ pub struct DevnetConfigFile {
     pub bitcoin_node_image_url: Option<String>,
     pub bitcoin_explorer_image_url: Option<String>,
     pub stacks_node_image_url: Option<String>,
+    pub stacks_signer_image_url: Option<String>,
     pub stacks_api_image_url: Option<String>,
     pub stacks_explorer_image_url: Option<String>,
     pub postgres_image_url: Option<String>,
@@ -275,6 +276,7 @@ pub struct DevnetConfig {
     pub execute_script: Vec<ExecuteScript>,
     pub bitcoin_node_image_url: String,
     pub stacks_node_image_url: String,
+    pub stacks_signer_image_url: String,
     pub stacks_api_image_url: String,
     pub stacks_explorer_image_url: String,
     pub postgres_image_url: String,
@@ -893,6 +895,16 @@ impl NetworkManifest {
                         }
                     },
                 ),
+                stacks_signer_image_url: devnet_config
+                    .stacks_signer_image_url
+                    .take()
+                    .unwrap_or_else(|| {
+                        if devnet_config.use_nakamoto.unwrap_or(false) {
+                            DEFAULT_STACKS_NODE_IMAGE_NAKA.to_string()
+                        } else {
+                            DEFAULT_STACKS_NODE_IMAGE.to_string()
+                        }
+                    }),
                 stacks_api_image_url: devnet_config.stacks_api_image_url.take().unwrap_or_else(
                     || {
                         if devnet_config.use_nakamoto.unwrap_or(false) {
