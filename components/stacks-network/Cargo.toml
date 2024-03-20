@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 atty = "0.2.14"
 ansi_term = "0.12.1"
-bollard = "0.15.0"
+bollard = "0.16.0"
 bytes = "1.4.0"
 bitcoin = "0.29.2"
 bitcoincore-rpc = "0.16.0"

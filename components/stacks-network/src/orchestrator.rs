@@ -1038,6 +1038,17 @@ amount = {}
 
         stacks_conf.push_str(&format!(
             r#"
+[[events_observer]]
+endpoint = "stacks-signer.{}:30002"
+retry_count = 255
+include_data_events = false
+events_keys = ["stackerdb", "block_proposal", "burn_blocks"]
+"#,
+            self.network_name
+        ));
+
+        stacks_conf.push_str(&format!(
+            r#"
 # Add orchestrator (docker-host) as an event observer
 [[events_observer]]
 endpoint = "host.docker.internal:{orchestrator_ingestion_port}"
@@ -1324,15 +1335,16 @@ start_height = {epoch_3_0}
         let signer_conf = format!(
             r#"
 stacks_private_key = "{signer_private_key}"
-node_host = "0.0.0.0:{stacks_node_rpc_port}" # eg "127.0.0.1:20443"
+node_host = "stacks-node.{network_name}:{stacks_node_rpc_port}" # eg "127.0.0.1:20443"
 # must be added as event_observer in node config:
-endpoint = "0.0.0.0:30000" # e.g 127.0.0.1:30000
+endpoint = "0.0.0.0:30002" # e.g 127.0.0.1:30000
 network = "testnet"
 auth_password = "12345"
-db_path = "/devnet/nakamoto-neon/stacks-signer-0.sqlite"
+db_path = "stacks-signer-0.sqlite"
 "#,
             signer_private_key = signer_private_key,
             // signer_private_key = devnet_config.signer_private_key,
+            network_name = self.network_name,
             stacks_node_rpc_port = devnet_config.stacks_node_rpc_port
         );
         let mut signer_conf_path = PathBuf::from(&devnet_config.working_dir);
@@ -2498,78 +2510,22 @@ events_keys = ["*"]
         let options = Some(KillContainerOptions { signal: "SIGKILL" });
 
         // Terminate containers
-        if let Some(ref bitcoin_explorer_container_id) = self.bitcoin_explorer_container_id {
-            let _ = docker
-                .kill_container(bitcoin_explorer_container_id, options.clone())
-                .await;
-            ctx.try_log(|logger| slog::info!(logger, "Terminating bitcoin-explorer"));
-            let _ = docker
-                .remove_container(bitcoin_explorer_container_id, None)
-                .await;
-        }
+        let container_ids = vec![
+            self.bitcoin_explorer_container_id.clone(),
+            self.stacks_explorer_container_id.clone(),
+            self.bitcoin_node_container_id.clone(),
+            self.stacks_api_container_id.clone(),
+            self.postgres_container_id.clone(),
+            self.stacks_node_container_id.clone(),
+            self.stacks_signer_container_id.clone(),
+            self.subnet_node_container_id.clone(),
+            self.subnet_api_container_id.clone(),
+        ];
 
-        if let Some(ref stacks_explorer_container_id) = self.stacks_explorer_container_id {
-            let _ = docker
-                .kill_container(stacks_explorer_container_id, options.clone())
-                .await;
-            ctx.try_log(|logger| slog::info!(logger, "Terminating stacks-explorer"));
-            let _ = docker
-                .remove_container(stacks_explorer_container_id, None)
-                .await;
-        }
-
-        if let Some(ref bitcoin_node_container_id) = self.bitcoin_node_container_id {
-            let _ = docker
-                .kill_container(bitcoin_node_container_id, options.clone())
-                .await;
-            ctx.try_log(|logger| slog::info!(logger, "Terminating bitcoin-node"));
-            let _ = docker
-                .remove_container(bitcoin_node_container_id, None)
-                .await;
-        }
-
-        if let Some(ref stacks_api_container_id) = self.stacks_api_container_id {
-            let _ = docker
-                .kill_container(stacks_api_container_id, options.clone())
-                .await;
-            ctx.try_log(|logger| slog::info!(logger, "Terminating stacks-api"));
-            let _ = docker.remove_container(stacks_api_container_id, None).await;
-        }
-
-        if let Some(ref postgres_container_id) = self.postgres_container_id {
-            let _ = docker
-                .kill_container(postgres_container_id, options.clone())
-                .await;
-            ctx.try_log(|logger| slog::info!(logger, "Terminating postgres"));
-            let _ = docker.remove_container(postgres_container_id, None).await;
-        }
-
-        if let Some(ref stacks_node_container_id) = self.stacks_node_container_id {
-            let _ = docker
-                .kill_container(stacks_node_container_id, options.clone())
-                .await;
-            ctx.try_log(|logger| slog::info!(logger, "Terminating stacks-node"));
-            let _ = docker
-                .remove_container(stacks_node_container_id, None)
-                .await;
-        }
-
-        if let Some(ref subnet_node_container_id) = self.subnet_node_container_id {
-            let _ = docker
-                .kill_container(subnet_node_container_id, options.clone())
-                .await;
-            ctx.try_log(|logger| slog::info!(logger, "Terminating subnet-node"));
-            let _ = docker
-                .remove_container(subnet_node_container_id, None)
-                .await;
-        }
-
-        if let Some(ref subnet_api_container_id) = self.subnet_api_container_id {
-            let _ = docker
-                .kill_container(subnet_api_container_id, options)
-                .await;
-            ctx.try_log(|logger| slog::info!(logger, "Terminating subnet-api"));
-            let _ = docker.remove_container(subnet_api_container_id, None).await;
+        for container_id in container_ids.into_iter().flatten() {
+            let _ = docker.kill_container(&container_id, options.clone()).await;
+            ctx.try_log(|logger| slog::info!(logger, "Terminating container: {}", &container_id));
+            let _ = docker.remove_container(&container_id, None).await;
         }
 
         // Delete network
