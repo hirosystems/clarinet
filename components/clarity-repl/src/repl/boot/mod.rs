@@ -16,29 +16,25 @@
 
 // This code is copied from stacks-blockchain/src/chainstate/atacks/boot/mod.rs
 
-const BOOT_CODE_POX_BODY: &str = std::include_str!("pox.clar");
-const BOOT_CODE_POX_TESTNET_CONSTS: &str = std::include_str!("pox-testnet.clar");
-const BOOT_CODE_POX_MAINNET_CONSTS: &str = std::include_str!("pox-mainnet.clar");
+const BOOT_CODE_GENESIS: &str = std::include_str!("genesis.clar");
+const BOOT_CODE_BNS: &str = std::include_str!("bns.clar");
 const BOOT_CODE_LOCKUP: &str = std::include_str!("lockup.clar");
+
 pub const BOOT_CODE_COSTS: &str = std::include_str!("costs.clar");
 pub const BOOT_CODE_COSTS_2: &str = std::include_str!("costs-2.clar");
-pub const BOOT_CODE_COSTS_3: &str = std::include_str!("costs-3.clar");
 pub const BOOT_CODE_COSTS_2_TESTNET: &str = std::include_str!("costs-2-testnet.clar");
-pub const BOOT_CODE_COSTS_3_TESTNET: &str = std::include_str!("costs-3.clar");
+pub const BOOT_CODE_COSTS_3: &str = std::include_str!("costs-3.clar");
 const BOOT_CODE_COST_VOTING_MAINNET: &str = std::include_str!("cost-voting.clar");
-const BOOT_CODE_BNS: &str = std::include_str!("bns.clar");
-const BOOT_CODE_GENESIS: &str = std::include_str!("genesis.clar");
-pub const POX_1_NAME: &str = "pox";
-pub const POX_2_NAME: &str = "pox-2";
-pub const POX_3_NAME: &str = "pox-3";
-pub const POX_4_NAME: &str = "pox-4";
 
+const BOOT_CODE_POX_TESTNET_CONSTS: &str = std::include_str!("pox-testnet.clar");
+const BOOT_CODE_POX_MAINNET_CONSTS: &str = std::include_str!("pox-mainnet.clar");
+const BOOT_CODE_POX_BODY: &str = std::include_str!("pox.clar");
 const POX_2_BODY: &str = std::include_str!("pox-2.clar");
 const POX_3_BODY: &str = std::include_str!("pox-3.clar");
 const POX_4_BODY: &str = std::include_str!("pox-4.clar");
 
-pub const COSTS_1_NAME: &str = "costs";
-pub const COSTS_2_NAME: &str = "costs-2";
+pub const BOOT_CODE_SIGNERS: &str = std::include_str!("signers.clar");
+pub const BOOT_CODE_SIGNERS_VOTING: &str = std::include_str!("signers-voting.clar");
 
 lazy_static! {
     pub static ref BOOT_CODE_POX_MAINNET: String =
@@ -54,7 +50,7 @@ lazy_static! {
     pub static ref POX_3_TESTNET_CODE: String =
         format!("{}\n{}", BOOT_CODE_POX_TESTNET_CONSTS, POX_3_BODY);
     pub static ref BOOT_CODE_COST_VOTING_TESTNET: String = make_testnet_cost_voting();
-    pub static ref STACKS_BOOT_CODE_MAINNET: [(&'static str, &'static str); 11] = [
+    pub static ref STACKS_BOOT_CODE_MAINNET: [(&'static str, &'static str); 13] = [
         ("pox", &BOOT_CODE_POX_MAINNET),
         ("lockup", &BOOT_CODE_LOCKUP),
         ("costs", &BOOT_CODE_COSTS),
@@ -66,8 +62,10 @@ lazy_static! {
         ("costs-3", &BOOT_CODE_COSTS_3),
         ("pox-3", &POX_3_MAINNET_CODE),
         ("pox-4", &POX_4_BODY),
+        ("signers", &BOOT_CODE_SIGNERS),
+        ("signers-voting", &BOOT_CODE_SIGNERS_VOTING),
     ];
-    pub static ref STACKS_BOOT_CODE_TESTNET: [(&'static str, &'static str); 11] = [
+    pub static ref STACKS_BOOT_CODE_TESTNET: [(&'static str, &'static str); 13] = [
         ("pox", &BOOT_CODE_POX_TESTNET),
         ("lockup", &BOOT_CODE_LOCKUP),
         ("costs", &BOOT_CODE_COSTS),
@@ -76,9 +74,11 @@ lazy_static! {
         ("genesis", &BOOT_CODE_GENESIS),
         ("costs-2", &BOOT_CODE_COSTS_2_TESTNET),
         ("pox-2", &POX_2_TESTNET_CODE),
-        ("costs-3", &BOOT_CODE_COSTS_3_TESTNET),
+        ("costs-3", &BOOT_CODE_COSTS_3),
         ("pox-3", &POX_3_TESTNET_CODE),
         ("pox-4", &POX_4_BODY),
+        ("signers", &BOOT_CODE_SIGNERS),
+        ("signers-voting", &BOOT_CODE_SIGNERS_VOTING),
     ];
 }
 
