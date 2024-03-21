@@ -661,7 +661,7 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 [[package]]
 name = "chainhook-sdk"
 version = "0.12.5"
-source = "git+https://github.com/hirosystems/chainhook.git?branch=chore/update-clarinet-and-clarity#e8e7e9e3840c9c10957168d14761abe55e0bb22c"
+source = "git+https://github.com/hirosystems/chainhook.git?branch=chore/update-clarinet-and-clarity#160fd65a66a679efa4cf19cbe33c685eebaa9c2d"
 dependencies = [
  "base58 0.2.0",
  "base64 0.21.7",
@@ -695,7 +695,7 @@ dependencies = [
 [[package]]
 name = "chainhook-types"
 version = "1.3.3"
-source = "git+https://github.com/hirosystems/chainhook.git?branch=chore/update-clarinet-and-clarity#e8e7e9e3840c9c10957168d14761abe55e0bb22c"
+source = "git+https://github.com/hirosystems/chainhook.git?branch=chore/update-clarinet-and-clarity#160fd65a66a679efa4cf19cbe33c685eebaa9c2d"
 dependencies = [
  "hex 0.4.3",
  "schemars",
@@ -782,13 +782,15 @@ checksum = "702fc72eb24e5a1e48ce58027a675bc24edd52096d5397d4aea7c6dd9eca0bd1"
 [[package]]
 name = "clar2wasm"
 version = "0.1.0"
-source = "git+https://github.com/stacks-network/clarity-wasm.git#bcda26f40779ddb8222687a1bbc4e7a53ff02924"
+source = "git+https://github.com/stacks-network/clarity-wasm.git#5edf193d8ec7c3a60676cfa3e079af126aaf99b6"
 dependencies = [
  "clap",
  "clarity",
  "lazy_static",
  "regex",
+ "stacks-common",
  "walrus",
+ "wasmtime",
  "wat",
 ]
 
@@ -928,7 +930,7 @@ dependencies = [
 [[package]]
 name = "clarity"
 version = "2.3.0"
-source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-next#b006cd68da6124c29d48806cde6272a19efdd8ce"
+source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-next#5eb967cf4f58efcffe385c7a6fd2ed82e5f5da58"
 dependencies = [
  "getrandom 0.2.8",
  "hashbrown 0.14.3",
@@ -1041,7 +1043,7 @@ dependencies = [
 [[package]]
 name = "clarity-repl"
 version = "2.3.1"
-source = "git+https://github.com/hirosystems/clarinet.git#dbc0178a1957eb507ac1979ffefb7798ddc6614c"
+source = "git+https://github.com/hirosystems/clarinet.git#0288a26106b1339b0d556b3cb0b0093595936a01"
 dependencies = [
  "ansi_term",
  "atty",
@@ -1290,11 +1292,10 @@ dependencies = [
 
 [[package]]
 name = "crossbeam-channel"
-version = "0.5.6"
+version = "0.5.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c2dd04ddaf88237dc3b8d8f9a3c1004b506b54b3313403944054d23c0870c521"
+checksum = "ab3db02a9c5b5121e1e42fbdb1aeb65f5e02624cc58c43f2884c6ccac0b82f95"
 dependencies = [
- "cfg-if",
  "crossbeam-utils",
 ]
 
@@ -1324,12 +1325,9 @@ dependencies = [
 
 [[package]]
 name = "crossbeam-utils"
-version = "0.8.14"
+version = "0.8.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4fb766fa798726286dbbb842f174001dab8abc7b627a1dd86e0b7222a95d929f"
-dependencies = [
- "cfg-if",
-]
+checksum = "248e3bacc7dc6baa3b21e405ee045c3047101a49145e7e9eca583ab4c2ca5345"
 
 [[package]]
 name = "crossterm"
@@ -2209,18 +2207,9 @@ dependencies = [
 
 [[package]]
 name = "hermit-abi"
-version = "0.2.6"
+version = "0.3.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ee512640fe35acbfb4bb779db6f0d80704c2cacfa2e39b601ef3e3f47d1ae4c7"
-dependencies = [
- "libc",
-]
-
-[[package]]
-name = "hermit-abi"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fed44880c466736ef9a5c5b5facefb5ed0785676d0c02d612db14e54f0d84286"
+checksum = "d231dfb89cfffdbc30e7fc41579ed6066ad03abda9e567ccafae602b97ec5024"
 
 [[package]]
 name = "hex"
@@ -2265,7 +2254,7 @@ dependencies = [
 [[package]]
 name = "hiro-system-kit"
 version = "0.1.0"
-source = "git+https://github.com/hirosystems/clarinet.git#dbc0178a1957eb507ac1979ffefb7798ddc6614c"
+source = "git+https://github.com/hirosystems/clarinet.git#0288a26106b1339b0d556b3cb0b0093595936a01"
 dependencies = [
  "ansi_term",
  "atty",
@@ -2570,7 +2559,7 @@ version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "22e18b0a45d56fe973d6db23972bf5bc46f988a4a2385deac9cc29572f09daef"
 dependencies = [
- "hermit-abi 0.3.1",
+ "hermit-abi 0.3.9",
  "io-lifetimes",
  "rustix 0.36.16",
  "windows-sys 0.45.0",
@@ -3228,11 +3217,11 @@ dependencies = [
 
 [[package]]
 name = "num_cpus"
-version = "1.15.0"
+version = "1.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0fac9e2da13b5eb447a6ce3d392f23a29d8694bff781bf03a16cd9ac8697593b"
+checksum = "4161fcb6d602d4d2081af7c3a45852d875a03dd337a6bfdd6e06407b61342a43"
 dependencies = [
- "hermit-abi 0.2.6",
+ "hermit-abi 0.3.9",
  "libc",
 ]
 
@@ -3510,7 +3499,7 @@ checksum = "439ee305def115ba05938db6eb1644ff94165c5ab5e9420d1c1bcedbba909391"
 [[package]]
 name = "pox-locking"
 version = "2.4.0"
-source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-next#b006cd68da6124c29d48806cde6272a19efdd8ce"
+source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-next#5eb967cf4f58efcffe385c7a6fd2ed82e5f5da58"
 dependencies = [
  "clarity",
  "slog",
@@ -4775,7 +4764,7 @@ dependencies = [
 [[package]]
 name = "stacks-common"
 version = "0.0.2"
-source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-next#b006cd68da6124c29d48806cde6272a19efdd8ce"
+source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-next#5eb967cf4f58efcffe385c7a6fd2ed82e5f5da58"
 dependencies = [
  "chrono",
  "curve25519-dalek 2.0.0",
@@ -4876,7 +4865,7 @@ dependencies = [
 [[package]]
 name = "stacks-rpc-client"
 version = "2.3.1"
-source = "git+https://github.com/hirosystems/clarinet.git#dbc0178a1957eb507ac1979ffefb7798ddc6614c"
+source = "git+https://github.com/hirosystems/clarinet.git#0288a26106b1339b0d556b3cb0b0093595936a01"
 dependencies = [
  "clarity-repl 2.3.1 (git+https://github.com/hirosystems/clarinet.git)",
  "hmac 0.12.1",
