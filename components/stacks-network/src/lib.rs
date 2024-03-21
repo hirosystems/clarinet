@@ -186,6 +186,7 @@ async fn do_run_devnet(
             ),
             &devnet_path,
             devnet_config.enable_subnet_node,
+            devnet_config.use_nakamoto,
             !devnet_config.bitcoin_controller_automining_disabled,
             &ctx,
         )?;

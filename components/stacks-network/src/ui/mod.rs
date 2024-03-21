@@ -32,6 +32,7 @@ pub fn start_ui(
     orchestrator_terminated_rx: Receiver<bool>,
     devnet_path: &str,
     subnet_enabled: bool,
+    nakamoto_enabled: bool,
     automining_enabled: bool,
     ctx: &Context,
 ) -> Result<(), String> {
@@ -42,6 +43,7 @@ pub fn start_ui(
         orchestrator_terminated_rx,
         devnet_path,
         subnet_enabled,
+        nakamoto_enabled,
         automining_enabled,
         ctx,
     );
@@ -58,6 +60,7 @@ pub fn do_start_ui(
     orchestrator_terminated_rx: Receiver<bool>,
     devnet_path: &str,
     subnet_enabled: bool,
+    nakamoto_enabled: bool,
     automining_enabled: bool,
     ctx: &Context,
 ) -> Result<(), String> {
@@ -95,7 +98,7 @@ pub fn do_start_ui(
         }
     });
 
-    let mut app = App::new("Clarinet", devnet_path, subnet_enabled);
+    let mut app = App::new("Clarinet", devnet_path, subnet_enabled, nakamoto_enabled);
 
     terminal
         .clear()

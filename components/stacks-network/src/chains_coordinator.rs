@@ -1,7 +1,7 @@
 use super::ChainsCoordinatorCommand;
 
+use crate::event::send_status_update;
 use crate::event::DevnetEvent;
-use crate::event::ServiceStatusData;
 use crate::event::Status;
 use crate::orchestrator::ServicesMapHosts;
 
@@ -249,6 +249,12 @@ pub async fn start_chains_coordinator(
     let chains_coordinator_commands_oper = sel.recv(&chains_coordinator_commands_rx);
     let observer_event_oper = sel.recv(&observer_event_rx);
 
+    let DevnetConfig {
+        use_nakamoto,
+        enable_subnet_node,
+        ..
+    } = config.devnet_config;
+
     loop {
         let oper = sel.select();
         let command = match oper.index() {
@@ -294,12 +300,12 @@ pub async fn start_chains_coordinator(
             ObserverEvent::BitcoinChainEvent((chain_update, _)) => {
                 // Contextual shortcut: Devnet is an environment under control,
                 // with 1 miner. As such we will ignore Reorgs handling.
-                let (log, status) = match &chain_update {
+                let (log, comment) = match &chain_update {
                     BitcoinChainEvent::ChainUpdatedWithBlocks(event) => {
                         let tip = event.new_blocks.last().unwrap();
                         let bitcoin_block_height = tip.block_identifier.index;
                         let log = format!("Bitcoin block #{} received", bitcoin_block_height);
-                        let status =
+                        let comment =
                             format!("mining blocks (chaintip = #{})", bitcoin_block_height);
 
                         // Stacking orders can't be published until devnet is ready
@@ -321,7 +327,7 @@ pub async fn start_chains_coordinator(
                             }
                         }
 
-                        (log, status)
+                        (log, comment)
                     }
                     BitcoinChainEvent::ChainUpdatedWithReorg(events) => {
                         let tip = events.blocks_to_apply.last().unwrap();
@@ -337,12 +343,14 @@ pub async fn start_chains_coordinator(
 
                 let _ = devnet_event_tx.send(DevnetEvent::debug(log));
 
-                let _ = devnet_event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
-                    order: 0,
-                    status: Status::Green,
-                    name: "bitcoin-node".into(),
-                    comment: status,
-                }));
+                send_status_update(
+                    &devnet_event_tx,
+                    use_nakamoto,
+                    enable_subnet_node,
+                    "bitcoin-node",
+                    Status::Green,
+                    &comment,
+                );
                 let _ = devnet_event_tx.send(DevnetEvent::BitcoinChainEvent(chain_update.clone()));
             }
             ObserverEvent::StacksChainEvent((chain_event, _)) => {
@@ -383,15 +391,20 @@ pub async fn start_chains_coordinator(
 
                 // Partially update the UI. With current approach a full update
                 // would requires either cloning the block, or passing ownership.
-                let _ = devnet_event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
-                    order: 1,
-                    status: Status::Green,
-                    name: "stacks-node 2.1".to_string(),
-                    comment: format!(
+                send_status_update(
+                    &devnet_event_tx,
+                    use_nakamoto,
+                    enable_subnet_node,
+                    "stacks-node",
+                    Status::Green,
+                    &format!(
                         "mining blocks (chaintip = #{})",
                         known_tip.block.block_identifier.index
                     ),
-                }));
+                );
+
+                // devnet_event_tx.send(DevnetEvent::send_status_update(status_update_data));
+
                 let message = if known_tip.block.block_identifier.index == 0 {
                     format!(
                         "Genesis Stacks block anchored in Bitcoin block #{} includes {} transactions",
@@ -451,14 +464,14 @@ pub async fn start_chains_coordinator(
                     if config.devnet_config.enable_subnet_node && !subnet_initialized {
                         for tx in transactions.iter() {
                             if tx.tx_description.contains("::commit-block") {
-                                let _ = devnet_event_tx.send(DevnetEvent::ServiceStatus(
-                                    ServiceStatusData {
-                                        order: 6,
-                                        status: Status::Green,
-                                        name: "subnet-node".into(),
-                                        comment: "⚡️".to_string(),
-                                    },
-                                ));
+                                send_status_update(
+                                    &devnet_event_tx,
+                                    use_nakamoto,
+                                    enable_subnet_node,
+                                    "subnet-node",
+                                    Status::Green,
+                                    "⚡️",
+                                );
                                 subnet_initialized = true;
                                 break;
                             }

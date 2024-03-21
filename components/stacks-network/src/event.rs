@@ -70,6 +70,42 @@ impl DevnetEvent {
     }
 }
 
+pub fn send_status_update(
+    event_tx: &Sender<DevnetEvent>,
+    with_nakamoto: bool,
+    with_subnets: bool,
+    name: &str,
+    status: Status,
+    comment: &str,
+) {
+    let signer_order_start = if with_nakamoto { 2 } else { 0 };
+    let subnet_order_start = if with_subnets {
+        5 + signer_order_start
+    } else {
+        signer_order_start
+    };
+
+    let order = match name {
+        "bitcoin-node" => 0,
+        "stacks-node" => 1,
+        "stacks-signer-1" => signer_order_start,
+        "stacks-signer-2" => signer_order_start + 1,
+        "stacks-api" => signer_order_start + 2,
+        "subnet-node" => subnet_order_start,
+        "subnet-api" => subnet_order_start + 1,
+        "stacks-explorer" => subnet_order_start + 2,
+        "bitcoin-explorer" => subnet_order_start + 3,
+        _ => return,
+    };
+
+    let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
+        order,
+        status,
+        name: name.into(),
+        comment: comment.into(),
+    }));
+}
+
 #[derive(Clone, Debug)]
 pub enum Status {
     Red,
