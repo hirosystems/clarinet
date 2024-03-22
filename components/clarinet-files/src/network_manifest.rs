@@ -17,9 +17,9 @@ pub const DEFAULT_DERIVATION_PATH: &str = "m/44'/5757'/0'/0/0";
 pub const DEFAULT_STACKS_NODE_IMAGE: &str = "quay.io/hirosystems/stacks-node:devnet-2.4.0.0.0";
 pub const DEFAULT_STACKS_API_IMAGE: &str = "hirosystems/stacks-blockchain-api:latest";
 // Nakamoto images overrides
-pub const DEFAULT_STACKS_NODE_IMAGE_NAKA: &str = "blockstack/stacks-blockchain:devnet-next-stable";
-pub const DEFAULT_STACKS_API_IMAGE_NAKA: &str =
-    "hirosystems/stacks-blockchain-api:7.9.0-nakamoto.1";
+pub const DEFAULT_STACKS_NODE_IMAGE_NAKA: &str =
+    "quay.io/hirosystems/stacks-node:devnet-with-signer-beta4";
+pub const DEFAULT_STACKS_API_IMAGE_NAKA: &str = "hirosystems/stacks-blockchain-api:7.10.0-beta.1";
 
 pub const DEFAULT_BITCOIN_NODE_IMAGE: &str = "quay.io/hirosystems/bitcoind:26.0";
 pub const DEFAULT_BITCOIN_EXPLORER_IMAGE: &str = "quay.io/hirosystems/bitcoin-explorer:devnet";
@@ -46,8 +46,9 @@ pub const DEFAULT_EPOCH_2_1: u64 = 101;
 pub const DEFAULT_EPOCH_2_2: u64 = 102;
 pub const DEFAULT_EPOCH_2_3: u64 = 103;
 pub const DEFAULT_EPOCH_2_4: u64 = 104;
-pub const DEFAULT_EPOCH_2_5: u64 = 105;
-pub const DEFAULT_EPOCH_3_0: u64 = 121;
+pub const DEFAULT_EPOCH_2_5: u64 = 108;
+// Epoch 3.0 isn't stable for now, let's focus on running 2.5
+pub const DEFAULT_EPOCH_3_0: u64 = 100001;
 
 // Currently, the pox-4 contract has these values hardcoded:
 // https://github.com/stacks-network/stacks-core/blob/e09ab931e2f15ff70f3bb5c2f4d7afb[…]42bd7bec6/stackslib/src/chainstate/stacks/boot/pox-testnet.clar
@@ -116,6 +117,7 @@ pub struct DevnetConfigFile {
     pub bitcoin_node_image_url: Option<String>,
     pub bitcoin_explorer_image_url: Option<String>,
     pub stacks_node_image_url: Option<String>,
+    pub stacks_signer_image_url: Option<String>,
     pub stacks_api_image_url: Option<String>,
     pub stacks_explorer_image_url: Option<String>,
     pub postgres_image_url: Option<String>,
@@ -275,6 +277,7 @@ pub struct DevnetConfig {
     pub execute_script: Vec<ExecuteScript>,
     pub bitcoin_node_image_url: String,
     pub stacks_node_image_url: String,
+    pub stacks_signer_image_url: String,
     pub stacks_api_image_url: String,
     pub stacks_explorer_image_url: String,
     pub postgres_image_url: String,
@@ -893,6 +896,16 @@ impl NetworkManifest {
                         }
                     },
                 ),
+                stacks_signer_image_url: devnet_config
+                    .stacks_signer_image_url
+                    .take()
+                    .unwrap_or_else(|| {
+                        if devnet_config.use_nakamoto.unwrap_or(false) {
+                            DEFAULT_STACKS_NODE_IMAGE_NAKA.to_string()
+                        } else {
+                            DEFAULT_STACKS_NODE_IMAGE.to_string()
+                        }
+                    }),
                 stacks_api_image_url: devnet_config.stacks_api_image_url.take().unwrap_or_else(
                     || {
                         if devnet_config.use_nakamoto.unwrap_or(false) {

@@ -24,10 +24,11 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         .constraints([Constraint::Min(0), Constraint::Length(78)].as_ref())
         .split(page_components[1]);
 
-    let service_len = match app.subnet_enabled {
-        false => 7,
-        true => 9,
-    };
+    let nb_of_services = 5;
+    let nb_of_signers = if app.nakamoto_enabled { 2 } else { 0 };
+    let nb_of_subnet_services = if app.subnet_enabled { 2 } else { 0 };
+
+    let service_len = nb_of_services + nb_of_signers + nb_of_subnet_services + 2;
 
     let top_right_components = Layout::default()
         .direction(Direction::Vertical)

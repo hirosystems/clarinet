@@ -23,7 +23,7 @@ use std::path::PathBuf;
 use std::sync::mpsc::{Receiver, Sender};
 use std::time::Duration;
 
-use crate::event::{DevnetEvent, ServiceStatusData, Status};
+use crate::event::{send_status_update, DevnetEvent, Status};
 
 #[derive(Debug)]
 pub struct DevnetOrchestrator {
@@ -34,6 +34,8 @@ pub struct DevnetOrchestrator {
     pub termination_success_tx: Option<Sender<bool>>,
     pub can_exit: bool,
     stacks_node_container_id: Option<String>,
+    stacks_signer_1_container_id: Option<String>,
+    stacks_signer_2_container_id: Option<String>,
     stacks_api_container_id: Option<String>,
     stacks_explorer_container_id: Option<String>,
     bitcoin_node_container_id: Option<String>,
@@ -152,6 +154,8 @@ impl DevnetOrchestrator {
             can_exit: true,
             termination_success_tx: None,
             stacks_node_container_id: None,
+            stacks_signer_1_container_id: None,
+            stacks_signer_2_container_id: None,
             stacks_api_container_id: None,
             stacks_explorer_container_id: None,
             bitcoin_node_container_id: None,
@@ -302,6 +306,7 @@ impl DevnetOrchestrator {
         let disable_bitcoin_explorer = devnet_config.disable_bitcoin_explorer;
         let enable_subnet_node = devnet_config.enable_subnet_node;
         let disable_subnet_api = devnet_config.disable_subnet_api;
+        let use_nakamoto = devnet_config.use_nakamoto;
 
         let _ = fs::create_dir(&devnet_config.working_dir);
         let _ = fs::create_dir(format!("{}/conf", devnet_config.working_dir));
@@ -312,71 +317,85 @@ impl DevnetOrchestrator {
         let stacks_api_port = devnet_config.stacks_api_port;
         let subnet_api_port = devnet_config.subnet_api_port;
 
-        let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
-            order: 0,
-            status: Status::Red,
-            name: "bitcoin-node".into(),
-            comment: "initializing".into(),
-        }));
+        send_status_update(
+            &event_tx,
+            use_nakamoto,
+            enable_subnet_node,
+            "bitcoin-node",
+            Status::Red,
+            "initializing",
+        );
 
-        let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
-            order: 1,
-            status: Status::Red,
-            name: "stacks-node".into(),
-            comment: "initializing".into(),
-        }));
+        send_status_update(
+            &event_tx,
+            use_nakamoto,
+            enable_subnet_node,
+            "stacks-node",
+            Status::Red,
+            "initializing",
+        );
 
-        let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
-            order: 2,
-            status: Status::Red,
-            name: "stacks-api".into(),
-            comment: if disable_stacks_api {
-                "disabled".into()
-            } else {
-                "initializing".into()
-            },
-        }));
+        if use_nakamoto {
+            send_status_update(
+                &event_tx,
+                use_nakamoto,
+                enable_subnet_node,
+                "stacks-signer-1",
+                Status::Red,
+                "initializing",
+            );
+            send_status_update(
+                &event_tx,
+                use_nakamoto,
+                enable_subnet_node,
+                "stacks-signer-2",
+                Status::Red,
+                "initializing",
+            );
+        }
 
-        let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
-            order: 3,
-            status: Status::Red,
-            name: "stacks-explorer".into(),
-            comment: if disable_stacks_explorer {
-                "disabled".into()
-            } else {
-                "initializing".into()
-            },
-        }));
-
-        let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
-            order: 4,
-            status: Status::Red,
-            name: "bitcoin-explorer".into(),
-            comment: if disable_bitcoin_explorer {
-                "disabled".into()
-            } else {
-                "initializing".into()
-            },
-        }));
+        send_status_update(
+            &event_tx,
+            use_nakamoto,
+            enable_subnet_node,
+            "stacks-api",
+            Status::Red,
+            "initializing",
+        );
+        send_status_update(
+            &event_tx,
+            use_nakamoto,
+            enable_subnet_node,
+            "stacks-explorer",
+            Status::Red,
+            "initializing",
+        );
+        send_status_update(
+            &event_tx,
+            use_nakamoto,
+            enable_subnet_node,
+            "bitcoin-explorer",
+            Status::Red,
+            "initializing",
+        );
 
         if enable_subnet_node {
-            let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
-                order: 5,
-                status: Status::Red,
-                name: "subnet-node".into(),
-                comment: "initializing".into(),
-            }));
-
-            let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
-                order: 6,
-                status: Status::Red,
-                name: "subnet-api".into(),
-                comment: if disable_subnet_api {
-                    "disabled".into()
-                } else {
-                    "initializing".into()
-                },
-            }));
+            send_status_update(
+                &event_tx,
+                use_nakamoto,
+                enable_subnet_node,
+                "subnet-node",
+                Status::Red,
+                "initializing",
+            );
+            send_status_update(
+                &event_tx,
+                use_nakamoto,
+                enable_subnet_node,
+                "subnet-api",
+                Status::Red,
+                "initializing",
+            );
         }
 
         let _ = event_tx.send(DevnetEvent::info(format!(
@@ -386,12 +405,14 @@ impl DevnetOrchestrator {
 
         // Start bitcoind
         let _ = event_tx.send(DevnetEvent::info("Starting bitcoin-node".to_string()));
-        let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
-            order: 0,
-            status: Status::Yellow,
-            name: "bitcoin-node".into(),
-            comment: "preparing container".into(),
-        }));
+        send_status_update(
+            &event_tx,
+            use_nakamoto,
+            enable_subnet_node,
+            "bitcoin-node",
+            Status::Yellow,
+            "preparing container",
+        );
         match self.prepare_bitcoin_node_container(ctx).await {
             Ok(_) => {}
             Err(message) => {
@@ -400,12 +421,14 @@ impl DevnetOrchestrator {
                 return Err(message);
             }
         };
-        let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
-            order: 0,
-            status: Status::Yellow,
-            name: "bitcoin-node".into(),
-            comment: "booting".into(),
-        }));
+        send_status_update(
+            &event_tx,
+            use_nakamoto,
+            enable_subnet_node,
+            "bitcoin-node",
+            Status::Yellow,
+            "booting",
+        );
         match self.boot_bitcoin_node_container().await {
             Ok(_) => {
                 self.initialize_bitcoin_node(&event_tx).await?;
@@ -420,12 +443,14 @@ impl DevnetOrchestrator {
         // Start stacks-api
         if !disable_stacks_api {
             // Start postgres
-            let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
-                order: 2,
-                status: Status::Yellow,
-                name: "stacks-api".into(),
-                comment: "preparing postgres container".into(),
-            }));
+            send_status_update(
+                &event_tx,
+                use_nakamoto,
+                enable_subnet_node,
+                "stacks-api",
+                Status::Yellow,
+                "preparing postgres container",
+            );
             let _ = event_tx.send(DevnetEvent::info("Starting postgres".to_string()));
             match self.prepare_postgres_container(ctx).await {
                 Ok(_) => {}
@@ -443,12 +468,14 @@ impl DevnetOrchestrator {
                     return Err(message);
                 }
             };
-            let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
-                order: 2,
-                status: Status::Yellow,
-                name: "stacks-api".into(),
-                comment: "preparing container".into(),
-            }));
+            send_status_update(
+                &event_tx,
+                use_nakamoto,
+                enable_subnet_node,
+                "stacks-api",
+                Status::Yellow,
+                "preparing container",
+            );
 
             let _ = event_tx.send(DevnetEvent::info("Starting stacks-api".to_string()));
             match self.prepare_stacks_api_container(ctx).await {
@@ -459,12 +486,15 @@ impl DevnetOrchestrator {
                     return Err(message);
                 }
             };
-            let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
-                order: 2,
-                status: Status::Green,
-                name: "stacks-api".into(),
-                comment: format!("http://localhost:{}/doc", stacks_api_port),
-            }));
+            send_status_update(
+                &event_tx,
+                use_nakamoto,
+                enable_subnet_node,
+                "stacks-api",
+                Status::Green,
+                &format!("http://localhost:{}/doc", stacks_api_port),
+            );
+
             match self.boot_stacks_api_container(ctx).await {
                 Ok(_) => {}
                 Err(message) => {
@@ -486,12 +516,14 @@ impl DevnetOrchestrator {
                     return Err(message);
                 }
             };
-            let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
-                order: 5,
-                status: Status::Yellow,
-                name: "subnet-node".into(),
-                comment: "booting".into(),
-            }));
+            send_status_update(
+                &event_tx,
+                use_nakamoto,
+                enable_subnet_node,
+                "subnet-node",
+                Status::Yellow,
+                "booting",
+            );
             match self.boot_subnet_node_container().await {
                 Ok(_) => {}
                 Err(message) => {
@@ -511,12 +543,14 @@ impl DevnetOrchestrator {
                         return Err(message);
                     }
                 };
-                let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
-                    order: 6,
-                    status: Status::Green,
-                    name: "subnet-api".into(),
-                    comment: format!("http://localhost:{}/doc", subnet_api_port),
-                }));
+                send_status_update(
+                    &event_tx,
+                    use_nakamoto,
+                    enable_subnet_node,
+                    "subnet-api",
+                    Status::Green,
+                    &format!("http://localhost:{}/doc", subnet_api_port),
+                );
                 match self.boot_subnet_api_container().await {
                     Ok(_) => {}
                     Err(message) => {
@@ -528,14 +562,16 @@ impl DevnetOrchestrator {
             }
         }
 
-        // Start stacks-blockchain
+        // Start stacks-node
         let _ = event_tx.send(DevnetEvent::info("Starting stacks-node".to_string()));
-        let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
-            order: 1,
-            status: Status::Yellow,
-            name: "stacks-node".into(),
-            comment: "updating image".into(),
-        }));
+        send_status_update(
+            &event_tx,
+            use_nakamoto,
+            enable_subnet_node,
+            "stacks-node",
+            Status::Yellow,
+            "updating image",
+        );
         match self.prepare_stacks_node_container(boot_index, ctx).await {
             Ok(_) => {}
             Err(message) => {
@@ -544,12 +580,14 @@ impl DevnetOrchestrator {
                 return Err(message);
             }
         };
-        let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
-            order: 1,
-            status: Status::Yellow,
-            name: "stacks-node".into(),
-            comment: "booting".into(),
-        }));
+        send_status_update(
+            &event_tx,
+            use_nakamoto,
+            enable_subnet_node,
+            "stacks-node",
+            Status::Yellow,
+            "booting",
+        );
         match self.boot_stacks_node_container().await {
             Ok(_) => {}
             Err(message) => {
@@ -559,14 +597,110 @@ impl DevnetOrchestrator {
             }
         };
 
+        if use_nakamoto {
+            // Start stacks-signer-1
+            let _ = event_tx.send(DevnetEvent::info("Starting stacks-signer-1".to_string()));
+            send_status_update(
+                &event_tx,
+                use_nakamoto,
+                enable_subnet_node,
+                "stacks-signer-1",
+                Status::Yellow,
+                "updating image",
+            );
+            match self
+                .prepare_stacks_signer_container(boot_index, ctx, 1)
+                .await
+            {
+                Ok(_) => {}
+                Err(message) => {
+                    let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
+                    self.kill(ctx, Some(&message)).await;
+                    return Err(message);
+                }
+            };
+            send_status_update(
+                &event_tx,
+                use_nakamoto,
+                enable_subnet_node,
+                "stacks-signer-1",
+                Status::Yellow,
+                "booting",
+            );
+            match self.boot_stacks_signer_container(1).await {
+                Ok(_) => {}
+                Err(message) => {
+                    let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
+                    self.kill(ctx, Some(&message)).await;
+                    return Err(message);
+                }
+            };
+            send_status_update(
+                &event_tx,
+                use_nakamoto,
+                enable_subnet_node,
+                "stacks-signer-1",
+                Status::Green,
+                "running",
+            );
+
+            // Start stacks-signer-2
+            let _ = event_tx.send(DevnetEvent::info("Starting stacks-signer-2".to_string()));
+            send_status_update(
+                &event_tx,
+                use_nakamoto,
+                enable_subnet_node,
+                "stacks-signer-2",
+                Status::Yellow,
+                "updating image",
+            );
+            match self
+                .prepare_stacks_signer_container(boot_index, ctx, 2)
+                .await
+            {
+                Ok(_) => {}
+                Err(message) => {
+                    let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
+                    self.kill(ctx, Some(&message)).await;
+                    return Err(message);
+                }
+            };
+            send_status_update(
+                &event_tx,
+                use_nakamoto,
+                enable_subnet_node,
+                "stacks-signer-2",
+                Status::Yellow,
+                "booting",
+            );
+            match self.boot_stacks_signer_container(2).await {
+                Ok(_) => {}
+                Err(message) => {
+                    let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
+                    self.kill(ctx, Some(&message)).await;
+                    return Err(message);
+                }
+            };
+            send_status_update(
+                &event_tx,
+                use_nakamoto,
+                enable_subnet_node,
+                "stacks-signer-2",
+                Status::Green,
+                "running",
+            );
+        }
+
         // Start stacks-explorer
         if !disable_stacks_explorer {
-            let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
-                order: 3,
-                status: Status::Yellow,
-                name: "stacks-explorer".into(),
-                comment: "preparing container".into(),
-            }));
+            send_status_update(
+                &event_tx,
+                use_nakamoto,
+                enable_subnet_node,
+                "stacks-explorer",
+                Status::Yellow,
+                "preparing container",
+            );
             match self.prepare_stacks_explorer_container(ctx).await {
                 Ok(_) => {}
                 Err(message) => {
@@ -584,22 +718,26 @@ impl DevnetOrchestrator {
                     return Err(message);
                 }
             };
-            let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
-                order: 3,
-                status: Status::Green,
-                name: "stacks-explorer".into(),
-                comment: format!("http://localhost:{}", stacks_explorer_port),
-            }));
+            send_status_update(
+                &event_tx,
+                use_nakamoto,
+                enable_subnet_node,
+                "stacks-explorer",
+                Status::Green,
+                &format!("http://localhost:{}", stacks_explorer_port),
+            );
         }
 
         // Start bitcoin-explorer
         if !disable_bitcoin_explorer {
-            let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
-                order: 4,
-                status: Status::Yellow,
-                name: "bitcoin-explorer".into(),
-                comment: "preparing container".into(),
-            }));
+            send_status_update(
+                &event_tx,
+                use_nakamoto,
+                enable_subnet_node,
+                "bitcoin-explorer",
+                Status::Yellow,
+                "preparing container",
+            );
             match self.prepare_bitcoin_explorer_container(ctx).await {
                 Ok(_) => {}
                 Err(message) => {
@@ -617,12 +755,14 @@ impl DevnetOrchestrator {
                     return Err(message);
                 }
             };
-            let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
-                order: 4,
-                status: Status::Green,
-                name: "bitcoin-explorer".into(),
-                comment: format!("http://localhost:{}", bitcoin_explorer_port),
-            }));
+            send_status_update(
+                &event_tx,
+                use_nakamoto,
+                enable_subnet_node,
+                "bitcoin-explorer",
+                Status::Green,
+                &format!("http://localhost:{}", bitcoin_explorer_port),
+            );
         }
 
         loop {
@@ -633,18 +773,23 @@ impl DevnetOrchestrator {
                     break;
                 }
                 Ok(false) => {
-                    let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
-                        order: 0,
-                        status: Status::Yellow,
-                        name: "bitcoin-node".into(),
-                        comment: "restarting".into(),
-                    }));
-                    let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
-                        order: 1,
-                        status: Status::Yellow,
-                        name: "stacks-node".into(),
-                        comment: "restarting".into(),
-                    }));
+                    send_status_update(
+                        &event_tx,
+                        use_nakamoto,
+                        enable_subnet_node,
+                        "bitcoin-node",
+                        Status::Yellow,
+                        "restarting",
+                    );
+
+                    send_status_update(
+                        &event_tx,
+                        use_nakamoto,
+                        enable_subnet_node,
+                        "stacks-node",
+                        Status::Yellow,
+                        "restarting",
+                    );
 
                     let _ = event_tx.send(DevnetEvent::debug("Killing containers".into()));
                     let _ = self.stop_containers().await;
@@ -959,6 +1104,7 @@ disable_block_download = true
 disable_inbound_handshakes = true
 disable_inbound_walks = true
 public_ip_address = "1.1.1.1:1234"
+block_proposal_token = "12345"
 
 [miner]
 min_tx_fee = 1
@@ -987,6 +1133,29 @@ address = "{}"
 amount = {}
 "#,
                 account.stx_address, account.balance
+            ));
+        }
+        if devnet_config.use_nakamoto {
+            stacks_conf.push_str(&format!(
+                r#"
+[[events_observer]]
+endpoint = "stacks-signer-1.{}:30001"
+retry_count = 255
+include_data_events = false
+events_keys = ["stackerdb", "block_proposal", "burn_blocks"]
+"#,
+                self.network_name
+            ));
+
+            stacks_conf.push_str(&format!(
+                r#"
+[[events_observer]]
+endpoint = "stacks-signer-2.{}:30002"
+retry_count = 255
+include_data_events = false
+events_keys = ["stackerdb", "block_proposal", "burn_blocks"]
+"#,
+                self.network_name
             ));
         }
 
@@ -1181,7 +1350,8 @@ start_height = {epoch_3_0}
             entrypoint: Some(vec![
                 "stacks-node".into(),
                 "start".into(),
-                "--config=/src/stacks-node/Stacks.toml".into(),
+                "--config".into(),
+                "/src/stacks-node/Stacks.toml".into(),
             ]),
             env: Some(env),
             host_config: Some(HostConfig {
@@ -1259,6 +1429,181 @@ start_height = {epoch_3_0}
             .start_container::<String>(&container, None)
             .await
             .map_err(|e| formatted_docker_error("unable to start stacks-node container", e))?;
+
+        Ok(())
+    }
+
+    pub fn prepare_stacks_signer_config(
+        &self,
+        boot_index: u32,
+        signer_id: u32,
+    ) -> Result<Config<String>, String> {
+        let devnet_config = match &self.network_config {
+            Some(ref network_config) => match network_config.devnet {
+                Some(ref devnet_config) => devnet_config,
+                _ => return Err("unable to initialize bitcoin node".to_string()),
+            },
+            _ => return Err("unable to initialize bitcoin node".to_string()),
+        };
+
+        // the default wallet_1 and wallet_2 are the default signers
+        let default_signing_keys = [
+            "7287ba251d44a4d3fd9276c88ce34c5c52a038955511cccaf77e61068649c17801",
+            "530d9f61984c888536871c6573073bdfc0058896dc1adfe9a6a10dfacadc209101",
+        ];
+
+        let signer_conf = format!(
+            r#"
+stacks_private_key = "{signer_private_key}"
+node_host = "stacks-node.{network_name}:{stacks_node_rpc_port}" # eg "127.0.0.1:20443"
+# must be added as event_observer in node config:
+endpoint = "0.0.0.0:3000{signer_id}"
+network = "testnet"
+auth_password = "12345"
+db_path = "stacks-signer-{signer_id}.sqlite"
+"#,
+            signer_private_key = default_signing_keys[(signer_id - 1) as usize],
+            // signer_private_key = devnet_config.signer_private_key,
+            network_name = self.network_name,
+            stacks_node_rpc_port = devnet_config.stacks_node_rpc_port
+        );
+        let mut signer_conf_path = PathBuf::from(&devnet_config.working_dir);
+        signer_conf_path.push(format!("conf/Signer-{signer_id}.toml"));
+        let mut file = File::create(signer_conf_path)
+            .map_err(|e| format!("unable to create Signer.toml: {:?}", e))?;
+        file.write_all(signer_conf.as_bytes())
+            .map_err(|e| format!("unable to write Signer.toml: {:?}", e))?;
+
+        let mut stacks_signer_data_path = PathBuf::from(&devnet_config.working_dir);
+        stacks_signer_data_path.push("data");
+        stacks_signer_data_path.push(format!("{}", boot_index));
+        stacks_signer_data_path.push("signer");
+        fs::create_dir_all(stacks_signer_data_path)
+            .map_err(|e| format!("unable to create stacks directory: {:?}", e))?;
+
+        let mut labels = HashMap::new();
+        labels.insert("project".to_string(), self.network_name.to_string());
+        labels.insert("reset".to_string(), "true".to_string());
+
+        let mut binds = vec![format!(
+            "{}/conf:/src/stacks-signer/",
+            devnet_config.working_dir
+        )];
+
+        if devnet_config.bind_containers_volumes {
+            binds.push(format!(
+                "{}/data/{}/stacks:/devnet/",
+                devnet_config.working_dir, boot_index
+            ))
+        }
+
+        let config = Config {
+            labels: Some(labels),
+            image: Some(devnet_config.stacks_signer_image_url.clone()),
+            // domainname: Some(self.network_name.to_string()),
+            tty: None,
+            exposed_ports: None,
+            entrypoint: Some(vec![
+                "stacks-signer".into(),
+                "run".into(),
+                "--config".into(),
+                format!("/src/stacks-signer/Signer-{signer_id}.toml"),
+            ]),
+            env: None,
+            host_config: Some(HostConfig {
+                auto_remove: Some(true),
+                binds: Some(binds),
+                network_mode: Some(self.network_name.clone()),
+                port_bindings: None,
+                extra_hosts: Some(vec!["host.docker.internal:host-gateway".into()]),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+
+        Ok(config)
+    }
+
+    pub async fn prepare_stacks_signer_container(
+        &mut self,
+        boot_index: u32,
+        ctx: &Context,
+        signer_id: u32,
+    ) -> Result<(), String> {
+        let (docker, devnet_config) = match (&self.docker_client, &self.network_config) {
+            (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
+                Some(ref devnet_config) => (docker, devnet_config),
+                _ => return Err("unable to get devnet configuration".into()),
+            },
+            _ => return Err("unable to get Docker client".into()),
+        };
+
+        let _info = docker
+            .create_image(
+                Some(CreateImageOptions {
+                    from_image: devnet_config.stacks_signer_image_url.clone(),
+                    platform: devnet_config.docker_platform.clone(),
+                    ..Default::default()
+                }),
+                None,
+                None,
+            )
+            .try_collect::<Vec<_>>()
+            .await
+            .map_err(|e| format!("unable to create image: {}", e))?;
+
+        let config = self.prepare_stacks_signer_config(boot_index, signer_id)?;
+
+        let options = CreateContainerOptions {
+            name: format!("stacks-signer-{signer_id}.{}", self.network_name),
+            platform: Some(devnet_config.docker_platform.to_string()),
+        };
+
+        let container = docker
+            .create_container::<String, String>(Some(options), config)
+            .await
+            .map_err(|e| format!("unable to create container: {}", e))?
+            .id;
+
+        ctx.try_log(|logger| {
+            slog::info!(
+                logger,
+                "Created container stacks-signer-{signer_id}: {}",
+                container
+            )
+        });
+        if signer_id == 1 {
+            self.stacks_signer_1_container_id = Some(container.clone());
+        } else {
+            self.stacks_signer_2_container_id = Some(container.clone());
+        }
+        // self.stacks_signer_container_id = Some(container.clone());
+
+        Ok(())
+    }
+
+    pub async fn boot_stacks_signer_container(&mut self, signer_id: u32) -> Result<(), String> {
+        let container = match signer_id {
+            1 => match &self.stacks_signer_1_container_id {
+                Some(container) => container.clone(),
+                _ => return Err("unable to boot container".to_string()),
+            },
+            2 => match &self.stacks_signer_2_container_id {
+                Some(container) => container.clone(),
+                _ => return Err("unable to boot container".to_string()),
+            },
+            _ => return Err("invalid signer_id".to_string()),
+        };
+
+        let docker = match &self.docker_client {
+            Some(ref docker) => docker,
+            _ => return Err("unable to get Docker client".into()),
+        };
+
+        docker
+            .start_container::<String>(&container, None)
+            .await
+            .map_err(|e| formatted_docker_error("unable to start stacks-signer container", e))?;
 
         Ok(())
     }
@@ -2137,19 +2482,23 @@ events_keys = ["*"]
     pub async fn stop_containers(&self) -> Result<(), String> {
         let containers_ids = match (
             &self.stacks_node_container_id,
+            &self.stacks_signer_1_container_id,
+            &self.stacks_signer_2_container_id,
             &self.stacks_api_container_id,
             &self.stacks_explorer_container_id,
             &self.bitcoin_node_container_id,
             &self.bitcoin_explorer_container_id,
             &self.postgres_container_id,
         ) {
-            (Some(c1), Some(c2), Some(c3), Some(c4), Some(c5), Some(c6)) => {
-                (c1, c2, c3, c4, c5, c6)
+            (Some(c1), Some(c2), Some(c3), Some(c4), Some(c5), Some(c6), Some(c7), Some(c8)) => {
+                (c1, c2, c3, c4, c5, c6, c7, c8)
             }
             _ => return Err("unable to boot container".to_string()),
         };
         let (
             stacks_node_c_id,
+            stacks_signer_1_c_id,
+            stacks_signer_2_c_id,
             stacks_api_c_id,
             stacks_explorer_c_id,
             bitcoin_node_c_id,
@@ -2166,6 +2515,14 @@ events_keys = ["*"]
 
         let _ = docker
             .kill_container(stacks_node_c_id, Some(options.clone()))
+            .await;
+
+        let _ = docker
+            .kill_container(stacks_signer_1_c_id, Some(options.clone()))
+            .await;
+
+        let _ = docker
+            .kill_container(stacks_signer_2_c_id, Some(options.clone()))
             .await;
 
         let _ = docker
@@ -2298,78 +2655,23 @@ events_keys = ["*"]
         let options = Some(KillContainerOptions { signal: "SIGKILL" });
 
         // Terminate containers
-        if let Some(ref bitcoin_explorer_container_id) = self.bitcoin_explorer_container_id {
-            let _ = docker
-                .kill_container(bitcoin_explorer_container_id, options.clone())
-                .await;
-            ctx.try_log(|logger| slog::info!(logger, "Terminating bitcoin-explorer"));
-            let _ = docker
-                .remove_container(bitcoin_explorer_container_id, None)
-                .await;
-        }
+        let container_ids = vec![
+            self.bitcoin_explorer_container_id.clone(),
+            self.stacks_explorer_container_id.clone(),
+            self.bitcoin_node_container_id.clone(),
+            self.stacks_api_container_id.clone(),
+            self.postgres_container_id.clone(),
+            self.stacks_node_container_id.clone(),
+            self.stacks_signer_1_container_id.clone(),
+            self.stacks_signer_2_container_id.clone(),
+            self.subnet_node_container_id.clone(),
+            self.subnet_api_container_id.clone(),
+        ];
 
-        if let Some(ref stacks_explorer_container_id) = self.stacks_explorer_container_id {
-            let _ = docker
-                .kill_container(stacks_explorer_container_id, options.clone())
-                .await;
-            ctx.try_log(|logger| slog::info!(logger, "Terminating stacks-explorer"));
-            let _ = docker
-                .remove_container(stacks_explorer_container_id, None)
-                .await;
-        }
-
-        if let Some(ref bitcoin_node_container_id) = self.bitcoin_node_container_id {
-            let _ = docker
-                .kill_container(bitcoin_node_container_id, options.clone())
-                .await;
-            ctx.try_log(|logger| slog::info!(logger, "Terminating bitcoin-node"));
-            let _ = docker
-                .remove_container(bitcoin_node_container_id, None)
-                .await;
-        }
-
-        if let Some(ref stacks_api_container_id) = self.stacks_api_container_id {
-            let _ = docker
-                .kill_container(stacks_api_container_id, options.clone())
-                .await;
-            ctx.try_log(|logger| slog::info!(logger, "Terminating stacks-api"));
-            let _ = docker.remove_container(stacks_api_container_id, None).await;
-        }
-
-        if let Some(ref postgres_container_id) = self.postgres_container_id {
-            let _ = docker
-                .kill_container(postgres_container_id, options.clone())
-                .await;
-            ctx.try_log(|logger| slog::info!(logger, "Terminating postgres"));
-            let _ = docker.remove_container(postgres_container_id, None).await;
-        }
-
-        if let Some(ref stacks_node_container_id) = self.stacks_node_container_id {
-            let _ = docker
-                .kill_container(stacks_node_container_id, options.clone())
-                .await;
-            ctx.try_log(|logger| slog::info!(logger, "Terminating stacks-node"));
-            let _ = docker
-                .remove_container(stacks_node_container_id, None)
-                .await;
-        }
-
-        if let Some(ref subnet_node_container_id) = self.subnet_node_container_id {
-            let _ = docker
-                .kill_container(subnet_node_container_id, options.clone())
-                .await;
-            ctx.try_log(|logger| slog::info!(logger, "Terminating subnet-node"));
-            let _ = docker
-                .remove_container(subnet_node_container_id, None)
-                .await;
-        }
-
-        if let Some(ref subnet_api_container_id) = self.subnet_api_container_id {
-            let _ = docker
-                .kill_container(subnet_api_container_id, options)
-                .await;
-            ctx.try_log(|logger| slog::info!(logger, "Terminating subnet-api"));
-            let _ = docker.remove_container(subnet_api_container_id, None).await;
+        for container_id in container_ids.into_iter().flatten() {
+            let _ = docker.kill_container(&container_id, options.clone()).await;
+            ctx.try_log(|logger| slog::info!(logger, "Terminating container: {}", &container_id));
+            let _ = docker.remove_container(&container_id, None).await;
         }
 
         // Delete network

@@ -1,7 +1,7 @@
 use super::ChainsCoordinatorCommand;
 
+use crate::event::send_status_update;
 use crate::event::DevnetEvent;
-use crate::event::ServiceStatusData;
 use crate::event::Status;
 use crate::orchestrator::ServicesMapHosts;
 
@@ -31,12 +31,23 @@ use clarity_repl::clarity::util::hash::{hex_bytes, Hash160};
 use clarity_repl::clarity::vm::types::{BuffData, SequenceData, TupleData};
 use clarity_repl::clarity::vm::ClarityName;
 use clarity_repl::clarity::vm::Value as ClarityValue;
+use clarity_repl::clarity::PublicKey;
 use clarity_repl::codec;
 use hiro_system_kit;
 use hiro_system_kit::slog;
 use hiro_system_kit::yellow;
 use stacks_rpc_client::PoxInfo;
 use stacks_rpc_client::StacksRpc;
+use stackslib::chainstate::stacks::address::PoxAddress;
+use stackslib::core::CHAIN_ID_TESTNET;
+use stackslib::types::chainstate::StacksPrivateKey;
+use stackslib::types::chainstate::StacksPublicKey;
+use stackslib::types::PrivateKey;
+use stackslib::util::hash::Sha256Sum;
+use stackslib::util::secp256k1::MessageSignature;
+use stackslib::util_lib::signed_structured_data::pox4::make_pox_4_signed_data_domain;
+use stackslib::util_lib::signed_structured_data::pox4::Pox4SignatureTopic;
+use stackslib::util_lib::signed_structured_data::structured_data_message_hash;
 use std::convert::TryFrom;
 use std::str;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -238,6 +249,12 @@ pub async fn start_chains_coordinator(
     let chains_coordinator_commands_oper = sel.recv(&chains_coordinator_commands_rx);
     let observer_event_oper = sel.recv(&observer_event_rx);
 
+    let DevnetConfig {
+        use_nakamoto,
+        enable_subnet_node,
+        ..
+    } = config.devnet_config;
+
     loop {
         let oper = sel.select();
         let command = match oper.index() {
@@ -283,12 +300,12 @@ pub async fn start_chains_coordinator(
             ObserverEvent::BitcoinChainEvent((chain_update, _)) => {
                 // Contextual shortcut: Devnet is an environment under control,
                 // with 1 miner. As such we will ignore Reorgs handling.
-                let (log, status) = match &chain_update {
+                let (log, comment) = match &chain_update {
                     BitcoinChainEvent::ChainUpdatedWithBlocks(event) => {
                         let tip = event.new_blocks.last().unwrap();
                         let bitcoin_block_height = tip.block_identifier.index;
                         let log = format!("Bitcoin block #{} received", bitcoin_block_height);
-                        let status =
+                        let comment =
                             format!("mining blocks (chaintip = #{})", bitcoin_block_height);
 
                         // Stacking orders can't be published until devnet is ready
@@ -310,7 +327,7 @@ pub async fn start_chains_coordinator(
                             }
                         }
 
-                        (log, status)
+                        (log, comment)
                     }
                     BitcoinChainEvent::ChainUpdatedWithReorg(events) => {
                         let tip = events.blocks_to_apply.last().unwrap();
@@ -326,12 +343,14 @@ pub async fn start_chains_coordinator(
 
                 let _ = devnet_event_tx.send(DevnetEvent::debug(log));
 
-                let _ = devnet_event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
-                    order: 0,
-                    status: Status::Green,
-                    name: "bitcoin-node".into(),
-                    comment: status,
-                }));
+                send_status_update(
+                    &devnet_event_tx,
+                    use_nakamoto,
+                    enable_subnet_node,
+                    "bitcoin-node",
+                    Status::Green,
+                    &comment,
+                );
                 let _ = devnet_event_tx.send(DevnetEvent::BitcoinChainEvent(chain_update.clone()));
             }
             ObserverEvent::StacksChainEvent((chain_event, _)) => {
@@ -372,15 +391,20 @@ pub async fn start_chains_coordinator(
 
                 // Partially update the UI. With current approach a full update
                 // would requires either cloning the block, or passing ownership.
-                let _ = devnet_event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
-                    order: 1,
-                    status: Status::Green,
-                    name: "stacks-node 2.1".to_string(),
-                    comment: format!(
+                send_status_update(
+                    &devnet_event_tx,
+                    use_nakamoto,
+                    enable_subnet_node,
+                    "stacks-node",
+                    Status::Green,
+                    &format!(
                         "mining blocks (chaintip = #{})",
                         known_tip.block.block_identifier.index
                     ),
-                }));
+                );
+
+                // devnet_event_tx.send(DevnetEvent::send_status_update(status_update_data));
+
                 let message = if known_tip.block.block_identifier.index == 0 {
                     format!(
                         "Genesis Stacks block anchored in Bitcoin block #{} includes {} transactions",
@@ -440,14 +464,14 @@ pub async fn start_chains_coordinator(
                     if config.devnet_config.enable_subnet_node && !subnet_initialized {
                         for tx in transactions.iter() {
                             if tx.tx_description.contains("::commit-block") {
-                                let _ = devnet_event_tx.send(DevnetEvent::ServiceStatus(
-                                    ServiceStatusData {
-                                        order: 5,
-                                        status: Status::Green,
-                                        name: "subnet-node".into(),
-                                        comment: "⚡️".to_string(),
-                                    },
-                                ));
+                                send_status_update(
+                                    &devnet_event_tx,
+                                    use_nakamoto,
+                                    enable_subnet_node,
+                                    "subnet-node",
+                                    Status::Green,
+                                    "⚡️",
+                                );
                                 subnet_initialized = true;
                                 break;
                             }
@@ -648,8 +672,8 @@ pub async fn publish_stacking_orders(
     fee_rate: u64,
     bitcoin_block_height: u32,
 ) -> Option<usize> {
-    let stacks_node_rpc_url = format!("http://{}", &services_map_hosts.stacks_node_host);
-    let pox_info: PoxInfo = match reqwest::get(format!("{}/v2/pox", stacks_node_rpc_url)).await {
+    let node_rpc_url = format!("http://{}", &services_map_hosts.stacks_node_host);
+    let pox_info: PoxInfo = match reqwest::get(format!("{}/v2/pox", node_rpc_url)).await {
         Ok(result) => match result.json().await {
             Ok(pox_info) => Some(pox_info),
             Err(e) => {
@@ -682,53 +706,58 @@ pub async fn publish_stacking_orders(
         return None;
     }
 
+    let pox_contract_id = pox_info.contract_id;
+    let pox_version = pox_contract_id
+        .rsplit('-')
+        .next()
+        .and_then(|version| version.parse::<u32>().ok())
+        .unwrap();
+
+    let default_signing_keys = [
+        StacksPrivateKey::from_hex(
+            "7287ba251d44a4d3fd9276c88ce34c5c52a038955511cccaf77e61068649c17801",
+        )
+        .unwrap(),
+        StacksPrivateKey::from_hex(
+            "530d9f61984c888536871c6573073bdfc0058896dc1adfe9a6a10dfacadc209101",
+        )
+        .unwrap(),
+    ];
+
     let mut transactions = 0;
     for (i, pox_stacking_order) in devnet_config.pox_stacking_orders.iter().enumerate() {
         if !should_publish_stacking_orders(&current_cycle, pox_stacking_order) {
             continue;
         }
 
-        let PoxStackingOrder {
-            duration,
-            start_at_cycle,
-            ..
-        } = pox_stacking_order;
-
         // if the is not the first cycle of this stacker, then stacking order will be extended
-        let extend_stacking = current_cycle != start_at_cycle - 1;
+        let extend_stacking = current_cycle != pox_stacking_order.start_at_cycle - 1;
         if extend_stacking && !pox_stacking_order.auto_extend.unwrap_or_default() {
             continue;
         }
 
-        let account = accounts
+        let account = match accounts
             .iter()
-            .find(|e| e.label == pox_stacking_order.wallet);
-
-        let account = match account {
-            Some(account) => account.clone(),
+            .find(|e| e.label == pox_stacking_order.wallet)
+            .cloned()
+        {
+            Some(account) => account,
             _ => continue,
         };
 
         transactions += 1;
 
         let stx_amount = pox_info.next_cycle.min_threshold_ustx * pox_stacking_order.slots;
-        let addr_bytes = pox_stacking_order
-            .btc_address
-            .from_base58()
-            .expect("Unable to get bytes from btc address");
-        let node_url = stacks_node_rpc_url.clone();
-        let pox_contract_id = pox_info.contract_id.clone();
-        let pox_version = pox_contract_id
-            .rsplit('-')
-            .next()
-            .and_then(|version| version.parse::<u32>().ok())
-            .unwrap();
 
-        let duration = *duration;
+        let node_rpc_url_moved = node_rpc_url.clone();
+        let pox_contract_id_moved = pox_contract_id.clone();
+        let btc_address_moved = pox_stacking_order.btc_address.clone();
+        let duration = pox_stacking_order.duration;
+
         let stacking_result =
             hiro_system_kit::thread_named("Stacking orders handler").spawn(move || {
                 let default_fee = fee_rate * 1000;
-                let stacks_rpc = StacksRpc::new(&node_url);
+                let stacks_rpc = StacksRpc::new(&node_rpc_url_moved);
                 let nonce = stacks_rpc.get_nonce(&account.stx_address)?;
 
                 let (_, _, account_secret_key) = clarinet_files::compute_addresses(
@@ -737,51 +766,21 @@ pub async fn publish_stacking_orders(
                     &StacksNetwork::Devnet.get_networks(),
                 );
 
-                let pox_addr_arg = ClarityValue::Tuple(
-                    TupleData::from_data(vec![
-                        (
-                            ClarityName::try_from("version".to_owned()).unwrap(),
-                            ClarityValue::buff_from_byte(AddressHashMode::SerializeP2PKH as u8),
-                        ),
-                        (
-                            ClarityName::try_from("hashbytes".to_owned()).unwrap(),
-                            ClarityValue::Sequence(SequenceData::Buffer(BuffData {
-                                data: Hash160::from_bytes(&addr_bytes[1..21])
-                                    .unwrap()
-                                    .as_bytes()
-                                    .to_vec(),
-                            })),
-                        ),
-                    ])
-                    .unwrap(),
+                let (method, arguments) = get_stacking_tx_method_and_args(
+                    pox_version,
+                    bitcoin_block_height,
+                    current_cycle.into(),
+                    &default_signing_keys[i % 2],
+                    extend_stacking,
+                    &btc_address_moved,
+                    stx_amount,
+                    duration,
+                    i.try_into().unwrap(),
                 );
 
-                let (method, mut arguments) = match extend_stacking {
-                    false => (
-                        "stack-stx",
-                        vec![
-                            ClarityValue::UInt(stx_amount.into()),
-                            pox_addr_arg,
-                            ClarityValue::UInt((bitcoin_block_height - 1).into()),
-                            ClarityValue::UInt(duration.into()),
-                        ],
-                    ),
-                    true => (
-                        "stack-extend",
-                        vec![ClarityValue::UInt(duration.into()), pox_addr_arg],
-                    ),
-                };
-
-                if pox_version >= 4 {
-                    let mut signer_key = vec![0; 33];
-                    signer_key[0] = i as u8;
-                    signer_key[1] = nonce as u8;
-                    arguments.push(ClarityValue::buff_from(signer_key).unwrap());
-                };
-
                 let tx = codec::build_contrat_call_transaction(
-                    pox_contract_id,
-                    method.into(),
+                    pox_contract_id_moved,
+                    method,
                     arguments,
                     nonce,
                     default_fee,
@@ -930,4 +929,168 @@ async fn handle_bitcoin_mining(
             }
         }
     }
+}
+
+fn get_stacking_tx_method_and_args(
+    pox_version: u32,
+    bitcoin_block_height: u32,
+    cycle: u128,
+    signer_key: &StacksPrivateKey,
+    extend_stacking: bool,
+    btc_address: &str,
+    stx_amount: u64,
+    duration: u32,
+    auth_id: u128,
+) -> (String, Vec<ClarityValue>) {
+    let addr_bytes = btc_address
+        .from_base58()
+        .expect("Unable to get bytes from btc address");
+    let pox_addr_tuple = ClarityValue::Tuple(
+        TupleData::from_data(vec![
+            (
+                ClarityName::try_from("version".to_owned()).unwrap(),
+                ClarityValue::buff_from_byte(AddressHashMode::SerializeP2PKH as u8),
+            ),
+            (
+                ClarityName::try_from("hashbytes".to_owned()).unwrap(),
+                ClarityValue::Sequence(SequenceData::Buffer(BuffData {
+                    data: Hash160::from_bytes(&addr_bytes[1..21])
+                        .unwrap()
+                        .as_bytes()
+                        .to_vec(),
+                })),
+            ),
+        ])
+        .unwrap(),
+    );
+    let pox_addr = PoxAddress::try_from_pox_tuple(false, &pox_addr_tuple).unwrap();
+
+    let burn_block_height: u128 = (bitcoin_block_height - 1).into();
+
+    let method = if extend_stacking {
+        "stack-extend"
+    } else {
+        "stack-stx"
+    };
+
+    let mut arguments = if extend_stacking {
+        vec![ClarityValue::UInt(duration.into()), pox_addr_tuple]
+    } else {
+        vec![
+            ClarityValue::UInt(stx_amount.into()),
+            pox_addr_tuple,
+            ClarityValue::UInt(burn_block_height),
+            ClarityValue::UInt(duration.into()),
+        ]
+    };
+
+    if pox_version >= 4 {
+        // extra arguments for pox-4 ( for both stack-stx and stack-extend)
+        //   (signer-sig (optional (buff 65)))
+        //   (signer-key (buff 33))
+        //   (max-amount uint)
+        //   (auth-id uint)
+        let signature_amount = if extend_stacking { 0 } else { stx_amount };
+        let topic = if extend_stacking {
+            Pox4SignatureTopic::StackExtend
+        } else {
+            Pox4SignatureTopic::StackStx
+        };
+
+        let signer_sig = make_signer_key_signature(
+            &pox_addr,
+            signer_key,
+            cycle,
+            &topic,
+            duration.into(),
+            signature_amount.into(),
+            auth_id,
+        );
+        let pub_key = StacksPublicKey::from_private(signer_key);
+        arguments.push(ClarityValue::some(ClarityValue::buff_from(signer_sig).unwrap()).unwrap());
+        arguments.push(ClarityValue::buff_from(pub_key.to_bytes()).unwrap());
+        arguments.push(ClarityValue::UInt(stx_amount.into()));
+        arguments.push(ClarityValue::UInt(auth_id));
+    };
+
+    (method.to_string(), arguments)
+}
+
+// The current version of stackslib we are using (from feat/clarity-wasm-next) does not have the latest version of make_pox_4_signer_key_signature
+// This is a temporary fix until feat/clarity-wasm-next catches up with the branch next
+
+fn make_pox_4_signer_key_message_hash(
+    pox_addr: &PoxAddress,
+    reward_cycle: u128,
+    topic: &Pox4SignatureTopic,
+    chain_id: u32,
+    period: u128,
+    max_amount: u128,
+    auth_id: u128,
+) -> Sha256Sum {
+    let domain_tuple = make_pox_4_signed_data_domain(chain_id);
+    let data_tuple = ClarityValue::Tuple(
+        TupleData::from_data(vec![
+            (
+                "pox-addr".into(),
+                pox_addr.clone().as_clarity_tuple().unwrap().into(),
+            ),
+            ("reward-cycle".into(), ClarityValue::UInt(reward_cycle)),
+            ("period".into(), ClarityValue::UInt(period)),
+            (
+                "topic".into(),
+                ClarityValue::string_ascii_from_bytes(topic.get_name_str().into()).unwrap(),
+            ),
+            ("auth-id".into(), ClarityValue::UInt(auth_id)),
+            ("max-amount".into(), ClarityValue::UInt(max_amount)),
+        ])
+        .unwrap(),
+    );
+    structured_data_message_hash(data_tuple, domain_tuple)
+}
+
+fn make_pox_4_signer_key_signature(
+    pox_addr: &PoxAddress,
+    signer_key: &StacksPrivateKey,
+    reward_cycle: u128,
+    topic: &Pox4SignatureTopic,
+    chain_id: u32,
+    period: u128,
+    max_amount: u128,
+    auth_id: u128,
+) -> Result<MessageSignature, &'static str> {
+    let msg_hash = make_pox_4_signer_key_message_hash(
+        pox_addr,
+        reward_cycle,
+        topic,
+        chain_id,
+        period,
+        max_amount,
+        auth_id,
+    );
+    signer_key.sign(msg_hash.as_bytes())
+}
+
+fn make_signer_key_signature(
+    pox_addr: &PoxAddress,
+    signer_key: &StacksPrivateKey,
+    reward_cycle: u128,
+    topic: &Pox4SignatureTopic,
+    period: u128,
+    max_amount: u128,
+    auth_id: u128,
+) -> Vec<u8> {
+    let signature = make_pox_4_signer_key_signature(
+        pox_addr,
+        signer_key,
+        reward_cycle,
+        topic,
+        CHAIN_ID_TESTNET,
+        period,
+        max_amount,
+        auth_id,
+    )
+    .unwrap();
+
+    signature.to_rsv()
 }

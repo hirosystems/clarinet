@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 atty = "0.2.14"
 ansi_term = "0.12.1"
-bollard = "0.15.0"
+bollard = "0.16.0"
 bytes = "1.4.0"
 bitcoin = "0.29.2"
 bitcoincore-rpc = "0.16.0"
@@ -31,18 +31,20 @@ chrono = "0.4.31"
 futures = "0.3.12"
 base58 = "0.2.0"
 tokio = { version = "1.35.1", features = ["full"] }
+dirs = { version = "4.0.0" }
+clap = { version = "4.4.8", features = ["derive"] }
+serde_yaml = "0.8.23"
 
+stackslib = { git = "https://github.com/stacks-network/stacks-core.git", branch="feat/clarity-wasm-next", package = "stackslib" }
 chainhook-sdk = { default-features = true, git = "https://github.com/hirosystems/chainhook.git", branch="chore/update-clarinet-and-clarity" }
 # chainhook-sdk = { version = "=0.11", default-features = true }
+
 stacks-rpc-client = { path = "../stacks-rpc-client" }
 clarinet-files = { path = "../clarinet-files", features = ["cli"] }
 clarinet-deployments = { path = "../clarinet-deployments", features = ["cli"] }
 clarinet-utils = { path = "../clarinet-utils" }
 hiro-system-kit = { path = "../hiro-system-kit", features = ["log"] }
 clarity-repl = { path = "../clarity-repl", features = ["cli"] }
-dirs = { version = "4.0.0" }
-clap = { version = "4.4.8", features = ["derive"] }
-serde_yaml = "0.8.23"
 
 [lib]
 name = "stacks_network"
