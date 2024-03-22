@@ -1785,7 +1785,7 @@ mod tests {
             let res = interpreter
                 .run(&boot_contract, &mut Some(ast), false, None)
                 .expect(&format!(
-                    "failed to interprete {} boot contract",
+                    "failed to interpret {} boot contract",
                     &boot_contract.name
                 ));
 
