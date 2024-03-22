@@ -597,97 +597,99 @@ impl DevnetOrchestrator {
             }
         };
 
-        // Start stacks-signer-1
-        let _ = event_tx.send(DevnetEvent::info("Starting stacks-signer-1".to_string()));
-        send_status_update(
-            &event_tx,
-            use_nakamoto,
-            enable_subnet_node,
-            "stacks-signer-1",
-            Status::Yellow,
-            "updating image",
-        );
-        match self
-            .prepare_stacks_signer_container(boot_index, ctx, 1)
-            .await
-        {
-            Ok(_) => {}
-            Err(message) => {
-                let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
-                self.kill(ctx, Some(&message)).await;
-                return Err(message);
-            }
-        };
-        send_status_update(
-            &event_tx,
-            use_nakamoto,
-            enable_subnet_node,
-            "stacks-signer-1",
-            Status::Yellow,
-            "booting",
-        );
-        match self.boot_stacks_signer_container(1).await {
-            Ok(_) => {}
-            Err(message) => {
-                let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
-                self.kill(ctx, Some(&message)).await;
-                return Err(message);
-            }
-        };
-        send_status_update(
-            &event_tx,
-            use_nakamoto,
-            enable_subnet_node,
-            "stacks-signer-1",
-            Status::Green,
-            "running",
-        );
+        if use_nakamoto {
+            // Start stacks-signer-1
+            let _ = event_tx.send(DevnetEvent::info("Starting stacks-signer-1".to_string()));
+            send_status_update(
+                &event_tx,
+                use_nakamoto,
+                enable_subnet_node,
+                "stacks-signer-1",
+                Status::Yellow,
+                "updating image",
+            );
+            match self
+                .prepare_stacks_signer_container(boot_index, ctx, 1)
+                .await
+            {
+                Ok(_) => {}
+                Err(message) => {
+                    let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
+                    self.kill(ctx, Some(&message)).await;
+                    return Err(message);
+                }
+            };
+            send_status_update(
+                &event_tx,
+                use_nakamoto,
+                enable_subnet_node,
+                "stacks-signer-1",
+                Status::Yellow,
+                "booting",
+            );
+            match self.boot_stacks_signer_container(1).await {
+                Ok(_) => {}
+                Err(message) => {
+                    let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
+                    self.kill(ctx, Some(&message)).await;
+                    return Err(message);
+                }
+            };
+            send_status_update(
+                &event_tx,
+                use_nakamoto,
+                enable_subnet_node,
+                "stacks-signer-1",
+                Status::Green,
+                "running",
+            );
 
-        // Start stacks-signer-2
-        let _ = event_tx.send(DevnetEvent::info("Starting stacks-signer-2".to_string()));
-        send_status_update(
-            &event_tx,
-            use_nakamoto,
-            enable_subnet_node,
-            "stacks-signer-2",
-            Status::Yellow,
-            "updating image",
-        );
-        match self
-            .prepare_stacks_signer_container(boot_index, ctx, 2)
-            .await
-        {
-            Ok(_) => {}
-            Err(message) => {
-                let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
-                self.kill(ctx, Some(&message)).await;
-                return Err(message);
-            }
-        };
-        send_status_update(
-            &event_tx,
-            use_nakamoto,
-            enable_subnet_node,
-            "stacks-signer-2",
-            Status::Yellow,
-            "booting",
-        );
-        match self.boot_stacks_signer_container(2).await {
-            Ok(_) => {}
-            Err(message) => {
-                let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
-                self.kill(ctx, Some(&message)).await;
-                return Err(message);
-            }
-        };
-        send_status_update(
-            &event_tx,
-            use_nakamoto,
-            enable_subnet_node,
-            "stacks-signer-2",
-            Status::Green,
-            "running",
-        );
+            // Start stacks-signer-2
+            let _ = event_tx.send(DevnetEvent::info("Starting stacks-signer-2".to_string()));
+            send_status_update(
+                &event_tx,
+                use_nakamoto,
+                enable_subnet_node,
+                "stacks-signer-2",
+                Status::Yellow,
+                "updating image",
+            );
+            match self
+                .prepare_stacks_signer_container(boot_index, ctx, 2)
+                .await
+            {
+                Ok(_) => {}
+                Err(message) => {
+                    let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
+                    self.kill(ctx, Some(&message)).await;
+                    return Err(message);
+                }
+            };
+            send_status_update(
+                &event_tx,
+                use_nakamoto,
+                enable_subnet_node,
+                "stacks-signer-2",
+                Status::Yellow,
+                "booting",
+            );
+            match self.boot_stacks_signer_container(2).await {
+                Ok(_) => {}
+                Err(message) => {
+                    let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
+                    self.kill(ctx, Some(&message)).await;
+                    return Err(message);
+                }
+            };
+            send_status_update(
+                &event_tx,
+                use_nakamoto,
+                enable_subnet_node,
+                "stacks-signer-2",
+                Status::Green,
+                "running",
+            );
+        }
 
         // Start stacks-explorer
         if !disable_stacks_explorer {
