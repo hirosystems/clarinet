@@ -967,6 +967,12 @@ fn get_stacking_tx_method_and_args(
 
     let burn_block_height: u128 = (bitcoin_block_height - 1).into();
 
+    let method = if extend_stacking {
+        "stack-extend"
+    } else {
+        "stack-stx"
+    };
+
     let mut arguments = if extend_stacking {
         vec![ClarityValue::UInt(duration.into()), pox_addr_tuple]
     } else {
@@ -976,12 +982,6 @@ fn get_stacking_tx_method_and_args(
             ClarityValue::UInt(burn_block_height),
             ClarityValue::UInt(duration.into()),
         ]
-    };
-
-    let method = if extend_stacking {
-        "stack-extend"
-    } else {
-        "stack-stx"
     };
 
     if pox_version >= 4 {
