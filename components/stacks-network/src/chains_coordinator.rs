@@ -966,37 +966,44 @@ fn get_stacking_tx_method_and_args(
     let pox_addr = PoxAddress::try_from_pox_tuple(false, &pox_addr_tuple).unwrap();
 
     let burn_block_height: u128 = (bitcoin_block_height - 1).into();
-    let (method, topic, mut arguments) = match extend_stacking {
-        false => (
-            "stack-stx",
-            Pox4SignatureTopic::StackStx,
-            vec![
-                ClarityValue::UInt(stx_amount.into()),
-                pox_addr_tuple,
-                ClarityValue::UInt(burn_block_height),
-                ClarityValue::UInt(duration.into()),
-            ],
-        ),
-        true => (
-            "stack-extend",
-            Pox4SignatureTopic::StackExtend,
-            vec![ClarityValue::UInt(duration.into()), pox_addr_tuple],
-        ),
+
+    let mut arguments = if extend_stacking {
+        vec![ClarityValue::UInt(duration.into()), pox_addr_tuple]
+    } else {
+        vec![
+            ClarityValue::UInt(stx_amount.into()),
+            pox_addr_tuple,
+            ClarityValue::UInt(burn_block_height),
+            ClarityValue::UInt(duration.into()),
+        ]
     };
 
-    // extra arguments for pox-4
-    //   (signer-sig (optional (buff 65)))
-    //   (signer-key (buff 33))
-    //   (max-amount uint)
-    //   (auth-id uint)
+    let method = if extend_stacking {
+        "stack-extend"
+    } else {
+        "stack-stx"
+    };
+
     if pox_version >= 4 {
+        // extra arguments for pox-4 ( for both stack-stx and stack-extend)
+        //   (signer-sig (optional (buff 65)))
+        //   (signer-key (buff 33))
+        //   (max-amount uint)
+        //   (auth-id uint)
+        let signature_amount = if extend_stacking { 0 } else { stx_amount };
+        let topic = if extend_stacking {
+            Pox4SignatureTopic::StackExtend
+        } else {
+            Pox4SignatureTopic::StackStx
+        };
+
         let signer_sig = make_signer_key_signature(
             &pox_addr,
             signer_key,
             cycle,
             &topic,
             duration.into(),
-            stx_amount.into(),
+            signature_amount.into(),
             auth_id,
         );
         let pub_key = StacksPublicKey::from_private(signer_key);
