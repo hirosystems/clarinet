@@ -48,7 +48,7 @@ lazy_static! {
         PrincipalData::parse_standard_principal(BOOT_MAINNET_ADDRESS).unwrap();
     pub static ref BOOT_CONTRACTS_DATA: BTreeMap<QualifiedContractIdentifier, (ClarityContract, ContractAST)> = {
         let mut result = BTreeMap::new();
-        let deploy: [(&StandardPrincipalData, [(&str, &str); 11]); 2] = [
+        let deploy: [(&StandardPrincipalData, [(&str, &str); 13]); 2] = [
             (&*BOOT_TESTNET_PRINCIPAL, *STACKS_BOOT_CODE_TESTNET),
             (&*BOOT_MAINNET_PRINCIPAL, *STACKS_BOOT_CODE_MAINNET),
         ];
@@ -58,7 +58,9 @@ lazy_static! {
         for (deployer, boot_code) in deploy.iter() {
             for (name, code) in boot_code.iter() {
                 let (epoch, clarity_version) = match *name {
-                    "pox-4" => (StacksEpochId::Epoch25, ClarityVersion::Clarity2),
+                    "pox-4" | "signers" | "signers-voting" => {
+                        (StacksEpochId::Epoch25, ClarityVersion::Clarity2)
+                    }
                     "pox-3" => (StacksEpochId::Epoch24, ClarityVersion::Clarity2),
                     "pox-2" | "costs-3" => (StacksEpochId::Epoch21, ClarityVersion::Clarity2),
                     "cost-2" => (StacksEpochId::Epoch2_05, ClarityVersion::Clarity1),
