@@ -792,19 +792,6 @@ checksum = "702fc72eb24e5a1e48ce58027a675bc24edd52096d5397d4aea7c6dd9eca0bd1"
 [[package]]
 name = "clar2wasm"
 version = "0.1.0"
-source = "git+https://github.com/stacks-network/clarity-wasm.git?branch=chore/update-clarity#d08b7628206b36f6d7a5e7a92a786ac007c8e7e6"
-dependencies = [
- "clap",
- "clarity",
- "lazy_static",
- "regex",
- "walrus",
- "wat",
-]
-
-[[package]]
-name = "clar2wasm"
-version = "0.1.0"
 source = "git+https://github.com/stacks-network/clarity-wasm.git#5edf193d8ec7c3a60676cfa3e079af126aaf99b6"
 dependencies = [
  "clap",
@@ -953,7 +940,7 @@ dependencies = [
 [[package]]
 name = "clarity"
 version = "2.3.0"
-source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-next#5eb967cf4f58efcffe385c7a6fd2ed82e5f5da58"
+source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-next#35cce11f4a7e49f29dd1cf06680abfbd31099669"
 dependencies = [
  "getrandom 0.2.8",
  "hashbrown 0.14.3",
@@ -1035,7 +1022,7 @@ dependencies = [
  "atty",
  "bytes",
  "chrono",
- "clar2wasm 0.1.0 (git+https://github.com/stacks-network/clarity-wasm.git)",
+ "clar2wasm",
  "clarity",
  "debug_types",
  "futures",
@@ -1066,7 +1053,7 @@ dependencies = [
 [[package]]
 name = "clarity-repl"
 version = "2.3.1"
-source = "git+https://github.com/hirosystems/clarinet.git#0288a26106b1339b0d556b3cb0b0093595936a01"
+source = "git+https://github.com/hirosystems/clarinet.git#05c6a57097359e321d597813898234d040b021b2"
 dependencies = [
  "ansi_term",
  "atty",
@@ -2293,7 +2280,7 @@ dependencies = [
 [[package]]
 name = "hiro-system-kit"
 version = "0.1.0"
-source = "git+https://github.com/hirosystems/clarinet.git#0288a26106b1339b0d556b3cb0b0093595936a01"
+source = "git+https://github.com/hirosystems/clarinet.git#05c6a57097359e321d597813898234d040b021b2"
 dependencies = [
  "ansi_term",
  "atty",
@@ -2967,7 +2954,7 @@ dependencies = [
 [[package]]
 name = "libstackerdb"
 version = "0.0.1"
-source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-next#5eb967cf4f58efcffe385c7a6fd2ed82e5f5da58"
+source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-next#35cce11f4a7e49f29dd1cf06680abfbd31099669"
 dependencies = [
  "clarity",
  "secp256k1 0.24.3",
@@ -3703,7 +3690,7 @@ checksum = "439ee305def115ba05938db6eb1644ff94165c5ab5e9420d1c1bcedbba909391"
 [[package]]
 name = "pox-locking"
 version = "2.4.0"
-source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-next#5eb967cf4f58efcffe385c7a6fd2ed82e5f5da58"
+source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-next#35cce11f4a7e49f29dd1cf06680abfbd31099669"
 dependencies = [
  "clarity",
  "slog",
@@ -4984,7 +4971,7 @@ dependencies = [
 [[package]]
 name = "stacks-common"
 version = "0.0.2"
-source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-next#5eb967cf4f58efcffe385c7a6fd2ed82e5f5da58"
+source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-next#35cce11f4a7e49f29dd1cf06680abfbd31099669"
 dependencies = [
  "chrono",
  "curve25519-dalek 2.0.0",
@@ -5086,7 +5073,7 @@ dependencies = [
 [[package]]
 name = "stacks-rpc-client"
 version = "2.3.1"
-source = "git+https://github.com/hirosystems/clarinet.git#0288a26106b1339b0d556b3cb0b0093595936a01"
+source = "git+https://github.com/hirosystems/clarinet.git#05c6a57097359e321d597813898234d040b021b2"
 dependencies = [
  "clarity-repl 2.3.1 (git+https://github.com/hirosystems/clarinet.git)",
  "hmac 0.12.1",
@@ -5103,10 +5090,10 @@ dependencies = [
 [[package]]
 name = "stackslib"
 version = "0.0.1"
-source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-next#5eb967cf4f58efcffe385c7a6fd2ed82e5f5da58"
+source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-next#35cce11f4a7e49f29dd1cf06680abfbd31099669"
 dependencies = [
  "chrono",
- "clar2wasm 0.1.0 (git+https://github.com/stacks-network/clarity-wasm.git?branch=chore/update-clarity)",
+ "clar2wasm",
  "clarity",
  "curve25519-dalek 2.0.0",
  "ed25519-dalek",
