@@ -1109,28 +1109,29 @@ amount = {}
                 account.stx_address, account.balance
             ));
         }
-
-        stacks_conf.push_str(&format!(
-            r#"
+        if devnet_config.use_nakamoto {
+            stacks_conf.push_str(&format!(
+                r#"
 [[events_observer]]
-endpoint = "stacks-signer-1.{}:30000"
+endpoint = "stacks-signer-1.{}:30001"
 retry_count = 255
 include_data_events = false
 events_keys = ["stackerdb", "block_proposal", "burn_blocks"]
 "#,
-            self.network_name
-        ));
+                self.network_name
+            ));
 
-        stacks_conf.push_str(&format!(
-            r#"
+            stacks_conf.push_str(&format!(
+                r#"
 [[events_observer]]
-endpoint = "stacks-signer-2.{}:30000"
+endpoint = "stacks-signer-2.{}:30002"
 retry_count = 255
 include_data_events = false
 events_keys = ["stackerdb", "block_proposal", "burn_blocks"]
 "#,
-            self.network_name
-        ));
+                self.network_name
+            ));
+        }
 
         stacks_conf.push_str(&format!(
             r#"
@@ -1429,7 +1430,7 @@ start_height = {epoch_3_0}
 stacks_private_key = "{signer_private_key}"
 node_host = "stacks-node.{network_name}:{stacks_node_rpc_port}" # eg "127.0.0.1:20443"
 # must be added as event_observer in node config:
-endpoint = "0.0.0.0:30000" # e.g 127.0.0.1:30000
+endpoint = "0.0.0.0:3000{signer_id}"
 network = "testnet"
 auth_password = "12345"
 db_path = "stacks-signer-{signer_id}.sqlite"
