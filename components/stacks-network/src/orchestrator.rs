@@ -640,11 +640,19 @@ impl DevnetOrchestrator {
             enable_subnet_node,
             "stacks-signer-1",
             Status::Green,
-            "Waiting for messages",
+            "running",
         );
 
         // Start stacks-signer-2
         let _ = event_tx.send(DevnetEvent::info("Starting stacks-signer-2".to_string()));
+        send_status_update(
+            &event_tx,
+            use_nakamoto,
+            enable_subnet_node,
+            "stacks-signer-2",
+            Status::Yellow,
+            "updating image",
+        );
         match self
             .prepare_stacks_signer_container(boot_index, ctx, 2)
             .await
@@ -656,6 +664,14 @@ impl DevnetOrchestrator {
                 return Err(message);
             }
         };
+        send_status_update(
+            &event_tx,
+            use_nakamoto,
+            enable_subnet_node,
+            "stacks-signer-2",
+            Status::Yellow,
+            "booting",
+        );
         match self.boot_stacks_signer_container(2).await {
             Ok(_) => {}
             Err(message) => {
@@ -664,6 +680,14 @@ impl DevnetOrchestrator {
                 return Err(message);
             }
         };
+        send_status_update(
+            &event_tx,
+            use_nakamoto,
+            enable_subnet_node,
+            "stacks-signer-2",
+            Status::Green,
+            "running",
+        );
 
         // Start stacks-explorer
         if !disable_stacks_explorer {
@@ -1412,15 +1436,16 @@ start_height = {epoch_3_0}
         boot_index: u32,
         signer_id: u32,
     ) -> Result<Config<String>, String> {
-        let (_, devnet_config) = match &self.network_config {
+        let devnet_config = match &self.network_config {
             Some(ref network_config) => match network_config.devnet {
-                Some(ref devnet_config) => (network_config, devnet_config),
-                _ => return Err("unable to get devnet configuration".into()),
+                Some(ref devnet_config) => devnet_config,
+                _ => return Err("unable to initialize bitcoin node".to_string()),
             },
-            _ => return Err("unable to get Docker client".into()),
+            _ => return Err("unable to initialize bitcoin node".to_string()),
         };
 
-        let signer_private_keys = [
+        // the default wallet_1 and wallet_2 are the default signers
+        let default_signing_keys = [
             "7287ba251d44a4d3fd9276c88ce34c5c52a038955511cccaf77e61068649c17801",
             "530d9f61984c888536871c6573073bdfc0058896dc1adfe9a6a10dfacadc209101",
         ];
@@ -1435,7 +1460,7 @@ network = "testnet"
 auth_password = "12345"
 db_path = "stacks-signer-{signer_id}.sqlite"
 "#,
-            signer_private_key = signer_private_keys[(signer_id - 1) as usize],
+            signer_private_key = default_signing_keys[(signer_id - 1) as usize],
             // signer_private_key = devnet_config.signer_private_key,
             network_name = self.network_name,
             stacks_node_rpc_port = devnet_config.stacks_node_rpc_port

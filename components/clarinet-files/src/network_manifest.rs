@@ -46,8 +46,9 @@ pub const DEFAULT_EPOCH_2_1: u64 = 101;
 pub const DEFAULT_EPOCH_2_2: u64 = 102;
 pub const DEFAULT_EPOCH_2_3: u64 = 103;
 pub const DEFAULT_EPOCH_2_4: u64 = 104;
-pub const DEFAULT_EPOCH_2_5: u64 = 105;
-pub const DEFAULT_EPOCH_3_0: u64 = 121;
+pub const DEFAULT_EPOCH_2_5: u64 = 108;
+// Epoch 3.0 isn't stable for now, let's focus on running 2.5
+pub const DEFAULT_EPOCH_3_0: u64 = 100001;
 
 // Currently, the pox-4 contract has these values hardcoded:
 // https://github.com/stacks-network/stacks-core/blob/e09ab931e2f15ff70f3bb5c2f4d7afb[…]42bd7bec6/stackslib/src/chainstate/stacks/boot/pox-testnet.clar

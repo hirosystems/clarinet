@@ -713,7 +713,7 @@ pub async fn publish_stacking_orders(
         .and_then(|version| version.parse::<u32>().ok())
         .unwrap();
 
-    let signer_private_keys = [
+    let default_signing_keys = [
         StacksPrivateKey::from_hex(
             "7287ba251d44a4d3fd9276c88ce34c5c52a038955511cccaf77e61068649c17801",
         )
@@ -770,7 +770,7 @@ pub async fn publish_stacking_orders(
                     pox_version,
                     bitcoin_block_height,
                     current_cycle.into(),
-                    &signer_private_keys[i],
+                    &default_signing_keys[i % 2],
                     extend_stacking,
                     &btc_address_moved,
                     stx_amount,
@@ -1086,53 +1086,4 @@ fn make_signer_key_signature(
     .unwrap();
 
     signature.to_rsv()
-}
-
-#[cfg(test)]
-mod key_tests {
-    use super::*;
-    use clarinet_files::DEFAULT_DERIVATION_PATH;
-    use stackslib::{net::stackerdb::db, util::hash::bytes_to_hex};
-    #[test]
-    fn test_make_signer_key_signature() {
-        let label = "wallet_1".to_string();
-        let mnemonic = "sell invite acquire kitten bamboo drastic jelly vivid peace spawn twice guilt pave pen trash pretty park cube fragile unaware remain midnight betray rebuild".to_string();
-
-        let account = AccountConfig {
-            label,
-            mnemonic,
-            derivation: DEFAULT_DERIVATION_PATH.into(),
-            balance: 100000,
-            stx_address: "ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5".into(),
-            btc_address: "mr1iPkD9N3RJZZxXRk7xF9d36gffa6exNC".into(),
-            is_mainnet: false,
-        };
-
-        let addr_bytes = account
-            .btc_address
-            .from_base58()
-            .expect("Unable to get bytes from btc address");
-
-        let pox_addr_tuple = ClarityValue::Tuple(
-            TupleData::from_data(vec![
-                (
-                    ClarityName::try_from("version".to_owned()).unwrap(),
-                    ClarityValue::buff_from_byte(AddressHashMode::SerializeP2PKH as u8),
-                ),
-                (
-                    ClarityName::try_from("hashbytes".to_owned()).unwrap(),
-                    ClarityValue::Sequence(SequenceData::Buffer(BuffData {
-                        data: Hash160::from_bytes(&addr_bytes[1..21])
-                            .unwrap()
-                            .as_bytes()
-                            .to_vec(),
-                    })),
-                ),
-            ])
-            .unwrap(),
-        );
-
-        let pox_addr = PoxAddress::try_from_pox_tuple(false, &pox_addr_tuple).unwrap();
-        dbg!(pox_addr);
-    }
 }
