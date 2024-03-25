@@ -1,3 +1,17 @@
+# [2.4.0](https://github.com/hirosystems/clarinet/compare/v2.3.1...v2.4.0) (2024-03-25)
+
+##### New Features
+
+*  Upgrade devnet to improve epoch 2.5 handling (7c201d44)
+*  Add signers and signers-voting boot contracts (#1386) (05c6a570)
+*  Call private function in simnet (#1380) (0288a261)
+
+##### Chores
+
+*  Update pox contracts (#1387) (9adb0f0f)
+*  Handle pox-locking in simnet (#1375) (dbc0178a)
+*  Update clarity and clarity-wasm (#1372) (ae47f28a)
+
 # [2.3.1](https://github.com/hirosystems/clarinet/compare/v2.3.0...v2.3.1) (2024-03-04)
 
 ##### Bug Fixes
