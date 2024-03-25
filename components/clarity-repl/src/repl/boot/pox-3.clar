@@ -182,7 +182,7 @@
 ;; partial-stacked-by-cycle right after it was deleted (so, subsequent calls
 ;; to the `stack-aggregation-*` functions will overwrite this).
 (define-map logged-partial-stacked-by-cycle
-    { 
+    {
         pox-addr: { version: (buff 1), hashbytes: (buff 32) },
         reward-cycle: uint,
         sender: principal
