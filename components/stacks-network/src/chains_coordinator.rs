@@ -985,12 +985,11 @@ fn get_stacking_tx_method_and_args(
     };
 
     if pox_version >= 4 {
-        // extra arguments for pox-4 ( for both stack-stx and stack-extend)
+        // extra arguments for pox-4 (for both stack-stx and stack-extend)
         //   (signer-sig (optional (buff 65)))
         //   (signer-key (buff 33))
         //   (max-amount uint)
         //   (auth-id uint)
-        let signature_amount = if extend_stacking { 0 } else { stx_amount };
         let topic = if extend_stacking {
             Pox4SignatureTopic::StackExtend
         } else {
@@ -1003,7 +1002,7 @@ fn get_stacking_tx_method_and_args(
             cycle,
             &topic,
             duration.into(),
-            signature_amount.into(),
+            stx_amount.into(),
             auth_id,
         );
         let pub_key = StacksPublicKey::from_private(signer_key);
