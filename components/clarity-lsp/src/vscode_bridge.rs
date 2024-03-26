@@ -65,7 +65,9 @@ impl LspVscodeBridge {
             DidOpenTextDocument::METHOD => {
                 let params: DidOpenTextDocumentParams = match decode_from_js(js_params) {
                     Ok(params) => params,
-                    Err(err) => return Promise::reject(&JsValue::from(format!("error: {}", err))),
+                    Err(err) => {
+                        return Promise::reject(&JsValue::from(format!("error (did open): {err}")))
+                    }
                 };
                 let uri = &params.text_document.uri;
                 if let Some(contract_location) = get_contract_location(uri) {
@@ -73,14 +75,18 @@ impl LspVscodeBridge {
                 } else if let Some(manifest_location) = get_manifest_location(uri) {
                     LspNotification::ManifestOpened(manifest_location)
                 } else {
-                    return Promise::reject(&JsValue::from_str("Unsupported file opened"));
+                    return Promise::reject(&JsValue::from_str(
+                        "error (did open): unsupported file opened",
+                    ));
                 }
             }
 
             DidSaveTextDocument::METHOD => {
                 let params: DidSaveTextDocumentParams = match decode_from_js(js_params) {
                     Ok(params) => params,
-                    Err(err) => return Promise::reject(&JsValue::from(format!("error: {}", err))),
+                    Err(err) => {
+                        return Promise::reject(&JsValue::from(format!("error (did save): {err}")))
+                    }
                 };
                 let uri = &params.text_document.uri;
 
@@ -89,14 +95,20 @@ impl LspVscodeBridge {
                 } else if let Some(manifest_location) = get_manifest_location(uri) {
                     LspNotification::ManifestSaved(manifest_location)
                 } else {
-                    return Promise::reject(&JsValue::from_str("Unsupported file opened"));
+                    return Promise::reject(&JsValue::from_str(
+                        "error (did save): unsupported file opened",
+                    ));
                 }
             }
 
             DidChangeTextDocument::METHOD => {
                 let params: DidChangeTextDocumentParams = match decode_from_js(js_params) {
                     Ok(params) => params,
-                    Err(err) => return Promise::reject(&JsValue::from(format!("error: {}", err))),
+                    Err(err) => {
+                        return Promise::reject(&JsValue::from(format!(
+                            "error (did change): {err}"
+                        )))
+                    }
                 };
                 let uri = &params.text_document.uri;
 
@@ -113,7 +125,9 @@ impl LspVscodeBridge {
             DidCloseTextDocument::METHOD => {
                 let params: DidCloseTextDocumentParams = match decode_from_js(js_params) {
                     Ok(params) => params,
-                    Err(err) => return Promise::reject(&JsValue::from(format!("error: {}", err))),
+                    Err(err) => {
+                        return Promise::reject(&JsValue::from(format!("error (did close): {err}")))
+                    }
                 };
                 let uri = &params.text_document.uri;
 
@@ -126,7 +140,7 @@ impl LspVscodeBridge {
 
             _ => {
                 #[cfg(debug_assertions)]
-                log!("unexpected notification ({})", method);
+                log!("unexpected notification ({method})");
                 return Promise::resolve(&JsValue::FALSE);
             }
         };
