@@ -14,7 +14,7 @@ pub fn setup_logger() -> Logger {
     if cfg!(feature = "release") || cfg!(feature = "release_debug") {
         let drain = slog_json::Json::new(std::io::stderr()).add_default_keys();
 
-        let drain = if cfg!(feature = "full_level_prefix") {
+        let drain = if cfg!(feature = "full_log_level_prefix") {
             drain.add_key_value(o!(
                 "level" => FnValue(move |rinfo : &Record| {
                     rinfo.level().as_str()
@@ -28,7 +28,7 @@ pub fn setup_logger() -> Logger {
     } else {
         let decorator = slog_term::TermDecorator::new().build();
         let drain = slog_term::FullFormat::new(decorator);
-        let drain = if cfg!(feature = "full_level_prefix") {
+        let drain = if cfg!(feature = "full_log_level_prefix") {
             drain
                 .use_custom_header_print(custom_print_msg_header)
                 .build()
