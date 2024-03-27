@@ -1,4 +1,4 @@
-use slog::{o, Drain, FnValue, Logger, Record};
+use slog::{o, Drain, FnValue, Logger, Record, LOG_LEVEL_NAMES};
 use slog_async;
 use slog_atomic::AtomicSwitch;
 use slog_scope::GlobalLoggerGuard;
@@ -17,7 +17,7 @@ pub fn setup_logger() -> Logger {
         let drain = if cfg!(feature = "full_log_level_prefix") {
             drain.add_key_value(o!(
                 "level" => FnValue(move |rinfo : &Record| {
-                    rinfo.level().as_str()
+                    LOG_LEVEL_NAMES[rinfo.level().as_usize()]
                 }),
             ))
         } else {
@@ -54,7 +54,7 @@ pub fn custom_print_msg_header(
 
     rd.start_level()?;
     if cfg!(feature = "full_log_level_prefix") {
-        write!(rd, "{}", record.level().as_str())?;
+        write!(rd, "{}", LOG_LEVEL_NAMES[record.level().as_usize()])?;
     } else {
         write!(rd, "{}", record.level().as_short_str())?;
     }
