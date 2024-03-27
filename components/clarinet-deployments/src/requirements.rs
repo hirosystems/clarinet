@@ -1,6 +1,9 @@
 use clarinet_files::{FileAccessor, FileLocation};
 use clarity_repl::{
-    clarity::{vm::types::QualifiedContractIdentifier, ClarityVersion, StacksEpochId},
+    clarity::{
+        chainstate::StacksAddress, vm::types::QualifiedContractIdentifier, Address, ClarityVersion,
+        StacksEpochId,
+    },
     repl::{DEFAULT_CLARITY_VERSION, DEFAULT_EPOCH},
 };
 use reqwest;
@@ -57,7 +60,9 @@ pub async fn retrieve_contract(
         ));
     }
 
-    let is_mainnet = contract_deployer.starts_with("SP");
+    let is_mainnet = StacksAddress::from_string(&contract_deployer)
+        .unwrap()
+        .is_mainnet();
     let stacks_node_addr = if is_mainnet {
         "https://api.hiro.so".to_string()
     } else {
