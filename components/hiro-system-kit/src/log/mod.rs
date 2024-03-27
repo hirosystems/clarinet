@@ -1,4 +1,4 @@
-use slog::{o, Drain, FnValue, Logger, Record, LOG_LEVEL_NAMES};
+use slog::{o, Drain, FnValue, Logger, PushFnValue, Record, LOG_LEVEL_NAMES};
 use slog_async;
 use slog_atomic::AtomicSwitch;
 use slog_scope::GlobalLoggerGuard;
@@ -12,16 +12,22 @@ pub fn setup_global_logger(logger: Logger) -> GlobalLoggerGuard {
 
 pub fn setup_logger() -> Logger {
     if cfg!(feature = "release") || cfg!(feature = "release_debug") {
-        let drain = slog_json::Json::new(std::io::stderr()).add_default_keys();
-
         let drain = if cfg!(feature = "full_log_level_prefix") {
-            drain.add_key_value(o!(
+            slog_json::Json::new(std::io::stderr()).add_key_value(o!(
+                "ts" => FnValue(move |_ : &Record| {
+                        time::OffsetDateTime::now_utc()
+                        .format(&time::format_description::well_known::Rfc3339)
+                        .ok()
+                }),
                 "level" => FnValue(move |rinfo : &Record| {
                     LOG_LEVEL_NAMES[rinfo.level().as_usize()]
                 }),
+                "msg" => PushFnValue(move |record : &Record, ser| {
+                    ser.emit(record.msg())
+                }),
             ))
         } else {
-            drain
+            slog_json::Json::new(std::io::stderr()).add_default_keys()
         };
 
         Logger::root(Mutex::new(drain.build()).map(slog::Fuse), slog::o!())
