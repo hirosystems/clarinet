@@ -227,6 +227,7 @@ pub async fn start_chains_coordinator(
             observer_command_rx,
             Some(observer_event_tx_moved),
             None,
+            None,
             ctx_moved,
         );
     });
