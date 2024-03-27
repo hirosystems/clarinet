@@ -57,7 +57,7 @@ pub async fn retrieve_contract(
         ));
     }
 
-    let is_mainnet = contract_deployer.starts_with("SP");
+    let is_mainnet = contract_deployer.starts_with("SP") || contract_deployer.starts_with("SM");
     let stacks_node_addr = if is_mainnet {
         "https://api.hiro.so".to_string()
     } else {
