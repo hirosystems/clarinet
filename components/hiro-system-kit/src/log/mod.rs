@@ -10,7 +10,7 @@ pub fn setup_global_logger(logger: Logger) -> GlobalLoggerGuard {
 }
 
 pub fn setup_logger() -> Logger {
-    if cfg!(feature = "release") {
+    if cfg!(feature = "release") || cfg!(feature = "release_debug") {
         Logger::root(
             Mutex::new(slog_json::Json::default(std::io::stderr())).map(slog::Fuse),
             slog::o!(),
