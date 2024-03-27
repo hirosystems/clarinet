@@ -1,3 +1,9 @@
+# [2.4.1](https://github.com/hirosystems/clarinet/compare/v2.4.0...v2.4.1) (2024-03-25)
+
+##### Fix
+
+*  Allow requirements for contracts deployed with multisig (807c738d)
+
 # [2.4.0](https://github.com/hirosystems/clarinet/compare/v2.3.1...v2.4.0) (2024-03-25)
 
 ##### New Features
