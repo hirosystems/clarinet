@@ -27,21 +27,19 @@ pub fn setup_logger() -> Logger {
         Logger::root(Mutex::new(drain.build()).map(slog::Fuse), slog::o!())
     } else {
         let decorator = slog_term::TermDecorator::new().build();
-        let drain = slog_term::FullFormat::new(decorator);
-        let drain = if cfg!(feature = "full_log_level_prefix") {
-            drain
+        let drain = Mutex::new(
+            slog_term::FullFormat::new(decorator)
                 .use_custom_header_print(custom_print_msg_header)
-                .build()
-        } else {
-            drain.build()
-        };
-        let drain = Mutex::new(drain).fuse();
+                .build(),
+        )
+        .fuse();
         let drain = slog_async::Async::new(drain).build().fuse();
         let drain = AtomicSwitch::new(drain);
         Logger::root(drain.fuse(), o!())
     }
 }
 
+/// Copied from `slog_term::print_msg_header` with minor adjustments.
 pub fn custom_print_msg_header(
     fn_timestamp: &dyn ThreadSafeTimestampFn<Output = io::Result<()>>,
     mut rd: &mut dyn RecordDecorator,
@@ -55,7 +53,11 @@ pub fn custom_print_msg_header(
     write!(rd, " ")?;
 
     rd.start_level()?;
-    write!(rd, "{}", record.level().as_str())?;
+    if cfg!(feature = "full_log_level_prefix") {
+        write!(rd, "{}", record.level().as_str())?;
+    } else {
+        write!(rd, "{}", record.level().as_short_str())?;
+    }
 
     if use_file_location {
         rd.start_location()?;
