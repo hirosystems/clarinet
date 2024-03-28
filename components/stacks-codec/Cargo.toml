@@ -6,18 +6,6 @@ edition = "2021"
 
 [dependencies]
 # clarity-vm = "2"
-clarity = { git = "https://github.com/stacks-network/stacks-core.git", branch="feat/clarity-wasm-next", package = "clarity", optional = true, default-features = false }
+clarity = { git = "https://github.com/stacks-network/stacks-core.git", branch="feat/clarity-wasm-next", package = "clarity",  default-features = false, features = ["canonical", "developer-mode", "log"] }
 serde = { version = "1", features = ["derive"] }
-wsts = { version = "8.1.0", default-features = false, optional = true }
-
-[features]
-default = [
-    "clarity/canonical",
-    "clarity/developer-mode",
-    "clarity/log",
-    "wsts"
-]
-wasm = [
-    "clarity/wasm",
-    "clarity/developer-mode",
-]
+wsts = { version = "8.1.0", default-features = false }

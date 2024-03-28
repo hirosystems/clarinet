@@ -671,6 +671,7 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 [[package]]
 name = "chainhook-sdk"
 version = "0.12.5"
+source = "git+https://github.com/hirosystems/chainhook.git?branch=chore/use-stacks-codec#21df595de7e480e2582de165e34516da654e5e8c"
 dependencies = [
  "base58 0.2.0",
  "base64 0.21.7",
@@ -696,7 +697,7 @@ dependencies = [
  "serde-hex",
  "serde_derive",
  "serde_json",
- "stacks-codec",
+ "stacks-codec 2.4.1 (git+https://github.com/hirosystems/clarinet.git?branch=feat/stacks-codec)",
  "threadpool",
  "tokio",
 ]
@@ -704,6 +705,7 @@ dependencies = [
 [[package]]
 name = "chainhook-types"
 version = "1.3.3"
+source = "git+https://github.com/hirosystems/chainhook.git?branch=chore/use-stacks-codec#21df595de7e480e2582de165e34516da654e5e8c"
 dependencies = [
  "hex 0.4.3",
  "schemars",
@@ -880,7 +882,7 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "serde_yaml",
- "stacks-codec",
+ "stacks-codec 2.4.1",
  "stacks-rpc-client",
  "tiny-hderive",
 ]
@@ -1042,7 +1044,6 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "sha2 0.10.6",
- "stacks-codec",
  "tokio",
  "tokio-util",
  "wasm-bindgen",
@@ -4943,6 +4944,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "stacks-codec"
+version = "2.4.1"
+source = "git+https://github.com/hirosystems/clarinet.git?branch=feat/stacks-codec#b39261ae29babfab3c77395483c5a11178d849ca"
+dependencies = [
+ "clarity",
+ "serde",
+ "wsts",
+]
+
+[[package]]
 name = "stacks-common"
 version = "0.0.2"
 source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-next#35cce11f4a7e49f29dd1cf06680abfbd31099669"
@@ -5020,7 +5031,7 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "serde_yaml",
- "stacks-codec",
+ "stacks-codec 2.4.1",
  "stacks-rpc-client",
  "stackslib",
  "tokio",
@@ -5041,7 +5052,7 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "sha2 0.10.6",
- "stacks-codec",
+ "stacks-codec 2.4.1",
  "tiny-hderive",
 ]
 

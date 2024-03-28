@@ -11,9 +11,6 @@ extern crate serde_derive;
 #[macro_use]
 extern crate hiro_system_kit;
 
-#[macro_use]
-mod macros;
-
 pub mod analysis;
 
 pub mod clarity {
