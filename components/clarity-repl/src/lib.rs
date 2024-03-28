@@ -15,20 +15,18 @@ extern crate hiro_system_kit;
 mod macros;
 
 pub mod analysis;
-#[cfg(not(feature = "wasm"))]
-pub mod codec;
+
+pub mod clarity {
+    #![allow(ambiguous_glob_reexports)]
+    // pub use ::stacks_codec::clarity::types::*;
+    pub use ::stacks_codec::clarity::vm::*;
+    pub use ::stacks_codec::clarity::*;
+}
 pub mod repl;
 pub mod utils;
 
 #[cfg(test)]
 pub mod test_fixtures;
-
-pub mod clarity {
-    #![allow(ambiguous_glob_reexports)]
-    pub use ::clarity::types::*;
-    pub use ::clarity::vm::*;
-    pub use ::clarity::*;
-}
 
 #[cfg(feature = "cli")]
 pub mod frontend;

@@ -882,6 +882,7 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "serde_yaml",
+ "stacks-codec",
  "stacks-rpc-client 2.4.1",
  "tiny-hderive",
 ]
@@ -1046,7 +1047,6 @@ dependencies = [
  "bytes",
  "chrono",
  "clar2wasm",
- "clarity",
  "debug_types",
  "futures",
  "getrandom 0.2.8",
@@ -1066,11 +1066,11 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "sha2 0.10.6",
+ "stacks-codec",
  "tokio",
  "tokio-util",
  "wasm-bindgen",
  "wasm-bindgen-futures",
- "wsts",
 ]
 
 [[package]]
@@ -4969,6 +4969,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "stacks-codec"
+version = "2.4.1"
+dependencies = [
+ "clarity",
+ "serde",
+ "serde_json",
+ "wsts",
+]
+
+[[package]]
 name = "stacks-common"
 version = "0.0.2"
 source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-next#35cce11f4a7e49f29dd1cf06680abfbd31099669"
@@ -5046,6 +5056,7 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "serde_yaml",
+ "stacks-codec",
  "stacks-rpc-client 2.4.1",
  "stackslib",
  "tokio",
@@ -5075,7 +5086,6 @@ dependencies = [
 name = "stacks-rpc-client"
 version = "2.4.1"
 dependencies = [
- "clarity-repl 2.4.1",
  "hmac 0.12.1",
  "libsecp256k1 0.7.1",
  "pbkdf2",
@@ -5084,6 +5094,7 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "sha2 0.10.6",
+ "stacks-codec",
  "tiny-hderive",
 ]
 

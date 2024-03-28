@@ -1,0 +1,24 @@
+[package]
+name = "stacks-codec"
+version = "2.4.1"
+license = "GPL-3.0"
+edition = "2021"
+
+[dependencies]
+# clarity-vm = "2"
+clarity = { git = "https://github.com/stacks-network/stacks-core.git", branch="feat/clarity-wasm-next", package = "clarity", optional = true, default-features = false }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1.0.47", features = ["unbounded_depth"] }
+wsts = { version = "8.1.0", default-features = false, optional = true }
+
+[features]
+default = [
+    "clarity/canonical",
+    "clarity/developer-mode",
+    "clarity/log",
+    "wsts"
+]
+wasm = [
+    "clarity/wasm",
+    "clarity/developer-mode",
+]

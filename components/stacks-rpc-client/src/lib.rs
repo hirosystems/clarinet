@@ -9,8 +9,8 @@ extern crate serde_derive;
 extern crate serde_json;
 
 pub mod clarity {
-    pub use clarity_repl::clarity::vm;
-    pub use clarity_repl::codec;
+    pub use stacks_codec::clarity::vm;
+    pub use stacks_codec::codec;
 }
 
 pub mod rpc_client;
