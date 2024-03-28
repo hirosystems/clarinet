@@ -12,19 +12,19 @@ use clarity_repl::clarity::vm::types::{
 };
 use clarity_repl::clarity::vm::{ClarityName, Value};
 use clarity_repl::clarity::{ClarityVersion, ContractName, EvaluationResult};
-use clarity_repl::codec::{
-    SinglesigHashMode, SinglesigSpendingCondition, StacksString, StacksTransactionSigner,
-    TokenTransferMemo, TransactionAuth, TransactionContractCall, TransactionPayload,
-    TransactionPostConditionMode, TransactionPublicKeyEncoding, TransactionSmartContract,
-    TransactionSpendingCondition, TransactionVersion,
-};
-use clarity_repl::codec::{StacksTransaction, TransactionAnchorMode};
 use clarity_repl::repl::session::{
     BOOT_MAINNET_ADDRESS, BOOT_TESTNET_ADDRESS, V1_BOOT_CONTRACTS, V2_BOOT_CONTRACTS,
     V3_BOOT_CONTRACTS,
 };
 use clarity_repl::repl::{Session, SessionSettings};
 use reqwest::Url;
+use stacks_codec::codec::{
+    SinglesigHashMode, SinglesigSpendingCondition, StacksString, StacksTransactionSigner,
+    TokenTransferMemo, TransactionAuth, TransactionContractCall, TransactionPayload,
+    TransactionPostConditionMode, TransactionPublicKeyEncoding, TransactionSmartContract,
+    TransactionSpendingCondition, TransactionVersion,
+};
+use stacks_codec::codec::{StacksTransaction, TransactionAnchorMode};
 use stacks_rpc_client::StacksRpc;
 use std::collections::{BTreeMap, HashSet, VecDeque};
 use std::str::FromStr;
