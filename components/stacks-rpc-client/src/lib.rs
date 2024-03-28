@@ -17,4 +17,4 @@ pub mod rpc_client;
 
 pub mod crypto;
 
-pub use rpc_client::{PoxInfo, StacksRpc};
+pub use rpc_client::StacksRpc;

@@ -1,5 +1,4 @@
 pub mod codec;
-pub mod pox;
 
 #[macro_use]
 mod macros;

@@ -18,9 +18,9 @@ pub mod analysis;
 
 pub mod clarity {
     #![allow(ambiguous_glob_reexports)]
-    // pub use ::stacks_codec::clarity::types::*;
-    pub use ::stacks_codec::clarity::vm::*;
-    pub use ::stacks_codec::clarity::*;
+    pub use ::clarity::types::*;
+    pub use ::clarity::vm::*;
+    pub use ::clarity::*;
 }
 pub mod repl;
 pub mod utils;

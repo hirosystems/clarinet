@@ -149,16 +149,16 @@ impl StacksRpc {
         Ok(nonce)
     }
 
-    pub fn get_pox_info(&self) -> Result<PoxInfo, RpcError> {
-        let request_url = format!("{}/v2/pox", self.url);
+    // pub fn get_pox_info(&self) -> Result<PoxInfo, RpcError> {
+    //     let request_url = format!("{}/v2/pox", self.url);
 
-        self.client
-            .get(request_url)
-            .send()
-            .map_err(|e| RpcError::Message(e.to_string()))?
-            .json::<PoxInfo>()
-            .map_err(|e| RpcError::Message(e.to_string()))
-    }
+    //     self.client
+    //         .get(request_url)
+    //         .send()
+    //         .map_err(|e| RpcError::Message(e.to_string()))?
+    //         .json::<PoxInfo>()
+    //         .map_err(|e| RpcError::Message(e.to_string()))
+    // }
 
     pub fn get_info(&self) -> Result<NodeInfo, RpcError> {
         let request_url = format!("{}/v2/info", self.url);

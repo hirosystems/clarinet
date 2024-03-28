@@ -8,7 +8,6 @@ edition = "2021"
 # clarity-vm = "2"
 clarity = { git = "https://github.com/stacks-network/stacks-core.git", branch="feat/clarity-wasm-next", package = "clarity", optional = true, default-features = false }
 serde = { version = "1", features = ["derive"] }
-serde_json = { version = "1.0.47", features = ["unbounded_depth"] }
 wsts = { version = "8.1.0", default-features = false, optional = true }
 
 [features]
