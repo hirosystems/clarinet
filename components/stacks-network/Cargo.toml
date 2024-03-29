@@ -36,7 +36,7 @@ clap = { version = "4.4.8", features = ["derive"] }
 serde_yaml = "0.8.23"
 
 stackslib = { git = "https://github.com/stacks-network/stacks-core.git", branch="feat/clarity-wasm-next", package = "stackslib" }
-chainhook-sdk = { default-features = true, git = "https://github.com/hirosystems/chainhook.git", branch="chore/update-clarinet-and-clarity" }
+chainhook-sdk = { default-features = true, git = "https://github.com/hirosystems/chainhook.git" }
 # chainhook-sdk = { version = "=0.11", default-features = true }
 
 stacks-rpc-client = { path = "../stacks-rpc-client" }
@@ -45,6 +45,7 @@ clarinet-deployments = { path = "../clarinet-deployments", features = ["cli"] }
 clarinet-utils = { path = "../clarinet-utils" }
 hiro-system-kit = { path = "../hiro-system-kit", features = ["log"] }
 clarity-repl = { path = "../clarity-repl", features = ["cli"] }
+stacks-codec = { path = "../stacks-codec" }
 
 [lib]
 name = "stacks_network"

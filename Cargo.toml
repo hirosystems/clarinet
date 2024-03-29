@@ -11,6 +11,7 @@ members = [
     "components/clarity-repl",
     "components/clarity-events",
     "components/hiro-system-kit",
+    "components/stacks-codec",
     "components/stacks-devnet-js",
     "components/stacks-network",
     "components/stacks-rpc-client",
@@ -19,3 +20,7 @@ default-members = ["components/clarinet-cli"]
 
 # [patch.crates-io]
 # "clarity-vm" = { path = "../stacks-blockchain/clarity" }
+
+# [patch.'https://github.com/hirosystems/chainhook.git']
+# chainhook-sdk = {path = "../chainhook/components/chainhook-sdk" }
+# chainhook-types = {path = "../chainhook/components/chainhook-types-rs" }

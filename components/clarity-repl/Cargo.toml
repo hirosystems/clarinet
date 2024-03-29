@@ -58,7 +58,6 @@ reqwest = { version = "0.11", default-features = false, features = [
     "json",
     "rustls-tls",
 ] }
-wsts = { version = "8.1.0", default-features = false, optional = true }
 
 # WASM
 wasm-bindgen = { version = "0.2.91", optional = true }
@@ -87,16 +86,14 @@ cli = [
     "clarity/log",
     "hiro_system_kit/tokio_helpers",
     "clar2wasm",
-    "pox-locking/default",
-    "wsts"
+    "pox-locking/default"
 ]
 sdk = [
     "clarity/canonical",
     "clarity/developer-mode",
     "clarity/log",
     "hiro_system_kit/tokio_helpers",
-    "pox-locking/default",
-    "wsts"
+    "pox-locking/default"
 ]
 dap = [
     "tokio",

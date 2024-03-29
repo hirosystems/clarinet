@@ -11,17 +11,7 @@ extern crate serde_derive;
 #[macro_use]
 extern crate hiro_system_kit;
 
-#[macro_use]
-mod macros;
-
 pub mod analysis;
-#[cfg(not(feature = "wasm"))]
-pub mod codec;
-pub mod repl;
-pub mod utils;
-
-#[cfg(test)]
-pub mod test_fixtures;
 
 pub mod clarity {
     #![allow(ambiguous_glob_reexports)]
@@ -29,6 +19,11 @@ pub mod clarity {
     pub use ::clarity::vm::*;
     pub use ::clarity::*;
 }
+pub mod repl;
+pub mod utils;
+
+#[cfg(test)]
+pub mod test_fixtures;
 
 #[cfg(feature = "cli")]
 pub mod frontend;

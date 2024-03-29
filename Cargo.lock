@@ -671,7 +671,7 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 [[package]]
 name = "chainhook-sdk"
 version = "0.12.5"
-source = "git+https://github.com/hirosystems/chainhook.git?branch=chore/update-clarinet-and-clarity#160fd65a66a679efa4cf19cbe33c685eebaa9c2d"
+source = "git+https://github.com/hirosystems/chainhook.git#6e3f2a1097b11c14b92beef0faf275aee5814559"
 dependencies = [
  "base58 0.2.0",
  "base64 0.21.7",
@@ -683,7 +683,7 @@ dependencies = [
  "futures",
  "fxhash",
  "hex 0.4.3",
- "hiro-system-kit 0.3.1",
+ "hiro-system-kit 0.3.4",
  "hyper 0.14.27",
  "lazy_static",
  "miniscript",
@@ -697,7 +697,7 @@ dependencies = [
  "serde-hex",
  "serde_derive",
  "serde_json",
- "stacks-rpc-client 2.3.1",
+ "stacks-codec 2.4.1 (git+https://github.com/hirosystems/clarinet.git?branch=feat/stacks-codec)",
  "threadpool",
  "tokio",
 ]
@@ -705,7 +705,7 @@ dependencies = [
 [[package]]
 name = "chainhook-types"
 version = "1.3.3"
-source = "git+https://github.com/hirosystems/chainhook.git?branch=chore/update-clarinet-and-clarity#160fd65a66a679efa4cf19cbe33c685eebaa9c2d"
+source = "git+https://github.com/hirosystems/chainhook.git#6e3f2a1097b11c14b92beef0faf275aee5814559"
 dependencies = [
  "hex 0.4.3",
  "schemars",
@@ -819,7 +819,7 @@ dependencies = [
  "clarinet-files",
  "clarinet-utils",
  "clarity-lsp",
- "clarity-repl 2.4.1",
+ "clarity-repl",
  "crossbeam-channel",
  "crossterm",
  "ctrlc",
@@ -874,7 +874,7 @@ dependencies = [
  "bitcoincore-rpc-json 0.16.0",
  "clarinet-files",
  "clarinet-utils",
- "clarity-repl 2.4.1",
+ "clarity-repl",
  "colored 2.1.0",
  "libsecp256k1 0.7.1",
  "reqwest",
@@ -882,7 +882,8 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "serde_yaml",
- "stacks-rpc-client 2.4.1",
+ "stacks-codec 2.4.1",
+ "stacks-rpc-client",
  "tiny-hderive",
 ]
 
@@ -894,7 +895,7 @@ dependencies = [
  "bitcoin 0.29.2",
  "chainhook-types",
  "clarinet-utils",
- "clarity-repl 2.4.1",
+ "clarity-repl",
  "js-sys",
  "libsecp256k1 0.7.1",
  "serde",
@@ -914,7 +915,7 @@ version = "2.4.1"
 dependencies = [
  "clarinet-deployments",
  "clarinet-files",
- "clarity-repl 2.4.1",
+ "clarity-repl",
  "colored 2.1.0",
  "console_error_panic_hook",
  "gloo-utils",
@@ -966,7 +967,7 @@ version = "1.0.0"
 dependencies = [
  "clap",
  "clarinet-files",
- "clarity-repl 2.4.1",
+ "clarity-repl",
  "serde",
  "serde_derive",
  "serde_json",
@@ -978,7 +979,7 @@ name = "clarity-jupyter-kernel"
 version = "1.0.0"
 dependencies = [
  "chrono",
- "clarity-repl 2.4.1",
+ "clarity-repl",
  "colored 1.9.3",
  "dirs",
  "failure",
@@ -1000,7 +1001,7 @@ version = "1.0.0"
 dependencies = [
  "clarinet-deployments",
  "clarinet-files",
- "clarity-repl 2.4.1",
+ "clarity-repl",
  "console_error_panic_hook",
  "js-sys",
  "lazy_static",
@@ -1012,29 +1013,6 @@ dependencies = [
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
-]
-
-[[package]]
-name = "clarity-repl"
-version = "2.3.1"
-source = "git+https://github.com/hirosystems/clarinet.git#56acb9e4beebd58e05e7bf04e33499c7faacd11b"
-dependencies = [
- "ansi_term",
- "atty",
- "chrono",
- "clarity",
- "getrandom 0.2.8",
- "hiro-system-kit 0.1.0 (git+https://github.com/hirosystems/clarinet.git)",
- "integer-sqrt",
- "lazy_static",
- "pox-locking",
- "regex",
- "reqwest",
- "serde",
- "serde_derive",
- "serde_json",
- "sha2 0.10.6",
- "wsts",
 ]
 
 [[package]]
@@ -1070,7 +1048,6 @@ dependencies = [
  "tokio-util",
  "wasm-bindgen",
  "wasm-bindgen-futures",
- "wsts",
 ]
 
 [[package]]
@@ -2279,20 +2256,9 @@ dependencies = [
 
 [[package]]
 name = "hiro-system-kit"
-version = "0.1.0"
-source = "git+https://github.com/hirosystems/clarinet.git#56acb9e4beebd58e05e7bf04e33499c7faacd11b"
-dependencies = [
- "ansi_term",
- "atty",
- "lazy_static",
- "tokio",
-]
-
-[[package]]
-name = "hiro-system-kit"
-version = "0.3.1"
+version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "94a96596d2b33489f33f79b2df6f340dbbd2baba05a251715bb84661d33bf1c9"
+checksum = "4d3bf5cf007a9973ef9b7dffe8d63fa5228e9bb1aa012e89da2b9f1e7119ce6e"
 dependencies = [
  "ansi_term",
  "atty",
@@ -2303,6 +2269,7 @@ dependencies = [
  "slog-json",
  "slog-scope",
  "slog-term",
+ "time",
  "tokio",
 ]
 
@@ -4969,6 +4936,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "stacks-codec"
+version = "2.4.1"
+dependencies = [
+ "clarity",
+ "serde",
+ "wsts",
+]
+
+[[package]]
+name = "stacks-codec"
+version = "2.4.1"
+source = "git+https://github.com/hirosystems/clarinet.git?branch=feat/stacks-codec#f8bd0af8e387c3c5169a261f3257380397a8c0fb"
+dependencies = [
+ "clarity",
+ "serde",
+ "wsts",
+]
+
+[[package]]
 name = "stacks-common"
 version = "0.0.2"
 source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-next#35cce11f4a7e49f29dd1cf06680abfbd31099669"
@@ -5033,7 +5019,7 @@ dependencies = [
  "clarinet-deployments",
  "clarinet-files",
  "clarinet-utils",
- "clarity-repl 2.4.1",
+ "clarity-repl",
  "crossbeam-channel",
  "crossterm",
  "ctrlc",
@@ -5046,7 +5032,8 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "serde_yaml",
- "stacks-rpc-client 2.4.1",
+ "stacks-codec 2.4.1",
+ "stacks-rpc-client",
  "stackslib",
  "tokio",
  "tracing",
@@ -5056,26 +5043,8 @@ dependencies = [
 
 [[package]]
 name = "stacks-rpc-client"
-version = "2.3.1"
-source = "git+https://github.com/hirosystems/clarinet.git#56acb9e4beebd58e05e7bf04e33499c7faacd11b"
-dependencies = [
- "clarity-repl 2.3.1",
- "hmac 0.12.1",
- "libsecp256k1 0.7.1",
- "pbkdf2",
- "reqwest",
- "serde",
- "serde_derive",
- "serde_json",
- "sha2 0.10.6",
- "tiny-hderive",
-]
-
-[[package]]
-name = "stacks-rpc-client"
 version = "2.4.1"
 dependencies = [
- "clarity-repl 2.4.1",
  "hmac 0.12.1",
  "libsecp256k1 0.7.1",
  "pbkdf2",
@@ -5084,6 +5053,7 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "sha2 0.10.6",
+ "stacks-codec 2.4.1",
  "tiny-hderive",
 ]
 
