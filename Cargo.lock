@@ -683,7 +683,7 @@ dependencies = [
  "futures",
  "fxhash",
  "hex 0.4.3",
- "hiro-system-kit 0.3.1",
+ "hiro-system-kit 0.3.4",
  "hyper 0.14.27",
  "lazy_static",
  "miniscript",
@@ -2256,9 +2256,9 @@ dependencies = [
 
 [[package]]
 name = "hiro-system-kit"
-version = "0.3.1"
+version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "94a96596d2b33489f33f79b2df6f340dbbd2baba05a251715bb84661d33bf1c9"
+checksum = "4d3bf5cf007a9973ef9b7dffe8d63fa5228e9bb1aa012e89da2b9f1e7119ce6e"
 dependencies = [
  "ansi_term",
  "atty",
@@ -2269,6 +2269,7 @@ dependencies = [
  "slog-json",
  "slog-scope",
  "slog-term",
+ "time",
  "tokio",
 ]
 
@@ -4946,7 +4947,7 @@ dependencies = [
 [[package]]
 name = "stacks-codec"
 version = "2.4.1"
-source = "git+https://github.com/hirosystems/clarinet.git?branch=feat/stacks-codec#b39261ae29babfab3c77395483c5a11178d849ca"
+source = "git+https://github.com/hirosystems/clarinet.git?branch=feat/stacks-codec#a9da55627efdbc5c72e468dfb2d5ab39d0be2c60"
 dependencies = [
  "clarity",
  "serde",

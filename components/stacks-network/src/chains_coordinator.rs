@@ -7,7 +7,6 @@ use crate::orchestrator::ServicesMapHosts;
 
 use base58::FromBase58;
 use chainhook_sdk::chainhooks::types::ChainhookConfig;
-use chainhook_sdk::indexer::PoxInfo;
 use chainhook_sdk::observer::{
     start_event_observer, EventObserverConfig, ObserverCommand, ObserverEvent,
     StacksChainMempoolEvent,
@@ -37,6 +36,7 @@ use hiro_system_kit;
 use hiro_system_kit::slog;
 use hiro_system_kit::yellow;
 use stacks_codec::codec;
+use stacks_rpc_client::rpc_client::PoxInfo;
 use stacks_rpc_client::StacksRpc;
 use stackslib::chainstate::stacks::address::PoxAddress;
 use stackslib::core::CHAIN_ID_TESTNET;
