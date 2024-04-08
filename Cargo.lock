@@ -2251,6 +2251,7 @@ dependencies = [
  "slog-json",
  "slog-scope",
  "slog-term",
+ "time",
  "tokio",
 ]
 
