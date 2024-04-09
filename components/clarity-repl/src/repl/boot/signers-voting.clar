@@ -148,7 +148,7 @@
             (cached-weight (try! (get-and-cache-total-weight reward-cycle)))
             (threshold-weight (get-threshold-weight reward-cycle))
             (current-round (default-to {
-                votes-count: u0,
+                votes-count: u0, 
                 votes-weight: u0} (map-get? round-data {reward-cycle: reward-cycle, round: round})))
                 )
         ;; Check that the key has not yet been set for this reward cycle

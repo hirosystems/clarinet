@@ -12,7 +12,7 @@
 ;; Called internally by the Stacks node.
 ;; Stores the stackerdb signer slots for a given reward cycle.
 ;; Since there is one stackerdb per signer message, the `num-slots` field will always be u1.
-(define-private (stackerdb-set-signer-slots
+(define-private (stackerdb-set-signer-slots 
                    (signer-slots (list 4000 { signer: principal, num-slots: uint }))
                    (reward-cycle uint)
                    (set-at-height uint))
@@ -43,7 +43,7 @@
             (err ERR_NO_SUCH_PAGE))))
 
 ;; Get a signer's signing weight by a given index.
-;; Used by other contracts (e.g. the voting contract)
+;; Used by other contracts (e.g. the voting contract) 
 (define-read-only (get-signer-by-index (cycle uint) (signer-index uint))
 	(ok (element-at (unwrap! (map-get? cycle-signer-set cycle) (err ERR_CYCLE_NOT_SET)) signer-index)))
 
@@ -52,7 +52,7 @@
 (define-read-only (stackerdb-get-config)
 	(ok
 		{ chunk-size: CHUNK_SIZE,
-		  write-freq: u0,
+		  write-freq: u0, 
 		  max-writes: MAX_WRITES,
 		  max-neighbors: u32,
 		  hint-replicas: (list ) }
