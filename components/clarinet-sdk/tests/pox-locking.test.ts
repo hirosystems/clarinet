@@ -121,6 +121,24 @@ describe("test pox-3", () => {
       }),
     );
   });
+
+  it("can get pox boot contract code coverage", () => {
+    const stackStxArgs = [
+      Cl.uint(ustxAmount),
+      Cl.tuple({
+        version: Cl.bufferFromHex("00"),
+        hashbytes: Cl.bufferFromHex("7321b74e2b6a7e949e6c4ad313035b1665095017"),
+      }),
+      Cl.uint(0),
+      Cl.uint(1),
+    ];
+    const stackStx = simnet.callPublicFn(poxContract, "stack-stx", stackStxArgs, address1);
+    expect(stackStx.events).toHaveLength(2);
+
+    const { coverage } = simnet.collectReport();
+    expect(coverage).toContain("SF:./boot-contracts/pox-3");
+    expect(coverage).toContain("FNDA:1,stack-stx");
+  });
 });
 
 describe("test pox-4", () => {
@@ -147,12 +165,7 @@ describe("test pox-4", () => {
       btcAddr: publicKeyToBtcAddress(pubKey),
       signerPrivKey: signerPrivKey,
       signerPubKey: signerPubKey,
-      client: new StackingClient(stxAddress, {
-        ...network,
-        transactionVersion: network.version,
-        magicBytes: "X2",
-        peerNetworkId: network.chainId,
-      }),
+      client: new StackingClient(stxAddress, network),
     };
   });
 
