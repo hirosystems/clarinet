@@ -11,7 +11,6 @@
 
 (define-private (inner-increment)
   (begin
-    (print "call inner-increment")
     (if (is-none (map-get? participants tx-sender))
       (map-insert participants tx-sender true)
       (map-set participants tx-sender true)
@@ -22,7 +21,7 @@
 
 (define-public (increment)
   (begin
-    (print "call increment")
+    ;; (print "call increment")
     (try! (stx-transfer? u1000000 tx-sender (as-contract tx-sender)))
     (ok (inner-increment))
   )
@@ -30,7 +29,7 @@
 
 (define-public (add (n uint))
   (begin
-    (print "call add")
+    (print n)
     (if (is-none (map-get? participants tx-sender))
       (map-insert participants tx-sender true)
       (map-set participants tx-sender true)

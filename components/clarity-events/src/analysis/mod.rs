@@ -1,5 +1,5 @@
 use clarity_repl::analysis::ast_visitor::{traverse, ASTVisitor, TypedVar};
-use clarity_repl::clarity::analysis::type_checker::v2_05::TypeChecker;
+use clarity_repl::clarity::analysis::type_checker::v2_1::TypeChecker;
 use clarity_repl::clarity::util::hash;
 use clarity_repl::clarity::vm::analysis::types::ContractAnalysis;
 use clarity_repl::clarity::vm::types::{
@@ -637,7 +637,7 @@ impl ASTVisitor<'_> for EventCollector<'_, '_> {
             .type_checker
             .type_map
             .get_type(expr)
-            .expect("unable to infer value's type shape");
+            .unwrap_or(&TypeSignature::UIntType);
 
         let data = SmartContractEventData {
             data_type: serialize_type_signature(value_type_shape, value),

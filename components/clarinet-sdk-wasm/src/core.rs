@@ -10,10 +10,13 @@ use clarinet_deployments::{
 };
 use clarinet_files::chainhook_types::StacksNetwork;
 use clarinet_files::{FileAccessor, FileLocation, ProjectManifest, WASMFileSystemAccessor};
+use clarity_events::analysis::{EventCollector, Settings};
 use clarity_repl::analysis::coverage::CoverageReporter;
 use clarity_repl::clarity::analysis::contract_interface_builder::{
     ContractInterface, ContractInterfaceFunction, ContractInterfaceFunctionAccess,
 };
+use clarity_repl::clarity::analysis::type_checker::v2_1::TypeChecker;
+use clarity_repl::clarity::costs::LimitedCostTracker;
 use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
 use clarity_repl::clarity::{
     ClarityVersion, EvaluationResult, ExecutionResult, ParsedContract, StacksEpochId,
@@ -859,6 +862,33 @@ impl SDK {
                 message
             }
         }
+    }
+
+    #[wasm_bindgen(js_name=getEvents)]
+    pub fn get_events(&mut self, contract: &str) -> Result<JsValue, String> {
+        let contract_id = self.desugar_contract_id(contract)?;
+        let mut contract_analysis = self
+            .parsed_contracts
+            .get(&contract_id)
+            .ok_or("contract not found")?
+            .analysis
+            .clone();
+
+        let session = self.get_session_mut();
+        let mut analysis_db = session.interpreter.datastore.as_analysis_db();
+
+        let cost_track = LimitedCostTracker::new_free();
+        let type_checker = TypeChecker::new(
+            &mut analysis_db,
+            cost_track,
+            &contract_id,
+            &ClarityVersion::Clarity2,
+        );
+        let settings = Settings::default();
+        let mut event_collector = EventCollector::new(settings, type_checker);
+        let event_map = event_collector.run(&mut contract_analysis);
+
+        encode_to_js(&event_map).map_err(|e| e.to_string())
     }
 
     #[wasm_bindgen(js_name=setCurrentTestName)]

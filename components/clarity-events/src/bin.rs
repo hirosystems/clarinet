@@ -10,7 +10,10 @@ pub mod analysis;
 use analysis::{EventCollector, Settings};
 use clap::{Parser, Subcommand};
 use clarinet_files::FileLocation;
-use clarity_repl::clarity::analysis::type_checker::v2_05::TypeChecker;
+// use clarity_repl::clarity::analysis::type_checker::v2_05::TypeChecker;
+use clarity_repl::clarity::analysis::type_checker::v2_1::TypeChecker;
+use clarity_repl::clarity::types::{ContractIdentifier, QualifiedContractIdentifier};
+use clarity_repl::clarity::ClarityVersion;
 use clarity_repl::{
     clarity::{costs::LimitedCostTracker, EvaluationResult},
     repl::{Session, SessionSettings},
@@ -67,7 +70,12 @@ pub fn main() {
             {
                 let mut analysis_db = session.interpreter.datastore.as_analysis_db();
                 let cost_track = LimitedCostTracker::new_free();
-                let type_checker = TypeChecker::new(&mut analysis_db, cost_track);
+                let type_checker = TypeChecker::new(
+                    &mut analysis_db,
+                    cost_track,
+                    &QualifiedContractIdentifier::transient(),
+                    &ClarityVersion::Clarity2,
+                );
                 let settings = Settings::default();
                 let mut event_collector = EventCollector::new(settings, type_checker);
                 let event_map = event_collector.run(&mut contract_analysis);

@@ -327,6 +327,13 @@ describe("simnet can transfer stx", () => {
   });
 });
 
+describe.only("simnet can retrieve contract events", () => {
+  it("can list events of a given contract", () => {
+    const events = simnet.getEvents("counter");
+    console.dir(events, { depth: null });
+  });
+});
+
 describe("simnet can get session reports", () => {
   it("can get line coverage", () => {
     simnet.callPublicFn("counter", "increment", [], address1);

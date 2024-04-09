@@ -16,6 +16,7 @@ serde_derive = "1"
 default = ["cli"]
 cli = ["clarity-repl/cli", "clarinet-files/cli", "clap", "toml"]
 lib = ["clarity-repl/cli"]
+wasm = ["clarity-repl/wasm"]
 
 [lib]
 crate-type = ["cdylib", "rlib"]
