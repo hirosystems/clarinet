@@ -19,7 +19,5 @@ members = [
 default-members = ["components/clarinet-cli"]
 
 [patch.crates-io]
-# clarity-vm = { path = "../stacks-blockchain/clarity" , optioanl = true, default-features = false}
-clarity-vm = { git = "https://github.com/stacks-network/stacks-core.git", branch="feat/clarity-wasm-next", package = "clarity", optional = true }
 chainhook-sdk = { git = "https://github.com/hirosystems/chainhook.git", branch = "feat/update-pox-default-settings" }
 chainhook-types = { git = "https://github.com/hirosystems/chainhook.git", branch = "feat/update-pox-default-settings" }

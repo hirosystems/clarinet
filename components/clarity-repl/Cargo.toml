@@ -32,7 +32,10 @@ serde_derive = "1.0"
 integer-sqrt = "0.1.3"
 getrandom = { version = "0.2.3", features = ["js"] }
 atty = "0.2.14"
-clarity-vm = { version = "2.3.0", default-features = false }
+
+# clarity-vm = { version = "2.3.0", default-features = false }
+# clarity-vm = { path = "../stacks-blockchain/clarity" , optioanl = true, default-features = false}
+clarity = { git = "https://github.com/stacks-network/stacks-core.git", branch="feat/clarity-wasm-next", package = "clarity", default-features = false }
 clar2wasm = { git = "https://github.com/stacks-network/clarity-wasm.git", optional = true }
 # clar2wasm = { path="../../../clarity-wasm/clar2wasm", optional = true }
 pox-locking = { git = "https://github.com/stacks-network/stacks-core.git", branch="feat/clarity-wasm-next",  optional = true, default-features = false }
@@ -79,17 +82,17 @@ cli = [
     "pico-args",
     "rustyline",
     "prettytable-rs",
-    "clarity-vm/canonical",
-    "clarity-vm/developer-mode",
-    "clarity-vm/log",
+    "clarity/canonical",
+    "clarity/developer-mode",
+    "clarity/log",
     "hiro_system_kit/tokio_helpers",
     "clar2wasm",
     "pox-locking/default"
 ]
 sdk = [
-    "clarity-vm/canonical",
-    "clarity-vm/developer-mode",
-    "clarity-vm/log",
+    "clarity/canonical",
+    "clarity/developer-mode",
+    "clarity/log",
     "hiro_system_kit/tokio_helpers",
     "pox-locking/default"
 ]
@@ -106,8 +109,8 @@ dap = [
 wasm = [
     "wasm-bindgen",
     "wasm-bindgen-futures",
-    "clarity-vm/wasm",
-    "clarity-vm/developer-mode",
+    "clarity/wasm",
+    "clarity/developer-mode",
     "pox-locking/wasm"
 ]
 
