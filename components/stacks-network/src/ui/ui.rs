@@ -25,7 +25,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         .split(page_components[1]);
 
     let nb_of_services = 5;
-    let nb_of_signers = if app.nakamoto_enabled { 2 } else { 0 };
+    let nb_of_signers = 2;
     let nb_of_subnet_services = if app.subnet_enabled { 2 } else { 0 };
 
     let service_len = nb_of_services + nb_of_signers + nb_of_subnet_services + 2;

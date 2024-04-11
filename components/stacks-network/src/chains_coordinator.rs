@@ -251,9 +251,7 @@ pub async fn start_chains_coordinator(
     let observer_event_oper = sel.recv(&observer_event_rx);
 
     let DevnetConfig {
-        use_nakamoto,
-        enable_subnet_node,
-        ..
+        enable_subnet_node, ..
     } = config.devnet_config;
 
     loop {
@@ -346,7 +344,6 @@ pub async fn start_chains_coordinator(
 
                 send_status_update(
                     &devnet_event_tx,
-                    use_nakamoto,
                     enable_subnet_node,
                     "bitcoin-node",
                     Status::Green,
@@ -394,7 +391,6 @@ pub async fn start_chains_coordinator(
                 // would requires either cloning the block, or passing ownership.
                 send_status_update(
                     &devnet_event_tx,
-                    use_nakamoto,
                     enable_subnet_node,
                     "stacks-node",
                     Status::Green,
@@ -467,7 +463,6 @@ pub async fn start_chains_coordinator(
                             if tx.tx_description.contains("::commit-block") {
                                 send_status_update(
                                     &devnet_event_tx,
-                                    use_nakamoto,
                                     enable_subnet_node,
                                     "subnet-node",
                                     Status::Green,
