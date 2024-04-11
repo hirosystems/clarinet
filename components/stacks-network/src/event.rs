@@ -72,13 +72,13 @@ impl DevnetEvent {
 
 pub fn send_status_update(
     event_tx: &Sender<DevnetEvent>,
-    with_nakamoto: bool,
     with_subnets: bool,
     name: &str,
     status: Status,
     comment: &str,
 ) {
-    let signers_services = if with_nakamoto { 2 } else { 0 };
+    // leaving it a variable in case we want to make it dynamic in the future
+    let signers_services = 2;
     let subnet_services = if with_subnets { 2 } else { 0 };
 
     let order = match name {
