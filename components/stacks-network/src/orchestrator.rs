@@ -1080,7 +1080,6 @@ second_attempt_time_ms = {subsequent_attempt_time_ms}
 block_reward_recipient = "{miner_coinbase_recipient}"
 wait_for_block_download = false
 microblock_attempt_time_ms = 10
-self_signing_seed = 1
 mining_key = "19ec1c3e31d139c989a23a27eac60d1abfad5277d3ae9604242514c738258efa01"
 # microblock_attempt_time_ms = 15000
 "#,
