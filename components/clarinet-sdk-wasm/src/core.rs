@@ -10,11 +10,10 @@ use clarinet_deployments::{
 };
 use clarinet_files::chainhook_types::StacksNetwork;
 use clarinet_files::{FileAccessor, FileLocation, ProjectManifest, WASMFileSystemAccessor};
-use clarity_repl::analysis::coverage::{self, CoverageReporter};
+use clarity_repl::analysis::coverage::CoverageReporter;
 use clarity_repl::clarity::analysis::contract_interface_builder::{
     ContractInterface, ContractInterfaceFunction, ContractInterfaceFunctionAccess,
 };
-use clarity_repl::clarity::ast::ContractAST;
 use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
 use clarity_repl::clarity::{
     ClarityVersion, EvaluationResult, ExecutionResult, ParsedContract, StacksEpochId,
@@ -31,7 +30,7 @@ use js_sys::Function as JsFunction;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use serde_wasm_bindgen::to_value as encode_to_js;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 use std::{panic, path::PathBuf};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsValue;
@@ -871,7 +870,11 @@ impl SDK {
     // this method empty the session costs and coverage reports
     // and returns this report
     #[wasm_bindgen(js_name=collectReport)]
-    pub fn collect_report(&mut self) -> Result<SessionReport, String> {
+    pub fn collect_report(
+        &mut self,
+        include_boot_contracts: bool,
+        boot_contracts_path: String,
+    ) -> Result<SessionReport, String> {
         let contracts_locations = self.contracts_locations.clone();
         let session = self.get_session_mut();
         let mut coverage_reporter = CoverageReporter::new();
@@ -883,16 +886,16 @@ impl SDK {
                 .insert(contract_id.name.to_string(), contract_location.to_string());
         }
 
-        // if <settings>.include_boot_contracts_coverage { ...
-        for (contract_id, (_, ast)) in BOOT_CONTRACTS_DATA.iter() {
-            coverage_reporter
-                .asts
-                .insert(contract_id.clone(), ast.clone());
-            coverage_reporter.contract_paths.insert(
-                contract_id.name.to_string(),
-                // probably provide some sort of `setting.boot_contracts_path``
-                format!("./boot-contracts/{}.clar", contract_id.name),
-            );
+        if include_boot_contracts {
+            for (contract_id, (_, ast)) in BOOT_CONTRACTS_DATA.iter() {
+                coverage_reporter
+                    .asts
+                    .insert(contract_id.clone(), ast.clone());
+                coverage_reporter.contract_paths.insert(
+                    contract_id.name.to_string(),
+                    format!("{boot_contracts_path}/{}.clar", contract_id.name),
+                );
+            }
         }
 
         coverage_reporter

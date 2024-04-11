@@ -135,8 +135,9 @@ describe("test pox-3", () => {
     const stackStx = simnet.callPublicFn(poxContract, "stack-stx", stackStxArgs, address1);
     expect(stackStx.events).toHaveLength(2);
 
-    const { coverage } = simnet.collectReport();
-    expect(coverage).toContain("SF:./boot-contracts/pox-3");
+    const bootContractsPath = "./contracts/boot_contracts/";
+    const { coverage } = simnet.collectReport(true, bootContractsPath);
+    expect(coverage).toContain(`SF:${bootContractsPath}/pox-3`);
     expect(coverage).toContain("FNDA:1,stack-stx");
   });
 });
