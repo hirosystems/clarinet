@@ -117,10 +117,17 @@ function checkCVType<T extends ClarityType>(
   const isCVWithType = isClarityValueWithType(actual, expectedType);
 
   if (!isCVWithType) {
+    // for readability, the error diff is kept short if the developers uses the wrong `expect<ClarityType>`
+    // ideally, we should have a way to display short message diffs even if the actual and/or expected data are big lists/tuples/buffers
+
+    // for now, we make an exception and display the full error message if the actual value is a ResponseErr
+    const errorCode = actual.type === ClarityType.ResponseErr ? ` ${Cl.prettyPrint(actual)}` : "";
+
     throw new ClarityTypeError({
+      // generic and short message
       message: `actual value must ${notStr(isNot)}be a Clarity "${
         ClarityType[expectedType]
-      }", received "${ClarityType[actual.type]}"`,
+      }", received "${ClarityType[actual.type]}"${errorCode}`,
       actual: ClarityType[actual.type],
       expected: ClarityType[expectedType],
     });
