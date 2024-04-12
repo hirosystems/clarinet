@@ -19,6 +19,7 @@ use clarity_repl::clarity::{
     ClarityVersion, EvaluationResult, ExecutionResult, ParsedContract, StacksEpochId,
 };
 use clarity_repl::repl::clarity_values::{uint8_to_string, uint8_to_value};
+use clarity_repl::repl::session::BOOT_CONTRACTS_DATA;
 use clarity_repl::repl::{
     clarity_values, ClarityCodeSource, ClarityContract, ContractDeployer, Session,
     DEFAULT_CLARITY_VERSION, DEFAULT_EPOCH,
@@ -869,16 +870,34 @@ impl SDK {
     // this method empty the session costs and coverage reports
     // and returns this report
     #[wasm_bindgen(js_name=collectReport)]
-    pub fn collect_report(&mut self) -> Result<SessionReport, String> {
+    pub fn collect_report(
+        &mut self,
+        include_boot_contracts: bool,
+        boot_contracts_path: String,
+    ) -> Result<SessionReport, String> {
         let contracts_locations = self.contracts_locations.clone();
         let session = self.get_session_mut();
         let mut coverage_reporter = CoverageReporter::new();
         coverage_reporter.asts.append(&mut session.asts);
+
         for (contract_id, contract_location) in contracts_locations.iter() {
             coverage_reporter
                 .contract_paths
                 .insert(contract_id.name.to_string(), contract_location.to_string());
         }
+
+        if include_boot_contracts {
+            for (contract_id, (_, ast)) in BOOT_CONTRACTS_DATA.iter() {
+                coverage_reporter
+                    .asts
+                    .insert(contract_id.clone(), ast.clone());
+                coverage_reporter.contract_paths.insert(
+                    contract_id.name.to_string(),
+                    format!("{boot_contracts_path}/{}.clar", contract_id.name),
+                );
+            }
+        }
+
         coverage_reporter
             .reports
             .append(&mut session.coverage_reports);

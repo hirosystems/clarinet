@@ -13,6 +13,8 @@ declare global {
       coverageFilename: string;
       costs: boolean;
       costsFilename: string;
+      includeBootContracts: boolean;
+      bootContractsPath: string;
     };
   };
 }

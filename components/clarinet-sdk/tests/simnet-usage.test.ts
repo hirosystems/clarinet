@@ -333,7 +333,7 @@ describe("simnet can get session reports", () => {
     simnet.callPublicFn("counter", "increment", [], address1);
     simnet.callPrivateFn("counter", "inner-increment", [], address1);
 
-    const reports = simnet.collectReport();
+    const reports = simnet.collectReport(false, "");
 
     // increment is called twice
     expect(reports.coverage.includes("FNDA:2,increment")).toBe(true);
@@ -347,7 +347,7 @@ describe("simnet can get session reports", () => {
   it("can get costs", () => {
     simnet.callPublicFn("counter", "increment", [], address1);
 
-    const reports = simnet.collectReport();
+    const reports = simnet.collectReport(false, "");
     expect(() => JSON.parse(reports.costs)).not.toThrow();
 
     const parsedReports = JSON.parse(reports.costs);
