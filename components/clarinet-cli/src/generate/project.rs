@@ -3,8 +3,8 @@ use clarinet_files::{
     DEFAULT_EPOCH_2_0, DEFAULT_EPOCH_2_05, DEFAULT_EPOCH_2_1, DEFAULT_EPOCH_2_2, DEFAULT_EPOCH_2_3,
     DEFAULT_EPOCH_2_4, DEFAULT_EPOCH_2_5, DEFAULT_FAUCET_MNEMONIC, DEFAULT_POSTGRES_IMAGE,
     DEFAULT_STACKS_API_IMAGE, DEFAULT_STACKS_EXPLORER_IMAGE, DEFAULT_STACKS_MINER_MNEMONIC,
-    DEFAULT_STACKS_NODE_IMAGE, DEFAULT_SUBNET_API_IMAGE, DEFAULT_SUBNET_CONTRACT_ID,
-    DEFAULT_SUBNET_MNEMONIC, DEFAULT_SUBNET_NODE_IMAGE,
+    DEFAULT_STACKS_NODE_IMAGE, DEFAULT_STACKS_SIGNER_IMAGE, DEFAULT_SUBNET_API_IMAGE,
+    DEFAULT_SUBNET_CONTRACT_ID, DEFAULT_SUBNET_MNEMONIC, DEFAULT_SUBNET_NODE_IMAGE,
 };
 
 use super::changes::{Changes, DirectoryCreation, FileCreation};
@@ -386,6 +386,7 @@ disable_stacks_api = false
 # postgres_database = "postgres"
 # bitcoin_node_image_url = "{default_bitcoin_node_image}"
 # stacks_node_image_url = "{default_stacks_node_image}"
+# stacks_signer_image_url = "{default_stacks_signer_image}"
 # stacks_api_image_url = "{default_stacks_api_image}"
 # stacks_explorer_image_url = "{default_stacks_explorer_image}"
 # bitcoin_explorer_image_url = "{default_bitcoin_explorer_image}"
@@ -437,6 +438,7 @@ btc_address = "mvZtbibDAAA3WLpY7zXXFqRa3T4XSknBX7"
             default_derivation_path = DEFAULT_DERIVATION_PATH,
             default_bitcoin_node_image = DEFAULT_BITCOIN_NODE_IMAGE,
             default_stacks_node_image = DEFAULT_STACKS_NODE_IMAGE,
+            default_stacks_signer_image = DEFAULT_STACKS_SIGNER_IMAGE,
             default_bitcoin_explorer_image = DEFAULT_BITCOIN_EXPLORER_IMAGE,
             default_stacks_api_image = DEFAULT_STACKS_API_IMAGE,
             default_stacks_explorer_image = DEFAULT_STACKS_EXPLORER_IMAGE,

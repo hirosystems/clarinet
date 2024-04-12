@@ -16,6 +16,8 @@ pub const DEFAULT_DERIVATION_PATH: &str = "m/44'/5757'/0'/0/0";
 
 pub const DEFAULT_STACKS_NODE_IMAGE: &str =
     "quay.io/hirosystems/stacks-node:devnet-with-signer-2.5";
+pub const DEFAULT_STACKS_SIGNER_IMAGE: &str =
+    "quay.io/hirosystems/stacks-node:devnet-with-signer-2.5";
 pub const DEFAULT_STACKS_API_IMAGE: &str = "hirosystems/stacks-blockchain-api:7.10.0-beta.2";
 
 pub const DEFAULT_BITCOIN_NODE_IMAGE: &str = "quay.io/hirosystems/bitcoind:26.0";
@@ -889,7 +891,7 @@ impl NetworkManifest {
                 stacks_signer_image_url: devnet_config
                     .stacks_signer_image_url
                     .take()
-                    .unwrap_or(DEFAULT_STACKS_NODE_IMAGE.to_string()),
+                    .unwrap_or(DEFAULT_STACKS_SIGNER_IMAGE.to_string()),
                 stacks_api_image_url: devnet_config
                     .stacks_api_image_url
                     .take()
