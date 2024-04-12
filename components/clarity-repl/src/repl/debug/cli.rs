@@ -6,7 +6,7 @@ use clarity::vm::types::QualifiedContractIdentifier;
 use clarity::vm::types::Value;
 use clarity::vm::{ContractName, EvalHook, SymbolicExpression};
 use rustyline::error::ReadlineError;
-use rustyline::Editor;
+use rustyline::DefaultEditor;
 
 use super::{
     AccessType, Breakpoint, BreakpointData, DebugState, FunctionBreakpoint, Source,
@@ -16,13 +16,13 @@ use super::{
 const HISTORY_FILE: Option<&'static str> = option_env!("CLARITY_DEBUG_HISTORY_FILE");
 
 pub struct CLIDebugger {
-    editor: Editor<()>,
+    editor: DefaultEditor,
     state: DebugState,
 }
 
 impl CLIDebugger {
     pub fn new(contract_id: &QualifiedContractIdentifier, snippet: &str) -> Self {
-        let mut editor = Editor::<()>::new();
+        let mut editor = DefaultEditor::new().unwrap();
         editor
             .load_history(HISTORY_FILE.unwrap_or(".debug_history"))
             .ok();
@@ -36,15 +36,15 @@ impl CLIDebugger {
     fn prompt(&mut self, env: &mut Environment, context: &LocalContext, expr: &SymbolicExpression) {
         let prompt = black!("(debug) ");
         loop {
-            let readline = self.editor.readline(&prompt);
+            let readline = self.editor.readline(&prompt.escape_default().to_string());
             let resume = match readline {
                 Ok(mut command) => {
                     if command.is_empty() {
-                        if let Some(prev) = self.editor.history().last() {
+                        if let Some(prev) = self.editor.history().iter().last() {
                             command = prev.clone()
                         }
                     }
-                    self.editor.add_history_entry(&command);
+                    let _ = self.editor.add_history_entry(&command);
                     self.handle_command(&command, env, context, expr)
                 }
                 Err(ReadlineError::Interrupted) | Err(ReadlineError::Eof) => {

@@ -2,7 +2,7 @@ use crate::repl::{settings::SessionSettings, Session};
 
 use clarity::vm::EvaluationResult;
 use rustyline::error::ReadlineError;
-use rustyline::Editor;
+use rustyline::DefaultEditor;
 
 const VERSION: Option<&'static str> = option_env!("CARGO_PKG_VERSION");
 const HISTORY_FILE: Option<&'static str> = option_env!("CLARITY_REPL_HISTORY_FILE");
@@ -110,7 +110,7 @@ impl Terminal {
             }
         };
         println!("{}", output);
-        let mut editor = Editor::<()>::new();
+        let mut editor = DefaultEditor::new().unwrap();
         let mut ctrl_c_acc = 0;
         let mut input_buffer = vec![];
         let mut prompt = String::from(">> ");
@@ -183,7 +183,7 @@ impl Terminal {
                             }
                             prompt = String::from(">> ");
                             self.session.executed.push(input.to_string());
-                            editor.add_history_entry(input);
+                            let _ = editor.add_history_entry(input);
                             input_buffer.clear();
                             if reload {
                                 break true;
