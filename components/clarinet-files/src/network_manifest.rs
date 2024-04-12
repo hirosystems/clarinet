@@ -18,8 +18,8 @@ pub const DEFAULT_STACKS_NODE_IMAGE: &str = "quay.io/hirosystems/stacks-node:dev
 pub const DEFAULT_STACKS_API_IMAGE: &str = "hirosystems/stacks-blockchain-api:latest";
 // Nakamoto images overrides
 pub const DEFAULT_STACKS_NODE_IMAGE_NAKA: &str =
-    "quay.io/hirosystems/stacks-node:devnet-with-signer-beta4";
-pub const DEFAULT_STACKS_API_IMAGE_NAKA: &str = "hirosystems/stacks-blockchain-api:7.10.0-beta.1";
+    "quay.io/hirosystems/stacks-node:devnet-with-signer-2.5";
+pub const DEFAULT_STACKS_API_IMAGE_NAKA: &str = "hirosystems/stacks-blockchain-api:7.10.0-beta.2";
 
 pub const DEFAULT_BITCOIN_NODE_IMAGE: &str = "quay.io/hirosystems/bitcoind:26.0";
 pub const DEFAULT_BITCOIN_EXPLORER_IMAGE: &str = "quay.io/hirosystems/bitcoin-explorer:devnet";
