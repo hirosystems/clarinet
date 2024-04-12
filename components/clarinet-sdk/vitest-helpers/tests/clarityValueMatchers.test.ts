@@ -424,7 +424,7 @@ describe("test nested types", () => {
     });
   });
 
-  it("display values on one line in message", () => {
+  it("displays values on one line in message", () => {
     const failingTest = () =>
       expect(Cl.ok(Cl.tuple({ counter: Cl.uint(1) }))).toBeOk(Cl.tuple({ counter: Cl.uint(2) }));
 
@@ -435,5 +435,21 @@ describe("test nested types", () => {
       expect(e.actual).toBe("(ok {\n  counter: u1\n})");
       expect(e.expected).toBe("(ok {\n  counter: u2\n})");
     }
+  });
+
+  it("displays short message of the matchers does not match the actual clarity type", () => {
+    const value = Cl.ok(Cl.uint(1));
+    const failingTest = () => expect(value).toBeList([]);
+
+    expect(failingTest).toThrow('actual value must be a Clarity "List", received "ResponseOk"');
+  });
+
+  it("displays error code even if `err` is not the expected type", () => {
+    const value = Cl.error(Cl.uint(1));
+    const failingTest = () => expect(value).toBeOk(Cl.tuple({ counter: Cl.uint(2) }));
+
+    expect(failingTest).toThrow(
+      'actual value must be a Clarity "ResponseOk", received "ResponseErr" (err u1)',
+    );
   });
 });
