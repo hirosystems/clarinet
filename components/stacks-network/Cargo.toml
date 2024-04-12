@@ -36,8 +36,7 @@ clap = { version = "4.4.8", features = ["derive"] }
 serde_yaml = "0.8.23"
 
 stackslib = { git = "https://github.com/stacks-network/stacks-core.git", branch="feat/clarity-wasm-next", package = "stackslib" }
-chainhook-sdk = { default-features = true, git = "https://github.com/hirosystems/chainhook.git" }
-# chainhook-sdk = { version = "=0.11", default-features = true }
+chainhook-sdk = { version = "0.12" }
 
 stacks-rpc-client = { path = "../stacks-rpc-client" }
 clarinet-files = { path = "../clarinet-files", features = ["cli"] }
