@@ -697,7 +697,7 @@ dependencies = [
  "serde-hex",
  "serde_derive",
  "serde_json",
- "stacks-codec 2.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "stacks-codec 2.4.1",
  "threadpool",
  "tokio",
 ]
@@ -806,7 +806,7 @@ dependencies = [
 
 [[package]]
 name = "clarinet-cli"
-version = "2.4.1"
+version = "2.5.0"
 dependencies = [
  "ansi_term",
  "atty",
@@ -865,7 +865,7 @@ dependencies = [
 
 [[package]]
 name = "clarinet-deployments"
-version = "2.4.1"
+version = "2.5.0"
 dependencies = [
  "base58 0.2.0",
  "base64 0.21.7",
@@ -882,14 +882,14 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "serde_yaml",
- "stacks-codec 2.4.1",
+ "stacks-codec 2.5.0",
  "stacks-rpc-client",
  "tiny-hderive",
 ]
 
 [[package]]
 name = "clarinet-files"
-version = "2.4.1"
+version = "2.5.0"
 dependencies = [
  "bip39",
  "bitcoin 0.29.2",
@@ -911,7 +911,7 @@ dependencies = [
 
 [[package]]
 name = "clarinet-sdk-wasm"
-version = "2.5.0-beta2"
+version = "2.5.0"
 dependencies = [
  "clarinet-deployments",
  "clarinet-files",
@@ -919,7 +919,6 @@ dependencies = [
  "colored 2.1.0",
  "console_error_panic_hook",
  "gloo-utils",
- "hashbrown 0.14.3",
  "js-sys",
  "serde",
  "serde-wasm-bindgen",
@@ -1017,7 +1016,7 @@ dependencies = [
 
 [[package]]
 name = "clarity-repl"
-version = "2.4.1"
+version = "2.5.0"
 dependencies = [
  "ansi_term",
  "atty",
@@ -4961,19 +4960,19 @@ dependencies = [
 [[package]]
 name = "stacks-codec"
 version = "2.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9d5791855bf9de767f55042f1a034a2575373c6433b0965f1efac14e7215f71b"
 dependencies = [
- "clarity",
+ "clarity-vm",
  "serde",
  "wsts",
 ]
 
 [[package]]
 name = "stacks-codec"
-version = "2.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9d5791855bf9de767f55042f1a034a2575373c6433b0965f1efac14e7215f71b"
+version = "2.5.0"
 dependencies = [
- "clarity-vm",
+ "clarity",
  "serde",
  "wsts",
 ]
@@ -5043,7 +5042,7 @@ dependencies = [
 
 [[package]]
 name = "stacks-devnet-js"
-version = "2.4.1"
+version = "2.5.0"
 dependencies = [
  "clarinet-deployments",
  "clarinet-files",
@@ -5059,7 +5058,7 @@ dependencies = [
 
 [[package]]
 name = "stacks-network"
-version = "2.4.1"
+version = "2.5.0"
 dependencies = [
  "ansi_term",
  "atty",
@@ -5087,7 +5086,7 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "serde_yaml",
- "stacks-codec 2.4.1",
+ "stacks-codec 2.5.0",
  "stacks-rpc-client",
  "stackslib",
  "tokio",
@@ -5098,7 +5097,7 @@ dependencies = [
 
 [[package]]
 name = "stacks-rpc-client"
-version = "2.4.1"
+version = "2.5.0"
 dependencies = [
  "hmac 0.12.1",
  "libsecp256k1 0.7.1",
@@ -5108,7 +5107,7 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "sha2 0.10.6",
- "stacks-codec 2.4.1",
+ "stacks-codec 2.5.0",
  "tiny-hderive",
 ]
 
