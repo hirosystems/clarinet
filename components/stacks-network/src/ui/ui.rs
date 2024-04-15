@@ -228,7 +228,7 @@ fn draw_block_details(f: &mut Frame, area: Rect, block: &StacksBlockData) {
         Paragraph::new("PoX informations").style(Style::default().add_modifier(Modifier::BOLD));
     f.render_widget(title, labels[7]);
 
-    let label = format!("PoX Cycle: {}", block.metadata.pox_cycle_index + 1);
+    let label = format!("PoX Cycle: {}", block.metadata.pox_cycle_index);
     let paragraph = Paragraph::new(label);
     f.render_widget(paragraph, labels[8]);
 

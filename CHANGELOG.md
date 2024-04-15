@@ -1,3 +1,21 @@
+# [2.5.0](https://github.com/hirosystems/clarinet/compare/v2.4.1...v2.5.0) (2024-04-15)
+
+##### New Features
+
+*  Improved epoch 2.5 support (#1418) (397d8a49)
+*  Enable boot contracts coverage (#1412) (c5709640)
+*  Introduce the stacks-codec component (#1399) (83e13831)
+
+##### Chores
+
+*  Update dependencies (#1415) (38824a8b)
+*  Update pox-4.clar (#1409) (a5b3ffbd)
+
+##### Bug Fixes
+
+*  Improve error message in sdk custom matchers (#1417) (a7bd0738)
+*  Allow epoch 2.5 in clarinet-sdk (#1414) (19747e38)
+
 # [2.4.1](https://github.com/hirosystems/clarinet/compare/v2.4.0...v2.4.1) (2024-03-25)
 
 ##### Fix
