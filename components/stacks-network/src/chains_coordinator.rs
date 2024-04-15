@@ -702,8 +702,7 @@ pub async fn publish_stacking_orders(
     let pox_cycle_length = pox_info.reward_cycle_length;
     let pox_cycle_position = effective_height % pox_cycle_length;
 
-    let should_submit_pox_orders = pox_cycle_position == 10;
-    if !should_submit_pox_orders {
+    if pox_cycle_position != 10 {
         return None;
     }
 
