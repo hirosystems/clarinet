@@ -1,3 +1,13 @@
+# [2.5.1](https://github.com/hirosystems/clarinet/compare/v2.5.0...v2.5.1) (2024-04-16)
+
+##### Continuous Integration
+
+*  Fix homebrew release (#1420) (4a02ce0d)
+
+##### Bug Fixes
+
+*  Unsafe unwrap (#1423) (7a83595e)
+
 # [2.5.0](https://github.com/hirosystems/clarinet/compare/v2.4.1...v2.5.0) (2024-04-15)
 
 ##### New Features

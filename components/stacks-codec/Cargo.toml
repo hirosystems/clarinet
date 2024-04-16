@@ -1,6 +1,6 @@
 [package]
 name = "stacks-codec"
-version = "2.5.0"
+version = "2.5.1"
 license = "GPL-3.0"
 edition = "2021"
 description = "Stack wire format implementation"
