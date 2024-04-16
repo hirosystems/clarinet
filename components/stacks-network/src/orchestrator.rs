@@ -22,6 +22,7 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::sync::mpsc::{Receiver, Sender};
 use std::time::Duration;
+use tokio::time::sleep;
 
 use crate::event::{send_status_update, DevnetEvent, Status};
 
@@ -1046,10 +1047,22 @@ rpcport={bitcoin_node_rpc_port}
             _ => return Err("unable to get Docker client".into()),
         };
 
-        docker
-            .start_container::<String>(&container, None)
-            .await
-            .map_err(|e| formatted_docker_error("unable to start bitcoind container", e))?;
+        let mut retry_count = 0;
+        loop {
+            match docker.start_container::<String>(&container, None).await {
+                Ok(_) => break,
+                Err(e) => {
+                    retry_count += 1;
+                    if retry_count >= 10 {
+                        return Err(formatted_docker_error(
+                            "unable to start bitcoind container",
+                            e,
+                        ));
+                    }
+                    sleep(Duration::from_secs(1)).await;
+                }
+            }
+        }
 
         Ok(())
     }
