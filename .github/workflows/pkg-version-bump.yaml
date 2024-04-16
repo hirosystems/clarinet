@@ -28,7 +28,7 @@ jobs:
           TAG: ${{ github.event.client_payload.tag || github.event.inputs.tag }}
         run: |
           # Get version info
-          VERSION=$(echo "${ENV#v}")
+          VERSION=$(echo "${TAG#v}")
 
           # Configure git configs
           git config --global user.name "${GIT_USER_NAME}"
