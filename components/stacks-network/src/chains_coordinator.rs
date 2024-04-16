@@ -711,7 +711,7 @@ pub async fn publish_stacking_orders(
         .rsplit('-')
         .next()
         .and_then(|version| version.parse().ok())
-        .unwrap_or(1);
+        .unwrap_or(1); // pox 1 contract is `pox.clar`
 
     let default_signing_keys = [
         StacksPrivateKey::from_hex(
