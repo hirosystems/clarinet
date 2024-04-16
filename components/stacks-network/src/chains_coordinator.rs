@@ -710,8 +710,8 @@ pub async fn publish_stacking_orders(
     let pox_version = pox_contract_id
         .rsplit('-')
         .next()
-        .and_then(|version| version.parse::<u32>().ok())
-        .unwrap();
+        .and_then(|version| version.parse().ok())
+        .unwrap_or(1);
 
     let default_signing_keys = [
         StacksPrivateKey::from_hex(
