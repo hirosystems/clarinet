@@ -7,7 +7,6 @@ RUN echo "Building stacks-signer from commit: https://github.com/stacks-network/
 
 RUN apt-get update && apt-get install -y libclang-dev
 RUN rustup toolchain install stable
-# RUN rustup component add rustfmt --toolchain stable
 
 WORKDIR /stacks
 RUN git init && \
