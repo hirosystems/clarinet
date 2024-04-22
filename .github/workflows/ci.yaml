@@ -52,7 +52,7 @@ jobs:
         env:
           LATEST_RELEASE: ${{ steps.release.outputs.release }}
         run: |
-          CARGO_VERSION=v$(grep "version" components/clarinet-cli/Cargo.toml | head -n 1 | cut -d\" -f2)
+          CARGO_VERSION=v$(grep "version" Cargo.toml | head -n 1 | cut -d\" -f2)
           if [[ "${CARGO_VERSION}" != "${LATEST_RELEASE}" ]]; then
             echo "::set-output name=TAG::${CARGO_VERSION}"
             echo "::warning::Will create release for version: ${CARGO_VERSION}"
