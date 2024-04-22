@@ -72,7 +72,7 @@ jobs:
         env:
           LATEST_RELEASE: ${{ steps.release.outputs.name }}
         run: |
-          CARGO_VERSION=${COMPONENT}-v$(grep "version" ${COMPONENT_DIR}/Cargo.toml | head -n 1 | cut -d\" -f2)
+          CARGO_VERSION=${COMPONENT}-v$(grep "version" Cargo.toml | head -n 1 | cut -d\" -f2)
           if [[ "${CARGO_VERSION}" != "${LATEST_RELEASE}" ]]; then
             echo "::set-output name=TAG::${CARGO_VERSION}"
             echo "::warning::Will create release for version: ${CARGO_VERSION}"
