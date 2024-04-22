@@ -7,7 +7,6 @@ RUN echo "Building stacks-node from commit: https://github.com/stacks-network/st
 
 RUN apt-get update && apt-get install -y libclang-dev
 RUN rustup toolchain install stable
-RUN rustup component add rustfmt --toolchain stable
 
 WORKDIR /stacks
 RUN git init && \
