@@ -18,7 +18,7 @@ members = [
 default-members = ["components/clarinet-cli"]
 
 [workspace.package]
-version = "2.5.1"
+version = "2.6.0"
 
 [patch.crates-io]
 chainhook-sdk = { git = "https://github.com/hirosystems/chainhook.git", branch = "feat/update-pox-default-settings" }
