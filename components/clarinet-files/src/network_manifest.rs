@@ -14,19 +14,16 @@ use toml::value::Value;
 
 pub const DEFAULT_DERIVATION_PATH: &str = "m/44'/5757'/0'/0/0";
 
-pub const DEFAULT_STACKS_NODE_IMAGE: &str = "quay.io/hirosystems/stacks-node:devnet-2.4.0.0.0";
-pub const DEFAULT_STACKS_API_IMAGE: &str = "hirosystems/stacks-blockchain-api:latest";
-// Nakamoto images overrides
-pub const DEFAULT_STACKS_NODE_IMAGE_NAKA: &str =
-    "quay.io/hirosystems/stacks-node:devnet-with-signer-2.5";
-pub const DEFAULT_STACKS_API_IMAGE_NAKA: &str = "hirosystems/stacks-blockchain-api:7.10.0-beta.2";
+pub const DEFAULT_STACKS_NODE_IMAGE: &str = "quay.io/hirosystems/stacks-node:devnet-2.5";
+pub const DEFAULT_STACKS_SIGNER_IMAGE: &str = "quay.io/hirosystems/stacks-signer:devnet-2.5";
+pub const DEFAULT_STACKS_API_IMAGE: &str = "hirosystems/stacks-blockchain-api:master";
 
 pub const DEFAULT_BITCOIN_NODE_IMAGE: &str = "quay.io/hirosystems/bitcoind:26.0";
 pub const DEFAULT_BITCOIN_EXPLORER_IMAGE: &str = "quay.io/hirosystems/bitcoin-explorer:devnet";
 pub const DEFAULT_STACKS_EXPLORER_IMAGE: &str = "hirosystems/explorer:latest";
 pub const DEFAULT_POSTGRES_IMAGE: &str = "postgres:alpine";
 pub const DEFAULT_SUBNET_NODE_IMAGE: &str = "hirosystems/stacks-subnets:0.8.1";
-pub const DEFAULT_SUBNET_API_IMAGE: &str = "hirosystems/stacks-blockchain-api:latest";
+pub const DEFAULT_SUBNET_API_IMAGE: &str = "hirosystems/stacks-blockchain-api:master";
 pub const DEFAULT_SUBNET_CONTRACT_ID: &str =
     "ST173JK7NZBA4BS05ZRATQH1K89YJMTGEH1Z5J52E.subnet-v3-0-1";
 pub const DEFAULT_STACKS_MINER_MNEMONIC: &str = "fragile loan twenty basic net assault jazz absorb diet talk art shock innocent float punch travel gadget embrace caught blossom hockey surround initial reduce";
@@ -151,7 +148,6 @@ pub struct DevnetConfigFile {
     pub epoch_3_0: Option<u64>,
     pub use_docker_gateway_routing: Option<bool>,
     pub docker_platform: Option<String>,
-    pub use_nakamoto: Option<bool>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -317,7 +313,6 @@ pub struct DevnetConfig {
     pub epoch_3_0: u64,
     pub use_docker_gateway_routing: bool,
     pub docker_platform: String,
-    pub use_nakamoto: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -887,34 +882,18 @@ impl NetworkManifest {
                     .bitcoin_node_image_url
                     .take()
                     .unwrap_or(DEFAULT_BITCOIN_NODE_IMAGE.to_string()),
-                stacks_node_image_url: devnet_config.stacks_node_image_url.take().unwrap_or_else(
-                    || {
-                        if devnet_config.use_nakamoto.unwrap_or(false) {
-                            DEFAULT_STACKS_NODE_IMAGE_NAKA.to_string()
-                        } else {
-                            DEFAULT_STACKS_NODE_IMAGE.to_string()
-                        }
-                    },
-                ),
+                stacks_node_image_url: devnet_config
+                    .stacks_node_image_url
+                    .take()
+                    .unwrap_or(DEFAULT_STACKS_NODE_IMAGE.to_string()),
                 stacks_signer_image_url: devnet_config
                     .stacks_signer_image_url
                     .take()
-                    .unwrap_or_else(|| {
-                        if devnet_config.use_nakamoto.unwrap_or(false) {
-                            DEFAULT_STACKS_NODE_IMAGE_NAKA.to_string()
-                        } else {
-                            DEFAULT_STACKS_NODE_IMAGE.to_string()
-                        }
-                    }),
-                stacks_api_image_url: devnet_config.stacks_api_image_url.take().unwrap_or_else(
-                    || {
-                        if devnet_config.use_nakamoto.unwrap_or(false) {
-                            DEFAULT_STACKS_API_IMAGE_NAKA.to_string()
-                        } else {
-                            DEFAULT_STACKS_API_IMAGE.to_string()
-                        }
-                    },
-                ),
+                    .unwrap_or(DEFAULT_STACKS_SIGNER_IMAGE.to_string()),
+                stacks_api_image_url: devnet_config
+                    .stacks_api_image_url
+                    .take()
+                    .unwrap_or(DEFAULT_STACKS_API_IMAGE.to_string()),
                 postgres_image_url: devnet_config
                     .postgres_image_url
                     .take()
@@ -986,7 +965,6 @@ impl NetworkManifest {
                 docker_platform: devnet_config
                     .docker_platform
                     .unwrap_or(DEFAULT_DOCKER_PLATFORM.to_string()),
-                use_nakamoto: devnet_config.use_nakamoto.unwrap_or(false),
             };
             Some(config)
         } else {
