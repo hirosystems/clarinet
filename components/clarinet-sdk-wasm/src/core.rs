@@ -434,12 +434,7 @@ impl SDK {
             }
         }
 
-        for (contract_id, (_, location)) in deployment.contracts {
-            self.contracts_locations
-                .insert(contract_id, location.clone());
-        }
-
-        for (_, result) in executed_contracts
+        for (contract_id, result) in executed_contracts
             .boot_contracts
             .into_iter()
             .chain(executed_contracts.contracts.into_iter())
@@ -448,11 +443,19 @@ impl SDK {
                 Ok(execution_result) => {
                     self.add_contract(&execution_result);
                 }
-                Err(e) => {
-                    log!("unable to load deployment: {:}", e[0].message);
-                    std::process::exit(1);
+                Err(diagnostics) => {
+                    let contract_diagnostics = HashMap::from([(contract_id, diagnostics)]);
+                    let diags_digest = DiagnosticsDigest::new(&contract_diagnostics, &deployment);
+                    if diags_digest.errors > 0 {
+                        return Err(diags_digest.message);
+                    }
                 }
             }
+        }
+
+        for (contract_id, (_, location)) in deployment.contracts {
+            self.contracts_locations
+                .insert(contract_id, location.clone());
         }
 
         self.session = Some(session);
