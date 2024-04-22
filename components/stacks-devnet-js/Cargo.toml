@@ -1,8 +1,8 @@
 [package]
 name = "stacks-devnet-js"
-version = "2.5.1"
-license = "ISC"
+version.workspace = true
 edition = "2018"
+license = "ISC"
 exclude = ["index.node"]
 
 [lib]

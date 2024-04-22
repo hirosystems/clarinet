@@ -962,7 +962,7 @@ dependencies = [
 
 [[package]]
 name = "clarity-events"
-version = "1.0.0"
+version = "2.5.1"
 dependencies = [
  "clap",
  "clarinet-files",
@@ -996,7 +996,7 @@ dependencies = [
 
 [[package]]
 name = "clarity-lsp"
-version = "1.0.0"
+version = "2.5.1"
 dependencies = [
  "clarinet-deployments",
  "clarinet-files",

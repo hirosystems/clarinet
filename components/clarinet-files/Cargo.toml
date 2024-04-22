@@ -1,9 +1,9 @@
 [package]
 name = "clarinet-files"
+version.workspace = true
+edition = "2021"
 description = "Clarinet manifests files helpers"
 license = "GPL-3.0"
-version = "2.5.1"
-edition = "2021"
 
 [dependencies]
 serde = "1"

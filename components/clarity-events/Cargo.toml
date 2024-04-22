@@ -1,7 +1,7 @@
 [package]
-edition = "2021"
 name = "clarity-events"
-version = "1.0.0"
+version.workspace = true
+edition = "2021"
 
 [dependencies]
 clarinet-files = { path = "../clarinet-files", default-features = false, optional = true }
