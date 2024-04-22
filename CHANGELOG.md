@@ -1,3 +1,18 @@
+# [2.6.0](https://github.com/hirosystems/clarinet/compare/v2.5.1...v2.6.0) (2024-04-22)
+
+##### New Features
+
+*  Devnet in 2.5 by default (#1422) (664b4e82)
+
+##### Chores
+
+*  Update 2.5 constants (#1433) (e2295e11)
+
+##### Continuous Integration
+
+*  Use workspace version (#1431) (9440f583)
+*  Fix homebrew release (#1425) (887b7a64)
+
 # [2.5.1](https://github.com/hirosystems/clarinet/compare/v2.5.0...v2.5.1) (2024-04-16)
 
 ##### Continuous Integration

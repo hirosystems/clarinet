@@ -697,7 +697,7 @@ dependencies = [
  "serde-hex",
  "serde_derive",
  "serde_json",
- "stacks-codec 2.5.1 (git+https://github.com/hirosystems/clarinet.git)",
+ "stacks-codec 2.5.1",
  "threadpool",
  "tokio",
 ]
@@ -806,7 +806,7 @@ dependencies = [
 
 [[package]]
 name = "clarinet-cli"
-version = "2.5.1"
+version = "2.6.0"
 dependencies = [
  "ansi_term",
  "atty",
@@ -865,7 +865,7 @@ dependencies = [
 
 [[package]]
 name = "clarinet-deployments"
-version = "2.5.1"
+version = "2.6.0"
 dependencies = [
  "base58 0.2.0",
  "base64 0.21.7",
@@ -882,14 +882,14 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "serde_yaml",
- "stacks-codec 2.5.1",
+ "stacks-codec 2.6.0",
  "stacks-rpc-client",
  "tiny-hderive",
 ]
 
 [[package]]
 name = "clarinet-files"
-version = "2.5.1"
+version = "2.6.0"
 dependencies = [
  "bip39",
  "bitcoin 0.29.2",
@@ -911,7 +911,7 @@ dependencies = [
 
 [[package]]
 name = "clarinet-sdk-wasm"
-version = "2.5.1"
+version = "2.6.0"
 dependencies = [
  "clarinet-deployments",
  "clarinet-files",
@@ -962,7 +962,7 @@ dependencies = [
 
 [[package]]
 name = "clarity-events"
-version = "2.5.1"
+version = "2.6.0"
 dependencies = [
  "clap",
  "clarinet-files",
@@ -975,7 +975,7 @@ dependencies = [
 
 [[package]]
 name = "clarity-lsp"
-version = "2.5.1"
+version = "2.6.0"
 dependencies = [
  "clarinet-deployments",
  "clarinet-files",
@@ -995,7 +995,7 @@ dependencies = [
 
 [[package]]
 name = "clarity-repl"
-version = "2.5.1"
+version = "2.6.0"
 dependencies = [
  "ansi_term",
  "atty",
@@ -4843,6 +4843,7 @@ dependencies = [
 [[package]]
 name = "stacks-codec"
 version = "2.5.1"
+source = "git+https://github.com/hirosystems/clarinet.git#cc0577e6514065cd3d451d010c0ad8babbc6932e"
 dependencies = [
  "clarity",
  "serde",
@@ -4851,8 +4852,7 @@ dependencies = [
 
 [[package]]
 name = "stacks-codec"
-version = "2.5.1"
-source = "git+https://github.com/hirosystems/clarinet.git#cc0577e6514065cd3d451d010c0ad8babbc6932e"
+version = "2.6.0"
 dependencies = [
  "clarity",
  "serde",
@@ -4893,7 +4893,7 @@ dependencies = [
 
 [[package]]
 name = "stacks-devnet-js"
-version = "2.5.1"
+version = "2.6.0"
 dependencies = [
  "clarinet-deployments",
  "clarinet-files",
@@ -4909,7 +4909,7 @@ dependencies = [
 
 [[package]]
 name = "stacks-network"
-version = "2.5.1"
+version = "2.6.0"
 dependencies = [
  "ansi_term",
  "atty",
@@ -4937,7 +4937,7 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "serde_yaml",
- "stacks-codec 2.5.1",
+ "stacks-codec 2.6.0",
  "stacks-rpc-client",
  "stackslib",
  "tokio",
@@ -4948,7 +4948,7 @@ dependencies = [
 
 [[package]]
 name = "stacks-rpc-client"
-version = "2.5.1"
+version = "2.6.0"
 dependencies = [
  "hmac 0.12.1",
  "libsecp256k1 0.7.1",
@@ -4958,7 +4958,7 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "sha2 0.10.6",
- "stacks-codec 2.5.1",
+ "stacks-codec 2.6.0",
  "tiny-hderive",
 ]
 
