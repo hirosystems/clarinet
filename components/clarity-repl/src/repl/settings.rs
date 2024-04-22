@@ -54,7 +54,9 @@ pub struct SessionSettings {
 #[derive(Debug, Default, Clone, Deserialize, Serialize)]
 pub struct Settings {
     pub analysis: analysis::Settings,
+    #[serde(skip_serializing, skip_deserializing)]
     pub clarity_wasm_mode: bool,
+    #[serde(skip_serializing, skip_deserializing)]
     pub show_timings: bool,
 }
 
