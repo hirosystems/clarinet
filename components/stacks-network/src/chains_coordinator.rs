@@ -414,14 +414,14 @@ pub async fn start_chains_coordinator(
                     )
                 } else {
                     format!(
-                        "Stacks block #{} anchored in Bitcoin block #{} includes {} transactions",
+                        "Stacks block #{} mined including {} transaction{}",
                         known_tip.block.block_identifier.index,
-                        known_tip
-                            .block
-                            .metadata
-                            .bitcoin_anchor_block_identifier
-                            .index,
                         known_tip.block.transactions.len(),
+                        if known_tip.block.transactions.len() <= 1 {
+                            ""
+                        } else {
+                            "s"
+                        },
                     )
                 };
                 let _ = devnet_event_tx.send(DevnetEvent::info(message));

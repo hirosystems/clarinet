@@ -14,18 +14,16 @@ use toml::value::Value;
 
 pub const DEFAULT_DERIVATION_PATH: &str = "m/44'/5757'/0'/0/0";
 
-pub const DEFAULT_STACKS_NODE_IMAGE: &str =
-    "quay.io/hirosystems/stacks-node:devnet-with-signer-2.5";
-pub const DEFAULT_STACKS_SIGNER_IMAGE: &str =
-    "quay.io/hirosystems/stacks-node:devnet-with-signer-2.5";
-pub const DEFAULT_STACKS_API_IMAGE: &str = "hirosystems/stacks-blockchain-api:7.10.0-beta.2";
+pub const DEFAULT_STACKS_NODE_IMAGE: &str = "quay.io/hirosystems/stacks-node:devnet-2.5";
+pub const DEFAULT_STACKS_SIGNER_IMAGE: &str = "quay.io/hirosystems/stacks-node:devnet-2.5";
+pub const DEFAULT_STACKS_API_IMAGE: &str = "hirosystems/stacks-blockchain-api:master";
 
 pub const DEFAULT_BITCOIN_NODE_IMAGE: &str = "quay.io/hirosystems/bitcoind:26.0";
 pub const DEFAULT_BITCOIN_EXPLORER_IMAGE: &str = "quay.io/hirosystems/bitcoin-explorer:devnet";
 pub const DEFAULT_STACKS_EXPLORER_IMAGE: &str = "hirosystems/explorer:latest";
 pub const DEFAULT_POSTGRES_IMAGE: &str = "postgres:alpine";
 pub const DEFAULT_SUBNET_NODE_IMAGE: &str = "hirosystems/stacks-subnets:0.8.1";
-pub const DEFAULT_SUBNET_API_IMAGE: &str = "hirosystems/stacks-blockchain-api:latest";
+pub const DEFAULT_SUBNET_API_IMAGE: &str = "hirosystems/stacks-blockchain-api:master";
 pub const DEFAULT_SUBNET_CONTRACT_ID: &str =
     "ST173JK7NZBA4BS05ZRATQH1K89YJMTGEH1Z5J52E.subnet-v3-0-1";
 pub const DEFAULT_STACKS_MINER_MNEMONIC: &str = "fragile loan twenty basic net assault jazz absorb diet talk art shock innocent float punch travel gadget embrace caught blossom hockey surround initial reduce";
