@@ -141,6 +141,7 @@ impl CoverageReporter {
                                         if line >= line_start && line <= line_end {
                                             local_function_hits.insert(function);
                                             // functions hits must have a matching line hit
+                                            // if we hit a line inside a function, make sure to count one line hit
                                             if line > line_start {
                                                 let hit_count =
                                                     line_execution_counts.get(&line_start);
@@ -245,7 +246,7 @@ impl CoverageReporter {
             let mut frontier = vec![expression];
 
             while let Some(cur_expr) = frontier.pop() {
-                // Only consider body functions and function declaration
+                // Only consider functions declaration and body (ignore arguments)
                 if let Some(define_expr) = DefineFunctionsParsed::try_parse(cur_expr).ok().flatten()
                 {
                     match define_expr {
