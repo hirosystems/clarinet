@@ -95,9 +95,27 @@ fn line_count_in_iterator() {
             "FNF:2",
             "FNH:2",
             "DA:1,2",
+            "DA:2,1",
             "DA:3,1",
             "BRF:0",
             "BRH:0",
+        ]
+        .join("\n"),
+    );
+    assert_eq!(cov, expect);
+}
+
+// each FNDA should have a corresponding DA
+#[test]
+fn function_hit_should_have_line_hit() {
+    let contract = ["(define-read-only (t)", "  true", ")"].join("\n");
+
+    let snippet = "(contract-call? .contract-0 t)";
+    let (_, cov) = get_coverage_report(contract.as_str(), vec![snippet.into()]);
+
+    let expect = get_expected_report(
+        [
+            "FN:1,t", "FNDA:1,t", "FNF:1", "FNH:1", "DA:1,1", "DA:2,1", "BRF:0", "BRH:0",
         ]
         .join("\n"),
     );
@@ -125,6 +143,7 @@ fn multiple_line_execution() {
             "FNDA:1,add",
             "FNF:1",
             "FNH:1",
+            "DA:1,1",
             "DA:2,1",
             "DA:3,1",
             "DA:4,1",
@@ -158,6 +177,7 @@ fn let_binding() {
             "FNDA:1,add-print",
             "FNF:1",
             "FNH:1",
+            "DA:1,1",
             "DA:2,1",
             "DA:3,1",
             "DA:5,1",
@@ -183,6 +203,7 @@ fn simple_if_branching() {
         "FNDA:1,one-or-two",
         "FNF:1",
         "FNH:1",
+        "DA:1,1",
         "DA:2,1",
         "BRF:2",
         "BRH:1",
@@ -228,6 +249,7 @@ fn simple_if_branches_with_exprs() {
             "FNDA:1,add-or-sub",
             "FNF:1",
             "FNH:1",
+            "DA:1,1",
             "DA:2,1",
             "BRF:2",
             "BRH:1",
@@ -264,7 +286,8 @@ fn hit_all_if_branches() {
             "FNDA:1,add-or-sub",
             "FNF:1",
             "FNH:1",
-            "DA:2,5", // 3 + 2
+            "DA:1,1",
+            "DA:2,5",
             "BRF:2",
             "BRH:2",
             "BRDA:2,8,0,3",
@@ -294,6 +317,7 @@ fn simple_asserts_branching() {
             "FNDA:1,is-one",
             "FNF:1",
             "FNH:1",
+            "DA:1,1",
             "DA:2,1",
             "BRF:1",
             "BRH:0",
@@ -313,6 +337,7 @@ fn simple_asserts_branching() {
             "FNDA:1,is-one",
             "FNF:1",
             "FNH:1",
+            "DA:1,1",
             "DA:2,1",
             "BRF:1",
             "BRH:1",
@@ -344,6 +369,7 @@ fn branch_if_plus_and() {
             "FNDA:1,unecessary-ifs",
             "FNF:1",
             "FNH:1",
+            "DA:1,1",
             "DA:2,1",
             "DA:3,0", // left if path
             "DA:4,1", // right if path
@@ -382,6 +408,7 @@ fn branch_if_plus_or() {
             "FNDA:1,unecessary-ors",
             "FNF:1",
             "FNH:1",
+            "DA:1,1",
             "DA:2,1",
             "DA:3,1", // left if path
             "DA:4,0", // right if path
@@ -413,6 +440,7 @@ fn match_opt_oneline() {
         "FNDA:1,match-opt",
         "FNF:1",
         "FNH:1",
+        "DA:1,1",
         "DA:2,1",
         "BRF:2",
         "BRH:1",
@@ -459,6 +487,7 @@ fn match_opt_multiline() {
         "FNDA:1,match-opt",
         "FNF:1",
         "FNH:1",
+        "DA:1,1",
         "DA:2,1",
     ];
 
@@ -530,6 +559,7 @@ fn match_res_oneline() {
             "FNDA:1,match-res",
             "FNF:1",
             "FNH:1",
+            "DA:1,1",
             "DA:2,3",
             "BRF:2",
             "BRH:2",
@@ -570,6 +600,7 @@ fn fold_iterator() {
             "FNF:2",
             "FNH:2",
             "DA:1,3", // the list has 3 items
+            "DA:2,1",
             "DA:3,1",
             "DA:4,1",
             "DA:5,1", // inner-sum func call
@@ -608,6 +639,7 @@ fn map_iterator() {
             "FNF:2",
             "FNH:2",
             "DA:1,3",
+            "DA:2,1",
             "DA:3,1",
             "DA:4,1",
             "DA:5,1",
@@ -645,6 +677,7 @@ fn filter_iterator() {
             "FNF:2",
             "FNH:2",
             "DA:1,3",
+            "DA:2,1",
             "DA:3,1",
             "DA:4,1",
             "DA:5,1",

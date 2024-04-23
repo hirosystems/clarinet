@@ -2,7 +2,6 @@ use std::{
     collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     fs::{create_dir_all, File},
     io::{Error, ErrorKind, Write},
-    path::{Path, PathBuf},
 };
 
 use clarity::vm::{
@@ -33,19 +32,11 @@ pub struct TestCoverageReport {
     pub contracts_coverage: HashMap<QualifiedContractIdentifier, ExprCoverage>,
 }
 
-pub fn parse_coverage_str(path: &str) -> Result<PathBuf, Error> {
-    let filepath = Path::new(path);
-    let path_buf = filepath.to_path_buf();
-    match path_buf.extension() {
-        None => Ok(path_buf.join(Path::new("coverage.lcov"))),
-        Some(_) => Ok(path_buf),
-    }
-}
-
 // LCOV format:
 // TN: test name
 // SF: source file path
 // FN: line number,function name
+// FNDA: execution count, function name
 // FNF: number functions found
 // FNH: number functions hit
 // DA: line data: line number, hit count
@@ -149,6 +140,14 @@ impl CoverageReporter {
                                     for (function, line_start, line_end) in functions.iter() {
                                         if line >= line_start && line <= line_end {
                                             local_function_hits.insert(function);
+                                            // functions hits must have a matching line hit
+                                            if line > line_start {
+                                                let hit_count =
+                                                    line_execution_counts.get(&line_start);
+                                                if hit_count.is_none() || hit_count == Some(&0) {
+                                                    line_execution_counts.insert(line_start, 1);
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -246,13 +245,16 @@ impl CoverageReporter {
             let mut frontier = vec![expression];
 
             while let Some(cur_expr) = frontier.pop() {
-                // Only consider body functions
+                // Only consider body functions and function declaration
                 if let Some(define_expr) = DefineFunctionsParsed::try_parse(cur_expr).ok().flatten()
                 {
                     match define_expr {
-                        DefineFunctionsParsed::PrivateFunction { signature: _, body }
-                        | DefineFunctionsParsed::PublicFunction { signature: _, body }
-                        | DefineFunctionsParsed::ReadOnlyFunction { signature: _, body } => {
+                        DefineFunctionsParsed::PrivateFunction { signature, body }
+                        | DefineFunctionsParsed::PublicFunction { signature, body }
+                        | DefineFunctionsParsed::ReadOnlyFunction { signature, body } => {
+                            if let Some(function_name) = signature.first() {
+                                frontier.push(function_name);
+                            }
                             frontier.push(body);
                         }
                         _ => {}
