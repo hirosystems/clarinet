@@ -98,6 +98,19 @@ pub struct TransactionsBatchSpecificationFile {
     pub epoch: Option<EpochSpec>,
 }
 
+impl TransactionsBatchSpecificationFile {
+    pub fn remove_publish_transactions(&mut self) {
+        self.transactions.retain(|transaction| {
+            !matches!(
+                transaction,
+                TransactionSpecificationFile::RequirementPublish(_)
+                    | TransactionSpecificationFile::ContractPublish(_)
+                    | TransactionSpecificationFile::EmulatedContractPublish(_)
+            )
+        });
+    }
+}
+
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum TransactionSpecificationFile {
@@ -1032,8 +1045,7 @@ impl DeploymentSpecification {
                                             .get(&contract_path)
                                             .cloned()
                                             .unwrap_or_else(|| panic!("missing contract source for {}", spec.path.clone().unwrap_or_default()))
-                                    }
-                                    );
+                                    });
 
                                     let spec = EmulatedContractPublishSpecification::from_specifications(spec, project_root_location, source)?;
                                     let contract_id = QualifiedContractIdentifier::new(spec.emulated_sender.clone(), spec.contract_name.clone());
