@@ -1,7 +1,7 @@
 use clarinet_deployments::diagnostic_digest::DiagnosticsDigest;
 use clarinet_deployments::types::{
-    DeploymentGenerationArtifacts, DeploymentSpecification, DeploymentSpecificationFile,
-    EmulatedContractPublishSpecification, TransactionSpecification,
+    DeploymentSpecification, DeploymentSpecificationFile, EmulatedContractPublishSpecification,
+    TransactionSpecification,
 };
 use clarinet_deployments::{
     generate_default_deployment, initiate_session_from_deployment,
@@ -13,6 +13,7 @@ use clarity_repl::analysis::coverage::CoverageReporter;
 use clarity_repl::clarity::analysis::contract_interface_builder::{
     ContractInterface, ContractInterfaceFunction, ContractInterfaceFunctionAccess,
 };
+use clarity_repl::clarity::ast::ContractAST;
 use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
 use clarity_repl::clarity::{
     ClarityVersion, EvaluationResult, ExecutionResult, ParsedContract, StacksEpochId,
@@ -28,7 +29,7 @@ use js_sys::Function as JsFunction;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use serde_wasm_bindgen::to_value as encode_to_js;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::{panic, path::PathBuf};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsValue;
@@ -245,8 +246,16 @@ pub fn execution_result_to_transaction_res(execution: &ExecutionResult) -> Trans
     }
 }
 
-#[wasm_bindgen(getter_with_clone)]
+#[derive(Clone)]
+struct ProjectCache {
+    manifest: ProjectManifest,
+    deployment: DeploymentSpecification,
+    asts: BTreeMap<QualifiedContractIdentifier, ContractAST>,
+}
+
+#[wasm_bindgen]
 pub struct SDK {
+    #[wasm_bindgen(getter_with_clone)]
     pub deployer: String,
     file_accessor: Box<dyn FileAccessor>,
     session: Option<Session>,
@@ -254,14 +263,7 @@ pub struct SDK {
     contracts_locations: HashMap<QualifiedContractIdentifier, FileLocation>,
     contracts_interfaces: HashMap<QualifiedContractIdentifier, ContractInterface>,
     parsed_contracts: HashMap<QualifiedContractIdentifier, ParsedContract>,
-    cache: HashMap<
-        FileLocation,
-        (
-            ProjectManifest,
-            DeploymentSpecification,
-            DeploymentGenerationArtifacts,
-        ),
-    >,
+    cache: HashMap<FileLocation, ProjectCache>,
     current_test_name: String,
 }
 
@@ -303,76 +305,21 @@ impl SDK {
         let manifest_location = FileLocation::try_parse(&manifest_path, Some(&cwd_root))
             .ok_or("Failed to parse manifest location")?;
 
-        let (manifest, deployment, artifacts) = match self.cache.get(&manifest_location) {
+        let ProjectCache {
+            manifest,
+            deployment,
+            asts,
+        } = match self.cache.get(&manifest_location) {
             Some(cache) => cache.clone(),
-            None => {
-                let project_root = manifest_location.get_parent_location()?;
-                let deployment_plan_location = FileLocation::try_parse(
-                    "deployments/default.simnet-plan.yaml",
-                    Some(&project_root),
-                )
-                .ok_or("Failed to parse default deployment location")?;
-                let manifest =
-                    ProjectManifest::from_file_accessor(&manifest_location, &*self.file_accessor)
-                        .await?;
-                let (mut deployment, default_artifacts) = generate_default_deployment(
-                    &manifest,
-                    &StacksNetwork::Simnet,
-                    false,
-                    Some(&*self.file_accessor),
-                    Some(StacksEpochId::Epoch21),
-                )
-                .await?;
-
-                if self
-                    .file_accessor
-                    .file_exists(deployment_plan_location.to_string())
-                    .await?
-                {
-                    let mut spec_file = DeploymentSpecificationFile::from_file_accessor(
-                        &deployment_plan_location,
-                        &*self.file_accessor,
-                    )
-                    .await?;
-
-                    if let Some(ref mut plan) = spec_file.plan {
-                        for batch in plan.batches.iter_mut() {
-                            batch.remove_publish_transactions()
-                        }
-                    }
-
-                    let existing_deployment = DeploymentSpecification::from_specifications(
-                        &spec_file,
-                        &StacksNetwork::Simnet,
-                        &project_root,
-                        None,
-                    )?;
-
-                    deployment.merge_batches(existing_deployment.plan.batches);
-                }
-
-                self.write_deployment_plan(&deployment, &project_root, &deployment_plan_location)
-                    .await?;
-
-                let cache = (manifest, deployment, default_artifacts);
-                self.cache.insert(manifest_location, cache.clone());
-                cache
-            }
+            None => self.build_cache(&manifest_location).await?,
         };
-
-        if !artifacts.success {
-            let diags_digest = DiagnosticsDigest::new(&artifacts.diags, &deployment);
-            if diags_digest.errors > 0 {
-                return Err(diags_digest.message);
-            }
-        }
 
         let mut session = initiate_session_from_deployment(&manifest);
         update_session_with_genesis_accounts(&mut session, &deployment);
         let executed_contracts = update_session_with_contracts_executions(
             &mut session,
             &deployment,
-            Some(&artifacts.asts),
+            Some(&asts),
             false,
             Some(DEFAULT_EPOCH),
         );
@@ -406,13 +353,78 @@ impl SDK {
             }
         }
 
-        for (contract_id, (_, location)) in deployment.contracts {
+        for (contract_id, (_, location)) in &deployment.contracts {
             self.contracts_locations
-                .insert(contract_id, location.clone());
+                .insert(contract_id.clone(), location.clone());
         }
 
         self.session = Some(session);
         Ok(())
+    }
+
+    async fn build_cache(
+        &mut self,
+        manifest_location: &FileLocation,
+    ) -> Result<ProjectCache, String> {
+        let manifest =
+            ProjectManifest::from_file_accessor(manifest_location, &*self.file_accessor).await?;
+        let project_root = manifest_location.get_parent_location()?;
+        let deployment_plan_location =
+            FileLocation::try_parse("deployments/default.simnet-plan.yaml", Some(&project_root))
+                .ok_or("Failed to parse default deployment location")?;
+
+        let (mut deployment, artifacts) = generate_default_deployment(
+            &manifest,
+            &StacksNetwork::Simnet,
+            false,
+            Some(&*self.file_accessor),
+            Some(StacksEpochId::Epoch21),
+        )
+        .await?;
+        if self
+            .file_accessor
+            .file_exists(deployment_plan_location.to_string())
+            .await?
+        {
+            let mut spec_file = DeploymentSpecificationFile::from_file_accessor(
+                &deployment_plan_location,
+                &*self.file_accessor,
+            )
+            .await?;
+
+            if let Some(ref mut plan) = spec_file.plan {
+                for batch in plan.batches.iter_mut() {
+                    batch.remove_publish_transactions()
+                }
+            }
+
+            let existing_deployment = DeploymentSpecification::from_specifications(
+                &spec_file,
+                &StacksNetwork::Simnet,
+                &project_root,
+                None,
+            )?;
+
+            deployment.merge_batches(existing_deployment.plan.batches);
+        }
+
+        if artifacts.success {
+            let diags_digest = DiagnosticsDigest::new(&artifacts.diags, &deployment);
+            if diags_digest.errors > 0 {
+                return Err(diags_digest.message);
+            }
+        }
+
+        self.write_deployment_plan(&deployment, &project_root, &deployment_plan_location)
+            .await?;
+
+        let cache = ProjectCache {
+            manifest,
+            deployment,
+            asts: artifacts.asts,
+        };
+        self.cache.insert(manifest_location.clone(), cache.clone());
+        Ok(cache)
     }
 
     async fn write_deployment_plan(
