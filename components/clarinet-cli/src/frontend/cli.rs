@@ -1858,16 +1858,11 @@ mod tests {
                 let mut cmd = Opts::command();
                 generate(shell, &mut cmd, "clarinet", &mut output_buffer);
                 assert!(
-                    output_buffer.len() > 0,
-                    "failed to generate completion for {}",
-                    shell.to_string()
+                    !output_buffer.is_empty(),
+                    "failed to generate completion for {shell}",
                 );
             });
-            assert!(
-                result.is_ok(),
-                "failed to generate completion for {}",
-                shell.to_string()
-            );
+            assert!(result.is_ok(), "failed to generate completion for {shell}",);
         }
     }
 }

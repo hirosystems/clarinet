@@ -530,10 +530,10 @@ mod tests {
     // ranges are painful to test and just reflects the `span`s
     // of the ast, it can be safe to not test it
     fn to_partial(symbol: &DocumentSymbol) -> PartialDocumentSymbol {
-        let children = match &symbol.children {
-            Some(children) => Some(children.iter().map(|child| to_partial(child)).collect()),
-            None => None,
-        };
+        let children = symbol
+            .children
+            .as_ref()
+            .map(|children| children.iter().map(to_partial).collect());
         PartialDocumentSymbol {
             name: symbol.name.to_string(),
             detail: symbol.detail.clone(),
@@ -553,7 +553,7 @@ mod tests {
         )
         .unwrap();
 
-        return contract_ast.expressions;
+        contract_ast.expressions
     }
 
     fn get_symbols(source: &str) -> Vec<DocumentSymbol> {
@@ -568,7 +568,7 @@ mod tests {
         assert_eq!(
             symbols,
             vec![build_symbol(
-                &"impl-trait".to_owned(),
+                "impl-trait",
                 Some("sip-010-trait".to_owned()),
                 ClaritySymbolKind::IMPL_TRAIT,
                 &new_span(1, 1, 1, 95),
@@ -583,7 +583,7 @@ mod tests {
         assert_eq!(
             symbols,
             vec![build_symbol(
-                &"next-id".to_owned(),
+                "next-id",
                 Some("uint".to_owned()),
                 ClaritySymbolKind::VARIABLE,
                 &new_span(1, 1, 1, 33),
@@ -598,7 +598,7 @@ mod tests {
         assert_eq!(
             symbols,
             vec![build_symbol(
-                &"data".to_owned(),
+                "data",
                 Some("list".to_owned()),
                 ClaritySymbolKind::VARIABLE,
                 &new_span(1, 1, 1, 46),
@@ -610,7 +610,7 @@ mod tests {
     #[test]
     fn test_data_var_tuple() {
         let symbols = get_symbols(
-            vec![
+            [
                 "(define-data-var owners",
                 "  { addr: principal, p: int }",
                 "  { addr: contract-caller, p: 1 }",
@@ -628,7 +628,7 @@ mod tests {
     #[test]
     fn test_data_var_nested_tuple() {
         let symbols = get_symbols(
-            vec![
+            [
                 "(define-data-var names",
                 "  { id: { addr: principal, name: (string-ascii 10) }, qt: int }",
                 "  {",
@@ -652,7 +652,7 @@ mod tests {
         assert_eq!(
             symbols,
             vec![build_symbol(
-                &"ERR_PANIC".to_owned(),
+                "ERR_PANIC",
                 None,
                 ClaritySymbolKind::CONSTANT,
                 &new_span(1, 1, 1, 29),
@@ -664,7 +664,7 @@ mod tests {
         assert_eq!(
             symbols,
             vec![build_symbol(
-                &"ERR_PANIC".to_owned(),
+                "ERR_PANIC",
                 None,
                 ClaritySymbolKind::CONSTANT,
                 &new_span(1, 1, 1, 35),
@@ -680,18 +680,18 @@ mod tests {
         assert_eq!(
             to_partial(&symbols[0]),
             build_partial_symbol(
-                &"owners".to_owned(),
+                "owners",
                 None,
                 ClaritySymbolKind::MAP,
                 Some(vec![
                     build_partial_symbol(
-                        &"key".to_owned(),
+                        "key",
                         Some("principal".to_owned()),
                         ClaritySymbolKind::KEY,
                         None
                     ),
                     build_partial_symbol(
-                        &"value".to_owned(),
+                        "value",
                         Some("tuple".to_owned()),
                         ClaritySymbolKind::VALUE,
                         None
@@ -703,7 +703,7 @@ mod tests {
 
     #[test]
     fn test_define_functions() {
-        let source = vec![
+        let source = [
             "(define-read-only (get-id) (ok u1))",
             "(define-public (get-id-again) (ok u1))",
             "(define-private (set-id (new-id uint)) (ok u1))",
@@ -716,7 +716,7 @@ mod tests {
         assert_eq!(
             symbols[0],
             build_symbol(
-                &"get-id".to_owned(),
+                "get-id",
                 Some("read-only".to_owned()),
                 ClaritySymbolKind::FUNCTION,
                 &new_span(1, 1, 1, 35),
@@ -733,7 +733,7 @@ mod tests {
         assert_eq!(
             symbols[1],
             build_symbol(
-                &"get-id-again".to_owned(),
+                "get-id-again",
                 Some("public".to_owned()),
                 ClaritySymbolKind::FUNCTION,
                 &new_span(2, 1, 2, 38),
@@ -750,7 +750,7 @@ mod tests {
         assert_eq!(
             symbols[2],
             build_symbol(
-                &"set-id".to_owned(),
+                "set-id",
                 Some("private".to_owned()),
                 ClaritySymbolKind::FUNCTION,
                 &new_span(3, 1, 3, 47),
@@ -791,7 +791,7 @@ mod tests {
     #[test]
     fn test_let() {
         let symbols = get_symbols(
-            vec![
+            [
                 "(define-public (with-let)",
                 "  (let ((id u1))",
                 "    (ok id)))",
@@ -841,7 +841,7 @@ mod tests {
     #[test]
     fn test_define_trait() {
         let symbols = get_symbols(
-            vec![
+            [
                 "(define-trait my-trait (",
                 "  (get-id () (response uint uint))",
                 "  (set-id () (response bool uint))",
@@ -853,18 +853,18 @@ mod tests {
         assert_eq!(
             to_partial(&symbols[0]),
             build_partial_symbol(
-                &"my-trait".to_owned(),
+                "my-trait",
                 None,
                 ClaritySymbolKind::TRAIT,
                 Some(vec![
                     build_partial_symbol(
-                        &"get-id".to_owned(),
+                        "get-id",
                         Some("trait method".to_owned()),
                         ClaritySymbolKind::FUNCTION,
                         None
                     ),
                     build_partial_symbol(
-                        &"set-id".to_owned(),
+                        "set-id",
                         Some("trait method".to_owned()),
                         ClaritySymbolKind::FUNCTION,
                         None
