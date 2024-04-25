@@ -267,7 +267,6 @@ pub struct SDK {
     current_test_name: String,
 }
 
-#[allow(non_snake_case)]
 #[wasm_bindgen]
 impl SDK {
     #[wasm_bindgen(constructor)]
@@ -343,6 +342,14 @@ impl SDK {
             Some(StacksEpochId::Epoch21),
         )
         .await?;
+
+        if !artifacts.success {
+            let diags_digest = DiagnosticsDigest::new(&artifacts.diags, &deployment);
+            if diags_digest.errors > 0 {
+                return Err(diags_digest.message);
+            }
+        }
+
         if self
             .file_accessor
             .file_exists(deployment_plan_location.to_string())
@@ -368,13 +375,6 @@ impl SDK {
             )?;
 
             deployment.merge_batches(existing_deployment.plan.batches);
-        }
-
-        if artifacts.success {
-            let diags_digest = DiagnosticsDigest::new(&artifacts.diags, &deployment);
-            if diags_digest.errors > 0 {
-                return Err(diags_digest.message);
-            }
         }
 
         self.write_deployment_plan(&deployment, &project_root, &deployment_plan_location)

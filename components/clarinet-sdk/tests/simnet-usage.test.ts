@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
-import { Cl, cvToValue } from "@stacks/transactions";
-import { describe, expect, it, beforeEach, afterEach, assert } from "vitest";
+import { Cl } from "@stacks/transactions";
+import { describe, expect, it, beforeEach, afterEach } from "vitest";
 
 // test the built package and not the source code
 // makes it simpler to handle wasm build
@@ -86,7 +86,6 @@ describe("simnet can run arbitrary snippets", () => {
 
   it("show diagnostic in case of error", () => {
     const res = simnet.runSnippet("(+ 1 u2)");
-    console.log("res", res);
     expect(res).toBe("error:\nexpecting expression of type 'int', found 'uint'");
   });
 });

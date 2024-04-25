@@ -1,11 +1,11 @@
 import fs from "node:fs";
 import path from "node:path";
-import { describe, expect, it, beforeEach, afterEach, assert } from "vitest";
+import { describe, expect, it, beforeEach, afterEach } from "vitest";
 
 // test the built package and not the source code
 // makes it simpler to handle wasm build
 import { initSimnet } from "../dist/esm";
-import { Cl, cvToHex, hexToCV } from "@stacks/transactions";
+import { Cl } from "@stacks/transactions";
 
 const nbOfBootContracts = 24;
 
@@ -85,14 +85,11 @@ describe("deployment plans test", async () => {
     );
     const manifestContent = fs.readFileSync("tests/fixtures/Clarinet.toml", "utf-8");
     const newContent = manifestContent.replace("counter.clar", "_counter.clar");
-    console.log(manifestContent);
     fs.writeFileSync("tests/fixtures/Clarinet.toml", newContent);
 
-    try {
-      await initSimnet("tests/fixtures/Clarinet.toml", true);
-    } catch (e) {
-      console.log("e", e);
-    }
+    const simnet = await initSimnet("tests/fixtures/Clarinet.toml", true);
+    const contractInterfaces = simnet.getContractsInterfaces();
+    expect(contractInterfaces.get(`${simnet.deployer}.counter`)).toBeDefined();
 
     // revert the changes
     fs.renameSync(
