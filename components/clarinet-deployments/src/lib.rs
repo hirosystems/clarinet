@@ -55,7 +55,6 @@ pub fn setup_session_with_deployment(
 ) -> DeploymentGenerationArtifacts {
     let mut session = initiate_session_from_deployment(manifest);
     update_session_with_genesis_accounts(&mut session, deployment);
-    // session.load_boot_contracts();
     let UpdateSessionExecutionResult { contracts, .. } = update_session_with_contracts_executions(
         &mut session,
         deployment,
