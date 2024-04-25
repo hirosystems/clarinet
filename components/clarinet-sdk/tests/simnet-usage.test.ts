@@ -63,7 +63,8 @@ describe("basic simnet interactions", () => {
   });
 
   it("can get and set epoch", () => {
-    // should be 2.4 by default
+    // should be 2.4 at the beginning because
+    // the latest contract in the manifest is deployed in 2.4
     expect(simnet.currentEpoch).toBe("2.4");
 
     simnet.setEpoch("2.0");
@@ -71,9 +72,9 @@ describe("basic simnet interactions", () => {
 
     // @ts-ignore
     // "0" is an invalid epoch
-    // it logs that 0 is invalid and defaults to 2.4
+    // it logs that 0 is invalid and defaults to 2.5
     simnet.setEpoch("0");
-    expect(simnet.currentEpoch).toBe("2.4");
+    expect(simnet.currentEpoch).toBe("2.5");
   });
 });
 
