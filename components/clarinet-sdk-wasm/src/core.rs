@@ -246,24 +246,17 @@ pub fn execution_result_to_transaction_res(execution: &ExecutionResult) -> Trans
     }
 }
 
-#[derive(Clone)]
-struct ProjectCache {
-    manifest: ProjectManifest,
-    deployment: DeploymentSpecification,
-    asts: BTreeMap<QualifiedContractIdentifier, ContractAST>,
-}
-
 #[wasm_bindgen]
 pub struct SDK {
     #[wasm_bindgen(getter_with_clone)]
     pub deployer: String,
     file_accessor: Box<dyn FileAccessor>,
     session: Option<Session>,
+    cached_sessions: HashMap<FileLocation, Session>,
     accounts: HashMap<String, String>,
     contracts_locations: HashMap<QualifiedContractIdentifier, FileLocation>,
     contracts_interfaces: HashMap<QualifiedContractIdentifier, ContractInterface>,
     parsed_contracts: HashMap<QualifiedContractIdentifier, ParsedContract>,
-    cache: HashMap<FileLocation, ProjectCache>,
     current_test_name: String,
 }
 
@@ -283,7 +276,7 @@ impl SDK {
             contracts_locations: HashMap::new(),
             contracts_interfaces: HashMap::new(),
             parsed_contracts: HashMap::new(),
-            cache: HashMap::new(),
+            cached_sessions: HashMap::new(),
             current_test_name: String::new(),
         }
     }
@@ -305,67 +298,18 @@ impl SDK {
         let manifest_location = FileLocation::try_parse(&manifest_path, Some(&cwd_root))
             .ok_or("Failed to parse manifest location")?;
 
-        let ProjectCache {
-            manifest,
-            deployment,
-            asts,
-        } = match self.cache.get(&manifest_location) {
+        let session = match self.cached_sessions.get(&manifest_location) {
             Some(cache) => cache.clone(),
             None => self.build_cache(&manifest_location).await?,
         };
 
-        let mut session = initiate_session_from_deployment(&manifest);
-        update_session_with_genesis_accounts(&mut session, &deployment);
-        let executed_contracts = update_session_with_contracts_executions(
-            &mut session,
-            &deployment,
-            Some(&asts),
-            false,
-            Some(DEFAULT_EPOCH),
-        );
-
-        if let Some(ref spec) = deployment.genesis {
-            for wallet in spec.wallets.iter() {
-                if wallet.name == "deployer" {
-                    self.deployer = wallet.address.to_string();
-                }
-                self.accounts
-                    .insert(wallet.name.clone(), wallet.address.to_string());
-            }
-        }
-
-        for (contract_id, result) in executed_contracts
-            .boot_contracts
-            .into_iter()
-            .chain(executed_contracts.contracts.into_iter())
-        {
-            match result {
-                Ok(execution_result) => {
-                    self.add_contract(&execution_result);
-                }
-                Err(diagnostics) => {
-                    let contract_diagnostics = HashMap::from([(contract_id, diagnostics)]);
-                    let diags_digest = DiagnosticsDigest::new(&contract_diagnostics, &deployment);
-                    if diags_digest.errors > 0 {
-                        return Err(diags_digest.message);
-                    }
-                }
-            }
-        }
-
-        for (contract_id, (_, location)) in &deployment.contracts {
-            self.contracts_locations
-                .insert(contract_id.clone(), location.clone());
-        }
+        self.deployer = session.interpreter.get_tx_sender().to_string();
 
         self.session = Some(session);
         Ok(())
     }
 
-    async fn build_cache(
-        &mut self,
-        manifest_location: &FileLocation,
-    ) -> Result<ProjectCache, String> {
+    async fn build_cache(&mut self, manifest_location: &FileLocation) -> Result<Session, String> {
         let manifest =
             ProjectManifest::from_file_accessor(manifest_location, &*self.file_accessor).await?;
         let project_root = manifest_location.get_parent_location()?;
@@ -418,13 +362,53 @@ impl SDK {
         self.write_deployment_plan(&deployment, &project_root, &deployment_plan_location)
             .await?;
 
-        let cache = ProjectCache {
-            manifest,
-            deployment,
-            asts: artifacts.asts,
-        };
-        self.cache.insert(manifest_location.clone(), cache.clone());
-        Ok(cache)
+        let mut session = initiate_session_from_deployment(&manifest);
+        update_session_with_genesis_accounts(&mut session, &deployment);
+        let executed_contracts = update_session_with_contracts_executions(
+            &mut session,
+            &deployment,
+            Some(&artifacts.asts),
+            false,
+            Some(DEFAULT_EPOCH),
+        );
+
+        if let Some(ref spec) = deployment.genesis {
+            for wallet in spec.wallets.iter() {
+                if wallet.name == "deployer" {
+                    self.deployer = wallet.address.to_string();
+                }
+                self.accounts
+                    .insert(wallet.name.clone(), wallet.address.to_string());
+            }
+        }
+
+        for (contract_id, result) in executed_contracts
+            .boot_contracts
+            .into_iter()
+            .chain(executed_contracts.contracts.into_iter())
+        {
+            match result {
+                Ok(execution_result) => {
+                    self.add_contract(&execution_result);
+                }
+                Err(diagnostics) => {
+                    let contract_diagnostics = HashMap::from([(contract_id, diagnostics)]);
+                    let diags_digest = DiagnosticsDigest::new(&contract_diagnostics, &deployment);
+                    if diags_digest.errors > 0 {
+                        return Err(diags_digest.message);
+                    }
+                }
+            }
+        }
+
+        for (contract_id, (_, location)) in &deployment.contracts {
+            self.contracts_locations
+                .insert(contract_id.clone(), location.clone());
+        }
+
+        self.cached_sessions
+            .insert(manifest_location.clone(), session.clone());
+        Ok(session)
     }
 
     async fn write_deployment_plan(

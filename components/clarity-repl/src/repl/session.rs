@@ -645,7 +645,7 @@ impl Session {
             args,
             self.current_epoch,
             clarity_version,
-            true,
+            false,
             allow_private,
             Some(hooks),
         ) {
