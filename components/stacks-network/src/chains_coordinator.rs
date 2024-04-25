@@ -571,6 +571,7 @@ fn should_publish_stacking_orders(
     true
 }
 
+#[allow(clippy::items_after_test_module)]
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -591,72 +592,39 @@ mod tests {
         let pox_stacking_order = build_pox_stacking_order(12, 6);
 
         // cycle just before start_at_cycle
-        assert_eq!(
-            should_publish_stacking_orders(&5, &pox_stacking_order),
-            true
-        );
+        assert!(should_publish_stacking_orders(&5, &pox_stacking_order));
 
         // cycle before start_at_cycle + duration
-        assert_eq!(
-            should_publish_stacking_orders(&17, &pox_stacking_order),
-            true
-        );
+        assert!(should_publish_stacking_orders(&17, &pox_stacking_order),);
 
         // cycle before start_at_cycle + duration * 42
-        assert_eq!(
-            should_publish_stacking_orders(&509, &pox_stacking_order),
-            true
-        );
+        assert!(should_publish_stacking_orders(&509, &pox_stacking_order));
 
         // cycle equal to start_at_cycle
-        assert_eq!(
-            should_publish_stacking_orders(&6, &pox_stacking_order),
-            false
-        );
+        assert!(!should_publish_stacking_orders(&6, &pox_stacking_order));
 
         // cycle after to start_at_cycle
-        assert_eq!(
-            should_publish_stacking_orders(&8, &pox_stacking_order),
-            false
-        );
+        assert!(!should_publish_stacking_orders(&8, &pox_stacking_order));
     }
 
     #[test]
     fn test_should_publish_stacking_orders_edge_cases() {
         // duration is one cycle
         let pox_stacking_order = build_pox_stacking_order(1, 4);
-        assert_eq!(
-            should_publish_stacking_orders(&2, &pox_stacking_order),
-            false
-        );
+        assert!(!should_publish_stacking_orders(&2, &pox_stacking_order));
 
         for i in 3..=20 {
-            assert_eq!(
-                should_publish_stacking_orders(&i, &pox_stacking_order),
-                true
-            );
+            assert!(should_publish_stacking_orders(&i, &pox_stacking_order));
         }
 
         // duration is low and start_at_cycle is high
         let pox_stacking_order = build_pox_stacking_order(2, 100);
         for i in 0..=98 {
-            assert_eq!(
-                should_publish_stacking_orders(&i, &pox_stacking_order),
-                false
-            );
+            assert!(!should_publish_stacking_orders(&i, &pox_stacking_order));
         }
-        assert_eq!(
-            should_publish_stacking_orders(&99, &pox_stacking_order),
-            true
-        );
-        assert_eq!(
-            should_publish_stacking_orders(&100, &pox_stacking_order),
-            false
-        );
-        assert_eq!(
-            should_publish_stacking_orders(&101, &pox_stacking_order),
-            true
-        );
+        assert!(should_publish_stacking_orders(&99, &pox_stacking_order));
+        assert!(!should_publish_stacking_orders(&100, &pox_stacking_order));
+        assert!(should_publish_stacking_orders(&101, &pox_stacking_order));
     }
 }
 

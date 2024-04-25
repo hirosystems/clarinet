@@ -2,8 +2,7 @@ use std::collections::BTreeMap;
 
 use clarinet_files::{chainhook_types::StacksNetwork, FileLocation};
 use clarity_repl::clarity::{
-    vm::types::{QualifiedContractIdentifier, StandardPrincipalData},
-    ClarityName, ClarityVersion, ContractName,
+    vm::types::QualifiedContractIdentifier, ClarityName, ClarityVersion, ContractName,
 };
 
 use crate::types::*;
@@ -12,7 +11,7 @@ fn get_test_txs() -> (TransactionSpecification, TransactionSpecification) {
     let contract_id =
         QualifiedContractIdentifier::parse("ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.test")
             .unwrap();
-    let tx_sender = StandardPrincipalData::from(contract_id.issuer.clone());
+    let tx_sender = contract_id.issuer.clone();
 
     let contract_publish_tx =
         TransactionSpecification::EmulatedContractPublish(EmulatedContractPublishSpecification {

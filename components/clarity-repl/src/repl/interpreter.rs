@@ -1456,7 +1456,7 @@ mod tests {
         let diagnostics = result.unwrap_err();
         assert_eq!(diagnostics.len(), 1);
 
-        let message = format!("Runtime Error: Runtime error while interpreting {}.{}: Runtime(DivisionByZero, Some([FunctionIdentifier {{ identifier: \"_native_:native_div\" }}]))", StandardPrincipalData::transient().to_string(), contract.name);
+        let message = format!("Runtime Error: Runtime error while interpreting {}.{}: Runtime(DivisionByZero, Some([FunctionIdentifier {{ identifier: \"_native_:native_div\" }}]))", StandardPrincipalData::transient(), contract.name);
         assert_eq!(
             diagnostics[0],
             Diagnostic {
@@ -1562,7 +1562,7 @@ mod tests {
             issuer: StandardPrincipalData::transient(),
             name: "contract".into(),
         };
-        let count = interpreter.get_data_var(&contract_id, &"count");
+        let count = interpreter.get_data_var(&contract_id, "count");
 
         assert_eq!(
             count,
@@ -1596,9 +1596,9 @@ mod tests {
             issuer: StandardPrincipalData::transient(),
             name: "contract".into(),
         };
-        let name = interpreter.get_map_entry(&contract_id, &"people", &Value::UInt(0));
+        let name = interpreter.get_map_entry(&contract_id, "people", &Value::UInt(0));
         assert_eq!(name, Some("0x0a0d000000077361746f736869".to_owned()));
-        let no_name = interpreter.get_map_entry(&contract_id, &"people", &Value::UInt(404));
+        let no_name = interpreter.get_map_entry(&contract_id, "people", &Value::UInt(404));
         assert_eq!(no_name, None);
     }
 
@@ -1771,8 +1771,10 @@ mod tests {
 
     #[test]
     fn can_run_boot_contracts() {
-        let mut repl_settings = Settings::default();
-        repl_settings.clarity_wasm_mode = true;
+        let repl_settings = Settings {
+            clarity_wasm_mode: true,
+            ..Default::default()
+        };
         let mut interpreter =
             ClarityInterpreter::new(StandardPrincipalData::transient(), repl_settings);
 
@@ -1784,10 +1786,9 @@ mod tests {
             }
             let res = interpreter
                 .run(&boot_contract, &mut Some(ast), false, None)
-                .expect(&format!(
-                    "failed to interpret {} boot contract",
-                    &boot_contract.name
-                ));
+                .unwrap_or_else(|_| {
+                    panic!("failed to interpret {} boot contract", &boot_contract.name)
+                });
 
             assert!(res.diagnostics.is_empty());
         }
@@ -1816,7 +1817,7 @@ mod tests {
             &contract
                 .expect_resolved_contract_identifier(Some(&StandardPrincipalData::transient())),
             "public-func",
-            &vec![],
+            &[],
             StacksEpochId::Epoch24,
             ClarityVersion::Clarity2,
             false,
@@ -1855,7 +1856,7 @@ mod tests {
             &contract
                 .expect_resolved_contract_identifier(Some(&StandardPrincipalData::transient())),
             "private-func",
-            &vec![],
+            &[],
             StacksEpochId::Epoch24,
             ClarityVersion::Clarity2,
             false,
@@ -1894,7 +1895,7 @@ mod tests {
             &contract
                 .expect_resolved_contract_identifier(Some(&StandardPrincipalData::transient())),
             "private-func",
-            &vec![],
+            &[],
             StacksEpochId::Epoch24,
             ClarityVersion::Clarity2,
             false,

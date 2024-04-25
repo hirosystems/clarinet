@@ -98,7 +98,7 @@ mod definitions_visitor_tests {
         position: &Position,
     ) -> Option<Vec<lsp_types::SignatureInformation>> {
         let contract = &ActiveContractData::new(Clarity2, Epoch21, None, source);
-        get_signatures(&contract, position)
+        get_signatures(contract, position)
     }
 
     #[test]
@@ -115,7 +115,7 @@ mod definitions_visitor_tests {
         let signatures = signatures.unwrap();
         assert_eq!(signatures.len(), 1);
         assert_eq!(
-            signatures.get(0).unwrap(),
+            signatures.first().unwrap(),
             &SignatureInformation {
                 label: "(var-set var-name expr1) -> bool".to_string(),
                 documentation: None,
@@ -149,7 +149,7 @@ mod definitions_visitor_tests {
                 "begin",
                 "tuple",
             ]
-            .contains(&method)
+            .contains(method)
             {
                 continue;
             }

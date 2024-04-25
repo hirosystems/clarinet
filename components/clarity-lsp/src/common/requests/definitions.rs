@@ -605,7 +605,7 @@ mod definitions_visitor_tests {
             clarity_repl::clarity::ast::ASTRules::Typical,
         )
         .unwrap();
-        return contract_ast.expressions;
+        contract_ast.expressions
     }
 
     fn get_tokens(sources: &str) -> HashMap<(u32, u32), DefinitionLocation> {
@@ -669,7 +669,7 @@ mod definitions_visitor_tests {
     #[test]
     fn find_data_var_definition() {
         let tokens = get_tokens(
-            vec![
+            [
                 "(define-data-var var1 int 1)",
                 "(var-get var1)",
                 "(var-set var1 2)",
@@ -693,7 +693,7 @@ mod definitions_visitor_tests {
     #[test]
     fn find_map_definition() {
         let tokens = get_tokens(
-            vec![
+            [
                 "(define-map owners int principal)",
                 "(map-insert owners 1 tx-sender)",
                 "(map-get? owners 1)",
@@ -727,7 +727,7 @@ mod definitions_visitor_tests {
     #[test]
     fn find_ft_definition() {
         let tokens = get_tokens(
-            vec![
+            [
                 "(define-fungible-token ft u1)",
                 "(ft-mint? ft u1 tx-sender)",
                 "(ft-burn? ft u1 tx-sender)",

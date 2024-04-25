@@ -1307,6 +1307,7 @@ fn clarity_keywords() -> HashMap<String, String> {
     keywords
 }
 
+#[allow(clippy::items_after_test_module)]
 #[cfg(test)]
 mod tests {
     use crate::repl::{self, settings::Account};

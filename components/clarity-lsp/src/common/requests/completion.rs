@@ -903,7 +903,7 @@ mod populate_snippet_with_options_tests {
         let snippet = data.populate_snippet_with_options(
             &ClarityVersion::Clarity2,
             &"var-get".to_string(),
-            &"var-get ${1:var}".to_string(),
+            "var-get ${1:var}",
         );
         assert_eq!(snippet, Some("var-get ${1|counter,is-active|}".to_string()));
     }
@@ -914,7 +914,7 @@ mod populate_snippet_with_options_tests {
         let snippet = data.populate_snippet_with_options(
             &ClarityVersion::Clarity2,
             &"map-get?".to_string(),
-            &"map-get? ${1:map-name} ${2:key-tuple}".to_string(),
+            "map-get? ${1:map-name} ${2:key-tuple}",
         );
         assert_eq!(
             snippet,
@@ -928,7 +928,7 @@ mod populate_snippet_with_options_tests {
         let snippet = data.populate_snippet_with_options(
             &ClarityVersion::Clarity2,
             &"ft-mint?".to_string(),
-            &"ft-mint? ${1:token-name} ${2:amount} ${3:recipient}".to_string(),
+            "ft-mint? ${1:token-name} ${2:amount} ${3:recipient}",
         );
         assert_eq!(
             snippet,
@@ -942,7 +942,7 @@ mod populate_snippet_with_options_tests {
         let snippet = data.populate_snippet_with_options(
             &ClarityVersion::Clarity2,
             &"nft-mint?".to_string(),
-            &"nft-mint? ${1:asset-name} ${2:asset-identifier} ${3:recipient}".to_string(),
+            "nft-mint? ${1:asset-name} ${2:asset-identifier} ${3:recipient}",
         );
         assert_eq!(
             snippet,

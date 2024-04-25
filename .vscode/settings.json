@@ -1,10 +1,8 @@
 {
-  "rust-analyzer.check.overrideCommand": [
-    "cargo",
-    "clippy",
-    "--workspace",
+  "rust-analyzer.check.command": "clippy",
+  "rust-analyzer.check.workspace": true,
+  "rust-analyzer.check.extraArgs": [
     "--exclude=clarinet-sdk-wasm",
-    "--exclude=clarity-jupyter-kernel",
-    "--message-format=json"
+    "--exclude=clarity-jupyter-kernel"
   ]
 }
