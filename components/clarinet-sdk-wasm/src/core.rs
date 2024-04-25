@@ -355,12 +355,15 @@ impl SDK {
             .file_exists(deployment_plan_location.to_string())
             .await?
         {
-            let mut spec_file = DeploymentSpecificationFile::from_file_accessor(
-                &deployment_plan_location,
-                &*self.file_accessor,
-            )
-            .await?;
+            let spec_file_content = self
+                .file_accessor
+                .read_file(deployment_plan_location.to_string())
+                .await?;
 
+            let mut spec_file = DeploymentSpecificationFile::from_file_content(&spec_file_content)?;
+
+            // the contract publish txs are management by the manifest
+            // keep the user added txs and merge them with the default deployment plan
             if let Some(ref mut plan) = spec_file.plan {
                 for batch in plan.batches.iter_mut() {
                     batch.remove_publish_transactions()
@@ -375,10 +378,18 @@ impl SDK {
             )?;
 
             deployment.merge_batches(existing_deployment.plan.batches);
-        }
 
-        self.write_deployment_plan(&deployment, &project_root, &deployment_plan_location)
+            self.write_deployment_plan(
+                &deployment,
+                &project_root,
+                &deployment_plan_location,
+                Some(&spec_file_content),
+            )
             .await?;
+        } else {
+            self.write_deployment_plan(&deployment, &project_root, &deployment_plan_location, None)
+                .await?;
+        }
 
         let mut session = initiate_session_from_deployment(&manifest);
         update_session_with_genesis_accounts(&mut session, &deployment);
@@ -448,6 +459,7 @@ impl SDK {
         deployment_plan: &DeploymentSpecification,
         project_root: &FileLocation,
         deployment_plan_location: &FileLocation,
+        existing_file: Option<&str>,
     ) -> Result<(), String> {
         // we must manually update the location of the contracts in the deployment plan to be relative to the project root
         // because the serialize function is not able to get project_root location in wasm, so it falls back to the full path
@@ -474,6 +486,15 @@ impl SDK {
             });
 
         let deployment_file = deployment_plan_with_relative_paths.to_file_content()?;
+
+        if let Some(existing_file) = existing_file {
+            if existing_file.as_bytes() == deployment_file {
+                return Ok(());
+            }
+        }
+
+        log!("Updated deployment plan file");
+
         self.file_accessor
             .write_file(deployment_plan_location.to_string(), &deployment_file)
             .await?;

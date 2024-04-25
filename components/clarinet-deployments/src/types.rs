@@ -1144,7 +1144,7 @@ impl DeploymentSpecification {
         })
     }
 
-    fn to_specification_file(&self) -> DeploymentSpecificationFile {
+    pub fn to_specification_file(&self) -> DeploymentSpecificationFile {
         DeploymentSpecificationFile {
             id: Some(self.id),
             name: self.name.clone(),
@@ -1247,6 +1247,12 @@ impl DeploymentSpecificationFile {
         let spec_file_content = file_accesor.read_file(path.to_string()).await?;
 
         serde_yaml::from_str(&spec_file_content)
+            .map_err(|msg| format!("unable to read file {}", msg))
+    }
+    pub fn from_file_content(
+        spec_file_content: &str,
+    ) -> Result<DeploymentSpecificationFile, String> {
+        serde_yaml::from_str(spec_file_content)
             .map_err(|msg| format!("unable to read file {}", msg))
     }
 }
