@@ -941,7 +941,7 @@ impl ClarityInterpreter {
         raw_args: &[Vec<u8>],
         epoch: StacksEpochId,
         clarity_version: ClarityVersion,
-        cost_track: bool,
+        track_costs: bool,
         allow_private: bool,
         eval_hooks: Option<Vec<&mut dyn EvalHook>>,
     ) -> Result<ExecutionResult, String> {
@@ -955,7 +955,7 @@ impl ClarityInterpreter {
         conn.set_clarity_epoch_version(epoch)
             .map_err(|e| e.to_string())?;
         conn.commit().map_err(|e| e.to_string())?;
-        let cost_tracker = if cost_track {
+        let cost_tracker = if track_costs {
             LimitedCostTracker::new(
                 false,
                 CHAIN_ID_TESTNET,
@@ -1020,7 +1020,7 @@ impl ClarityInterpreter {
         })?;
 
         let mut cost = None;
-        if cost_track {
+        if track_costs {
             cost = Some(CostSynthesis::from_cost_tracker(&global_context.cost_track));
         }
 

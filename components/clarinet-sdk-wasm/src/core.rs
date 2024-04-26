@@ -253,6 +253,25 @@ struct ProjectCache {
 }
 
 #[wasm_bindgen]
+pub struct SDKOptions {
+    #[wasm_bindgen(js_name = trackCosts)]
+    pub track_costs: bool,
+    #[wasm_bindgen(js_name = trackCoverage)]
+    pub track_coverage: bool,
+}
+
+#[wasm_bindgen]
+impl SDKOptions {
+    #[wasm_bindgen(constructor)]
+    pub fn new(track_costs: bool, track_coverage: bool) -> Self {
+        Self {
+            track_costs,
+            track_coverage,
+        }
+    }
+}
+
+#[wasm_bindgen]
 pub struct SDK {
     #[wasm_bindgen(getter_with_clone)]
     pub deployer: String,
@@ -264,16 +283,21 @@ pub struct SDK {
     session: Option<Session>,
 
     file_accessor: Box<dyn FileAccessor>,
+    options: SDKOptions,
     current_test_name: String,
 }
 
 #[wasm_bindgen]
 impl SDK {
     #[wasm_bindgen(constructor)]
-    pub fn new(fs_request: JsFunction) -> Self {
+    pub fn new(fs_request: JsFunction, options: Option<SDKOptions>) -> Self {
         panic::set_hook(Box::new(console_error_panic_hook::hook));
 
         let fs = Box::new(WASMFileSystemAccessor::new(fs_request));
+
+        let track_coverage = options.as_ref().map_or(false, |o| o.track_coverage);
+        let track_costs = options.as_ref().map_or(false, |o| o.track_costs);
+
         Self {
             deployer: String::new(),
             cache: HashMap::new(),
@@ -282,6 +306,10 @@ impl SDK {
             contracts_locations: HashMap::new(),
             session: None,
             file_accessor: fs,
+            options: SDKOptions {
+                track_coverage,
+                track_costs,
+            },
             current_test_name: String::new(),
         }
     }
@@ -642,9 +670,23 @@ impl SDK {
         allow_private: bool,
     ) -> Result<TransactionRes, String> {
         let test_name = self.current_test_name.clone();
+        let SDKOptions {
+            track_costs,
+            track_coverage,
+        } = self.options;
+
         let session = self.get_session_mut();
         let execution = session
-            .call_contract_fn(contract, method, args, sender, allow_private, test_name)
+            .call_contract_fn(
+                contract,
+                method,
+                args,
+                sender,
+                allow_private,
+                track_costs,
+                track_coverage,
+                test_name,
+            )
             .map_err(|diagnostics| {
                 let mut message = format!(
                     "{}: {}::{}({})",

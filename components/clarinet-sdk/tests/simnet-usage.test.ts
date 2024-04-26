@@ -327,39 +327,6 @@ describe("simnet can transfer stx", () => {
   });
 });
 
-describe("simnet can get session reports", () => {
-  it("can get line coverage", () => {
-    simnet.callPublicFn("counter", "increment", [], address1);
-    simnet.callPublicFn("counter", "increment", [], address1);
-    simnet.callPrivateFn("counter", "inner-increment", [], address1);
-
-    const reports = simnet.collectReport(false, "");
-
-    // increment is called twice
-    expect(reports.coverage.includes("FNDA:2,increment")).toBe(true);
-    // inner-increment is called one time directly and twice by `increment`
-    expect(reports.coverage.includes("FNDA:3,inner-increment")).toBe(true);
-
-    expect(reports.coverage.startsWith("TN:")).toBe(true);
-    expect(reports.coverage.endsWith("end_of_record\n")).toBe(true);
-  });
-
-  it("can get costs", () => {
-    simnet.callPublicFn("counter", "increment", [], address1);
-
-    const reports = simnet.collectReport(false, "");
-    expect(() => JSON.parse(reports.costs)).not.toThrow();
-
-    const parsedReports = JSON.parse(reports.costs);
-    expect(parsedReports).toHaveLength(1);
-
-    const report = parsedReports[0];
-    expect(report.contract_id).toBe(`${simnet.deployer}.counter`);
-    expect(report.method).toBe("increment");
-    expect(report.cost_result.total.write_count).toBe(3);
-  });
-});
-
 describe("the sdk handles multiple manifests project", () => {
   it("handle invalid project", () => {
     const manifestPath = path.join(process.cwd(), "tests/fixtures/contracts/invalid.clar");

@@ -617,6 +617,8 @@ impl Session {
         args: &[Vec<u8>],
         sender: &str,
         allow_private: bool,
+        track_costs: bool,
+        track_coverage: bool,
         test_name: String,
     ) -> Result<ExecutionResult, Vec<Diagnostic>> {
         let initial_tx_sender = self.get_tx_sender();
@@ -630,7 +632,9 @@ impl Session {
 
         let mut hooks: Vec<&mut dyn EvalHook> = vec![];
         let mut coverage = TestCoverageReport::new(test_name.clone());
-        hooks.push(&mut coverage);
+        if track_coverage {
+            hooks.push(&mut coverage);
+        }
 
         let clarity_version = ClarityVersion::default_for_epoch(self.current_epoch);
 
@@ -641,7 +645,7 @@ impl Session {
             args,
             self.current_epoch,
             clarity_version,
-            true,
+            track_costs,
             allow_private,
             Some(hooks),
         ) {
@@ -657,7 +661,10 @@ impl Session {
             }
         };
         self.set_tx_sender(initial_tx_sender);
-        self.coverage_reports.push(coverage);
+
+        if track_coverage {
+            self.coverage_reports.push(coverage);
+        }
 
         if let Some(ref cost) = execution.cost {
             self.costs_reports.push(CostsReport {
