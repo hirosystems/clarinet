@@ -362,7 +362,7 @@ impl SDK {
 
             let mut spec_file = DeploymentSpecificationFile::from_file_content(&spec_file_content)?;
 
-            // the contract publish txs are management by the manifest
+            // the contract publish txs are managed by the manifest
             // keep the user added txs and merge them with the default deployment plan
             if let Some(ref mut plan) = spec_file.plan {
                 for batch in plan.batches.iter_mut() {
