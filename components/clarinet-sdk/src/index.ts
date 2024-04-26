@@ -1,6 +1,7 @@
 import { Cl, ClarityValue } from "@stacks/transactions";
 import {
   SDK,
+  SDKOptions,
   TransactionRes,
   CallFnArgs,
   DeployContractArgs,
@@ -279,10 +280,15 @@ const getSessionProxy = () => ({
 function memoizedInit() {
   let simnet: Simnet | null = null;
 
-  return async (manifestPath = "./Clarinet.toml", noCache = false) => {
+  return async (
+    manifestPath = "./Clarinet.toml",
+    noCache = false,
+    options?: { trackCosts: boolean; trackCoverage: boolean },
+  ) => {
     if (noCache || !simnet) {
       const module = await wasmModule;
-      simnet = new Proxy(new module.SDK(vfs), getSessionProxy()) as unknown as Simnet;
+      let sdkOptions = new SDKOptions(!!options?.trackCosts, !!options?.trackCoverage);
+      simnet = new Proxy(new module.SDK(vfs, sdkOptions), getSessionProxy()) as unknown as Simnet;
     }
 
     // start a new simnet session

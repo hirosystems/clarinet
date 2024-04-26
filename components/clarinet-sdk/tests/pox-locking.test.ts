@@ -122,7 +122,13 @@ describe("test pox-3", () => {
     );
   });
 
-  it("can get pox boot contract code coverage", () => {
+  it("can get pox boot contract code coverage", async () => {
+    const simnet = await initSimnet("tests/fixtures/Clarinet.toml", true, {
+      trackCoverage: true,
+      trackCosts: false,
+    });
+    simnet.setEpoch("2.4");
+
     const stackStxArgs = [
       Cl.uint(ustxAmount),
       Cl.tuple({
