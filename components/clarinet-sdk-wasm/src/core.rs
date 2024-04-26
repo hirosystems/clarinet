@@ -1,11 +1,10 @@
 use clarinet_deployments::diagnostic_digest::DiagnosticsDigest;
 use clarinet_deployments::types::{
-    DeploymentGenerationArtifacts, DeploymentSpecification, DeploymentSpecificationFile,
-    EmulatedContractPublishSpecification, EmulatedContractPublishSpecificationFile,
-    TransactionSpecification, TransactionSpecificationFile,
+    DeploymentSpecification, DeploymentSpecificationFile, EmulatedContractPublishSpecification,
+    TransactionSpecification,
 };
 use clarinet_deployments::{
-    generate_default_deployment, initiate_session_from_deployment, setup_session_with_deployment,
+    generate_default_deployment, initiate_session_from_deployment,
     update_session_with_contracts_executions, update_session_with_genesis_accounts,
 };
 use clarinet_files::chainhook_types::StacksNetwork;
@@ -14,23 +13,21 @@ use clarity_repl::analysis::coverage::CoverageReporter;
 use clarity_repl::clarity::analysis::contract_interface_builder::{
     ContractInterface, ContractInterfaceFunction, ContractInterfaceFunctionAccess,
 };
+use clarity_repl::clarity::ast::ContractAST;
 use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
-use clarity_repl::clarity::{
-    ClarityVersion, EvaluationResult, ExecutionResult, ParsedContract, StacksEpochId,
-};
+use clarity_repl::clarity::{ClarityVersion, EvaluationResult, ExecutionResult, StacksEpochId};
 use clarity_repl::repl::clarity_values::{uint8_to_string, uint8_to_value};
 use clarity_repl::repl::session::BOOT_CONTRACTS_DATA;
 use clarity_repl::repl::{
     clarity_values, ClarityCodeSource, ClarityContract, ContractDeployer, Session,
     DEFAULT_CLARITY_VERSION, DEFAULT_EPOCH,
 };
-use colored::*;
 use gloo_utils::format::JsValueSerdeExt;
 use js_sys::Function as JsFunction;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use serde_wasm_bindgen::to_value as encode_to_js;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::{panic, path::PathBuf};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsValue;
@@ -247,20 +244,29 @@ pub fn execution_result_to_transaction_res(execution: &ExecutionResult) -> Trans
     }
 }
 
-#[wasm_bindgen(getter_with_clone)]
-pub struct SDK {
-    pub deployer: String,
-    file_accessor: Box<dyn FileAccessor>,
-    session: Option<Session>,
+#[derive(Clone)]
+struct ProjectCache {
     accounts: HashMap<String, String>,
     contracts_locations: HashMap<QualifiedContractIdentifier, FileLocation>,
     contracts_interfaces: HashMap<QualifiedContractIdentifier, ContractInterface>,
-    parsed_contracts: HashMap<QualifiedContractIdentifier, ParsedContract>,
-    cache: HashMap<FileLocation, (DeploymentSpecification, DeploymentGenerationArtifacts)>,
+    session: Session,
+}
+
+#[wasm_bindgen]
+pub struct SDK {
+    #[wasm_bindgen(getter_with_clone)]
+    pub deployer: String,
+    cache: HashMap<FileLocation, ProjectCache>,
+
+    accounts: HashMap<String, String>,
+    contracts_locations: HashMap<QualifiedContractIdentifier, FileLocation>,
+    contracts_interfaces: HashMap<QualifiedContractIdentifier, ContractInterface>,
+    session: Option<Session>,
+
+    file_accessor: Box<dyn FileAccessor>,
     current_test_name: String,
 }
 
-#[allow(non_snake_case)]
 #[wasm_bindgen]
 impl SDK {
     #[wasm_bindgen(constructor)]
@@ -270,13 +276,12 @@ impl SDK {
         let fs = Box::new(WASMFileSystemAccessor::new(fs_request));
         Self {
             deployer: String::new(),
-            file_accessor: fs,
-            session: None,
-            accounts: HashMap::new(),
-            contracts_locations: HashMap::new(),
-            contracts_interfaces: HashMap::new(),
-            parsed_contracts: HashMap::new(),
             cache: HashMap::new(),
+            accounts: HashMap::new(),
+            contracts_interfaces: HashMap::new(),
+            contracts_locations: HashMap::new(),
+            session: None,
+            file_accessor: fs,
             current_test_name: String::new(),
         }
     }
@@ -297,15 +302,39 @@ impl SDK {
         let cwd_root = FileLocation::FileSystem { path: cwd_path };
         let manifest_location = FileLocation::try_parse(&manifest_path, Some(&cwd_root))
             .ok_or("Failed to parse manifest location")?;
+
+        let ProjectCache {
+            session,
+            contracts_interfaces,
+            contracts_locations,
+            accounts,
+        } = match self.cache.get(&manifest_location) {
+            Some(cache) => cache.clone(),
+            None => self.setup_session(&manifest_location).await?,
+        };
+
+        self.deployer = session.interpreter.get_tx_sender().to_string();
+
+        self.contracts_interfaces = contracts_interfaces;
+        self.contracts_locations = contracts_locations;
+        self.accounts = accounts;
+        self.session = Some(session);
+
+        Ok(())
+    }
+
+    async fn setup_session(
+        &mut self,
+        manifest_location: &FileLocation,
+    ) -> Result<ProjectCache, String> {
+        let manifest =
+            ProjectManifest::from_file_accessor(manifest_location, &*self.file_accessor).await?;
         let project_root = manifest_location.get_parent_location()?;
         let deployment_plan_location =
             FileLocation::try_parse("deployments/default.simnet-plan.yaml", Some(&project_root))
                 .ok_or("Failed to parse default deployment location")?;
 
-        let manifest =
-            ProjectManifest::from_file_accessor(&manifest_location, &*self.file_accessor).await?;
-
-        let (mut default_deployment, default_artifacts) = generate_default_deployment(
+        let (mut deployment, artifacts) = generate_default_deployment(
             &manifest,
             &StacksNetwork::Simnet,
             false,
@@ -314,104 +343,52 @@ impl SDK {
         )
         .await?;
 
-        let (deployment, artifacts) = match self.cache.get(&manifest_location) {
-            Some(cache) => cache.clone(),
-            None => {
-                if self
-                    .file_accessor
-                    .file_exists(deployment_plan_location.to_string())
-                    .await?
-                {
-                    let spec_file = DeploymentSpecificationFile::from_file_accessor(
-                        &deployment_plan_location,
-                        &*self.file_accessor,
-                    )
-                    .await?;
-
-                    let contracts_paths = match spec_file.plan {
-                        Some(ref plan) => plan
-                            .batches
-                            .iter()
-                            .flat_map(|b| {
-                                b.transactions
-                                    .iter()
-                                    .filter_map(|t| match t {
-                                        TransactionSpecificationFile::EmulatedContractPublish(
-                                            EmulatedContractPublishSpecificationFile {
-                                                path: Some(ref path),
-                                                ..
-                                            },
-                                        ) => {
-                                            let contract_path =
-                                                FileLocation::try_parse(path, Some(&project_root));
-                                            contract_path.map(|p| p.to_string())
-                                        }
-                                        _ => None,
-                                    })
-                                    .collect::<Vec<String>>()
-                            })
-                            .collect::<Vec<String>>(),
-                        None => {
-                            vec![]
-                        }
-                    };
-
-                    let contracts_sources = self.file_accessor.read_files(contracts_paths).await?;
-                    let existing_deployment = DeploymentSpecification::from_specifications(
-                        &spec_file,
-                        &StacksNetwork::Simnet,
-                        &project_root,
-                        Some(&contracts_sources),
-                    )
-                    .map_err(|e| e.to_string())?;
-
-                    let (deployment_with_only_contract_publish_txs, custom_batches) =
-                        existing_deployment.extract_no_contract_publish_txs();
-
-                    let (deployment, artifacts) = if deployment_with_only_contract_publish_txs
-                        == default_deployment
-                    {
-                        log!("{}", "using existing deployment plan".yellow().bold());
-                        let artifacts =
-                            setup_session_with_deployment(&manifest, &existing_deployment, None);
-                        (existing_deployment, artifacts)
-                    } else {
-                        log!("{}", "using updated deployment plan".yellow().bold());
-                        default_deployment.merge_batches(custom_batches);
-                        self.write_deployment_plan(
-                            &default_deployment,
-                            &project_root,
-                            &deployment_plan_location,
-                        )
-                        .await?;
-                        (default_deployment, default_artifacts)
-                    };
-
-                    let cache = (deployment, artifacts);
-                    self.cache.insert(manifest_location, cache.clone());
-                    cache
-                } else {
-                    log!("{}", "generated a new deployment plan".green().bold());
-                    let cache = (default_deployment.clone(), default_artifacts.clone());
-                    self.cache.insert(manifest_location, cache.clone());
-
-                    self.write_deployment_plan(
-                        &default_deployment,
-                        &project_root,
-                        &deployment_plan_location,
-                    )
-                    .await?;
-
-                    cache
-                }
-            }
-        };
-
         if !artifacts.success {
             let diags_digest = DiagnosticsDigest::new(&artifacts.diags, &deployment);
             if diags_digest.errors > 0 {
                 return Err(diags_digest.message);
             }
+        }
+
+        if self
+            .file_accessor
+            .file_exists(deployment_plan_location.to_string())
+            .await?
+        {
+            let spec_file_content = self
+                .file_accessor
+                .read_file(deployment_plan_location.to_string())
+                .await?;
+
+            let mut spec_file = DeploymentSpecificationFile::from_file_content(&spec_file_content)?;
+
+            // the contract publish txs are managed by the manifest
+            // keep the user added txs and merge them with the default deployment plan
+            if let Some(ref mut plan) = spec_file.plan {
+                for batch in plan.batches.iter_mut() {
+                    batch.remove_publish_transactions()
+                }
+            }
+
+            let existing_deployment = DeploymentSpecification::from_specifications(
+                &spec_file,
+                &StacksNetwork::Simnet,
+                &project_root,
+                None,
+            )?;
+
+            deployment.merge_batches(existing_deployment.plan.batches);
+
+            self.write_deployment_plan(
+                &deployment,
+                &project_root,
+                &deployment_plan_location,
+                Some(&spec_file_content),
+            )
+            .await?;
+        } else {
+            self.write_deployment_plan(&deployment, &project_root, &deployment_plan_location, None)
+                .await?;
         }
 
         let mut session = initiate_session_from_deployment(&manifest);
@@ -424,16 +401,17 @@ impl SDK {
             Some(DEFAULT_EPOCH),
         );
 
+        let mut accounts = HashMap::new();
         if let Some(ref spec) = deployment.genesis {
             for wallet in spec.wallets.iter() {
                 if wallet.name == "deployer" {
                     self.deployer = wallet.address.to_string();
                 }
-                self.accounts
-                    .insert(wallet.name.clone(), wallet.address.to_string());
+                accounts.insert(wallet.name.clone(), wallet.address.to_string());
             }
         }
 
+        let mut contracts_interfaces = HashMap::new();
         for (contract_id, result) in executed_contracts
             .boot_contracts
             .into_iter()
@@ -441,7 +419,15 @@ impl SDK {
         {
             match result {
                 Ok(execution_result) => {
-                    self.add_contract(&execution_result);
+                    if let EvaluationResult::Contract(ref result) = &execution_result.result {
+                        let contract_id = result.contract.analysis.contract_identifier.clone();
+                        if let Some(contract_interface) =
+                            &result.contract.analysis.contract_interface
+                        {
+                            contracts_interfaces
+                                .insert(contract_id.clone(), contract_interface.clone());
+                        }
+                    }
                 }
                 Err(diagnostics) => {
                     let contract_diagnostics = HashMap::from([(contract_id, diagnostics)]);
@@ -453,13 +439,19 @@ impl SDK {
             }
         }
 
-        for (contract_id, (_, location)) in deployment.contracts {
-            self.contracts_locations
-                .insert(contract_id, location.clone());
+        let mut contracts_locations = HashMap::new();
+        for (contract_id, (_, location)) in &deployment.contracts {
+            contracts_locations.insert(contract_id.clone(), location.clone());
         }
 
-        self.session = Some(session);
-        Ok(())
+        let cache = ProjectCache {
+            accounts,
+            contracts_interfaces,
+            contracts_locations,
+            session,
+        };
+        self.cache.insert(manifest_location.clone(), cache.clone());
+        Ok(cache)
     }
 
     async fn write_deployment_plan(
@@ -467,6 +459,7 @@ impl SDK {
         deployment_plan: &DeploymentSpecification,
         project_root: &FileLocation,
         deployment_plan_location: &FileLocation,
+        existing_file: Option<&str>,
     ) -> Result<(), String> {
         // we must manually update the location of the contracts in the deployment plan to be relative to the project root
         // because the serialize function is not able to get project_root location in wasm, so it falls back to the full path
@@ -493,22 +486,19 @@ impl SDK {
             });
 
         let deployment_file = deployment_plan_with_relative_paths.to_file_content()?;
+
+        if let Some(existing_file) = existing_file {
+            if existing_file.as_bytes() == deployment_file {
+                return Ok(());
+            }
+        }
+
+        log!("Updated deployment plan file");
+
         self.file_accessor
             .write_file(deployment_plan_location.to_string(), &deployment_file)
             .await?;
         Ok(())
-    }
-
-    fn add_contract(&mut self, execution_result: &ExecutionResult) {
-        if let EvaluationResult::Contract(ref result) = &execution_result.result {
-            let contract_id = result.contract.analysis.contract_identifier.clone();
-            if let Some(contract_interface) = &result.contract.analysis.contract_interface {
-                self.contracts_interfaces
-                    .insert(contract_id.clone(), contract_interface.clone());
-            }
-            self.parsed_contracts
-                .insert(contract_id, result.contract.clone());
-        };
     }
 
     fn get_session(&self) -> &Session {
@@ -559,25 +549,27 @@ impl SDK {
 
     #[wasm_bindgen(js_name=getContractsInterfaces)]
     pub fn get_contracts_interfaces(&self) -> Result<JsValue, JsError> {
-        let stringified_contracts_interfaces: HashMap<String, ContractInterface> = self
+        let contracts_interfaces: HashMap<String, ContractInterface> = self
             .contracts_interfaces
             .iter()
             .map(|(k, v)| (k.to_string(), v.clone()))
             .collect();
-        Ok(encode_to_js(&stringified_contracts_interfaces)?)
+        Ok(encode_to_js(&contracts_interfaces)?)
     }
 
     #[wasm_bindgen(js_name=getContractSource)]
     pub fn get_contract_source(&self, contract: &str) -> Option<String> {
+        let session = self.get_session();
         let contract_id = self.desugar_contract_id(contract).ok()?;
-        let contract = self.parsed_contracts.get(&contract_id)?;
+        let contract = session.contracts.get(&contract_id)?;
         Some(contract.code.clone())
     }
 
     #[wasm_bindgen(js_name=getContractAST)]
     pub fn get_contract_ast(&self, contract: &str) -> Result<JsValue, String> {
+        let session = self.get_session();
         let contract_id = self.desugar_contract_id(contract)?;
-        let contract = self.parsed_contracts.get(&contract_id).ok_or("err")?;
+        let contract = session.contracts.get(&contract_id).ok_or("err")?;
         encode_to_js(&contract.ast).map_err(|e| e.to_string())
     }
 
@@ -636,7 +628,7 @@ impl SDK {
             .functions
             .iter()
             .find(|func| func.name == method)
-            .ok_or(format!("contract {contract} has no function {method}"))
+            .ok_or(format!("contract {} has no function {}", contract, method))
     }
 
     fn call_contract_fn(
@@ -780,7 +772,15 @@ impl SDK {
                 }
             }
         };
-        self.add_contract(&execution);
+
+        if let EvaluationResult::Contract(ref result) = &execution.result {
+            let contract_id = result.contract.analysis.contract_identifier.clone();
+            if let Some(contract_interface) = &result.contract.analysis.contract_interface {
+                self.contracts_interfaces
+                    .insert(contract_id, contract_interface.clone());
+            }
+        };
+
         Ok(execution_result_to_transaction_res(&execution))
     }
 
@@ -881,7 +881,11 @@ impl SDK {
         let contracts_locations = self.contracts_locations.clone();
         let session = self.get_session_mut();
         let mut coverage_reporter = CoverageReporter::new();
-        coverage_reporter.asts.append(&mut session.asts);
+        let mut asts: BTreeMap<QualifiedContractIdentifier, ContractAST> = BTreeMap::new();
+        for (contract_id, contract) in session.contracts.iter() {
+            asts.insert(contract_id.clone(), contract.ast.clone());
+        }
+        coverage_reporter.asts.append(&mut asts);
 
         for (contract_id, contract_location) in contracts_locations.iter() {
             coverage_reporter

@@ -120,7 +120,6 @@ pub fn update_session_with_genesis_accounts(
                 session.set_tx_sender(wallet.address.to_address());
             }
         }
-        session.load_boot_contracts();
     }
 }
 

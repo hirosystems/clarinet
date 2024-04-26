@@ -11,7 +11,8 @@ fn get_coverage_report(contract: &str, snippets: Vec<String>) -> (TestCoverageRe
         let _ = session.eval(snippet, Some(vec![&mut report]), false);
     }
 
-    let (contract_id, ast) = session.asts.pop_first().unwrap();
+    let (contract_id, contract) = session.contracts.pop_first().unwrap();
+    let ast = contract.ast;
 
     let mut coverage_reporter = CoverageReporter::new();
     coverage_reporter

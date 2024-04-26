@@ -17,7 +17,9 @@ use clarity::vm::types::{
     PrincipalData, QualifiedContractIdentifier, StandardPrincipalData, Value,
 };
 use clarity::vm::variables::NativeVariables;
-use clarity::vm::{ClarityVersion, CostSynthesis, EvalHook, EvaluationResult, ExecutionResult};
+use clarity::vm::{
+    ClarityVersion, CostSynthesis, EvalHook, EvaluationResult, ExecutionResult, ParsedContract,
+};
 use std::collections::{BTreeMap, HashMap};
 use std::fmt;
 use std::num::ParseIntError;
@@ -97,8 +99,7 @@ pub struct CostsReport {
 #[derive(Clone, Debug)]
 pub struct Session {
     pub settings: SessionSettings,
-    pub contracts: BTreeMap<String, BTreeMap<String, Vec<String>>>,
-    pub asts: BTreeMap<QualifiedContractIdentifier, ContractAST>,
+    pub contracts: BTreeMap<QualifiedContractIdentifier, ParsedContract>,
     pub interpreter: ClarityInterpreter,
     api_reference: HashMap<String, String>,
     pub coverage_reports: Vec<TestCoverageReport>,
@@ -122,7 +123,6 @@ impl Session {
 
         Session {
             interpreter: ClarityInterpreter::new(tx_sender, settings.repl_settings.clone()),
-            asts: BTreeMap::new(),
             contracts: BTreeMap::new(),
             api_reference: build_api_reference(),
             coverage_reports: vec![],
@@ -539,12 +539,8 @@ impl Session {
                     self.coverage_reports.push(coverage.clone());
                 }
                 if let EvaluationResult::Contract(contract_result) = &result.result {
-                    self.asts
-                        .insert(contract_id.clone(), contract_result.contract.ast.clone());
-                    self.contracts.insert(
-                        contract_id.to_string(),
-                        contract_result.contract.function_args.clone(),
-                    );
+                    self.contracts
+                        .insert(contract_id.clone(), contract_result.contract.clone());
                 };
                 Ok(result)
             }
@@ -699,13 +695,9 @@ impl Session {
         match result {
             Ok(result) => {
                 if let EvaluationResult::Contract(contract_result) = &result.result {
-                    self.asts.insert(
-                        contract_identifier.clone(),
-                        contract_result.contract.ast.clone(),
-                    );
                     self.contracts.insert(
-                        contract_result.contract.contract_identifier.clone(),
-                        contract_result.contract.function_args.clone(),
+                        contract_identifier.clone(),
+                        contract_result.contract.clone(),
                     );
                 };
                 Ok(result)
@@ -1071,12 +1063,13 @@ impl Session {
             let mut table = Table::new();
             table.add_row(row!["Contract identifier", "Public functions"]);
             let contracts = self.contracts.clone();
-            for (contract_id, methods) in contracts.iter() {
-                if !contract_id.starts_with(BOOT_TESTNET_ADDRESS)
-                    && !contract_id.starts_with(BOOT_MAINNET_ADDRESS)
+            for (contract_id, contract) in contracts.iter() {
+                let contract_id_str = contract_id.to_string();
+                if !contract_id_str.starts_with(BOOT_TESTNET_ADDRESS)
+                    && !contract_id_str.starts_with(BOOT_MAINNET_ADDRESS)
                 {
                     let mut formatted_methods = vec![];
-                    for (method_name, method_args) in methods.iter() {
+                    for (method_name, method_args) in contract.function_args.iter() {
                         let formatted_args = if method_args.is_empty() {
                             String::new()
                         } else if method_args.len() == 1 {
@@ -1088,7 +1081,7 @@ impl Session {
                     }
                     let formatted_spec = formatted_methods.join("\n").to_string();
                     table.add_row(Row::new(vec![
-                        Cell::new(contract_id),
+                        Cell::new(&contract_id_str),
                         Cell::new(&formatted_spec),
                     ]));
                 }
@@ -1130,9 +1123,9 @@ impl Session {
     #[cfg(not(feature = "cli"))]
     fn get_contracts(&self, output: &mut Vec<String>) {
         for (contract_id, _methods) in self.contracts.iter() {
-            if !contract_id.ends_with(".pox")
-                && !contract_id.ends_with(".bns")
-                && !contract_id.ends_with(".costs")
+            if !contract_id.to_string().ends_with(".pox")
+                && !contract_id.to_string().ends_with(".bns")
+                && !contract_id.to_string().ends_with(".costs")
             {
                 output.push(contract_id.to_string());
             }
