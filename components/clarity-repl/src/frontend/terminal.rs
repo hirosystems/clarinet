@@ -114,7 +114,7 @@ impl Terminal {
             }
         };
         println!("{}", output);
-        let mut editor = DefaultEditor::new().unwrap();
+        let mut editor = DefaultEditor::new().expect("Failed to initialize cli");
         let mut ctrl_c_acc = 0;
         let mut input_buffer = vec![];
         let mut prompt = String::from(">> ");

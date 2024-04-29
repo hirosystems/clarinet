@@ -22,7 +22,7 @@ pub struct CLIDebugger {
 
 impl CLIDebugger {
     pub fn new(contract_id: &QualifiedContractIdentifier, snippet: &str) -> Self {
-        let mut editor = DefaultEditor::new().unwrap();
+        let mut editor = DefaultEditor::new().expect("Failed to initialize cli");
         editor
             .load_history(HISTORY_FILE.unwrap_or(".debug_history"))
             .ok();
@@ -36,7 +36,7 @@ impl CLIDebugger {
     fn prompt(&mut self, env: &mut Environment, context: &LocalContext, expr: &SymbolicExpression) {
         let prompt = black!("(debug) ");
         loop {
-            let readline = self.editor.readline(&prompt.escape_default().to_string());
+            let readline = self.editor.readline(&prompt);
             let resume = match readline {
                 Ok(mut command) => {
                     if command.is_empty() {
