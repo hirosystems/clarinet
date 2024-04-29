@@ -122,6 +122,7 @@ jobs:
         uses: codecov/codecov-action@v4
         with:
           files: lcov.info
+          token: ${{ secrets.CODECOV_TOKEN }}
 
   dist_clarinet:
     name: Build Clarinet Distributions
