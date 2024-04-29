@@ -2,7 +2,7 @@ use crate::repl::{settings::SessionSettings, Session};
 
 use clarity::vm::EvaluationResult;
 use rustyline::error::ReadlineError;
-use rustyline::Editor;
+use rustyline::DefaultEditor;
 
 const VERSION: Option<&'static str> = option_env!("CARGO_PKG_VERSION");
 const HISTORY_FILE: Option<&'static str> = option_env!("CLARITY_REPL_HISTORY_FILE");
@@ -22,15 +22,19 @@ fn complete_input(str: &str) -> Result<Input, (char, char)> {
     let mut in_string = false;
 
     for (pos, character) in str.char_indices() {
+        // if the previous character was a backslash, skip this character (only in strings)
+        if skip_next {
+            skip_next = false;
+            continue;
+        }
+
         match character {
-            '\\' => skip_next = true,
-            '"' => {
-                if skip_next {
-                    skip_next = false
-                } else {
-                    in_string = !in_string
+            '\\' => {
+                if in_string {
+                    skip_next = true;
                 }
             }
+            '"' => in_string = !in_string,
             '(' | '{' => {
                 if !in_string {
                     brackets.push(character);
@@ -110,7 +114,7 @@ impl Terminal {
             }
         };
         println!("{}", output);
-        let mut editor = Editor::<()>::new();
+        let mut editor = DefaultEditor::new().expect("Failed to initialize cli");
         let mut ctrl_c_acc = 0;
         let mut input_buffer = vec![];
         let mut prompt = String::from(">> ");
@@ -183,7 +187,7 @@ impl Terminal {
                             }
                             prompt = String::from(">> ");
                             self.session.executed.push(input.to_string());
-                            editor.add_history_entry(input);
+                            let _ = editor.add_history_entry(input);
                             input_buffer.clear();
                             if reload {
                                 break true;
@@ -229,4 +233,33 @@ pub fn print_clarity_wasm_warning() {
         yellow!("It appears that Clarity-Wasm is returning an unexpected result.\nPlease help improve the Stacks network by reporting this issue at"),
         yellow!("and include the errors above along with the source code that triggered this.\n")
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use test_case::test_case;
+
+    #[test_case(r#"(list (list u1)"# ; "incomplete input missing closing parenthesis")]
+    #[test_case(r#"{ a: { b: 1 }"# ; "incomplete input missing closing curly brace")]
+    #[test_case(r#"(concat u")""# ; "incomplete input with closing parenthesis in string")]
+    #[test_case(r#"{ a: { b: "}" }"# ; "incomplete input with closing curly brace in strng")]
+    #[test_case(r#"{foo: "\"""# ; "incomplete input with escaped quote in string")]
+    fn test_incomplete_input(input: &str) {
+        let r = complete_input(input).unwrap();
+
+        assert!(matches!(r, Input::Incomplete(_)));
+    }
+
+    #[test_case(r#"(list (list u1 u2) (list u3 u4))"# ; "complete input with parenthesis")]
+    #[test_case(r#"{ a: { b: 1 } }"# ; "complete input with curly braces")]
+    #[test_case(r#"(len u"And this is an UTF-8 string \u{1f601}")"# ; "complete input with escaped utf8 in tuple")]
+    #[test_case(r#"(list u"\u{ff}")"# ; "complete input with escaped urf8 in parenthesis")]
+    #[test_case(r#"{foo: "\\"}"# ; "complete input with escaped backslash in string")]
+    #[test_case(r#"{foo: "\""}"# ; "complete input with escaped quote in string")]
+    fn test_complete_input(input: &str) {
+        let r = complete_input(input).unwrap();
+
+        assert!(matches!(r, Input::Complete(_)));
+    }
 }
