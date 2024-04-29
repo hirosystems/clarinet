@@ -63,6 +63,9 @@ reqwest = { version = "0.11", default-features = false, features = [
 wasm-bindgen = { version = "0.2.91", optional = true }
 wasm-bindgen-futures = { version = "0.4.41", optional = true }
 
+[dev-dependencies]
+test-case = "*"
+
 [lib]
 name = "clarity_repl"
 path = "src/lib.rs"
