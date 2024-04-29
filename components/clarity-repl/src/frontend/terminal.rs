@@ -22,22 +22,19 @@ fn complete_input(str: &str) -> Result<Input, (char, char)> {
     let mut in_string = false;
 
     for (pos, character) in str.char_indices() {
-        let skip_current = skip_next;
+        // if the previous character was a backslash, skip this character (only in strings)
         if skip_next {
             skip_next = false;
+            continue;
         }
 
         match character {
             '\\' => {
-                if !skip_current {
-                    skip_next = true
+                if in_string {
+                    skip_next = true;
                 }
             }
-            '"' => {
-                if !skip_current {
-                    in_string = !in_string
-                }
-            }
+            '"' => in_string = !in_string,
             '(' | '{' => {
                 if !in_string {
                     brackets.push(character);
