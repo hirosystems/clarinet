@@ -39,6 +39,7 @@ impl GetChangesForNewProject {
         self.create_vscode_settings_json();
         self.create_vscode_tasks_json();
         self.create_gitignore();
+        self.create_gitattributes();
         self.create_nodejs_files();
         Ok(self.changes.clone())
     }
@@ -175,6 +176,24 @@ node_modules
 "#
         .into();
         let name = ".gitignore".into();
+        let path = format!("{}/{}/{}", self.project_path, self.project_name, name);
+        let change = FileCreation {
+            comment: format!("{} {}/{}", green!("Created file"), self.project_name, name),
+            name,
+            content,
+            path,
+        };
+        self.changes.push(Changes::AddFile(change));
+    }
+
+    fn create_gitattributes(&mut self) {
+        let content = r#"
+tests/** linguist-vendored
+vitest.config.js linguist-vendored
+* text=lf
+"#
+        .into();
+        let name = ".gitattributes".into();
         let path = format!("{}/{}/{}", self.project_path, self.project_name, name);
         let change = FileCreation {
             comment: format!("{} {}/{}", green!("Created file"), self.project_name, name),
