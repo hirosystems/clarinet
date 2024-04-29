@@ -62,7 +62,11 @@ fn complete_input(str: &str) -> Result<Input, (char, char)> {
                     }
                 }
             }
-            _ => {}
+            _ => {
+                if skip_next {
+                    skip_next = false
+                }
+            }
         }
     }
 
@@ -125,6 +129,7 @@ impl Terminal {
                     ctrl_c_acc = 0;
                     input_buffer.push(command);
                     let input = input_buffer.join(" ");
+                    dbg!(&input);
                     match complete_input(&input) {
                         Ok(Input::Complete(_)) => {
                             let (reload, output, result) = self.session.handle_command(&input);
