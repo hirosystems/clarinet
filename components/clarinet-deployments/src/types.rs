@@ -1187,7 +1187,7 @@ impl DeploymentSpecification {
                     || matches!(tx, TransactionSpecification::EmulatedContractPublish(_))
             });
 
-            batch.transactions = contract_publish_txs.clone();
+            batch.transactions.clone_from(contract_publish_txs);
             if !custom_txs.is_empty() {
                 custom_txs_batches.push(TransactionsBatchSpecification {
                     id: batch.id,

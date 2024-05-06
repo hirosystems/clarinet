@@ -59,7 +59,7 @@ lazy_static! {
                 native_keyword.to_string(),
                 (reference.version, Vec::from([
                     "**Description**",
-                    &reference.description,
+                    reference.description,
                     separator,
                     "**Example**",
                     &code(reference.example),

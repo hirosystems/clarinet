@@ -268,7 +268,7 @@ impl Session {
         };
 
         if let Some(cost) = cost {
-            let headers = vec![
+            let headers = [
                 "".to_string(),
                 "Consumed".to_string(),
                 "Limit".to_string(),
