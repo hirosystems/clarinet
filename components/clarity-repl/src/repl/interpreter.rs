@@ -53,52 +53,6 @@ pub struct ClarityInterpreter {
 #[derive(Debug)]
 pub struct Txid(pub [u8; 32]);
 
-// trait Equivalent {
-//     fn equivalent(&self, other: &Self) -> bool;
-// }
-
-// impl Equivalent for SymbolicExpression {
-//     fn equivalent(&self, other: &Self) -> bool {
-//         use clarity::vm::representations::SymbolicExpressionType::*;
-//         match (&self.expr, &other.expr) {
-//             (AtomValue(a), AtomValue(b)) => a == b,
-//             (Atom(a), Atom(b)) => a == b,
-//             (List(a), List(b)) => {
-//                 if a.len() != b.len() {
-//                     return false;
-//                 }
-//                 for i in 0..a.len() {
-//                     if !a[i].equivalent(&b[i]) {
-//                         return false;
-//                     }
-//                 }
-//                 true
-//             }
-//             (LiteralValue(a), LiteralValue(b)) => a == b,
-//             (Field(a), Field(b)) => a == b,
-//             (TraitReference(a_name, a_trait), TraitReference(b_name, b_trait)) => {
-//                 a_name == b_name && a_trait == b_trait
-//             }
-//             _ => false,
-//         }
-//     }
-// }
-
-// impl Equivalent for ContractAST {
-//     fn equivalent(&self, other: &Self) -> bool {
-//         if self.expressions.len() != other.expressions.len() {
-//             return false;
-//         }
-
-//         for i in 0..self.expressions.len() {
-//             if !self.expressions[i].equivalent(&other.expressions[i]) {
-//                 return false;
-//             }
-//         }
-//         true
-//     }
-// }
-
 impl ClarityInterpreter {
     pub fn new(tx_sender: StandardPrincipalData, repl_settings: Settings) -> Self {
         let constants = StacksConstants {
