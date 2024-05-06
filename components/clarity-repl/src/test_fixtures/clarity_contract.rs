@@ -50,7 +50,7 @@ impl ClarityContractBuilder {
     }
 
     pub fn name(mut self, name: &str) -> Self {
-        self.contract.name = name.to_owned();
+        name.clone_into(&mut self.contract.name);
         self
     }
 

@@ -121,8 +121,3 @@ pub struct ServiceStatusData {
 pub struct ProtocolDeployingData {
     pub new_contracts_deployed: Vec<String>,
 }
-
-#[derive(Clone, Debug)]
-pub struct BootCompletedData {
-    pub contracts_deployed: Vec<String>,
-}

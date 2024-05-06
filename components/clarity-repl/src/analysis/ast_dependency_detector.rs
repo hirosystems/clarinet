@@ -499,7 +499,7 @@ impl<'a> ASTVisitor<'a> for ASTDependencyDetector<'a> {
         parameters: Option<Vec<TypedVar<'a>>>,
         body: &'a SymbolicExpression,
     ) -> bool {
-        self.params = parameters.clone();
+        self.params.clone_from(&parameters);
         self.top_level = false;
         let res =
             self.traverse_expr(body) && self.visit_define_private(expr, name, parameters, body);
@@ -537,7 +537,7 @@ impl<'a> ASTVisitor<'a> for ASTDependencyDetector<'a> {
         parameters: Option<Vec<TypedVar<'a>>>,
         body: &'a SymbolicExpression,
     ) -> bool {
-        self.params = parameters.clone();
+        self.params.clone_from(&parameters);
         self.top_level = false;
         let res =
             self.traverse_expr(body) && self.visit_define_read_only(expr, name, parameters, body);
@@ -575,7 +575,7 @@ impl<'a> ASTVisitor<'a> for ASTDependencyDetector<'a> {
         parameters: Option<Vec<TypedVar<'a>>>,
         body: &'a SymbolicExpression,
     ) -> bool {
-        self.params = parameters.clone();
+        self.params.clone_from(&parameters);
         self.top_level = false;
         let res =
             self.traverse_expr(body) && self.visit_define_public(expr, name, parameters, body);
@@ -693,7 +693,7 @@ impl<'a> ASTVisitor<'a> for ASTDependencyDetector<'a> {
     ) -> bool {
         if let Some(arg_types) = self
             .defined_functions
-            .get(&(&self.current_contract.unwrap(), name))
+            .get(&(self.current_contract.unwrap(), name))
         {
             for dependency in self.check_callee_type(arg_types, args) {
                 self.add_dependency(self.current_contract.unwrap(), &dependency);

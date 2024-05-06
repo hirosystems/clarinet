@@ -438,7 +438,7 @@ pub fn build_completion_item_list(
                             | ">= (greater than or equal)" => {
                                 snippet = item.label.split_whitespace().next().unwrap().to_string()
                             }
-                            _ => snippet = item.label.clone(),
+                            _ => snippet.clone_from(&item.label),
                         }
                         snippet.push_str(" $0");
                     }

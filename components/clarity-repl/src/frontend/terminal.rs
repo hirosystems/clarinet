@@ -7,9 +7,9 @@ use rustyline::DefaultEditor;
 const VERSION: Option<&'static str> = option_env!("CARGO_PKG_VERSION");
 const HISTORY_FILE: Option<&'static str> = option_env!("CLARITY_REPL_HISTORY_FILE");
 
-enum Input<'a> {
+enum Input {
     Incomplete(char),
-    Complete(Vec<&'a str>),
+    Complete(),
 }
 
 fn complete_input(str: &str) -> Result<Input, (char, char)> {
@@ -72,7 +72,7 @@ fn complete_input(str: &str) -> Result<Input, (char, char)> {
 
     match brackets.last() {
         Some(char) => Ok(Input::Incomplete(*char)),
-        _ => Ok(Input::Complete(forms)),
+        _ => Ok(Input::Complete()),
     }
 }
 
@@ -130,7 +130,7 @@ impl Terminal {
                     input_buffer.push(command);
                     let input = input_buffer.join(" ");
                     match complete_input(&input) {
-                        Ok(Input::Complete(_)) => {
+                        Ok(Input::Complete()) => {
                             let (reload, output, result) = self.session.handle_command(&input);
 
                             if let Some(session_wasm) = &mut self.session_wasm {
@@ -260,6 +260,6 @@ mod tests {
     fn test_complete_input(input: &str) {
         let r = complete_input(input).unwrap();
 
-        assert!(matches!(r, Input::Complete(_)));
+        assert!(matches!(r, Input::Complete()));
     }
 }

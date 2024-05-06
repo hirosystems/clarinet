@@ -41,7 +41,7 @@ impl CLIDebugger {
                 Ok(mut command) => {
                     if command.is_empty() {
                         if let Some(prev) = self.editor.history().iter().last() {
-                            command = prev.clone()
+                            command.clone_from(prev)
                         }
                     }
                     let _ = self.editor.add_history_entry(&command);

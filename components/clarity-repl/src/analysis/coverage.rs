@@ -77,7 +77,7 @@ impl CoverageReporter {
         let mut filtered_asts = HashMap::new();
         for (contract_id, ast) in self.asts.iter() {
             let contract_name = contract_id.name.to_string();
-            if self.contract_paths.get(&contract_name).is_some() {
+            if self.contract_paths.contains_key(&contract_name) {
                 filtered_asts.insert(
                     contract_name,
                     (
