@@ -978,8 +978,8 @@ fn get_stacking_tx_method_and_args(
     (method.to_string(), arguments)
 }
 
-// The current version of stackslib we are using (from feat/clarity-wasm-next) does not have the latest version of make_pox_4_signer_key_signature
-// This is a temporary fix until feat/clarity-wasm-next catches up with the branch next
+// The current version of stackslib we are using (from feat/clarity-wasm-develop) does not have the latest version of make_pox_4_signer_key_signature
+// This is a temporary fix until feat/clarity-wasm-develop catches up with the latest updates
 
 fn make_pox_4_signer_key_message_hash(
     pox_addr: &PoxAddress,
