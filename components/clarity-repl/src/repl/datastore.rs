@@ -181,7 +181,7 @@ impl Datastore {
 }
 
 impl ClarityBackingStore for Datastore {
-    fn put_all(&mut self, items: Vec<(String, String)>) -> Result<()> {
+    fn put_all_data(&mut self, items: Vec<(String, String)>) -> Result<()> {
         for (key, value) in items {
             self.put(&key, &value);
         }
@@ -189,7 +189,7 @@ impl ClarityBackingStore for Datastore {
     }
 
     /// fetch K-V out of the committed datastore
-    fn get(&mut self, key: &str) -> Result<Option<String>> {
+    fn get_data(&mut self, key: &str) -> Result<Option<String>> {
         let lookup_id = self
             .block_id_lookup
             .get(&self.current_chain_tip)
@@ -203,7 +203,7 @@ impl ClarityBackingStore for Datastore {
     }
 
     fn has_entry(&mut self, key: &str) -> Result<bool> {
-        Ok(self.get(key)?.is_some())
+        Ok(self.get_data(key)?.is_some())
     }
 
     /// change the current MARF context to service reads from a different chain_tip
@@ -271,7 +271,7 @@ impl ClarityBackingStore for Datastore {
         }
     }
 
-    fn get_with_proof(&mut self, _key: &str) -> Result<Option<(String, Vec<u8>)>> {
+    fn get_data_with_proof(&mut self, _key: &str) -> Result<Option<(String, Vec<u8>)>> {
         Ok(None)
     }
 
