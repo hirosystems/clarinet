@@ -1682,7 +1682,7 @@ fn display_contract_new_hint(project_name: Option<&str>) {
     }
     println!(
         "{}",
-        yellow!("Once your are ready to write your contracts, run the following commands:\n")
+        yellow!("Once you are ready to write your contracts, run the following commands:\n")
     );
     println!("{}", blue!("  $ clarinet contract new <contract-name>"));
     println!(
