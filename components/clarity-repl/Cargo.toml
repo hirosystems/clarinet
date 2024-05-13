@@ -87,6 +87,7 @@ cli = [
     "clarity/canonical",
     "clarity/developer-mode",
     "clarity/log",
+    "clarity/devtools",
     "hiro_system_kit/tokio_helpers",
     "clar2wasm",
     "pox-locking/default"
@@ -95,6 +96,7 @@ sdk = [
     "clarity/canonical",
     "clarity/developer-mode",
     "clarity/log",
+    "clarity/devtools",
     "hiro_system_kit/tokio_helpers",
     "pox-locking/default"
 ]

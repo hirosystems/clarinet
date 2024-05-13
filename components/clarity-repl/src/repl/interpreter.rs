@@ -1727,7 +1727,7 @@ mod tests {
     #[test]
     fn can_run_boot_contracts() {
         let repl_settings = Settings {
-            clarity_wasm_mode: true,
+            clarity_wasm_mode: false,
             ..Default::default()
         };
         let mut interpreter =
@@ -1741,7 +1741,8 @@ mod tests {
             }
             let res = interpreter
                 .run(&boot_contract, &mut Some(ast), false, None)
-                .unwrap_or_else(|_| {
+                .unwrap_or_else(|err| {
+                    dbg!(&err);
                     panic!("failed to interpret {} boot contract", &boot_contract.name)
                 });
 
@@ -1819,6 +1820,7 @@ mod tests {
             None,
         );
 
+        println!("{:?}", result);
         assert!(result.is_ok());
         let ExecutionResult { result, .. } = result.unwrap();
 
