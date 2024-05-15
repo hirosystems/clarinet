@@ -310,6 +310,7 @@ impl ClarityInterpreter {
             LimitedCostTracker::new_free(),
             contract.epoch,
             contract.clarity_version,
+            true,
         )
         .map_err(|(error, _)| error.diagnostic)?;
 
@@ -401,7 +402,7 @@ impl ClarityInterpreter {
         let key = ClarityDatabase::make_key_for_trip(contract_id, StoreType::Variable, var_name);
         let value_hex = self
             .datastore
-            .get(&key)
+            .get_data(&key)
             .expect("failed to get key from datastore")?;
         Some(format!("0x{value_hex}"))
     }
@@ -416,7 +417,7 @@ impl ClarityInterpreter {
             ClarityDatabase::make_key_for_data_map_entry(contract_id, map_name, map_key).unwrap();
         let value_hex = self
             .datastore
-            .get(&key)
+            .get_data(&key)
             .expect("failed to get map entry from datastore")?;
         Some(format!("0x{value_hex}"))
     }
@@ -1726,7 +1727,7 @@ mod tests {
     #[test]
     fn can_run_boot_contracts() {
         let repl_settings = Settings {
-            clarity_wasm_mode: true,
+            clarity_wasm_mode: false,
             ..Default::default()
         };
         let mut interpreter =
@@ -1740,7 +1741,8 @@ mod tests {
             }
             let res = interpreter
                 .run(&boot_contract, &mut Some(ast), false, None)
-                .unwrap_or_else(|_| {
+                .unwrap_or_else(|err| {
+                    dbg!(&err);
                     panic!("failed to interpret {} boot contract", &boot_contract.name)
                 });
 
@@ -1818,6 +1820,7 @@ mod tests {
             None,
         );
 
+        println!("{:?}", result);
         assert!(result.is_ok());
         let ExecutionResult { result, .. } = result.unwrap();
 

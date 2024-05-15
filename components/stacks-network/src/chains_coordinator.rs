@@ -42,12 +42,8 @@ use stackslib::chainstate::stacks::address::PoxAddress;
 use stackslib::core::CHAIN_ID_TESTNET;
 use stackslib::types::chainstate::StacksPrivateKey;
 use stackslib::types::chainstate::StacksPublicKey;
-use stackslib::types::PrivateKey;
-use stackslib::util::hash::Sha256Sum;
-use stackslib::util::secp256k1::MessageSignature;
-use stackslib::util_lib::signed_structured_data::pox4::make_pox_4_signed_data_domain;
+use stackslib::util_lib::signed_structured_data::pox4::make_pox_4_signer_key_signature;
 use stackslib::util_lib::signed_structured_data::pox4::Pox4SignatureTopic;
-use stackslib::util_lib::signed_structured_data::structured_data_message_hash;
 use std::convert::TryFrom;
 use std::str;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -959,15 +955,20 @@ fn get_stacking_tx_method_and_args(
             Pox4SignatureTopic::StackStx
         };
 
-        let signer_sig = make_signer_key_signature(
+        let signature = make_pox_4_signer_key_signature(
             &pox_addr,
             signer_key,
             cycle,
             &topic,
+            CHAIN_ID_TESTNET,
             duration.into(),
             stx_amount.into(),
             auth_id,
-        );
+        )
+        .expect("Unable to make pox 4 signature");
+
+        let signer_sig = signature.to_rsv();
+
         let pub_key = StacksPublicKey::from_private(signer_key);
         arguments.push(ClarityValue::some(ClarityValue::buff_from(signer_sig).unwrap()).unwrap());
         arguments.push(ClarityValue::buff_from(pub_key.to_bytes()).unwrap());
@@ -976,83 +977,4 @@ fn get_stacking_tx_method_and_args(
     };
 
     (method.to_string(), arguments)
-}
-
-// The current version of stackslib we are using (from feat/clarity-wasm-next) does not have the latest version of make_pox_4_signer_key_signature
-// This is a temporary fix until feat/clarity-wasm-next catches up with the branch next
-
-fn make_pox_4_signer_key_message_hash(
-    pox_addr: &PoxAddress,
-    reward_cycle: u128,
-    topic: &Pox4SignatureTopic,
-    chain_id: u32,
-    period: u128,
-    max_amount: u128,
-    auth_id: u128,
-) -> Sha256Sum {
-    let domain_tuple = make_pox_4_signed_data_domain(chain_id);
-    let data_tuple = ClarityValue::Tuple(
-        TupleData::from_data(vec![
-            (
-                "pox-addr".into(),
-                pox_addr.clone().as_clarity_tuple().unwrap().into(),
-            ),
-            ("reward-cycle".into(), ClarityValue::UInt(reward_cycle)),
-            ("period".into(), ClarityValue::UInt(period)),
-            (
-                "topic".into(),
-                ClarityValue::string_ascii_from_bytes(topic.get_name_str().into()).unwrap(),
-            ),
-            ("auth-id".into(), ClarityValue::UInt(auth_id)),
-            ("max-amount".into(), ClarityValue::UInt(max_amount)),
-        ])
-        .unwrap(),
-    );
-    structured_data_message_hash(data_tuple, domain_tuple)
-}
-
-fn make_pox_4_signer_key_signature(
-    pox_addr: &PoxAddress,
-    signer_key: &StacksPrivateKey,
-    reward_cycle: u128,
-    topic: &Pox4SignatureTopic,
-    chain_id: u32,
-    period: u128,
-    max_amount: u128,
-    auth_id: u128,
-) -> Result<MessageSignature, &'static str> {
-    let msg_hash = make_pox_4_signer_key_message_hash(
-        pox_addr,
-        reward_cycle,
-        topic,
-        chain_id,
-        period,
-        max_amount,
-        auth_id,
-    );
-    signer_key.sign(msg_hash.as_bytes())
-}
-
-fn make_signer_key_signature(
-    pox_addr: &PoxAddress,
-    signer_key: &StacksPrivateKey,
-    reward_cycle: u128,
-    topic: &Pox4SignatureTopic,
-    period: u128,
-    max_amount: u128,
-    auth_id: u128,
-) -> Vec<u8> {
-    let signature = make_pox_4_signer_key_signature(
-        pox_addr,
-        signer_key,
-        reward_cycle,
-        topic,
-        CHAIN_ID_TESTNET,
-        period,
-        max_amount,
-        auth_id,
-    )
-    .unwrap();
-
-    signature.to_rsv()
 }

@@ -636,7 +636,7 @@ impl ASTVisitor<'_> for EventCollector<'_, '_> {
         let value_type_shape = self
             .type_checker
             .type_map
-            .get_type(expr)
+            .get_type_expected(expr)
             .expect("unable to infer value's type shape");
 
         let data = SmartContractEventData {
@@ -846,7 +846,7 @@ impl ASTVisitor<'_> for EventCollector<'_, '_> {
         let type_signature = self
             .type_checker
             .type_map
-            .get_type(identifier)
+            .get_type_expected(identifier)
             .expect("unable to infer value's type shape");
 
         let mut data = NFTBurnEventData::default(self.create_asset_identifier(token.clone()));
@@ -887,7 +887,7 @@ impl ASTVisitor<'_> for EventCollector<'_, '_> {
         let type_signature = self
             .type_checker
             .type_map
-            .get_type(identifier)
+            .get_type_expected(identifier)
             .expect("unable to infer value's type shape");
 
         let mut data = NFTTransferEventData::default(self.create_asset_identifier(token.clone()));
@@ -939,7 +939,7 @@ impl ASTVisitor<'_> for EventCollector<'_, '_> {
         let type_signature = self
             .type_checker
             .type_map
-            .get_type(identifier)
+            .get_type_expected(identifier)
             .expect("unable to infer value's type shape");
 
         let mut data = NFTTransferEventData::default(self.create_asset_identifier(token.clone()));
