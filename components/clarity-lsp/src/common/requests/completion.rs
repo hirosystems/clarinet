@@ -474,6 +474,10 @@ pub fn check_if_should_wrap(source: &str, position: &Position) -> bool {
         .collect::<Vec<&str>>()
         .get(position.line as usize)
     {
+        if position.character as usize > line.len() {
+            return false;
+        }
+
         let mut chars = line[..position.character as usize].chars();
         while let Some(char) = chars.next_back() {
             match char {
