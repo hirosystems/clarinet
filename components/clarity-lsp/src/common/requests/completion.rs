@@ -469,11 +469,7 @@ pub fn build_completion_item_list(
 }
 
 pub fn check_if_should_wrap(source: &str, position: &Position) -> bool {
-    if let Some(line) = source
-        .lines()
-        .collect::<Vec<&str>>()
-        .get(position.line as usize)
-    {
+    if let Some(line) = source.lines().nth(position.line as usize) {
         if position.character as usize > line.len() {
             return false;
         }
@@ -482,11 +478,8 @@ pub fn check_if_should_wrap(source: &str, position: &Position) -> bool {
         while let Some(char) = chars.next_back() {
             match char {
                 '(' => return false,
-                char => {
-                    if char.is_whitespace() {
-                        return true;
-                    }
-                }
+                char if char.is_whitespace() => return true,
+                _ => {}
             }
         }
     }
