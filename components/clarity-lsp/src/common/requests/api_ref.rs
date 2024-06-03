@@ -21,7 +21,7 @@ lazy_static! {
             let reference = make_define_reference(define_function);
             api_references.insert(
                 define_function.to_string(),
-                (reference.version, Vec::from([
+                (reference.min_version, Vec::from([
                     &code(&reference.signature),
                     separator,
                     "**Description**",
@@ -38,7 +38,7 @@ lazy_static! {
             let reference = make_api_reference(native_function);
             api_references.insert(
                 native_function.to_string(),
-                (reference.version, Vec::from([
+                (reference.min_version, Vec::from([
                     &code(format!("{} -> {}", &reference.signature, &reference.output_type).as_str()),
                     separator,
                     "**Description**",
@@ -47,7 +47,7 @@ lazy_static! {
                     "**Example**",
                     &code(&reference.example),
                     separator,
-                    &format!("**Introduced in:** {}", &reference.version),
+                    &format!("**Introduced in:** {}", &reference.min_version),
                 ])
                 .join("\n"), Some(reference)),
             );
@@ -57,14 +57,14 @@ lazy_static! {
             let reference = make_keyword_reference(native_keyword).unwrap();
             api_references.insert(
                 native_keyword.to_string(),
-                (reference.version, Vec::from([
+                (reference.min_version, Vec::from([
                     "**Description**",
                     reference.description,
                     separator,
                     "**Example**",
                     &code(reference.example),
                     separator,
-                    &format!("**Introduced in:** {}", &reference.version),
+                    &format!("**Introduced in:** {}", &reference.min_version),
                 ])
                 .join("\n"), None),
             );

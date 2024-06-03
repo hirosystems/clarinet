@@ -798,12 +798,15 @@ checksum = "702fc72eb24e5a1e48ce58027a675bc24edd52096d5397d4aea7c6dd9eca0bd1"
 [[package]]
 name = "clar2wasm"
 version = "0.1.0"
-source = "git+https://github.com/stacks-network/clarity-wasm.git#6600e2dcb545210bd018149787698e254702eb80"
+source = "git+https://github.com/stacks-network/clarity-wasm.git?branch=chore/update-clarity#3233f99030b33a8909d41e6f2ec1ba5afd5863df"
 dependencies = [
+ "chrono",
  "clap",
  "clarity",
  "lazy_static",
  "regex",
+ "rusqlite",
+ "sha2 0.10.8",
  "stacks-common",
  "walrus",
  "wasmtime",
@@ -854,7 +857,7 @@ dependencies = [
  "serde",
  "serde_derive",
  "serde_json",
- "sha2 0.10.6",
+ "sha2 0.10.8",
  "signal-hook-registry",
  "similar",
  "stacks-network",
@@ -940,13 +943,13 @@ version = "1.0.0"
 dependencies = [
  "hmac 0.12.1",
  "pbkdf2",
- "sha2 0.10.6",
+ "sha2 0.10.8",
 ]
 
 [[package]]
 name = "clarity"
 version = "2.3.0"
-source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-develop#30bc1af6a07aaeedc01a084170f07065802bdff1"
+source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-develop#cf19e624a1ee687ae0b2646e7626de9327a416b9"
 dependencies = [
  "getrandom 0.2.8",
  "hashbrown 0.14.3",
@@ -956,6 +959,8 @@ dependencies = [
  "rand 0.8.5",
  "rand_chacha 0.3.1",
  "regex",
+ "rstest",
+ "rstest_reuse",
  "rusqlite",
  "serde",
  "serde_derive",
@@ -1028,7 +1033,7 @@ dependencies = [
  "serde",
  "serde_derive",
  "serde_json",
- "sha2 0.10.6",
+ "sha2 0.10.8",
  "test-case",
  "tokio",
  "tokio-util",
@@ -1676,7 +1681,7 @@ dependencies = [
  "ed25519",
  "rand_core 0.6.4",
  "serde",
- "sha2 0.10.6",
+ "sha2 0.10.8",
  "subtle 2.4.1",
  "zeroize",
 ]
@@ -1920,6 +1925,12 @@ name = "futures-task"
 version = "0.3.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dcf79a1bf610b10f42aea489289c5a2c478a786509693b80cd39c44ccd936366"
+
+[[package]]
+name = "futures-timer"
+version = "3.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f288b0a4f20f9a56b5d1da57e2227c661b7b16168e2f72365f57b63326e29b24"
 
 [[package]]
 name = "futures-util"
@@ -2853,14 +2864,14 @@ dependencies = [
 [[package]]
 name = "libstackerdb"
 version = "0.0.1"
-source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-develop#30bc1af6a07aaeedc01a084170f07065802bdff1"
+source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-develop#cf19e624a1ee687ae0b2646e7626de9327a416b9"
 dependencies = [
  "clarity",
  "secp256k1 0.24.3",
  "serde",
  "serde_derive",
  "serde_stacker",
- "sha2 0.10.6",
+ "sha2 0.10.8",
  "stacks-common",
 ]
 
@@ -3388,7 +3399,7 @@ dependencies = [
  "rand_core 0.6.4",
  "rustfmt-wrapper",
  "serde",
- "sha2 0.10.6",
+ "sha2 0.10.8",
  "syn 2.0.50",
 ]
 
@@ -3467,7 +3478,7 @@ dependencies = [
  "digest 0.10.7",
  "hmac 0.12.1",
  "password-hash",
- "sha2 0.10.6",
+ "sha2 0.10.8",
 ]
 
 [[package]]
@@ -3590,7 +3601,7 @@ checksum = "439ee305def115ba05938db6eb1644ff94165c5ab5e9420d1c1bcedbba909391"
 [[package]]
 name = "pox-locking"
 version = "2.4.0"
-source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-develop#30bc1af6a07aaeedc01a084170f07065802bdff1"
+source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-develop#cf19e624a1ee687ae0b2646e7626de9327a416b9"
 dependencies = [
  "clarity",
  "slog",
@@ -4121,6 +4132,44 @@ dependencies = [
 ]
 
 [[package]]
+name = "rstest"
+version = "0.17.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "de1bb486a691878cd320c2f0d319ba91eeaa2e894066d8b5f8f117c000e9d962"
+dependencies = [
+ "futures",
+ "futures-timer",
+ "rstest_macros",
+ "rustc_version",
+]
+
+[[package]]
+name = "rstest_macros"
+version = "0.17.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "290ca1a1c8ca7edb7c3283bd44dc35dd54fdec6253a3912e201ba1072018fca8"
+dependencies = [
+ "cfg-if 1.0.0",
+ "proc-macro2",
+ "quote",
+ "rustc_version",
+ "syn 1.0.107",
+ "unicode-ident",
+]
+
+[[package]]
+name = "rstest_reuse"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "45f80dcc84beab3a327bbe161f77db25f336a1452428176787c8c79ac79d7073"
+dependencies = [
+ "quote",
+ "rand 0.8.5",
+ "rustc_version",
+ "syn 1.0.107",
+]
+
+[[package]]
 name = "rusqlite"
 version = "0.28.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4550,9 +4599,9 @@ dependencies = [
 
 [[package]]
 name = "sha2"
-version = "0.10.6"
+version = "0.10.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "82e6b795fe2e3b1e845bafcb27aa35405c4d47cdfc92af5fc8d3002f76cebdc0"
+checksum = "793db75ad2bcafc3ffa7c68b215fee268f537982cd901d132f89c6343f3a3dc8"
 dependencies = [
  "cfg-if 1.0.0",
  "cpufeatures",
@@ -4840,7 +4889,7 @@ dependencies = [
 [[package]]
 name = "stacks-common"
 version = "0.0.2"
-source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-develop#30bc1af6a07aaeedc01a084170f07065802bdff1"
+source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-develop#cf19e624a1ee687ae0b2646e7626de9327a416b9"
 dependencies = [
  "chrono",
  "curve25519-dalek 2.0.0",
@@ -4859,7 +4908,7 @@ dependencies = [
  "serde",
  "serde_derive",
  "serde_json",
- "sha2 0.10.6",
+ "sha2 0.10.8",
  "sha3",
  "slog",
  "slog-json",
@@ -4935,7 +4984,7 @@ dependencies = [
  "serde",
  "serde_derive",
  "serde_json",
- "sha2 0.10.6",
+ "sha2 0.10.8",
  "stacks-codec",
  "tiny-hderive",
 ]
@@ -4943,7 +4992,7 @@ dependencies = [
 [[package]]
 name = "stackslib"
 version = "0.0.1"
-source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-develop#30bc1af6a07aaeedc01a084170f07065802bdff1"
+source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-develop#cf19e624a1ee687ae0b2646e7626de9327a416b9"
 dependencies = [
  "chrono",
  "clar2wasm",
@@ -4969,7 +5018,7 @@ dependencies = [
  "serde",
  "serde_derive",
  "serde_json",
- "sha2 0.10.6",
+ "sha2 0.10.8",
  "sha3",
  "siphasher",
  "slog",
@@ -5950,7 +5999,7 @@ dependencies = [
  "rustix",
  "serde",
  "serde_derive",
- "sha2 0.10.6",
+ "sha2 0.10.8",
  "toml 0.5.11",
  "windows-sys 0.48.0",
  "zstd",
@@ -6523,7 +6572,7 @@ dependencies = [
  "primitive-types",
  "rand_core 0.6.4",
  "serde",
- "sha2 0.10.6",
+ "sha2 0.10.8",
  "thiserror",
  "tracing",
  "tracing-subscriber",
@@ -6545,7 +6594,7 @@ dependencies = [
  "primitive-types",
  "rand_core 0.6.4",
  "serde",
- "sha2 0.10.6",
+ "sha2 0.10.8",
  "thiserror",
  "tracing",
  "tracing-subscriber",

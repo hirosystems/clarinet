@@ -62,6 +62,9 @@ impl Serialize for ClarityContract {
             ClarityVersion::Clarity2 => {
                 map.serialize_entry("clarity_version", &2)?;
             }
+            ClarityVersion::Clarity3 => {
+                map.serialize_entry("clarity_version", &3)?;
+            }
         }
         match self.epoch {
             StacksEpochId::Epoch10 => {

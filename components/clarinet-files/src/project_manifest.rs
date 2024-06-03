@@ -158,6 +158,8 @@ where
                     ClarityVersion::Clarity1
                 } else if version.eq(&2) {
                     ClarityVersion::Clarity2
+                } else if version.eq(&3) {
+                    ClarityVersion::Clarity3
                 } else {
                     return Err(serde::de::Error::custom(INVALID_CLARITY_VERSION));
                 }
@@ -463,6 +465,8 @@ fn get_epoch_and_clarity_version(
                 ClarityVersion::Clarity1
             } else if version.eq(&2) {
                 ClarityVersion::Clarity2
+            } else if version.eq(&3) {
+                ClarityVersion::Clarity3
             } else {
                 return Err(INVALID_CLARITY_VERSION.into());
             }
