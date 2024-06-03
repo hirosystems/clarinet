@@ -413,11 +413,8 @@ impl EditorState {
             line: position.line + 1,
             character: position.character + 1,
         };
-        let documentation = get_expression_documentation(
-            &position,
-            contract.clarity_version,
-            contract.expressions.as_ref()?,
-        )?;
+        let documentation =
+            get_expression_documentation(&position, contract.expressions.as_ref()?)?;
 
         Some(Hover {
             contents: lsp_types::HoverContents::Markup(lsp_types::MarkupContent {

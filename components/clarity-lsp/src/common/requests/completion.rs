@@ -512,7 +512,9 @@ pub fn build_default_native_keywords_list(version: ClarityVersion) -> Vec<Comple
         .iter()
         .filter_map(|func| {
             let mut api = make_api_reference(func);
-            if api.min_version > version {
+            if version < api.min_version
+                || version > api.max_version.unwrap_or(ClarityVersion::latest())
+            {
                 return None;
             }
             if clarity2_aliased_functions.contains(func) {
@@ -544,7 +546,9 @@ pub fn build_default_native_keywords_list(version: ClarityVersion) -> Vec<Comple
         .iter()
         .filter_map(|func| {
             let api = make_define_reference(func);
-            if api.min_version > version {
+            if version < api.min_version
+                || version > api.max_version.unwrap_or(ClarityVersion::latest())
+            {
                 return None;
             }
             Some(CompletionItem {
@@ -567,7 +571,9 @@ pub fn build_default_native_keywords_list(version: ClarityVersion) -> Vec<Comple
         .iter()
         .filter_map(|var| {
             if let Some(api) = make_keyword_reference(var) {
-                if api.min_version > version {
+                if version < api.min_version
+                    || version > api.max_version.unwrap_or(ClarityVersion::latest())
+                {
                     return None;
                 }
                 Some(CompletionItem {
