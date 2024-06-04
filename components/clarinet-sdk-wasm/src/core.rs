@@ -725,8 +725,9 @@ impl SDK {
         if interface.access != ContractInterfaceFunctionAccess::public {
             return Err(format!("{} is not a public function", &args.method));
         }
-        let session = self.get_session_mut();
+
         if advance_chain_tip {
+            let session = self.get_session_mut();
             session.advance_chain_tip(1);
         }
         self.call_contract_fn(args, false)
@@ -741,8 +742,8 @@ impl SDK {
         if interface.access != ContractInterfaceFunctionAccess::private {
             return Err(format!("{} is not a private function", &args.method));
         }
-        let session = self.get_session_mut();
         if advance_chain_tip {
+            let session = self.get_session_mut();
             session.advance_chain_tip(1);
         }
         self.call_contract_fn(args, true)
@@ -854,6 +855,11 @@ impl SDK {
             .into_serde()
             .map_err(|e| format!("Failed to parse js txs: {:}", e))?;
 
+        {
+            let session = self.get_session_mut();
+            session.advance_chain_tip(1);
+        }
+
         for tx in txs {
             let result = if let Some(call_public) = tx.call_public_fn {
                 self.inner_call_public_fn(&CallFnArgs::from_json_args(call_public), false)
@@ -868,9 +874,6 @@ impl SDK {
             }?;
             results.push(result);
         }
-
-        let session = self.get_session_mut();
-        session.advance_chain_tip(1);
 
         encode_to_js(&results).map_err(|e| format!("error: {}", e))
     }

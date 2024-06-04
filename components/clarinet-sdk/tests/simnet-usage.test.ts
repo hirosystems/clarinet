@@ -217,6 +217,22 @@ describe("simnet can call contracts function", () => {
   });
 });
 
+describe("mineBlock and callPublicFunction properly handle block height incrementation", () => {
+  const expectedReturnedBH = 2;
+
+  it("increases the block height after the call in callPublicFn", () => {
+    const { result } = simnet.callPublicFn("block-height-tests", "get-block-height", [], address1);
+    expect(result).toStrictEqual(Cl.ok(Cl.uint(expectedReturnedBH)));
+  });
+
+  it("increases the block height after the call in mineBlock", () => {
+    const [{ result }] = simnet.mineBlock([
+      tx.callPublicFn("block-height-tests", "get-block-height", [], address1),
+    ]);
+    expect(result).toStrictEqual(Cl.ok(Cl.uint(expectedReturnedBH)));
+  });
+});
+
 describe("simnet can read contracts data vars and maps", () => {
   it("can get data-vars", () => {
     const counter = simnet.getDataVar("counter", "count");
@@ -239,7 +255,7 @@ describe("simnet can read contracts data vars and maps", () => {
 describe("simnet can get contracts info and deploy contracts", () => {
   it("can get contract interfaces", () => {
     const contractInterfaces = simnet.getContractsInterfaces();
-    expect(contractInterfaces).toHaveLength(nbOfBootContracts + 3);
+    expect(contractInterfaces).toHaveLength(nbOfBootContracts + 4);
 
     const counterInterface = contractInterfaces.get(`${deployerAddr}.counter`);
     expect(counterInterface).not.toBeNull();
@@ -273,7 +289,7 @@ describe("simnet can get contracts info and deploy contracts", () => {
     expect(res.result).toStrictEqual(Cl.int(42));
 
     const contractInterfaces = simnet.getContractsInterfaces();
-    expect(contractInterfaces).toHaveLength(nbOfBootContracts + 3);
+    expect(contractInterfaces).toHaveLength(nbOfBootContracts + 4);
   });
 
   it("can deploy contracts", () => {
@@ -282,7 +298,7 @@ describe("simnet can get contracts info and deploy contracts", () => {
     expect(deployRes.result).toStrictEqual(Cl.bool(true));
 
     const contractInterfaces = simnet.getContractsInterfaces();
-    expect(contractInterfaces).toHaveLength(nbOfBootContracts + 4);
+    expect(contractInterfaces).toHaveLength(nbOfBootContracts + 5);
 
     const addRes = simnet.callPublicFn("op", "add", [Cl.uint(13), Cl.uint(29)], address1);
     expect(addRes.result).toStrictEqual(Cl.ok(Cl.uint(42)));

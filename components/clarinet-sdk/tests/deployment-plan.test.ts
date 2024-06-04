@@ -53,7 +53,7 @@ describe("deployment plans test", async () => {
 
     // test that all 3 contracts are deployed
     const contracts = simnet.getContractsInterfaces();
-    expect(contracts.size).toBe(nbOfBootContracts + 3);
+    expect(contracts.size).toBe(nbOfBootContracts + 4);
 
     // the additional custom tx should have been applied
     const count = simnet.getDataVar("counter", "count");
