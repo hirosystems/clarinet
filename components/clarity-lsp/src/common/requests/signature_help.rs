@@ -23,7 +23,7 @@ pub fn get_signatures(
     ]
     .contains(&function_name.as_str())
     {
-        // showing signature help for define-<function>, define-trait, let and bug adds to much noise
+        // showing signature help for define-<function>, define-trait, let, and begin adds to much noise
         // it doesn't make sense for the tuple {} notation
         return None;
     }

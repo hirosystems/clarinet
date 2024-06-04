@@ -86,8 +86,8 @@ cli = [
     "prettytable-rs",
     "clarity/canonical",
     "clarity/developer-mode",
-    "clarity/log",
     "clarity/devtools",
+    "clarity/log",
     "hiro_system_kit/tokio_helpers",
     "clar2wasm",
     "pox-locking/default"
@@ -95,8 +95,8 @@ cli = [
 sdk = [
     "clarity/canonical",
     "clarity/developer-mode",
-    "clarity/log",
     "clarity/devtools",
+    "clarity/log",
     "hiro_system_kit/tokio_helpers",
     "pox-locking/default"
 ]
@@ -115,6 +115,7 @@ wasm = [
     "wasm-bindgen-futures",
     "clarity/wasm",
     "clarity/developer-mode",
+    "clarity/devtools",
     "pox-locking/wasm"
 ]
 
