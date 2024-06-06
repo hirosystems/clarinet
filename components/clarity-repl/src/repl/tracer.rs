@@ -52,8 +52,10 @@ impl EvalHook for Tracer {
                         NativeFunctions::ContractCall => {
                             let mut call = format!(
                                 "{}├── {}  {}\n",
-                                "│   "
-                                    .repeat(self.stack.len() - self.pending_call_string.len() - 1),
+                                "│   ".repeat(
+                                    (self.stack.len() - self.pending_call_string.len())
+                                        .saturating_sub(1)
+                                ),
                                 expr,
                                 black!(format!(
                                     "{}:{}:{}",
@@ -104,7 +106,9 @@ impl EvalHook for Tracer {
                     // Call user-defined function
                     let mut call = format!(
                         "{}├── {}  {}\n",
-                        "│   ".repeat(self.stack.len() - self.pending_call_string.len() - 1),
+                        "│   ".repeat(
+                            (self.stack.len() - self.pending_call_string.len()).saturating_sub(1)
+                        ),
                         expr,
                         black!(format!(
                             "{}:{}:{}",
@@ -156,7 +160,9 @@ impl EvalHook for Tracer {
             for event in emitted_events.iter().skip(self.nb_of_emitted_events) {
                 println!(
                     "{}│ {}",
-                    "│   ".repeat(self.stack.len() - self.pending_call_string.len() - 1),
+                    "│   ".repeat(
+                        (self.stack.len() - self.pending_call_string.len()).saturating_sub(1)
+                    ),
                     black!(format!(
                         "✸ {}",
                         event
@@ -173,7 +179,9 @@ impl EvalHook for Tracer {
                 if let Ok(value) = res {
                     println!(
                         "{}└── {}",
-                        "│   ".repeat(self.stack.len() - self.pending_call_string.len() - 1),
+                        "│   ".repeat(
+                            (self.stack.len() - self.pending_call_string.len()).saturating_sub(1)
+                        ),
                         blue!(value.to_string())
                     );
                 }
