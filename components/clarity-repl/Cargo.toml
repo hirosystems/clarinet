@@ -35,7 +35,7 @@ getrandom = { version = "0.2.3", features = ["js"] }
 atty = "0.2.14"
 # clarity-vm = { version = "2.3.0", default-features = false }
 clarity = { git = "https://github.com/stacks-network/stacks-core.git", branch="feat/clarity-wasm-develop", package = "clarity", default-features = false }
-clar2wasm = { git = "https://github.com/stacks-network/clarity-wasm.git", optional = true }
+clar2wasm = { git = "https://github.com/stacks-network/clarity-wasm.git", branch = "chore/update-clarity", optional = true }
 # clar2wasm = { path="../../../clarity-wasm/clar2wasm", optional = true }
 pox-locking = { git = "https://github.com/stacks-network/stacks-core.git", branch="feat/clarity-wasm-develop", optional = true, default-features = false }
 

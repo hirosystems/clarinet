@@ -10,10 +10,12 @@ use serde_json::Value as JsonValue;
 use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;
 use std::str::FromStr;
-use toml::value::Value;
+use toml::Value as TomlValue;
 
-pub const INVALID_CLARITY_VERSION: &str = "clarity_version field invalid (value supported: 1, 2)";
-const INVALID_EPOCH: &str = "epoch field invalid (value supported: 2.0, 2.05, 2.1, 2.2, 2.3, 2.4)";
+pub const INVALID_CLARITY_VERSION: &str =
+    "clarity_version field invalid (value supported: 1, 2, 3)";
+const INVALID_EPOCH: &str =
+    "epoch field invalid (value supported: 2.0, 2.05, 2.1, 2.2, 2.3, 2.4, 3.0)";
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct ClarityContractMetadata {
@@ -26,7 +28,7 @@ pub struct ClarityContractMetadata {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ProjectManifestFile {
     project: ProjectConfigFile,
-    contracts: Option<Value>,
+    contracts: Option<TomlValue>,
     repl: Option<repl::SettingsFile>,
 }
 
@@ -36,7 +38,7 @@ pub struct ProjectConfigFile {
     authors: Option<Vec<String>>,
     description: Option<String>,
     telemetry: Option<bool>,
-    requirements: Option<Value>,
+    requirements: Option<TomlValue>,
     boot_contracts: Option<Vec<String>>,
 
     // The fields below have been moved into repl above, but are kept here for
@@ -95,83 +97,22 @@ where
             _ => ContractDeployer::DefaultDeployer,
         };
 
-        let settings_epoch = contract_settings.get("epoch");
-
-        let epoch = match settings_epoch {
-            None => StacksEpochId::Epoch2_05,
-            Some(JsonValue::String(epoch)) => {
-                if epoch.eq("2.0") {
-                    StacksEpochId::Epoch20
-                } else if epoch.eq("2.05") {
-                    StacksEpochId::Epoch2_05
-                } else if epoch.eq("2.1") {
-                    StacksEpochId::Epoch21
-                } else if epoch.eq("2.2") {
-                    StacksEpochId::Epoch22
-                } else if epoch.eq("2.3") {
-                    StacksEpochId::Epoch23
-                } else if epoch.eq("2.4") {
-                    StacksEpochId::Epoch24
-                } else if epoch.eq("2.5") {
-                    StacksEpochId::Epoch25
-                } else if epoch.eq("3.0") {
-                    StacksEpochId::Epoch30
-                } else {
-                    return Err(serde::de::Error::custom(INVALID_EPOCH));
-                }
-            }
-            Some(JsonValue::Number(epoch)) => {
-                let epoch = epoch.as_f64().unwrap();
-                if epoch.eq(&2.0) {
-                    StacksEpochId::Epoch20
-                } else if epoch.eq(&2.05) {
-                    StacksEpochId::Epoch2_05
-                } else if epoch.eq(&2.1) {
-                    StacksEpochId::Epoch21
-                } else if epoch.eq(&2.2) {
-                    StacksEpochId::Epoch22
-                } else if epoch.eq(&2.3) {
-                    StacksEpochId::Epoch23
-                } else if epoch.eq(&2.4) {
-                    StacksEpochId::Epoch24
-                } else if epoch.eq(&2.5) {
-                    StacksEpochId::Epoch25
-                } else if epoch.eq(&3.0) {
-                    StacksEpochId::Epoch30
-                } else {
-                    return Err(serde::de::Error::custom(INVALID_EPOCH));
-                }
-            }
-            _ => {
-                return Err(serde::de::Error::custom(INVALID_EPOCH));
-            }
+        let parsed_settings_epoch = match contract_settings.get("epoch") {
+            None => None,
+            Some(JsonValue::String(epoch)) => Some(epoch.as_str()),
+            Some(JsonValue::Number(epoch)) => Some(epoch.as_str()),
+            _ => return Err(serde::de::Error::custom(INVALID_EPOCH)),
         };
 
-        let clarity_version = match contract_settings.get("clarity_version") {
-            None => match settings_epoch {
-                None => ClarityVersion::Clarity1,
-                Some(_) => ClarityVersion::default_for_epoch(epoch),
-            },
-            Some(JsonValue::Number(version)) => {
-                let version = version.as_i64().unwrap();
-                if version.eq(&1) {
-                    ClarityVersion::Clarity1
-                } else if version.eq(&2) {
-                    ClarityVersion::Clarity2
-                } else {
-                    return Err(serde::de::Error::custom(INVALID_CLARITY_VERSION));
-                }
-            }
-            _ => {
-                return Err(serde::de::Error::custom(INVALID_CLARITY_VERSION));
-            }
+        let parsed_clarity_version = match contract_settings.get("clarity_version") {
+            None => None,
+            Some(JsonValue::Number(version)) => Some(version.as_str()),
+            _ => return Err(serde::de::Error::custom(INVALID_CLARITY_VERSION)),
         };
 
-        if clarity_version > ClarityVersion::default_for_epoch(epoch) {
-            return Err(serde::de::Error::custom(format!(
-                "{clarity_version} can not be used with {epoch}"
-            )));
-        }
+        let (epoch, clarity_version) =
+            get_epoch_and_clarity_version(parsed_settings_epoch, parsed_clarity_version)
+                .map_err(serde::de::Error::custom)?;
 
         let cc = ClarityContract {
             code_source,
@@ -329,22 +270,22 @@ impl ProjectManifest {
         let mut contracts_settings = HashMap::new();
         let mut config_requirements: Vec<RequirementConfig> = Vec::new();
 
-        if let Some(Value::Array(requirements)) = project_manifest_file.project.requirements {
+        if let Some(TomlValue::Array(requirements)) = project_manifest_file.project.requirements {
             for link_settings in requirements.iter() {
-                if let Value::Table(link_settings) = link_settings {
+                if let TomlValue::Table(link_settings) = link_settings {
                     let contract_id = match link_settings.get("contract_id") {
-                        Some(Value::String(contract_id)) => contract_id.to_string(),
+                        Some(TomlValue::String(contract_id)) => contract_id.to_string(),
                         _ => continue,
                     };
                     config_requirements.push(RequirementConfig { contract_id });
                 }
             }
         };
-        if let Some(Value::Table(contracts)) = project_manifest_file.contracts {
+        if let Some(TomlValue::Table(contracts)) = project_manifest_file.contracts {
             for (contract_name, contract_settings) in contracts.iter() {
-                if let Value::Table(contract_settings) = contract_settings {
+                if let TomlValue::Table(contract_settings) = contract_settings {
                     let contract_path = match contract_settings.get("path") {
-                        Some(Value::String(path)) => path,
+                        Some(TomlValue::String(path)) => path,
                         _ => continue,
                     };
                     let code_source = match PathBuf::from_str(contract_path) {
@@ -354,15 +295,30 @@ impl ProjectManifest {
                         }
                     };
                     let deployer = match contract_settings.get("deployer") {
-                        Some(Value::String(path)) => {
+                        Some(TomlValue::String(path)) => {
                             ContractDeployer::LabeledDeployer(path.clone())
                         }
                         _ => ContractDeployer::DefaultDeployer,
                     };
 
+                    let parsed_epoch = match contract_settings.get("epoch") {
+                        Some(TomlValue::String(epoch)) => Some(epoch.clone()),
+                        Some(TomlValue::Float(epoch)) => Some(epoch.to_string()),
+                        None => None,
+                        _ => return Err(INVALID_EPOCH.into()),
+                    };
+
+                    let parsed_clarity_version = match contract_settings.get("clarity_version") {
+                        Some(TomlValue::Integer(clarity_version)) => {
+                            Some(clarity_version.to_string())
+                        }
+                        None => None,
+                        _ => return Err(INVALID_CLARITY_VERSION.into()),
+                    };
+
                     let (epoch, clarity_version) = get_epoch_and_clarity_version(
-                        contract_settings.get("epoch"),
-                        contract_settings.get("clarity_version"),
+                        parsed_epoch.as_deref(),
+                        parsed_clarity_version.as_deref(),
                     )?;
 
                     config_contracts.insert(
@@ -398,59 +354,25 @@ impl ProjectManifest {
 }
 
 fn get_epoch_and_clarity_version(
-    settings_epoch: Option<&Value>,
-    settings_clarity_version: Option<&Value>,
+    settings_epoch: Option<&str>,
+    settings_clarity_version: Option<&str>,
 ) -> Result<(StacksEpochId, ClarityVersion), String> {
     // if neither epoch or version are specified in clarinet.toml use: epoch 2.05 and clarity 1
     // if epoch is specified but not version: use the default version for that epoch
 
     let epoch = match settings_epoch {
         None => StacksEpochId::Epoch2_05,
-        Some(Value::String(epoch)) => {
-            if epoch.eq("2.0") {
-                StacksEpochId::Epoch20
-            } else if epoch.eq("2.05") {
-                StacksEpochId::Epoch2_05
-            } else if epoch.eq("2.1") {
-                StacksEpochId::Epoch21
-            } else if epoch.eq("2.2") {
-                StacksEpochId::Epoch22
-            } else if epoch.eq("2.3") {
-                StacksEpochId::Epoch23
-            } else if epoch.eq("2.4") {
-                StacksEpochId::Epoch24
-            } else if epoch.eq("2.5") {
-                StacksEpochId::Epoch25
-            } else if epoch.eq("3.0") {
-                StacksEpochId::Epoch30
-            } else {
-                return Err(INVALID_EPOCH.into());
-            }
-        }
-        Some(Value::Float(epoch)) => {
-            if epoch.eq(&2.0) {
-                StacksEpochId::Epoch20
-            } else if epoch.eq(&2.05) {
-                StacksEpochId::Epoch2_05
-            } else if epoch.eq(&2.1) {
-                StacksEpochId::Epoch21
-            } else if epoch.eq(&2.2) {
-                StacksEpochId::Epoch22
-            } else if epoch.eq(&2.3) {
-                StacksEpochId::Epoch23
-            } else if epoch.eq(&2.4) {
-                StacksEpochId::Epoch24
-            } else if epoch.eq(&2.5) {
-                StacksEpochId::Epoch25
-            } else if epoch.eq(&3.0) {
-                StacksEpochId::Epoch30
-            } else {
-                return Err(INVALID_EPOCH.into());
-            }
-        }
-        _ => {
-            return Err(INVALID_EPOCH.into());
-        }
+        Some(epoch) => match epoch {
+            "2" | "2.0" => StacksEpochId::Epoch20,
+            "2.05" => StacksEpochId::Epoch2_05,
+            "2.1" => StacksEpochId::Epoch21,
+            "2.2" => StacksEpochId::Epoch22,
+            "2.3" => StacksEpochId::Epoch23,
+            "2.4" => StacksEpochId::Epoch24,
+            "2.5" => StacksEpochId::Epoch25,
+            "3" | "3.0" => StacksEpochId::Epoch30,
+            _ => return Err(INVALID_EPOCH.into()),
+        },
     };
 
     let clarity_version = match settings_clarity_version {
@@ -458,18 +380,8 @@ fn get_epoch_and_clarity_version(
             None => ClarityVersion::Clarity1,
             Some(_) => ClarityVersion::default_for_epoch(epoch),
         },
-        Some(Value::Integer(version)) => {
-            if version.eq(&1) {
-                ClarityVersion::Clarity1
-            } else if version.eq(&2) {
-                ClarityVersion::Clarity2
-            } else {
-                return Err(INVALID_CLARITY_VERSION.into());
-            }
-        }
-        _ => {
-            return Err(INVALID_CLARITY_VERSION.into());
-        }
+        Some(version) => ClarityVersion::from_str(&format!("clarity{version}"))
+            .map_err(|_| INVALID_CLARITY_VERSION)?,
     };
 
     if clarity_version > ClarityVersion::default_for_epoch(epoch) {
@@ -488,54 +400,45 @@ fn test_get_epoch_and_clarity_version() {
     let result = get_epoch_and_clarity_version(None, None);
     assert_eq!(result, Ok((Epoch2_05, Clarity1)));
 
-    // no version
-    // epoch 2.0
-    let result = get_epoch_and_clarity_version(Some(&Value::String(String::from("2.0"))), None);
+    // epoch 2.0, no version
+    let result = get_epoch_and_clarity_version(Some("2.0"), None);
     assert_eq!(result, Ok((Epoch20, Clarity1)));
 
     // epoch 2.05, no version
-    let result = get_epoch_and_clarity_version(Some(&Value::String(String::from("2.05"))), None);
+    let result = get_epoch_and_clarity_version(Some("2.05"), None);
     assert_eq!(result, Ok((Epoch2_05, Clarity1)));
 
     // epoch 2.1, no version
-    let result = get_epoch_and_clarity_version(Some(&Value::String(String::from("2.1"))), None);
+    let result = get_epoch_and_clarity_version(Some("2.1"), None);
     assert_eq!(result, Ok((Epoch21, Clarity2)));
+
+    // epoch 3.0, no version
+    let result = get_epoch_and_clarity_version(Some("3.0"), None);
+    assert_eq!(result, Ok((Epoch30, Clarity3)));
 
     // no epoch
     // no epoch, version 1
-    let result = get_epoch_and_clarity_version(None, Some(&Value::Integer(1)));
+    let result = get_epoch_and_clarity_version(None, Some("1"));
     assert_eq!(result, Ok((Epoch2_05, Clarity1)));
 
     // no epoch, version 2 -> error, must specify epoch
-    let result = get_epoch_and_clarity_version(None, Some(&Value::Integer(2)));
+    let result = get_epoch_and_clarity_version(None, Some("2"));
     assert_eq!(result, Err("Clarity 2 can not be used with 2.05".into()));
 
     // epoch and clarity version
     // no epoch 2.05, version 1
-    let result = get_epoch_and_clarity_version(
-        Some(&Value::String(String::from("2.05"))),
-        Some(&Value::Integer(1)),
-    );
+    let result = get_epoch_and_clarity_version(Some("2.05"), Some("1"));
     assert_eq!(result, Ok((Epoch2_05, Clarity1)));
 
     // no epoch 2.05, version 2 -> error
-    let result = get_epoch_and_clarity_version(
-        Some(&Value::String(String::from("2.05"))),
-        Some(&Value::Integer(2)),
-    );
+    let result = get_epoch_and_clarity_version(Some("2.05"), Some("2"));
     assert_eq!(result, Err("Clarity 2 can not be used with 2.05".into()));
 
     // no epoch 2.05, version 1
-    let result = get_epoch_and_clarity_version(
-        Some(&Value::String(String::from("2.1"))),
-        Some(&Value::Integer(1)),
-    );
+    let result = get_epoch_and_clarity_version(Some("2.1"), Some("1"));
     assert_eq!(result, Ok((Epoch21, Clarity1)));
 
     // no epoch 2.05, version 2 -> error
-    let result = get_epoch_and_clarity_version(
-        Some(&Value::String(String::from("2.1"))),
-        Some(&Value::Integer(2)),
-    );
+    let result = get_epoch_and_clarity_version(Some("2.1"), Some("2"));
     assert_eq!(result, Ok((Epoch21, Clarity2)));
 }

@@ -28,16 +28,12 @@ pub fn get_signatures(
         return None;
     }
 
-    let (version, _, reference) = API_REF.get(&function_name.to_string())?;
+    let (_, reference) = API_REF.get(&function_name.to_string())?;
     let FunctionAPI {
         signature,
         output_type,
         ..
     } = (*reference).as_ref()?;
-
-    if version > &contract.clarity_version {
-        return None;
-    }
 
     let signatures = signature
         .split(" |")

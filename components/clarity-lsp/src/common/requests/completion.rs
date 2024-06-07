@@ -26,6 +26,8 @@ lazy_static! {
         build_default_native_keywords_list(ClarityVersion::Clarity1);
     static ref COMPLETION_ITEMS_CLARITY_2: Vec<CompletionItem> =
         build_default_native_keywords_list(ClarityVersion::Clarity2);
+    static ref COMPLETION_ITEMS_CLARITY_3: Vec<CompletionItem> =
+        build_default_native_keywords_list(ClarityVersion::Clarity3);
     static ref VAR_FUNCTIONS: Vec<String> = vec![
         NativeFunctions::SetVar.to_string(),
         NativeFunctions::FetchVar.to_string(),
@@ -58,14 +60,20 @@ lazy_static! {
         build_map_valid_cb_completion_items(ClarityVersion::Clarity1);
     static ref VALID_MAP_FUNCTIONS_CLARITY_2: Vec<CompletionItem> =
         build_map_valid_cb_completion_items(ClarityVersion::Clarity2);
+    static ref VALID_MAP_FUNCTIONS_CLARITY_3: Vec<CompletionItem> =
+        build_map_valid_cb_completion_items(ClarityVersion::Clarity3);
     static ref VALID_FILTER_FUNCTIONS_CLARITY_1: Vec<CompletionItem> =
         build_filter_valid_cb_completion_items(ClarityVersion::Clarity1);
     static ref VALID_FILTER_FUNCTIONS_CLARITY_2: Vec<CompletionItem> =
         build_filter_valid_cb_completion_items(ClarityVersion::Clarity2);
+    static ref VALID_FILTER_FUNCTIONS_CLARITY_3: Vec<CompletionItem> =
+        build_filter_valid_cb_completion_items(ClarityVersion::Clarity3);
     static ref VALID_FOLD_FUNCTIONS_CLARITY_1: Vec<CompletionItem> =
         build_fold_valid_cb_completion_items(ClarityVersion::Clarity1);
     static ref VALID_FOLD_FUNCTIONS_CLARITY_2: Vec<CompletionItem> =
         build_fold_valid_cb_completion_items(ClarityVersion::Clarity2);
+    static ref VALID_FOLD_FUNCTIONS_CLARITY_3: Vec<CompletionItem> =
+        build_fold_valid_cb_completion_items(ClarityVersion::Clarity3);
 }
 
 #[derive(Clone, Debug, Default)]
@@ -381,6 +389,7 @@ pub fn build_completion_item_list(
     let native_keywords = match clarity_version {
         ClarityVersion::Clarity1 => COMPLETION_ITEMS_CLARITY_1.to_vec(),
         ClarityVersion::Clarity2 => COMPLETION_ITEMS_CLARITY_2.to_vec(),
+        ClarityVersion::Clarity3 => COMPLETION_ITEMS_CLARITY_3.to_vec(),
     };
     let placeholder_pattern = Regex::new(r" \$\{\d+:[\w-]+\}").unwrap();
 
@@ -503,13 +512,15 @@ pub fn build_default_native_keywords_list(version: ClarityVersion) -> Vec<Comple
         .iter()
         .filter_map(|func| {
             let mut api = make_api_reference(func);
-            if api.version > version {
+            if version < api.min_version
+                || version > api.max_version.unwrap_or(ClarityVersion::latest())
+            {
                 return None;
             }
             if clarity2_aliased_functions.contains(func) {
                 if version >= ClarityVersion::Clarity2 {
                     return None;
-                } else if api.version == ClarityVersion::Clarity1 {
+                } else if api.min_version == ClarityVersion::Clarity1 {
                     // only for element-at? and index-of?
                     api.snippet = api.snippet.replace('?', "");
                 }
@@ -535,7 +546,9 @@ pub fn build_default_native_keywords_list(version: ClarityVersion) -> Vec<Comple
         .iter()
         .filter_map(|func| {
             let api = make_define_reference(func);
-            if api.version > version {
+            if version < api.min_version
+                || version > api.max_version.unwrap_or(ClarityVersion::latest())
+            {
                 return None;
             }
             Some(CompletionItem {
@@ -558,7 +571,9 @@ pub fn build_default_native_keywords_list(version: ClarityVersion) -> Vec<Comple
         .iter()
         .filter_map(|var| {
             if let Some(api) = make_keyword_reference(var) {
-                if api.version > version {
+                if version < api.min_version
+                    || version > api.max_version.unwrap_or(ClarityVersion::latest())
+                {
                     return None;
                 }
                 Some(CompletionItem {
@@ -582,7 +597,7 @@ pub fn build_default_native_keywords_list(version: ClarityVersion) -> Vec<Comple
     let block_properties: Vec<CompletionItem> = BlockInfoProperty::ALL
         .iter()
         .filter_map(|var| {
-            if var.get_version() > version {
+            if var.get_min_version() > version {
                 return None;
             }
             Some(CompletionItem {
@@ -727,7 +742,7 @@ fn build_iterator_cb_completion_item(
     version: ClarityVersion,
 ) -> Option<CompletionItem> {
     let api = make_api_reference(func);
-    if api.version > version {
+    if api.min_version > version {
         return None;
     }
 
@@ -751,18 +766,21 @@ fn get_iterator_cb_completion_item(version: &ClarityVersion, func: &str) -> Vec<
     if func.to_string().eq(&NativeFunctions::Map.to_string()) {
         return match version {
             ClarityVersion::Clarity1 => VALID_MAP_FUNCTIONS_CLARITY_1.to_vec(),
-            ClarityVersion::Clarity2 => VALID_MAP_FUNCTIONS_CLARITY_1.to_vec(),
+            ClarityVersion::Clarity2 => VALID_MAP_FUNCTIONS_CLARITY_2.to_vec(),
+            ClarityVersion::Clarity3 => VALID_MAP_FUNCTIONS_CLARITY_3.to_vec(),
         };
     }
     if func.to_string().eq(&NativeFunctions::Filter.to_string()) {
         return match version {
             ClarityVersion::Clarity1 => VALID_FILTER_FUNCTIONS_CLARITY_1.to_vec(),
-            ClarityVersion::Clarity2 => VALID_FILTER_FUNCTIONS_CLARITY_1.to_vec(),
+            ClarityVersion::Clarity2 => VALID_FILTER_FUNCTIONS_CLARITY_2.to_vec(),
+            ClarityVersion::Clarity3 => VALID_FILTER_FUNCTIONS_CLARITY_3.to_vec(),
         };
     }
     match version {
         ClarityVersion::Clarity1 => VALID_FOLD_FUNCTIONS_CLARITY_1.to_vec(),
-        ClarityVersion::Clarity2 => VALID_FOLD_FUNCTIONS_CLARITY_1.to_vec(),
+        ClarityVersion::Clarity2 => VALID_FOLD_FUNCTIONS_CLARITY_2.to_vec(),
+        ClarityVersion::Clarity3 => VALID_FOLD_FUNCTIONS_CLARITY_3.to_vec(),
     }
 }
 

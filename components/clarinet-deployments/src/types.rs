@@ -501,8 +501,13 @@ impl ContractPublishSpecification {
                     Ok(ClarityVersion::Clarity1)
                 } else if clarity_version.eq(&2) {
                     Ok(ClarityVersion::Clarity2)
+                } else if clarity_version.eq(&3) {
+                    Ok(ClarityVersion::Clarity3)
                 } else {
-                    Err("unable to parse clarity_version (can either be '1' or '2'".to_string())
+                    Err(
+                        "unable to parse clarity_version, it can either be '1', '2', or '3'"
+                            .to_string(),
+                    )
                 }
             }
             _ => Ok(DEFAULT_CLARITY_VERSION),
@@ -661,6 +666,7 @@ pub mod clarity_version_serde {
         match clarity_version {
             ClarityVersion::Clarity1 => s.serialize_i64(1),
             ClarityVersion::Clarity2 => s.serialize_i64(2),
+            ClarityVersion::Clarity3 => s.serialize_i64(3),
         }
     }
 
@@ -672,6 +678,7 @@ pub mod clarity_version_serde {
         match cv {
             1 => Ok(ClarityVersion::Clarity1),
             2 => Ok(ClarityVersion::Clarity2),
+            3 => Ok(ClarityVersion::Clarity3),
             _ => Err(serde::de::Error::custom(INVALID_CLARITY_VERSION)),
         }
     }
@@ -743,8 +750,13 @@ impl RequirementPublishSpecification {
                     Ok(ClarityVersion::Clarity1)
                 } else if clarity_version.eq(&2) {
                     Ok(ClarityVersion::Clarity2)
+                } else if clarity_version.eq(&3) {
+                    Ok(ClarityVersion::Clarity3)
                 } else {
-                    Err("unable to parse clarity_version (can either be '1' or '2'".to_string())
+                    Err(
+                        "unable to parse clarity_version, it can either be '1', '2', or '3'"
+                            .to_string(),
+                    )
                 }
             }
             _ => Ok(DEFAULT_CLARITY_VERSION),
@@ -867,8 +879,13 @@ impl EmulatedContractPublishSpecification {
                     Ok(ClarityVersion::Clarity1)
                 } else if clarity_version.eq(&2) {
                     Ok(ClarityVersion::Clarity2)
+                } else if clarity_version.eq(&3) {
+                    Ok(ClarityVersion::Clarity3)
                 } else {
-                    Err("unable to parse clarity_version (can either be '1' or '2'".to_string())
+                    Err(
+                        "unable to parse clarity_version, it can either be '1', '2', or '3'"
+                            .to_string(),
+                    )
                 }
             }
             _ => Ok(DEFAULT_CLARITY_VERSION),
@@ -1380,6 +1397,7 @@ impl TransactionPlanSpecification {
                                 clarity_version: match tx.clarity_version {
                                     ClarityVersion::Clarity1 => Some(1),
                                     ClarityVersion::Clarity2 => Some(2),
+                                    ClarityVersion::Clarity3 => Some(3),
                                 },
                             },
                         )
@@ -1405,6 +1423,7 @@ impl TransactionPlanSpecification {
                                 clarity_version: match tx.clarity_version {
                                     ClarityVersion::Clarity1 => Some(1),
                                     ClarityVersion::Clarity2 => Some(2),
+                                    ClarityVersion::Clarity3 => Some(3),
                                 },
                             },
                         )
@@ -1426,6 +1445,7 @@ impl TransactionPlanSpecification {
                                 clarity_version: match tx.clarity_version {
                                     ClarityVersion::Clarity1 => Some(1),
                                     ClarityVersion::Clarity2 => Some(2),
+                                    ClarityVersion::Clarity3 => Some(3),
                                 },
                             },
                         )

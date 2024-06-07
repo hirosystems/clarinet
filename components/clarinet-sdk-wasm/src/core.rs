@@ -140,6 +140,7 @@ impl ContractOptions {
             Some(v) => match v {
                 1 => ClarityVersion::Clarity1,
                 2 => ClarityVersion::Clarity2,
+                3 => ClarityVersion::Clarity3,
                 _ => {
                     log!("Invalid clarity version {v}. Using default version.");
                     DEFAULT_CLARITY_VERSION
