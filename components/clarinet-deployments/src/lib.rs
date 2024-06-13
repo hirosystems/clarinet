@@ -147,11 +147,8 @@ pub fn update_session_with_contracts_executions(
             (None, Some(min_epoch)) => std::cmp::max(min_epoch, DEFAULT_EPOCH),
             _ => DEFAULT_EPOCH,
         };
+        session.advance_chain_tip(1);
         session.update_epoch(epoch);
-
-        if epoch >= StacksEpochId::Epoch30 {
-            session.set_tenure_height();
-        }
 
         for transaction in batch.transactions.iter() {
             match transaction {
@@ -211,7 +208,6 @@ pub fn update_session_with_contracts_executions(
                 }
             }
         }
-        session.advance_chain_tip(1);
     }
     UpdateSessionExecutionResult {
         boot_contracts,

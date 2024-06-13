@@ -867,10 +867,6 @@ impl Session {
         self.interpreter.advance_chain_tip(count)
     }
 
-    pub fn set_tenure_height(&mut self) {
-        self.interpreter.set_tenure_height();
-    }
-
     #[cfg(feature = "cli")]
     fn parse_and_set_tx_sender(&mut self, output: &mut Vec<String>, command: &str) {
         let args: Vec<_> = command.split(' ').collect();

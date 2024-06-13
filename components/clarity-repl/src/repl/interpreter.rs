@@ -1168,11 +1168,12 @@ impl ClarityInterpreter {
 
     pub fn advance_chain_tip(&mut self, count: u32) -> u32 {
         self.burn_datastore.advance_chain_tip(count);
+        let new_height = self.datastore.advance_chain_tip(count);
         self.set_tenure_height();
-        self.datastore.advance_chain_tip(count)
+        new_height
     }
 
-    pub fn set_tenure_height(&mut self) {
+    fn set_tenure_height(&mut self) {
         let block_height = self.get_block_height();
         let mut conn = ClarityDatabase::new(
             &mut self.datastore,
