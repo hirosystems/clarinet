@@ -148,6 +148,11 @@ pub fn update_session_with_contracts_executions(
             _ => DEFAULT_EPOCH,
         };
         session.update_epoch(epoch);
+
+        if epoch >= StacksEpochId::Epoch30 {
+            session.set_tenure_height();
+        }
+
         for transaction in batch.transactions.iter() {
             match transaction {
                 TransactionSpecification::RequirementPublish(_)
