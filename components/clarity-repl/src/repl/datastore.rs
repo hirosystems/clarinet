@@ -462,11 +462,13 @@ impl BurnStateDB for BurnDatastore {
     }
 
     fn get_tip_burn_block_height(&self) -> Option<u32> {
-        Some(0)
+        Some(self.chain_height)
     }
 
     fn get_tip_sortition_id(&self) -> Option<SortitionId> {
-        Some(SortitionId([0; 32]))
+        let bytes = height_to_hashed_bytes(self.chain_height);
+        let sortition_id = SortitionId(bytes);
+        Some(sortition_id)
     }
 
     /// Returns the *burnchain block height* for the `sortition_id` is associated with.
