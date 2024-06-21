@@ -12,22 +12,38 @@ use super::changes::{Changes, DirectoryCreation, FileCreation};
 pub struct GetChangesForNewProject {
     project_path: String,
     project_name: String,
+    use_current_dir: bool,
     changes: Vec<Changes>,
     telemetry_enabled: bool,
 }
 
 impl GetChangesForNewProject {
-    pub fn new(project_path: String, project_name: String, telemetry_enabled: bool) -> Self {
+    pub fn new(
+        project_path: String,
+        project_name: String,
+        use_current_dir: bool,
+        telemetry_enabled: bool,
+    ) -> Self {
+        println!("project_path: {project_path}, project_name: {project_name}");
+        let project_path = if use_current_dir {
+            project_path.clone()
+        } else {
+            format!("{}/{}", project_path, project_name)
+        };
+
         Self {
             project_path,
             project_name,
+            use_current_dir,
             changes: vec![],
             telemetry_enabled,
         }
     }
 
     pub fn run(&mut self) -> Result<Vec<Changes>, String> {
-        self.create_root_directory();
+        if !self.use_current_dir {
+            self.create_root_directory();
+        }
         self.create_contracts_directory();
         self.create_settings_directory();
         self.create_tests_directory();
@@ -45,36 +61,17 @@ impl GetChangesForNewProject {
     }
 
     fn create_root_directory(&mut self) {
-        let dir = format!("{}/{}", self.project_path, self.project_name);
         let change = DirectoryCreation {
             comment: format!("{} {}", green!("Created directory"), self.project_name),
             name: self.project_name.clone(),
-            path: dir,
+            path: self.project_path.clone(),
         };
         self.changes.push(Changes::AddDirectory(change));
-    }
-
-    #[allow(dead_code)]
-    fn create_clients_directory(&mut self) {
-        self.changes
-            .push(self.get_changes_for_new_root_dir("clients".into()));
     }
 
     fn create_contracts_directory(&mut self) {
         self.changes
             .push(self.get_changes_for_new_root_dir("contracts".into()));
-    }
-
-    #[allow(dead_code)]
-    fn create_notebooks_directory(&mut self) {
-        self.changes
-            .push(self.get_changes_for_new_root_dir("notebooks".into()));
-    }
-
-    #[allow(dead_code)]
-    fn create_scripts_directory(&mut self) {
-        self.changes
-            .push(self.get_changes_for_new_root_dir("scripts".into()));
     }
 
     fn create_settings_directory(&mut self) {
@@ -99,23 +96,9 @@ impl GetChangesForNewProject {
 }
 "#
         .into();
-        let name = "settings.json".into();
-        let path = format!(
-            "{}/{}/.vscode/{}",
-            self.project_path, self.project_name, name
-        );
-        let change = FileCreation {
-            comment: format!(
-                "{} {}/.vscode/{}",
-                green!("Created file"),
-                self.project_name,
-                name
-            ),
-            name,
-            content,
-            path,
-        };
-        self.changes.push(Changes::AddFile(change));
+        let name = ".vscode/settings.json".into();
+        self.changes
+            .push(self.get_changes_for_new_file(name, content));
     }
 
     fn create_vscode_tasks_json(&mut self) {
@@ -140,23 +123,9 @@ impl GetChangesForNewProject {
 }
 "#
         .into();
-        let name = "tasks.json".into();
-        let path = format!(
-            "{}/{}/.vscode/{}",
-            self.project_path, self.project_name, name
-        );
-        let change = FileCreation {
-            comment: format!(
-                "{} {}/.vscode/{}",
-                green!("Created file"),
-                self.project_name,
-                name
-            ),
-            name,
-            content,
-            path,
-        };
-        self.changes.push(Changes::AddFile(change));
+        let name = ".vscode/tasks.json".into();
+        self.changes
+            .push(self.get_changes_for_new_file(name, content));
     }
 
     fn create_gitignore(&mut self) {
@@ -176,14 +145,8 @@ node_modules
 "#
         .into();
         let name = ".gitignore".into();
-        let path = format!("{}/{}/{}", self.project_path, self.project_name, name);
-        let change = FileCreation {
-            comment: format!("{} {}/{}", green!("Created file"), self.project_name, name),
-            name,
-            content,
-            path,
-        };
-        self.changes.push(Changes::AddFile(change));
+        self.changes
+            .push(self.get_changes_for_new_file(name, content));
     }
 
     fn create_gitattributes(&mut self) {
@@ -194,14 +157,8 @@ vitest.config.js linguist-vendored
 "#
         .into();
         let name = ".gitattributes".into();
-        let path = format!("{}/{}/{}", self.project_path, self.project_name, name);
-        let change = FileCreation {
-            comment: format!("{} {}/{}", green!("Created file"), self.project_name, name),
-            name,
-            content,
-            path,
-        };
-        self.changes.push(Changes::AddFile(change));
+        self.changes
+            .push(self.get_changes_for_new_file(name, content));
     }
 
     fn create_clarinet_toml(&mut self) {
@@ -232,14 +189,8 @@ check_checker = {{ trusted_sender = false, trusted_caller = false, callee_filter
             self.project_name, self.telemetry_enabled
         );
         let name = "Clarinet.toml".into();
-        let path = format!("{}/{}/{}", self.project_path, self.project_name, name);
-        let change = FileCreation {
-            comment: format!("{} {}/{}", green!("Created file"), self.project_name, name),
-            name,
-            content,
-            path,
-        };
-        self.changes.push(Changes::AddFile(change));
+        self.changes
+            .push(self.get_changes_for_new_file(name, content));
     }
 
     fn create_environment_testnet_toml(&mut self) {
@@ -253,22 +204,8 @@ mnemonic = "<YOUR PRIVATE TESTNET MNEMONIC HERE>"
 "#
         .into();
         let name = "Testnet.toml".into();
-        let path = format!(
-            "{}/{}/settings/{}",
-            self.project_path, self.project_name, name
-        );
-        let change = FileCreation {
-            comment: format!(
-                "{} {}/settings/{}",
-                green!("Created file"),
-                self.project_name,
-                name
-            ),
-            name,
-            content,
-            path,
-        };
-        self.changes.push(Changes::AddFile(change));
+        self.changes
+            .push(self.get_changes_for_new_file(name, content));
     }
 
     fn create_environment_mainnet_toml(&mut self) {
@@ -281,23 +218,9 @@ deployment_fee_rate = 10
 mnemonic = "<YOUR PRIVATE MAINNET MNEMONIC HERE>"
 "#
         .into();
-        let name = "Mainnet.toml".into();
-        let path = format!(
-            "{}/{}/settings/{}",
-            self.project_path, self.project_name, name
-        );
-        let change = FileCreation {
-            comment: format!(
-                "{} {}/settings/{}",
-                green!("Created file"),
-                self.project_name,
-                name
-            ),
-            name,
-            content,
-            path,
-        };
-        self.changes.push(Changes::AddFile(change));
+        let name = "settings/Mainnet.toml".into();
+        self.changes
+            .push(self.get_changes_for_new_file(name, content));
     }
 
     fn create_environment_devnet_toml(&mut self) {
@@ -469,23 +392,9 @@ btc_address = "mvZtbibDAAA3WLpY7zXXFqRa3T4XSknBX7"
             default_stacks_miner_mnemonic = DEFAULT_STACKS_MINER_MNEMONIC,
             default_stacks_faucet_mnemonic = DEFAULT_FAUCET_MNEMONIC,
         );
-        let name = "Devnet.toml".into();
-        let path = format!(
-            "{}/{}/settings/{}",
-            self.project_path, self.project_name, name
-        );
-        let change = FileCreation {
-            comment: format!(
-                "{} {}/settings/{}",
-                green!("Created file"),
-                self.project_name,
-                name
-            ),
-            name,
-            content,
-            path,
-        };
-        self.changes.push(Changes::AddFile(change));
+        let name = "settings/Devnet.toml".into();
+        self.changes
+            .push(self.get_changes_for_new_file(name, content));
     }
 
     fn create_nodejs_files(&mut self) {
@@ -524,14 +433,8 @@ btc_address = "mvZtbibDAAA3WLpY7zXXFqRa3T4XSknBX7"
             self.project_name
         );
         let name = "package.json".into();
-        let path = format!("{}/{}/{}", self.project_path, self.project_name, name);
-        let change = FileCreation {
-            comment: format!("{} {}/{}", green!("Created file"), self.project_name, name),
-            name,
-            content,
-            path,
-        };
-        self.changes.push(Changes::AddFile(change));
+        self.changes
+            .push(self.get_changes_for_new_file(name, content));
     }
 
     fn create_ts_config(&mut self) {
@@ -564,14 +467,8 @@ btc_address = "mvZtbibDAAA3WLpY7zXXFqRa3T4XSknBX7"
 "#
         .into();
         let name = "tsconfig.json".into();
-        let path = format!("{}/{}/{}", self.project_path, self.project_name, name);
-        let change = FileCreation {
-            comment: format!("{} {}/{}", green!("Created file"), self.project_name, name),
-            name,
-            content,
-            path,
-        };
-        self.changes.push(Changes::AddFile(change));
+        self.changes
+            .push(self.get_changes_for_new_file(name, content));
     }
 
     fn create_vitest_config(&mut self) {
@@ -620,28 +517,27 @@ export default defineConfig({
 
 "#.into();
         let name = "vitest.config.js".into();
-        let path = format!("{}/{}/{}", self.project_path, self.project_name, name);
-        let change = FileCreation {
-            comment: format!("{} {}/{}", green!("Created file"), self.project_name, name),
-            name,
-            content,
-            path,
-        };
-        self.changes.push(Changes::AddFile(change));
+        self.changes
+            .push(self.get_changes_for_new_file(name, content))
     }
 
     fn get_changes_for_new_root_dir(&self, name: String) -> Changes {
-        let dir = format!("{}/{}", self.project_name, name);
-        let change = DirectoryCreation {
-            comment: format!(
-                "{} {}/{}",
-                green!("Created directory"),
-                self.project_name,
-                name
-            ),
+        let dir = format!("{}/{}", self.project_path, name);
+        Changes::AddDirectory(DirectoryCreation {
+            comment: format!("{} {}", green!("Created directory"), name),
             name,
             path: dir,
-        };
-        Changes::AddDirectory(change)
+        })
+    }
+
+    fn get_changes_for_new_file(&self, name: String, content: String) -> Changes {
+        let path = format!("{}/{}", self.project_path, name);
+
+        Changes::AddFile(FileCreation {
+            comment: format!("{} {}", green!("Created file"), name),
+            name,
+            content,
+            path,
+        })
     }
 }

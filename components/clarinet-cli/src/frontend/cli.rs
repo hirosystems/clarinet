@@ -463,7 +463,7 @@ pub fn main() {
             let mut file = match File::create(file_name.clone()) {
                 Ok(file) => file,
                 Err(e) => {
-                    println!(
+                    eprintln!(
                         "{} Unable to create file {}: {}",
                         red!("error:"),
                         file_name,
@@ -477,15 +477,33 @@ pub fn main() {
             println!("Check your shell's documentation for details about using this file to enable completions for clarinet");
         }
         Command::New(project_opts) => {
-            let current_path = {
-                let current_dir = match env::current_dir() {
-                    Ok(dir) => dir,
-                    Err(e) => {
-                        println!("{}{}", format_err!("unable to get current directory"), e);
-                        std::process::exit(1);
-                    }
-                };
-                current_dir.to_str().unwrap().to_owned()
+            let current_path = std::env::current_dir().unwrap_or_else(|e| {
+                eprintln!("{}{}", format_err!("unable to get current directory"), e);
+                std::process::exit(1);
+            });
+            let current_dir_name = current_path.file_name().map(|s| s.to_string_lossy());
+            let current_path = current_path.to_str().expect("Invalid path").to_owned();
+            let use_current_dir = project_opts.name == ".";
+            let project_name = sanitize_project_name(&project_opts.name);
+
+            let (relative_dir, project_id) = if use_current_dir {
+                (
+                    ".",
+                    current_dir_name
+                        .unwrap_or(std::borrow::Cow::Borrowed("project"))
+                        .to_string(),
+                )
+            } else {
+                let mut name_and_dir = project_name.rsplitn(2, '/');
+                let project_id = name_and_dir.next().unwrap();
+                let relative_dir = name_and_dir.next().unwrap_or(".");
+                (relative_dir, project_id.to_string())
+            };
+
+            let project_path = if relative_dir == "." {
+                current_path
+            } else {
+                format!("{}/{}", current_path, relative_dir)
             };
 
             let telemetry_enabled = if cfg!(feature = "telemetry") {
@@ -533,15 +551,16 @@ pub fn main() {
                     )
                 );
             }
-            let project_id = project_opts.name.clone();
+
             let changes = match generate::get_changes_for_new_project(
-                current_path,
+                project_path,
                 project_id,
+                use_current_dir,
                 telemetry_enabled,
             ) {
                 Ok(changes) => changes,
                 Err(message) => {
-                    println!("{}", format_err!(message));
+                    eprintln!("{}", format_err!(message));
                     std::process::exit(1);
                 }
             };
@@ -567,7 +586,7 @@ pub fn main() {
                 println!("Checking deployments");
                 let res = check_deployments(&manifest);
                 if let Err(message) = res {
-                    println!("{}", format_err!(message));
+                    eprintln!("{}", format_err!(message));
                     process::exit(1);
                 }
             }
@@ -590,7 +609,7 @@ pub fn main() {
                     match generate_default_deployment(&manifest, &network, cmd.no_batch) {
                         Ok(deployment) => deployment,
                         Err(message) => {
-                            println!("{}", format_err!(message));
+                            eprintln!("{}", format_err!(message));
                             std::process::exit(1);
                         }
                     };
@@ -601,14 +620,14 @@ pub fn main() {
                         (_, true, _) => 1,
                         (true, _, _) => 0,
                         (false, false, false) => {
-                            println!("{}", format_err!("cost strategy not specified (--low-cost, --medium-cost, --high-cost, --manual-cost)"));
+                            eprintln!("{}", format_err!("cost strategy not specified (--low-cost, --medium-cost, --high-cost, --manual-cost)"));
                             std::process::exit(1);
                         }
                     };
                     match update_deployment_costs(&mut deployment, priority) {
                         Ok(_) => {}
                         Err(message) => {
-                            println!(
+                            eprintln!(
                                 "{} unable to update costs\n{}",
                                 yellow!("warning:"),
                                 message
@@ -620,7 +639,7 @@ pub fn main() {
                 let write_plan = if default_deployment_path.exists() {
                     let existing_deployment = load_deployment(&manifest, &default_deployment_path)
                         .unwrap_or_else(|message| {
-                            println!(
+                            eprintln!(
                                 "{}",
                                 format_err!(format!(
                                     "unable to load {default_deployment_path}\n{message}",
@@ -636,7 +655,7 @@ pub fn main() {
                 if write_plan {
                     let res = write_deployment(&deployment, &default_deployment_path, false);
                     if let Err(message) = res {
-                        println!("{}", format_err!(message));
+                        eprintln!("{}", format_err!(message));
                         process::exit(1);
                     }
 
@@ -681,7 +700,7 @@ pub fn main() {
                                 let (deployment, _) = match generate_default_deployment(&manifest, network, false) {
                                     Ok(deployment) => deployment,
                                     Err(message) => {
-                                        println!("{}", red!(message));
+                                        eprintln!("{}", red!(message));
                                         std::process::exit(1);
                                     }
                                 };
@@ -705,7 +724,7 @@ pub fn main() {
                 let deployment = match result {
                     Ok(deployment) => deployment,
                     Err(e) => {
-                        println!("{}", e);
+                        eprintln!("{}", e);
                         std::process::exit(1);
                     }
                 };
@@ -726,7 +745,7 @@ pub fn main() {
                         && !buffer.starts_with('y')
                         && !buffer.starts_with('\n')
                     {
-                        println!("Deployment aborted");
+                        eprintln!("Deployment aborted");
                         std::process::exit(1);
                     }
                 }
@@ -788,7 +807,7 @@ pub fn main() {
                         };
                         match cmd {
                             DeploymentEvent::Interrupted(message) => {
-                                println!(
+                                eprintln!(
                                     "{} Error publishing transactions: {}",
                                     red!("x"),
                                     message
@@ -817,7 +836,7 @@ pub fn main() {
                             network
                         ),
                         Err(message) => {
-                            println!("{} Error publishing transactions: {}", red!("x"), message)
+                            eprintln!("{} Error publishing transactions: {}", red!("x"), message)
                         }
                     }
                 }
@@ -825,7 +844,7 @@ pub fn main() {
         },
         Command::Chainhooks => {
             let message = "This command is deprecated. Use the chainhooks library instead (https://github.com/hirosystems/chainhook)";
-            println!("{}", format_err!(message));
+            eprintln!("{}", format_err!(message));
             std::process::exit(1);
         }
         Command::Contracts(subcommand) => match subcommand {
@@ -840,7 +859,7 @@ pub fn main() {
                 ) {
                     Ok(changes) => changes,
                     Err(message) => {
-                        println!("{}", format_err!(message));
+                        eprintln!("{}", format_err!(message));
                         std::process::exit(1);
                     }
                 };
@@ -859,7 +878,7 @@ pub fn main() {
                     match generate::get_changes_for_rm_contract(&manifest.location, cmd.name) {
                         Ok(changes) => changes,
                         Err(message) => {
-                            println!("{}", format_err!(message));
+                            eprintln!("{}", format_err!(message));
                             std::process::exit(1);
                         }
                     };
@@ -873,7 +892,7 @@ pub fn main() {
                 );
                 std::io::stdin().read_line(&mut answer).unwrap();
                 if !answer.trim().eq_ignore_ascii_case("y") {
-                    println!("{} Not deleting contract files", yellow!("warning:"));
+                    eprintln!("{} Not deleting contract files", yellow!("warning:"));
                     std::process::exit(0);
                 }
                 if !execute_changes(changes) {
@@ -1017,7 +1036,7 @@ pub fn main() {
             let code_source = match fs::read_to_string(&file) {
                 Ok(code) => code,
                 _ => {
-                    println!("{} unable to read file: '{}'", red!("error:"), file);
+                    eprintln!("{} unable to read file: '{}'", red!("error:"), file);
                     std::process::exit(1);
                 }
             };
@@ -1135,7 +1154,7 @@ pub fn main() {
             std::process::exit(exit_code);
         }
         Command::Integrate(cmd) => {
-            println!(
+            eprintln!(
                 "{}",
                 format_warn!("This command is deprecated. Use 'clarinet devnet start' instead"),
             );
@@ -1145,7 +1164,7 @@ pub fn main() {
         Command::DAP => match super::dap::run_dap() {
             Ok(_) => (),
             Err(e) => {
-                println!("{}", red!(e));
+                eprintln!("{}", red!(e));
                 process::exit(1);
             }
         },
@@ -1153,7 +1172,7 @@ pub fn main() {
             Devnet::Package(cmd) => {
                 let manifest = load_manifest_or_exit(cmd.manifest_path);
                 if let Err(e) = Package::pack(cmd.package_file_name, manifest) {
-                    println!("Could not execute the package command. {}", format_err!(e));
+                    eprintln!("Could not execute the package command. {}", format_err!(e));
                     process::exit(1);
                 }
             }
@@ -1166,7 +1185,7 @@ fn get_manifest_location_or_exit(path: Option<String>) -> FileLocation {
     match get_manifest_location(path) {
         Some(manifest_location) => manifest_location,
         None => {
-            println!("Could not find Clarinet.toml");
+            eprintln!("Could not find Clarinet.toml");
             process::exit(1);
         }
     }
@@ -1176,7 +1195,7 @@ fn get_manifest_location_or_warn(path: Option<String>) -> Option<FileLocation> {
     match get_manifest_location(path) {
         Some(manifest_location) => Some(manifest_location),
         None => {
-            println!(
+            eprintln!(
                 "{} no manifest found, starting with default settings.",
                 yellow!("note:")
             );
@@ -1190,7 +1209,7 @@ fn load_manifest_or_exit(path: Option<String>) -> ProjectManifest {
     match ProjectManifest::from_location(&manifest_location) {
         Ok(manifest) => manifest,
         Err(message) => {
-            println!(
+            eprintln!(
                 "{} syntax errors in Clarinet.toml\n{}",
                 red!("error:"),
                 message,
@@ -1205,7 +1224,7 @@ fn load_manifest_or_warn(path: Option<String>) -> Option<ProjectManifest> {
         let manifest = match ProjectManifest::from_location(&manifest_location) {
             Ok(manifest) => manifest,
             Err(message) => {
-                println!(
+                eprintln!(
                     "{} syntax errors in Clarinet.toml\n{}",
                     red!("error:"),
                     message,
@@ -1289,7 +1308,7 @@ fn load_deployment_and_artifacts_or_exit(
     match result {
         Ok(deployment) => deployment,
         Err(e) => {
-            println!("{}", format_err!(e));
+            eprintln!("{}", format_err!(e));
             process::exit(1);
         }
     }
@@ -1414,7 +1433,7 @@ fn load_deployment_if_exists(
                 }
             }
             Err(message) => {
-                println!(
+                eprintln!(
                     "{} unable to compute an updated plan\n{}",
                     red!("error:"),
                     message
@@ -1458,6 +1477,24 @@ fn compare_wasm_artifacts(
     }
 }
 
+fn sanitize_project_name(name: &str) -> String {
+    let sanitized: String = name
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '_' || c == '-' || c == '/' {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect();
+    if sanitized.is_empty() || sanitized.chars().all(|c| c == '_' || c == '/') {
+        eprintln!("{} Invalid project name", red!("error:"));
+        process::exit(1)
+    }
+    sanitized
+}
+
 fn execute_changes(changes: Vec<Changes>) -> bool {
     let mut shared_config = None;
 
@@ -1477,7 +1514,7 @@ fn execute_changes(changes: Vec<Changes>) -> bool {
                 let mut file = match File::create(options.path.clone()) {
                     Ok(file) => file,
                     Err(e) => {
-                        println!(
+                        eprintln!(
                             "{} Unable to create file {}: {}",
                             red!("error:"),
                             options.path,
@@ -1489,7 +1526,7 @@ fn execute_changes(changes: Vec<Changes>) -> bool {
                 match file.write_all(options.content.as_bytes()) {
                     Ok(_) => (),
                     Err(e) => {
-                        println!(
+                        eprintln!(
                             "{} Unable to write file {}: {}",
                             red!("error:"),
                             options.path,
@@ -1504,7 +1541,7 @@ fn execute_changes(changes: Vec<Changes>) -> bool {
                 match fs::create_dir_all(options.path.clone()) {
                     Ok(_) => (),
                     Err(e) => {
-                        println!(
+                        eprintln!(
                             "{} Unable to create directory {}: {}",
                             red!("error:"),
                             options.path,
@@ -1523,7 +1560,7 @@ fn execute_changes(changes: Vec<Changes>) -> bool {
                         let project_manifest_content = match manifest_location.read_content() {
                             Ok(content) => content,
                             Err(message) => {
-                                println!("{}", format_err!(message));
+                                eprintln!("{}", format_err!(message));
                                 return false;
                             }
                         };
@@ -1532,7 +1569,7 @@ fn execute_changes(changes: Vec<Changes>) -> bool {
                             match toml::from_slice(&project_manifest_content[..]) {
                                 Ok(manifest) => manifest,
                                 Err(message) => {
-                                    println!(
+                                    eprintln!(
                                         "{} Failed to process manifest file: {}",
                                         red!("error:"),
                                         message
@@ -1546,7 +1583,7 @@ fn execute_changes(changes: Vec<Changes>) -> bool {
                         ) {
                             Ok(content) => content,
                             Err(message) => {
-                                println!("{}", format_err!(message));
+                                eprintln!("{}", format_err!(message));
                                 return false;
                             }
                         }
@@ -1577,7 +1614,7 @@ fn execute_changes(changes: Vec<Changes>) -> bool {
             Changes::RemoveFile(options) => {
                 if let Ok(entry) = fs::metadata(&options.path) {
                     if !entry.is_file() {
-                        println!(
+                        eprintln!(
                             "{} file doesn't exist at path {}",
                             yellow!("warning:"),
                             options.path
@@ -1587,7 +1624,7 @@ fn execute_changes(changes: Vec<Changes>) -> bool {
                 }
                 match fs::remove_file(&options.path) {
                     Ok(_) => println!("{}", options.comment),
-                    Err(e) => println!("error {}", e),
+                    Err(e) => eprintln!("error {}", e),
                 }
             }
         }
@@ -1597,7 +1634,7 @@ fn execute_changes(changes: Vec<Changes>) -> bool {
         let toml_value = match toml::Value::try_from(&project_manifest) {
             Ok(value) => value,
             Err(e) => {
-                println!("{} failed encoding config file ({})", red!("error:"), e);
+                eprintln!("{} failed encoding config file ({})", red!("error:"), e);
                 return false;
             }
         };
@@ -1605,7 +1642,7 @@ fn execute_changes(changes: Vec<Changes>) -> bool {
         let pretty_toml = match toml::ser::to_string_pretty(&toml_value) {
             Ok(value) => value,
             Err(e) => {
-                println!("{} failed formatting config file ({})", red!("error:"), e);
+                eprintln!("{} failed formatting config file ({})", red!("error:"), e);
                 return false;
             }
         };
@@ -1614,7 +1651,7 @@ fn execute_changes(changes: Vec<Changes>) -> bool {
             .location
             .write_content(pretty_toml.as_bytes())
         {
-            println!(
+            eprintln!(
                 "{} Unable to update manifest file - {}",
                 red!("error:"),
                 message
@@ -1740,7 +1777,7 @@ fn devnet_start(cmd: DevnetStart, global_settings: GlobalSettings) {
                 let package_file = match File::open(package) {
                     Ok(file) => file,
                     Err(_) => {
-                        println!("{} package file not found", red!("error:"));
+                        eprintln!("{} package file not found", red!("error:"));
                         std::process::exit(1);
                     }
                 };
@@ -1774,7 +1811,7 @@ fn devnet_start(cmd: DevnetStart, global_settings: GlobalSettings) {
                         {
                             Ok(deployment) => deployment,
                             Err(message) => {
-                                println!("{}", red!(message));
+                                eprintln!("{}", red!(message));
                                 std::process::exit(1);
                             }
                         };
@@ -1802,7 +1839,7 @@ fn devnet_start(cmd: DevnetStart, global_settings: GlobalSettings) {
     let deployment = match result {
         Ok(deployment) => deployment,
         Err(e) => {
-            println!("{}", format_err!(e));
+            eprintln!("{}", format_err!(e));
             std::process::exit(1);
         }
     };
@@ -1810,7 +1847,7 @@ fn devnet_start(cmd: DevnetStart, global_settings: GlobalSettings) {
     let orchestrator = match DevnetOrchestrator::new(manifest, None, None, true) {
         Ok(orchestrator) => orchestrator,
         Err(e) => {
-            println!("{}", format_err!(e));
+            eprintln!("{}", format_err!(e));
             process::exit(1);
         }
     };
@@ -1826,7 +1863,7 @@ fn devnet_start(cmd: DevnetStart, global_settings: GlobalSettings) {
     }
     match start(orchestrator, deployment, None, !cmd.no_dashboard) {
         Err(e) => {
-            println!("{}", format_err!(e));
+            eprintln!("{}", format_err!(e));
             process::exit(1);
         }
         Ok(_) => {
@@ -1864,5 +1901,26 @@ mod tests {
             });
             assert!(result.is_ok(), "failed to generate completion for {shell}",);
         }
+    }
+
+    #[test]
+    fn test_sanitize_project_name() {
+        let sanitized = sanitize_project_name("hello_world");
+        assert_eq!(sanitized, "hello_world");
+
+        let sanitized = sanitize_project_name("Hello_World");
+        assert_eq!(sanitized, "Hello_World");
+
+        let sanitized = sanitize_project_name("Hello-World");
+        assert_eq!(sanitized, "Hello-World");
+
+        let sanitized = sanitize_project_name("hello/world");
+        assert_eq!(sanitized, "hello/world");
+
+        let sanitized = sanitize_project_name("H€llo/world");
+        assert_eq!(sanitized, "H_llo/world");
+
+        let sanitized = sanitize_project_name("H€llo/world");
+        assert_eq!(sanitized, "H_llo/world");
     }
 }
