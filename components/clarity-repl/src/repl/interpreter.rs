@@ -1173,7 +1173,7 @@ impl ClarityInterpreter {
         new_height
     }
 
-    fn set_tenure_height(&mut self) {
+    pub fn set_tenure_height(&mut self) {
         let block_height = self.get_block_height();
         let mut conn = ClarityDatabase::new(
             &mut self.datastore,
