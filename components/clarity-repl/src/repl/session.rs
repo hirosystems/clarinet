@@ -951,12 +951,22 @@ impl Session {
                 ))
             }
         };
-        self.update_epoch(epoch);
-        output.push(green!(format!("Epoch updated to: {epoch}")))
+        if self.update_epoch(epoch) {
+            output.push(green!(format!("Epoch updated to: {epoch}")))
+        } else {
+            output.push(red!(format!("Epoch can not be set to a lower value")))
+        }
     }
 
-    pub fn update_epoch(&mut self, epoch: StacksEpochId) {
+    pub fn update_epoch(&mut self, epoch: StacksEpochId) -> bool {
+        if epoch < self.current_epoch {
+            return false;
+        }
         self.current_epoch = epoch;
+        if epoch >= StacksEpochId::Epoch30 {
+            self.interpreter.set_tenure_height();
+        }
+        true
     }
 
     pub fn encode(&mut self, output: &mut Vec<String>, cmd: &str) {
