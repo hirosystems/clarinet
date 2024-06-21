@@ -150,8 +150,7 @@ node_modules
     }
 
     fn create_gitattributes(&mut self) {
-        let content = r#"
-tests/** linguist-vendored
+        let content = r#"tests/** linguist-vendored
 vitest.config.js linguist-vendored
 * text=lf
 "#
@@ -163,8 +162,7 @@ vitest.config.js linguist-vendored
 
     fn create_clarinet_toml(&mut self) {
         let content = format!(
-            r#"
-[project]
+            r#"[project]
 name = "{}"
 description = ""
 authors = []

@@ -484,9 +484,15 @@ pub fn main() {
             let current_dir_name = current_path.file_name().map(|s| s.to_string_lossy());
             let current_path = current_path.to_str().expect("Invalid path").to_owned();
             let use_current_dir = project_opts.name == ".";
-            let project_name = sanitize_project_name(&project_opts.name);
 
             let (relative_dir, project_id) = if use_current_dir {
+                if let Ok(entries) = std::fs::read_dir(&current_path) {
+                    let is_empty = entries.count() == 0;
+                    if !is_empty {
+                        println!("{}", yellow!("Current directory is not empty"));
+                        prompt_user_to_continue();
+                    }
+                };
                 (
                     ".",
                     current_dir_name
@@ -494,10 +500,14 @@ pub fn main() {
                         .to_string(),
                 )
             } else {
-                let mut name_and_dir = project_name.rsplitn(2, '/');
+                if std::fs::read_dir(&project_opts.name).is_ok() {
+                    println!("{}", yellow!("Directory already exists"));
+                    prompt_user_to_continue();
+                }
+                let mut name_and_dir = project_opts.name.rsplitn(2, '/');
                 let project_id = name_and_dir.next().unwrap();
                 let relative_dir = name_and_dir.next().unwrap_or(".");
-                (relative_dir, project_id.to_string())
+                (relative_dir, sanitize_project_name(project_id))
             };
 
             let project_path = if relative_dir == "." {
@@ -1661,6 +1671,15 @@ fn execute_changes(changes: Vec<Changes>) -> bool {
     }
 
     true
+}
+
+fn prompt_user_to_continue() {
+    println!("{}", yellow!("Do you want to continue? (y/N)"));
+    let mut buffer = String::new();
+    std::io::stdin().read_line(&mut buffer).unwrap();
+    if !buffer.trim().eq_ignore_ascii_case("y") {
+        std::process::exit(0);
+    }
 }
 
 fn display_separator() {
