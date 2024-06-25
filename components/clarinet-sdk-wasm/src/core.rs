@@ -573,7 +573,7 @@ impl SDK {
         };
 
         let session = self.get_session_mut();
-        session.update_epoch(epoch)
+        session.update_epoch(epoch);
     }
 
     #[wasm_bindgen(js_name=getContractsInterfaces)]
