@@ -951,11 +951,13 @@ impl Session {
                 ))
             }
         };
+        self.update_epoch(epoch);
         output.push(green!(format!("Epoch updated to: {epoch}")));
     }
 
     pub fn update_epoch(&mut self, epoch: StacksEpochId) {
         self.current_epoch = epoch;
+        self.interpreter.burn_datastore.set_current_epoch(epoch);
         if epoch >= StacksEpochId::Epoch30 {
             self.interpreter.set_tenure_height();
         }

@@ -412,6 +412,23 @@ pub trait ASTVisitor<'a> {
                                 .unwrap_or(&DEFAULT_NAME),
                             args.get(1).unwrap_or(&DEFAULT_EXPR),
                         ),
+                        GetStacksBlockInfo => self.traverse_get_stacks_block_info(
+                            expr,
+                            args.get(0)
+                                .unwrap_or(&DEFAULT_EXPR)
+                                .match_atom()
+                                .unwrap_or(&DEFAULT_NAME),
+                            args.get(1).unwrap_or(&DEFAULT_EXPR),
+                        ),
+                        GetTenureInfo => self.traverse_get_tenure_info(
+                            expr,
+                            args.get(0)
+                                .unwrap_or(&DEFAULT_EXPR)
+                                .match_atom()
+                                .unwrap_or(&DEFAULT_NAME),
+                            args.get(1).unwrap_or(&DEFAULT_EXPR),
+                        ),
+
                         ConsError => self.traverse_err(expr, args.get(0).unwrap_or(&DEFAULT_EXPR)),
                         ConsOkay => self.traverse_ok(expr, args.get(0).unwrap_or(&DEFAULT_EXPR)),
                         ConsSome => self.traverse_some(expr, args.get(0).unwrap_or(&DEFAULT_EXPR)),
@@ -1457,6 +1474,42 @@ pub trait ASTVisitor<'a> {
     }
 
     fn visit_get_block_info(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        prop_name: &'a ClarityName,
+        block: &'a SymbolicExpression,
+    ) -> bool {
+        true
+    }
+
+    fn traverse_get_stacks_block_info(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        prop_name: &'a ClarityName,
+        block: &'a SymbolicExpression,
+    ) -> bool {
+        self.traverse_expr(block) && self.visit_get_stacks_block_info(expr, prop_name, block)
+    }
+
+    fn visit_get_stacks_block_info(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        prop_name: &'a ClarityName,
+        block: &'a SymbolicExpression,
+    ) -> bool {
+        true
+    }
+
+    fn traverse_get_tenure_info(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        prop_name: &'a ClarityName,
+        block: &'a SymbolicExpression,
+    ) -> bool {
+        self.traverse_expr(block) && self.visit_get_tenure_info(expr, prop_name, block)
+    }
+
+    fn visit_get_tenure_info(
         &mut self,
         expr: &'a SymbolicExpression,
         prop_name: &'a ClarityName,

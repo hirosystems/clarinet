@@ -57,10 +57,9 @@ impl ClarityInterpreter {
     pub fn new(tx_sender: StandardPrincipalData, repl_settings: Settings) -> Self {
         let constants = StacksConstants {
             burn_start_height: 0,
-            pox_prepare_length: 0,
-            pox_reward_cycle_length: 0,
+            pox_prepare_length: 50,
+            pox_reward_cycle_length: 1050,
             pox_rejection_fraction: 0,
-            epoch_21_start_height: 0,
         };
         Self {
             tx_sender,
