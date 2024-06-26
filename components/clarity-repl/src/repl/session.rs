@@ -504,6 +504,19 @@ impl Session {
         test_name: Option<String>,
         ast: &mut Option<ContractAST>,
     ) -> Result<ExecutionResult, Vec<Diagnostic>> {
+        if contract.epoch != self.current_epoch {
+            let diagnostic = Diagnostic {
+                level: Level::Error,
+                message: format!(
+                    "contract epoch {} does not match the current epoch {}",
+                    contract.epoch, self.current_epoch
+                ),
+                spans: vec![],
+                suggestion: None,
+            };
+            return Err(vec![diagnostic]);
+        }
+
         if contract.clarity_version > ClarityVersion::default_for_epoch(contract.epoch) {
             let diagnostic = Diagnostic {
                 level: Level::Error,
@@ -1314,9 +1327,20 @@ fn clarity_keywords() -> HashMap<String, String> {
 #[allow(clippy::items_after_test_module)]
 #[cfg(test)]
 mod tests {
-    use crate::repl::{self, settings::Account};
+    use crate::{repl::settings::Account, test_fixtures::clarity_contract::ClarityContractBuilder};
+    use clarity::vm::types::TupleData;
 
     use super::*;
+
+    #[track_caller]
+    fn eval_and_assert(session: &mut Session, snippet: String, expected_value: Value) {
+        let result = session.eval(snippet.to_string(), None, false).unwrap();
+        let result = match result.result {
+            EvaluationResult::Contract(_) => unreachable!(),
+            EvaluationResult::Snippet(res) => res,
+        };
+        assert_eq!(result.result, expected_value);
+    }
 
     #[test]
     fn initial_accounts() {
@@ -1379,6 +1403,27 @@ mod tests {
             Value::some(Value::string_ascii_from_bytes("stack".as_bytes().to_vec()).unwrap())
                 .unwrap()
         );
+    }
+
+    #[test]
+    fn set_epoch_command() {
+        let mut session = Session::new(SessionSettings::default());
+        let initial_epoch = session.handle_command("::get_epoch");
+        // initial epoch is 2.05
+        assert_eq!(initial_epoch.1[0], "Current epoch: 2.05");
+
+        // it can be lowered to 2.0
+        // it's possible that in the feature we want to start from 2.0 and forbid lowering the epoch
+        // this test would have to be updated
+        session.handle_command("::set_epoch 2.0");
+        let current_epoch = session.handle_command("::get_epoch");
+        assert_eq!(current_epoch.1[0], "Current epoch: 2.0");
+
+        session.handle_command("::set_epoch 2.4");
+        assert_eq!(current_epoch.1[0], "Current epoch: 2.4");
+
+        session.handle_command("::set_epoch 3.0");
+        assert_eq!(current_epoch.1[0], "Current epoch: 3.0");
     }
 
     #[test]
@@ -1460,6 +1505,86 @@ mod tests {
     }
 
     #[test]
+    fn block_height_support_in_clarity2_epoch2() {
+        let settings = SessionSettings::default();
+        let mut session = Session::new(settings);
+        session.start().expect("session could not start");
+
+        session.update_epoch(StacksEpochId::Epoch25);
+
+        let snippet = [
+            "(define-read-only (get-height)",
+            "  { block-height: block-height }",
+            ")",
+            "(define-read-only (get-info (h uint))",
+            "  { time: (get-block-info? time h) }",
+            ")",
+        ]
+        .join("\n");
+        let contract = ClarityContractBuilder::new()
+            .code_source(snippet)
+            .epoch(StacksEpochId::Epoch25)
+            .clarity_version(ClarityVersion::Clarity2)
+            .build();
+
+        let deploy_result = session.deploy_contract(&contract, None, false, None, &mut None);
+        assert!(deploy_result.is_ok());
+
+        eval_and_assert(
+            &mut session,
+            "(contract-call? .contract get-height)".into(),
+            Value::Tuple(
+                TupleData::from_data(vec![("block-height".into(), Value::UInt(0))]).unwrap(),
+            ),
+        );
+
+        session.advance_chain_tip(10);
+
+        eval_and_assert(
+            &mut session,
+            "(contract-call? .contract get-height)".into(),
+            Value::Tuple(
+                TupleData::from_data(vec![("block-height".into(), Value::UInt(10))]).unwrap(),
+            ),
+        );
+    }
+
+    #[test]
+    fn block_height_support_in_clarity2_epoch3() {
+        let settings = SessionSettings::default();
+        let mut session = Session::new(settings);
+        session.start().expect("session could not start");
+
+        session.update_epoch(StacksEpochId::Epoch30);
+
+        let snippet = [
+            "(define-read-only (get-height)",
+            "  { block-height: block-height }",
+            ")",
+            "(define-read-only (get-info (h uint))",
+            "  { time: (get-block-info? time h) }",
+            ")",
+        ]
+        .join("\n");
+        let contract = ClarityContractBuilder::new()
+            .code_source(snippet)
+            .epoch(StacksEpochId::Epoch30)
+            .clarity_version(ClarityVersion::Clarity2)
+            .build();
+
+        let deploy_result = session.deploy_contract(&contract, None, false, None, &mut None);
+        assert!(deploy_result.is_ok());
+
+        eval_and_assert(
+            &mut session,
+            "(contract-call? .contract get-height)".into(),
+            Value::Tuple(
+                TupleData::from_data(vec![("block-height".into(), Value::UInt(0))]).unwrap(),
+            ),
+        );
+    }
+
+    #[test]
     fn evaluate_at_block() {
         let settings = SessionSettings {
             include_boot_contracts: vec!["costs".into(), "costs-2".into(), "costs-3".into()],
@@ -1468,6 +1593,8 @@ mod tests {
 
         let mut session = Session::new(settings);
         session.start().expect("session could not start");
+
+        session.handle_command("::set_epoch 2.5");
 
         // setup contract state
         let snippet = "
@@ -1485,8 +1612,8 @@ mod tests {
             code_source: ClarityCodeSource::ContractInMemory(snippet.to_string()),
             name: "contract".to_string(),
             deployer: ContractDeployer::Address("ST000000000000000000002AMW42H".into()),
-            clarity_version: ClarityVersion::Clarity1,
-            epoch: repl::DEFAULT_EPOCH,
+            clarity_version: ClarityVersion::Clarity2,
+            epoch: StacksEpochId::Epoch25,
         };
 
         let _ = session.deploy_contract(&contract, None, false, None, &mut None);
