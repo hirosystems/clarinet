@@ -1325,8 +1325,19 @@ fn clarity_keywords() -> HashMap<String, String> {
 #[cfg(test)]
 mod tests {
     use crate::{repl::settings::Account, test_fixtures::clarity_contract::ClarityContractBuilder};
+    use clarity::vm::types::TupleData;
 
     use super::*;
+
+    #[track_caller]
+    fn eval_and_assert(session: &mut Session, snippet: String, expected_value: Value) {
+        let result = session.eval(snippet.to_string(), None, false).unwrap();
+        let result = match result.result {
+            EvaluationResult::Contract(_) => unreachable!(),
+            EvaluationResult::Snippet(res) => res,
+        };
+        assert_eq!(result.result, expected_value);
+    }
 
     #[test]
     fn initial_accounts() {
@@ -1503,10 +1514,7 @@ mod tests {
         let snippet = "(define-data-var x uint u0)";
         let contract = ClarityContractBuilder::new()
             .code_source(snippet.into())
-            .epoch(StacksEpochId::Epoch25)
-            .clarity_version(ClarityVersion::Clarity2)
             .build();
-
         let result = session.deploy_contract(&contract, None, false, None, &mut None);
         assert!(result.is_err());
         let err = result.unwrap_err();
@@ -1514,6 +1522,86 @@ mod tests {
         assert_eq!(
             err.first().unwrap().message,
             "contract epoch (2.5) does not match current epoch (2.4)"
+        )
+    }
+
+    #[test]
+    fn block_height_support_in_clarity2_epoch2() {
+        let settings = SessionSettings::default();
+        let mut session = Session::new(settings);
+        session.start().expect("session could not start");
+
+        session.update_epoch(StacksEpochId::Epoch25);
+
+        let snippet = [
+            "(define-read-only (get-height)",
+            "  { block-height: block-height }",
+            ")",
+            "(define-read-only (get-info (h uint))",
+            "  { time: (get-block-info? time h) }",
+            ")",
+        ]
+        .join("\n");
+        let contract = ClarityContractBuilder::new()
+            .code_source(snippet)
+            .epoch(StacksEpochId::Epoch25)
+            .clarity_version(ClarityVersion::Clarity2)
+            .build();
+
+        let deploy_result = session.deploy_contract(&contract, None, false, None, &mut None);
+        assert!(deploy_result.is_ok());
+
+        eval_and_assert(
+            &mut session,
+            "(contract-call? .contract get-height)".into(),
+            Value::Tuple(
+                TupleData::from_data(vec![("block-height".into(), Value::UInt(0))]).unwrap(),
+            ),
+        );
+
+        session.advance_chain_tip(10);
+
+        eval_and_assert(
+            &mut session,
+            "(contract-call? .contract get-height)".into(),
+            Value::Tuple(
+                TupleData::from_data(vec![("block-height".into(), Value::UInt(10))]).unwrap(),
+            ),
+        );
+    }
+
+    #[test]
+    fn block_height_support_in_clarity2_epoch3() {
+        let settings = SessionSettings::default();
+        let mut session = Session::new(settings);
+        session.start().expect("session could not start");
+
+        session.update_epoch(StacksEpochId::Epoch30);
+
+        let snippet = [
+            "(define-read-only (get-height)",
+            "  { block-height: block-height }",
+            ")",
+            "(define-read-only (get-info (h uint))",
+            "  { time: (get-block-info? time h) }",
+            ")",
+        ]
+        .join("\n");
+        let contract = ClarityContractBuilder::new()
+            .code_source(snippet)
+            .epoch(StacksEpochId::Epoch30)
+            .clarity_version(ClarityVersion::Clarity2)
+            .build();
+
+        let deploy_result = session.deploy_contract(&contract, None, false, None, &mut None);
+        assert!(deploy_result.is_ok());
+
+        eval_and_assert(
+            &mut session,
+            "(contract-call? .contract get-height)".into(),
+            Value::Tuple(
+                TupleData::from_data(vec![("block-height".into(), Value::UInt(0))]).unwrap(),
+            ),
         );
     }
 
