@@ -1420,9 +1420,11 @@ mod tests {
         assert_eq!(current_epoch.1[0], "Current epoch: 2.0");
 
         session.handle_command("::set_epoch 2.4");
+        let current_epoch = session.handle_command("::get_epoch");
         assert_eq!(current_epoch.1[0], "Current epoch: 2.4");
 
         session.handle_command("::set_epoch 3.0");
+        let current_epoch = session.handle_command("::get_epoch");
         assert_eq!(current_epoch.1[0], "Current epoch: 3.0");
     }
 
