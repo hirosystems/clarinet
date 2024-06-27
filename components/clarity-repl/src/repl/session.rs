@@ -1568,6 +1568,10 @@ mod tests {
                 TupleData::from_data(vec![("block-height".into(), Value::UInt(10))]).unwrap(),
             ),
         );
+
+        assert!(session
+            .eval("(contract-call? .contract get-info u1)".into(), None, false)
+            .is_ok());
     }
 
     #[test]
@@ -1603,6 +1607,76 @@ mod tests {
                 TupleData::from_data(vec![("block-height".into(), Value::UInt(0))]).unwrap(),
             ),
         );
+
+        assert!(session
+            .eval("(contract-call? .contract get-info u1)".into(), None, false)
+            .is_ok());
+    }
+
+    #[test]
+    fn block_height_support_in_clarity3_epoch3() {
+        let settings = SessionSettings::default();
+        let mut session = Session::new(settings);
+        session.start().expect("session could not start");
+
+        session.update_epoch(StacksEpochId::Epoch30);
+
+        let snippet = [
+            "(define-read-only (get-height)",
+            "  {",
+            "    stacks-block-height: stacks-block-height,",
+            "    tenure-height: tenure-height,",
+            "  }",
+            ")",
+            "(define-read-only (get-info (h uint))",
+            "  {",
+            "    stacks-time: (get-stacks-block-info? time h),",
+            "    stacks-id-header-hash: (get-stacks-block-info? id-header-hash h),",
+            "    stacks-header-hash: (get-stacks-block-info? header-hash h),",
+            "    tenure-time: (get-tenure-info? time h),",
+            "    tenure-miner-address: (get-tenure-info? miner-address h),",
+            "  }",
+            ")",
+        ]
+        .join("\n");
+        let contract = ClarityContractBuilder::new()
+            .code_source(snippet)
+            .epoch(StacksEpochId::Epoch30)
+            .clarity_version(ClarityVersion::Clarity3)
+            .build();
+
+        let deploy_result = session.deploy_contract(&contract, None, false, None, &mut None);
+        assert!(deploy_result.is_ok());
+
+        eval_and_assert(
+            &mut session,
+            "(contract-call? .contract get-height)".into(),
+            Value::Tuple(
+                TupleData::from_data(vec![
+                    ("stacks-block-height".into(), Value::UInt(0)),
+                    ("tenure-height".into(), Value::UInt(0)),
+                ])
+                .unwrap(),
+            ),
+        );
+
+        session.advance_chain_tip(10);
+
+        eval_and_assert(
+            &mut session,
+            "(contract-call? .contract get-height)".into(),
+            Value::Tuple(
+                TupleData::from_data(vec![
+                    ("stacks-block-height".into(), Value::UInt(10)),
+                    ("tenure-height".into(), Value::UInt(10)),
+                ])
+                .unwrap(),
+            ),
+        );
+
+        assert!(session
+            .eval("(contract-call? .contract get-info u1)".into(), None, false)
+            .is_ok());
     }
 
     #[test]
