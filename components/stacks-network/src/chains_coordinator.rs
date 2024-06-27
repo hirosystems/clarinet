@@ -478,6 +478,7 @@ pub async fn start_chains_coordinator(
             ObserverEvent::BitcoinPredicateTriggered(_) => {}
             ObserverEvent::StacksPredicateTriggered(_) => {}
             ObserverEvent::PredicateEnabled(_) => {}
+            ObserverEvent::PredicateInterrupted(_) => {}
         }
     }
     Ok(())
