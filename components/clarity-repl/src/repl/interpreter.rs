@@ -325,63 +325,6 @@ impl ClarityInterpreter {
         Ok((contract_analysis, diagnostics))
     }
 
-    pub fn save_contract(
-        &mut self,
-        contract: &ClarityContract,
-        contract_ast: &mut ContractAST,
-        contract_analysis: ContractAnalysis,
-        mainnet: bool,
-    ) {
-        let contract_id = contract.expect_resolved_contract_identifier(Some(&self.tx_sender));
-        {
-            let mut contract_context = ContractContext::new(
-                contract.expect_resolved_contract_identifier(Some(&self.tx_sender)),
-                contract.clarity_version,
-            );
-
-            let conn = ClarityDatabase::new(
-                &mut self.datastore,
-                &self.burn_datastore,
-                &self.burn_datastore,
-            );
-
-            let cost_tracker = LimitedCostTracker::new_free();
-            let mut global_context = GlobalContext::new(
-                mainnet,
-                clarity::consts::CHAIN_ID_TESTNET,
-                conn,
-                cost_tracker,
-                contract.epoch,
-            );
-            global_context.begin();
-
-            let _ = global_context
-                .execute(|g| eval_all(&contract_ast.expressions, &mut contract_context, g, None));
-
-            global_context
-                .database
-                .insert_contract_hash(&contract_id, contract.expect_in_memory_code_source())
-                .unwrap();
-            let contract = Contract { contract_context };
-            global_context
-                .database
-                .insert_contract(&contract_id, contract)
-                .expect("failed to insert contract");
-            global_context
-                .database
-                .set_contract_data_size(&contract_id, 0)
-                .unwrap();
-            global_context.commit().unwrap();
-        };
-
-        let mut analysis_db = AnalysisDatabase::new(&mut self.datastore);
-        analysis_db.begin();
-        analysis_db
-            .insert_contract(&contract_id, &contract_analysis)
-            .unwrap();
-        analysis_db.commit().expect("unable to save data");
-    }
-
     pub fn get_block_time(&mut self) -> u64 {
         let block_height = self.get_block_height();
         let mut conn = ClarityDatabase::new(
@@ -1259,6 +1202,24 @@ mod tests {
         vm::{self, ClarityVersion},
     };
 
+    #[track_caller]
+    fn deploy_contract(
+        interpreter: &mut ClarityInterpreter,
+        contract: &ClarityContract,
+    ) -> Result<ExecutionResult, String> {
+        let source = contract.expect_in_memory_code_source();
+        let (mut ast, ..) = interpreter.build_ast(contract);
+        let (annotations, _) = interpreter.collect_annotations(source);
+
+        let (analysis, _) = interpreter
+            .run_analysis(contract, &mut ast, &annotations)
+            .unwrap();
+
+        let result = interpreter.execute(contract, &mut ast, analysis, false, None);
+        assert!(result.is_ok());
+        result
+    }
+
     #[test]
     fn test_get_tx_sender() {
         let mut interpreter =
@@ -1453,16 +1414,8 @@ mod tests {
             ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
 
         let contract = ClarityContract::fixture();
-        let source = contract.expect_in_memory_code_source();
-        let (mut ast, ..) = interpreter.build_ast(&contract);
-        let (annotations, _) = interpreter.collect_annotations(source);
+        let result = deploy_contract(&mut interpreter, &contract);
 
-        let (analysis, _) = interpreter
-            .run_analysis(&contract, &mut ast, &annotations)
-            .unwrap();
-
-        let result = interpreter.execute(&contract, &mut ast, analysis, false, None);
-        assert!(result.is_ok());
         let ExecutionResult {
             diagnostics,
             events,
@@ -1503,7 +1456,7 @@ mod tests {
             ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
 
         let contract = ClarityContract::fixture();
-        let _ = interpreter.run(&contract, &mut None, false, None);
+        let _ = deploy_contract(&mut interpreter, &contract);
 
         let call_contract = ClarityContractBuilder::default()
             .code_source("(contract-call? .contract incr)".to_owned())
@@ -1518,14 +1471,9 @@ mod tests {
         let contract = ClarityContractBuilder::default()
             .code_source(["(define-data-var count uint u9)"].join("\n"))
             .build();
-        let source = contract.expect_in_memory_code_source();
-        let (mut ast, ..) = interpreter.build_ast(&contract);
-        let (annotations, _) = interpreter.collect_annotations(source);
-        let (analysis, _) = interpreter
-            .run_analysis(&contract, &mut ast, &annotations)
-            .unwrap();
 
-        interpreter.save_contract(&contract, &mut ast, analysis, false);
+        let deploy = deploy_contract(&mut interpreter, &contract);
+        assert!(deploy.is_ok());
 
         let contract_id = QualifiedContractIdentifier {
             issuer: StandardPrincipalData::transient(),
@@ -1552,14 +1500,9 @@ mod tests {
                 .join("\n"),
             )
             .build();
-        let source = contract.expect_in_memory_code_source();
-        let (mut ast, ..) = interpreter.build_ast(&contract);
-        let (annotations, _) = interpreter.collect_annotations(source);
-        let (analysis, _) = interpreter
-            .run_analysis(&contract, &mut ast, &annotations)
-            .unwrap();
 
-        interpreter.save_contract(&contract, &mut ast, analysis, false);
+        let deploy = deploy_contract(&mut interpreter, &contract);
+        assert!(deploy.is_ok());
 
         let contract_id = QualifiedContractIdentifier {
             issuer: StandardPrincipalData::transient(),
@@ -1591,13 +1534,6 @@ mod tests {
                 .join("\n"),
             )
             .build();
-        let source = contract.expect_in_memory_code_source();
-        let (mut ast, ..) = interpreter.build_ast(&contract);
-        let (annotations, _) = interpreter.collect_annotations(source);
-
-        let (analysis, _) = interpreter
-            .run_analysis(&contract, &mut ast, &annotations)
-            .unwrap();
 
         let account =
             PrincipalData::parse_standard_principal("S1G2081040G2081040G2081040G208105NK8PE5")
@@ -1605,7 +1541,7 @@ mod tests {
         let balance = interpreter.get_balance_for_account(&account.to_string(), "STX");
         assert_eq!(balance, 100000);
 
-        let result = interpreter.execute(&contract, &mut ast, analysis, false, None);
+        let result = deploy_contract(&mut interpreter, &contract);
         assert!(result.is_ok());
 
         let ExecutionResult {
@@ -1651,15 +1587,8 @@ mod tests {
                 .join("\n"),
             )
             .build();
-        let source = contract.expect_in_memory_code_source();
-        let (mut ast, ..) = interpreter.build_ast(&contract);
-        let (annotations, _) = interpreter.collect_annotations(source);
 
-        let (analysis, _) = interpreter
-            .run_analysis(&contract, &mut ast, &annotations)
-            .unwrap();
-
-        let result = interpreter.execute(&contract, &mut ast, analysis, false, None);
+        let result = deploy_contract(&mut interpreter, &contract);
         assert!(result.is_ok());
         let ExecutionResult {
             diagnostics,
@@ -1703,15 +1632,8 @@ mod tests {
                 .join("\n"),
             )
             .build();
-        let source = contract.expect_in_memory_code_source();
-        let (mut ast, ..) = interpreter.build_ast(&contract);
-        let (annotations, _) = interpreter.collect_annotations(source);
 
-        let (analysis, _) = interpreter
-            .run_analysis(&contract, &mut ast, &annotations)
-            .unwrap();
-
-        let result = interpreter.execute(&contract, &mut ast, analysis, false, None);
+        let result = deploy_contract(&mut interpreter, &contract);
         assert!(result.is_ok());
         let ExecutionResult {
             diagnostics,
@@ -1772,15 +1694,7 @@ mod tests {
         let contract = ClarityContractBuilder::default()
             .code_source("(define-public (public-func) (ok true))".into())
             .build();
-        let source = contract.expect_in_memory_code_source();
-        let (mut ast, ..) = interpreter.build_ast(&contract);
-        let (annotations, _) = interpreter.collect_annotations(source);
-
-        let (analysis, _) = interpreter
-            .run_analysis(&contract, &mut ast, &annotations)
-            .unwrap();
-
-        let _ = interpreter.execute(&contract, &mut ast, analysis, false, None);
+        let _ = deploy_contract(&mut interpreter, &contract);
 
         let allow_private = false;
         let result = interpreter.call_contract_fn(
@@ -1811,15 +1725,7 @@ mod tests {
         let contract = ClarityContractBuilder::default()
             .code_source("(define-private (private-func) true)".into())
             .build();
-        let source = contract.expect_in_memory_code_source();
-        let (mut ast, ..) = interpreter.build_ast(&contract);
-        let (annotations, _) = interpreter.collect_annotations(source);
-
-        let (analysis, _) = interpreter
-            .run_analysis(&contract, &mut ast, &annotations)
-            .unwrap();
-
-        let _ = interpreter.execute(&contract, &mut ast, analysis, false, None);
+        let _ = deploy_contract(&mut interpreter, &contract);
 
         let allow_private = true;
         let result = interpreter.call_contract_fn(
@@ -1834,7 +1740,6 @@ mod tests {
             None,
         );
 
-        println!("{:?}", result);
         assert!(result.is_ok());
         let ExecutionResult { result, .. } = result.unwrap();
 
@@ -1851,15 +1756,7 @@ mod tests {
         let contract = ClarityContractBuilder::default()
             .code_source("(define-private (private-func) true)".into())
             .build();
-        let source = contract.expect_in_memory_code_source();
-        let (mut ast, ..) = interpreter.build_ast(&contract);
-        let (annotations, _) = interpreter.collect_annotations(source);
-
-        let (analysis, _) = interpreter
-            .run_analysis(&contract, &mut ast, &annotations)
-            .unwrap();
-
-        let _ = interpreter.execute(&contract, &mut ast, analysis, false, None);
+        let _ = deploy_contract(&mut interpreter, &contract);
 
         let allow_private = false;
         let result = interpreter.call_contract_fn(

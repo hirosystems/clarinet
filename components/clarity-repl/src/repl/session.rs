@@ -508,7 +508,7 @@ impl Session {
             let diagnostic = Diagnostic {
                 level: Level::Error,
                 message: format!(
-                    "contract epoch {} does not match the current epoch {}",
+                    "contract epoch ({}) does not match current epoch ({})",
                     contract.epoch, self.current_epoch
                 ),
                 spans: vec![],
@@ -546,19 +546,16 @@ impl Session {
 
         let result = self.interpreter.run(contract, ast, cost_track, Some(hooks));
 
-        match result {
-            Ok(result) => {
-                if let Some(ref coverage) = coverage {
-                    self.coverage_reports.push(coverage.clone());
-                }
-                if let EvaluationResult::Contract(contract_result) = &result.result {
-                    self.contracts
-                        .insert(contract_id.clone(), contract_result.contract.clone());
-                };
-                Ok(result)
+        result.map(|result| {
+            if let EvaluationResult::Contract(contract_result) = &result.result {
+                self.contracts
+                    .insert(contract_id.clone(), contract_result.contract.clone());
             }
-            Err(res) => Err(res),
-        }
+            if let Some(coverage) = coverage {
+                self.coverage_reports.push(coverage);
+            }
+            result
+        })
     }
 
     pub fn invoke_contract_call(
@@ -1492,18 +1489,43 @@ mod tests {
     fn clarity_epoch_mismatch() {
         let settings = SessionSettings::default();
         let mut session = Session::new(settings);
-        session.start().expect("session could not start");
         let snippet = "(define-data-var x uint u0)";
+
+        // can not use ClarityContractBuilder to build an invalid contract
         let contract = ClarityContract {
             code_source: ClarityCodeSource::ContractInMemory(snippet.to_string()),
             name: "should_error".to_string(),
             deployer: ContractDeployer::Address("ST000000000000000000002AMW42H".into()),
             clarity_version: ClarityVersion::Clarity2,
-            epoch: StacksEpochId::Epoch20,
+            epoch: StacksEpochId::Epoch2_05,
         };
 
         let result = session.deploy_contract(&contract, None, false, None, &mut None);
         assert!(result.is_err(), "Expected error for clarity mismatch");
+    }
+
+    #[test]
+    fn deploy_contract_with_wrong_epoch() {
+        let settings = SessionSettings::default();
+        let mut session = Session::new(settings);
+
+        session.update_epoch(StacksEpochId::Epoch24);
+
+        let snippet = "(define-data-var x uint u0)";
+        let contract = ClarityContractBuilder::new()
+            .code_source(snippet.into())
+            .epoch(StacksEpochId::Epoch25)
+            .clarity_version(ClarityVersion::Clarity2)
+            .build();
+
+        let result = session.deploy_contract(&contract, None, false, None, &mut None);
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.len() == 1);
+        assert_eq!(
+            err.first().unwrap().message,
+            "contract epoch (2.5) does not match current epoch (2.4)"
+        );
     }
 
     #[test]
