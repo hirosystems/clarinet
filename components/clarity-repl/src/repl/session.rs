@@ -1514,7 +1514,10 @@ mod tests {
         let snippet = "(define-data-var x uint u0)";
         let contract = ClarityContractBuilder::new()
             .code_source(snippet.into())
+            .epoch(StacksEpochId::Epoch25)
+            .clarity_version(ClarityVersion::Clarity2)
             .build();
+
         let result = session.deploy_contract(&contract, None, false, None, &mut None);
         assert!(result.is_err());
         let err = result.unwrap_err();
@@ -1522,7 +1525,7 @@ mod tests {
         assert_eq!(
             err.first().unwrap().message,
             "contract epoch (2.5) does not match current epoch (2.4)"
-        )
+        );
     }
 
     #[test]
