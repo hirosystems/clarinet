@@ -8,7 +8,7 @@ use clarity_repl::clarity::vm::types::{
 };
 use clarity_repl::clarity::vm::{ClarityName, SymbolicExpression};
 use clarity_repl::clarity::SymbolicExpressionType;
-use clarity_repl::utils::value_to_string;
+use clarity_repl::repl::clarity_values::value_to_string;
 use serde::ser::SerializeMap;
 use serde::{Serialize, Serializer};
 use serde_json::Value as JsonValue;

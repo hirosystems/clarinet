@@ -25,7 +25,7 @@ pub fn uint8_to_value(mut value: &[u8]) -> Value {
         .unwrap_or_else(|e| panic!("failed to parse clarity value: {}", e))
 }
 
-fn value_to_string(value: &Value) -> String {
+pub fn value_to_string(value: &Value) -> String {
     match value {
         Value::Principal(principal_data) => {
             format!("'{principal_data}")
