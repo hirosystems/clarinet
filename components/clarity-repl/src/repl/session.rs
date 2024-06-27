@@ -504,6 +504,19 @@ impl Session {
         test_name: Option<String>,
         ast: &mut Option<ContractAST>,
     ) -> Result<ExecutionResult, Vec<Diagnostic>> {
+        if contract.epoch != self.current_epoch {
+            let diagnostic = Diagnostic {
+                level: Level::Error,
+                message: format!(
+                    "contract epoch ({}) does not match current epoch ({})",
+                    contract.epoch, self.current_epoch
+                ),
+                spans: vec![],
+                suggestion: None,
+            };
+            return Err(vec![diagnostic]);
+        }
+
         if contract.clarity_version > ClarityVersion::default_for_epoch(contract.epoch) {
             let diagnostic = Diagnostic {
                 level: Level::Error,
@@ -533,19 +546,16 @@ impl Session {
 
         let result = self.interpreter.run(contract, ast, cost_track, Some(hooks));
 
-        match result {
-            Ok(result) => {
-                if let Some(ref coverage) = coverage {
-                    self.coverage_reports.push(coverage.clone());
-                }
-                if let EvaluationResult::Contract(contract_result) = &result.result {
-                    self.contracts
-                        .insert(contract_id.clone(), contract_result.contract.clone());
-                };
-                Ok(result)
+        result.map(|result| {
+            if let EvaluationResult::Contract(contract_result) = &result.result {
+                self.contracts
+                    .insert(contract_id.clone(), contract_result.contract.clone());
             }
-            Err(res) => Err(res),
-        }
+            if let Some(coverage) = coverage {
+                self.coverage_reports.push(coverage);
+            }
+            result
+        })
     }
 
     pub fn invoke_contract_call(
@@ -951,11 +961,13 @@ impl Session {
                 ))
             }
         };
+        self.update_epoch(epoch);
         output.push(green!(format!("Epoch updated to: {epoch}")));
     }
 
     pub fn update_epoch(&mut self, epoch: StacksEpochId) {
         self.current_epoch = epoch;
+        self.interpreter.burn_datastore.set_current_epoch(epoch);
         if epoch >= StacksEpochId::Epoch30 {
             self.interpreter.set_tenure_height();
         }
@@ -1312,7 +1324,7 @@ fn clarity_keywords() -> HashMap<String, String> {
 #[allow(clippy::items_after_test_module)]
 #[cfg(test)]
 mod tests {
-    use crate::repl::{self, settings::Account};
+    use crate::{repl::settings::Account, test_fixtures::clarity_contract::ClarityContractBuilder};
 
     use super::*;
 
@@ -1380,6 +1392,29 @@ mod tests {
     }
 
     #[test]
+    fn set_epoch_command() {
+        let mut session = Session::new(SessionSettings::default());
+        let initial_epoch = session.handle_command("::get_epoch");
+        // initial epoch is 2.05
+        assert_eq!(initial_epoch.1[0], "Current epoch: 2.05");
+
+        // it can be lowered to 2.0
+        // it's possible that in the feature we want to start from 2.0 and forbid lowering the epoch
+        // this test would have to be updated
+        session.handle_command("::set_epoch 2.0");
+        let current_epoch = session.handle_command("::get_epoch");
+        assert_eq!(current_epoch.1[0], "Current epoch: 2.0");
+
+        session.handle_command("::set_epoch 2.4");
+        let current_epoch = session.handle_command("::get_epoch");
+        assert_eq!(current_epoch.1[0], "Current epoch: 2.4");
+
+        session.handle_command("::set_epoch 3.0");
+        let current_epoch = session.handle_command("::get_epoch");
+        assert_eq!(current_epoch.1[0], "Current epoch: 3.0");
+    }
+
+    #[test]
     fn encode_error() {
         let mut session = Session::new(SessionSettings::default());
         let mut output: Vec<String> = Vec::new();
@@ -1443,18 +1478,43 @@ mod tests {
     fn clarity_epoch_mismatch() {
         let settings = SessionSettings::default();
         let mut session = Session::new(settings);
-        session.start().expect("session could not start");
         let snippet = "(define-data-var x uint u0)";
+
+        // can not use ClarityContractBuilder to build an invalid contract
         let contract = ClarityContract {
             code_source: ClarityCodeSource::ContractInMemory(snippet.to_string()),
             name: "should_error".to_string(),
             deployer: ContractDeployer::Address("ST000000000000000000002AMW42H".into()),
             clarity_version: ClarityVersion::Clarity2,
-            epoch: StacksEpochId::Epoch20,
+            epoch: StacksEpochId::Epoch2_05,
         };
 
         let result = session.deploy_contract(&contract, None, false, None, &mut None);
         assert!(result.is_err(), "Expected error for clarity mismatch");
+    }
+
+    #[test]
+    fn deploy_contract_with_wrong_epoch() {
+        let settings = SessionSettings::default();
+        let mut session = Session::new(settings);
+
+        session.update_epoch(StacksEpochId::Epoch24);
+
+        let snippet = "(define-data-var x uint u0)";
+        let contract = ClarityContractBuilder::new()
+            .code_source(snippet.into())
+            .epoch(StacksEpochId::Epoch25)
+            .clarity_version(ClarityVersion::Clarity2)
+            .build();
+
+        let result = session.deploy_contract(&contract, None, false, None, &mut None);
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.len() == 1);
+        assert_eq!(
+            err.first().unwrap().message,
+            "contract epoch (2.5) does not match current epoch (2.4)"
+        );
     }
 
     #[test]
@@ -1467,13 +1527,13 @@ mod tests {
         let mut session = Session::new(settings);
         session.start().expect("session could not start");
 
+        session.handle_command("::set_epoch 2.5");
+
         // setup contract state
         let snippet = "
             (define-data-var x uint u0)
-
             (define-read-only (get-x)
                 (var-get x))
-
             (define-public (incr)
                 (begin
                     (var-set x (+ (var-get x) u1))
@@ -1483,8 +1543,8 @@ mod tests {
             code_source: ClarityCodeSource::ContractInMemory(snippet.to_string()),
             name: "contract".to_string(),
             deployer: ContractDeployer::Address("ST000000000000000000002AMW42H".into()),
-            clarity_version: ClarityVersion::Clarity1,
-            epoch: repl::DEFAULT_EPOCH,
+            clarity_version: ClarityVersion::Clarity2,
+            epoch: StacksEpochId::Epoch25,
         };
 
         let _ = session.deploy_contract(&contract, None, false, None, &mut None);
