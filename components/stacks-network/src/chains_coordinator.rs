@@ -355,7 +355,8 @@ pub async fn start_chains_coordinator(
                             if let Some(deployment_commands_tx) = deployment_commands_tx.take() {
                                 deployment_commands_tx
                                     .send(DeploymentCommand::Start)
-                                    .expect("unable to trigger deployment");
+                                    .map_err(|e| format!("unable to start deployment: {}", e))
+                                    .unwrap();
                             }
                         }
                     }
