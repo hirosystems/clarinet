@@ -1199,7 +1199,7 @@ mod tests {
     };
     use clarity::{
         types::{chainstate::StacksAddress, Address},
-        vm::{self, ClarityVersion},
+        vm::{self, types::TupleData, ClarityVersion},
     };
 
     #[track_caller]
@@ -1218,6 +1218,36 @@ mod tests {
         let result = interpreter.execute(contract, &mut ast, analysis, false, None);
         assert!(result.is_ok());
         result
+    }
+
+    #[track_caller]
+    fn call_fn_and_assert_value(
+        interpreter: &mut ClarityInterpreter,
+        contract_id: &QualifiedContractIdentifier,
+        method: &str,
+        raw_args: &[Vec<u8>],
+        epoch: StacksEpochId,
+        clarity_version: ClarityVersion,
+        expected_value: Value,
+    ) {
+        let result = interpreter.call_contract_fn(
+            contract_id,
+            method,
+            raw_args,
+            epoch,
+            clarity_version,
+            false,
+            true,
+            None,
+        );
+
+        assert!(result.is_ok());
+        let result = result.unwrap();
+        let result = match result.result {
+            EvaluationResult::Contract(_) => unreachable!(),
+            EvaluationResult::Snippet(res) => res,
+        };
+        assert_eq!(result.result, expected_value);
     }
 
     #[test]
@@ -1684,6 +1714,199 @@ mod tests {
 
             assert!(res.diagnostics.is_empty());
         }
+    }
+
+    #[test]
+    fn block_height_support_in_clarity2_epoch2() {
+        let mut interpreter =
+            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+
+        let snippet = [
+            "(define-read-only (get-height)",
+            "  { block-height: block-height }",
+            ")",
+            "(define-read-only (get-info (h uint))",
+            "  { time: (get-block-info? time h) }",
+            ")",
+        ]
+        .join("\n");
+        let contract = ClarityContractBuilder::new()
+            .code_source(snippet)
+            .epoch(StacksEpochId::Epoch25)
+            .clarity_version(ClarityVersion::Clarity2)
+            .build();
+
+        let deploy = deploy_contract(&mut interpreter, &contract);
+        assert!(deploy.is_ok());
+
+        let contract_id =
+            contract.expect_resolved_contract_identifier(Some(&StandardPrincipalData::transient()));
+
+        call_fn_and_assert_value(
+            &mut interpreter,
+            &contract_id,
+            "get-height",
+            &[],
+            StacksEpochId::Epoch25,
+            ClarityVersion::Clarity2,
+            Value::Tuple(
+                TupleData::from_data(vec![("block-height".into(), Value::UInt(0))]).unwrap(),
+            ),
+        );
+
+        interpreter.advance_chain_tip(10);
+
+        call_fn_and_assert_value(
+            &mut interpreter,
+            &contract_id,
+            "get-height",
+            &[],
+            StacksEpochId::Epoch25,
+            ClarityVersion::Clarity2,
+            Value::Tuple(
+                TupleData::from_data(vec![("block-height".into(), Value::UInt(10))]).unwrap(),
+            ),
+        );
+
+        let call_contract = ClarityContractBuilder::default()
+            .code_source("(contract-call? .contract get-info u1)".into())
+            .epoch(StacksEpochId::Epoch25)
+            .clarity_version(ClarityVersion::Clarity2)
+            .build();
+        assert!(interpreter
+            .run(&call_contract, &mut None, false, None)
+            .is_ok());
+    }
+
+    #[test]
+    fn block_height_support_in_clarity2_epoch3() {
+        let mut interpreter =
+            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+
+        interpreter.advance_chain_tip(1);
+
+        let snippet = [
+            "(define-read-only (get-height)",
+            "  { block-height: block-height }",
+            ")",
+            "(define-read-only (get-info (h uint))",
+            "  { time: (get-block-info? time h) }",
+            ")",
+        ]
+        .join("\n");
+        let contract = ClarityContractBuilder::new()
+            .code_source(snippet)
+            .epoch(StacksEpochId::Epoch30)
+            .clarity_version(ClarityVersion::Clarity2)
+            .build();
+
+        let deploy_result = deploy_contract(&mut interpreter, &contract);
+        assert!(deploy_result.is_ok());
+
+        let contract_id =
+            contract.expect_resolved_contract_identifier(Some(&StandardPrincipalData::transient()));
+
+        call_fn_and_assert_value(
+            &mut interpreter,
+            &contract_id,
+            "get-height",
+            &[],
+            StacksEpochId::Epoch30,
+            ClarityVersion::Clarity2,
+            Value::Tuple(
+                TupleData::from_data(vec![("block-height".into(), Value::UInt(1))]).unwrap(),
+            ),
+        );
+
+        let call_contract = ClarityContractBuilder::default()
+            .code_source("(contract-call? .contract get-info u1)".into())
+            .epoch(StacksEpochId::Epoch30)
+            .clarity_version(ClarityVersion::Clarity3)
+            .build();
+        assert!(interpreter
+            .run(&call_contract, &mut None, false, None)
+            .is_ok());
+    }
+
+    #[test]
+    fn block_height_support_in_clarity3_epoch3() {
+        let mut interpreter =
+            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+
+        interpreter.advance_chain_tip(1);
+
+        let snippet = [
+            "(define-read-only (get-height)",
+            "  {",
+            "    stacks-block-height: stacks-block-height,",
+            "    tenure-height: tenure-height,",
+            "  }",
+            ")",
+            "(define-read-only (get-info (h uint))",
+            "  {",
+            "    stacks-time: (get-stacks-block-info? time h),",
+            "    stacks-id-header-hash: (get-stacks-block-info? id-header-hash h),",
+            "    stacks-header-hash: (get-stacks-block-info? header-hash h),",
+            "    tenure-time: (get-tenure-info? time h),",
+            "    tenure-miner-address: (get-tenure-info? miner-address h),",
+            "  }",
+            ")",
+        ]
+        .join("\n");
+        let contract = ClarityContractBuilder::new()
+            .code_source(snippet)
+            .epoch(StacksEpochId::Epoch30)
+            .clarity_version(ClarityVersion::Clarity3)
+            .build();
+
+        let deploy_result = deploy_contract(&mut interpreter, &contract);
+        assert!(deploy_result.is_ok());
+
+        let contract_id =
+            contract.expect_resolved_contract_identifier(Some(&StandardPrincipalData::transient()));
+
+        call_fn_and_assert_value(
+            &mut interpreter,
+            &contract_id,
+            "get-height",
+            &[],
+            StacksEpochId::Epoch30,
+            ClarityVersion::Clarity3,
+            Value::Tuple(
+                TupleData::from_data(vec![
+                    ("stacks-block-height".into(), Value::UInt(1)),
+                    ("tenure-height".into(), Value::UInt(1)),
+                ])
+                .unwrap(),
+            ),
+        );
+
+        interpreter.advance_chain_tip(10);
+
+        call_fn_and_assert_value(
+            &mut interpreter,
+            &contract_id,
+            "get-height",
+            &[],
+            StacksEpochId::Epoch30,
+            ClarityVersion::Clarity3,
+            Value::Tuple(
+                TupleData::from_data(vec![
+                    ("stacks-block-height".into(), Value::UInt(11)),
+                    ("tenure-height".into(), Value::UInt(11)),
+                ])
+                .unwrap(),
+            ),
+        );
+
+        let call_contract = ClarityContractBuilder::default()
+            .code_source("(contract-call? .contract get-info u1)".into())
+            .epoch(StacksEpochId::Epoch30)
+            .clarity_version(ClarityVersion::Clarity3)
+            .build();
+        assert!(interpreter
+            .run(&call_contract, &mut None, false, None)
+            .is_ok());
     }
 
     #[test]
