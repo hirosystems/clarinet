@@ -3,6 +3,7 @@ use super::clarity_values::uint8_to_string;
 use super::diagnostic::output_diagnostic;
 use super::{ClarityCodeSource, ClarityContract, ClarityInterpreter, ContractDeployer};
 use crate::analysis::coverage::TestCoverageReport;
+use crate::repl::clarity_values::value_to_string;
 use crate::repl::Settings;
 use crate::utils;
 use clarity::codec::StacksMessageCodec;
@@ -1027,7 +1028,7 @@ impl Session {
             Ok(value) => value,
             Err(e) => return output.push(red!(format!("{}", e))),
         };
-        output.push(green!(format!("{}", crate::utils::value_to_string(&value))));
+        output.push(green!(format!("{}", value_to_string(&value))));
     }
 
     pub fn get_costs(&mut self, output: &mut Vec<String>, cmd: &str) {
@@ -1452,7 +1453,7 @@ mod tests {
             "::decode 0x0c00000002036261720403666f6f0d0000000568656c6c6f",
         );
         assert_eq!(output.len(), 1);
-        assert_eq!(output[0], green!("{bar: false, foo: \"hello\"}"));
+        assert_eq!(output[0], green!("{ bar: false, foo: \"hello\" }"));
     }
 
     #[test]
