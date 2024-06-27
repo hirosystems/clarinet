@@ -1328,16 +1328,6 @@ mod tests {
 
     use super::*;
 
-    #[track_caller]
-    fn eval_and_assert(session: &mut Session, snippet: String, expected_value: Value) {
-        let result = session.eval(snippet.to_string(), None, false).unwrap();
-        let result = match result.result {
-            EvaluationResult::Contract(_) => unreachable!(),
-            EvaluationResult::Snippet(res) => res,
-        };
-        assert_eq!(result.result, expected_value);
-    }
-
     #[test]
     fn initial_accounts() {
         let address = "ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5";
