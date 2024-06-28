@@ -5,6 +5,7 @@
   "version": 1,
   "networks": {
     "regtest": {
+      "include_outputs": true,
       "if_this": {
         "scope": "outputs",
         "p2pkh": {
