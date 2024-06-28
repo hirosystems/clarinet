@@ -1,3 +1,26 @@
+# [2.7.0](https://github.com/hirosystems/clarinet/compare/v2.6.0...v2.7.0) (2024-06-28)
+
+##### New Features
+
+*  Update Clarity (#1484) (33654709)
+*  Support clarity 3 (#1465) (2c92bef3)
+*  Create git attributes in projects (#1446) (b08df158)
+
+##### Bug Fixes
+
+*  Print error if deployment start fails (#1487) (fe8f96e7)
+*  Set tenure height on epoch change if great or equal than 3.0 (#1482) (e59b1f38)
+*  Better new project name handling (#1481) (6ce3af58)
+*  Prevent panic in trace (#1467) (343a01ae)
+*  Block height increment in sdk mine_block (#1466) (156058c5)
+*  Add a safety check in lsp check_if_should_wrap (#1459) (9c4bfdb7)
+*  Upgrade rustline and fix escape characters in cli (da11c99c)
+*  Add options to enable or disable costs and coverage reports in sdk (#1441) (fd761e44)
+
+##### Refactors
+
+*  Fix clippy warnings (#1438) (584a7223)
+
 # [2.6.0](https://github.com/hirosystems/clarinet/compare/v2.5.1...v2.6.0) (2024-04-22)
 
 ##### New Features
