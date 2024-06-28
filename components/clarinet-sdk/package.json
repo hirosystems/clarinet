@@ -1,6 +1,6 @@
 {
   "name": "@hirosystems/clarinet-sdk",
-  "version": "2.6.0",
+  "version": "2.7.0",
   "description": "A SDK to interact with Clarity Smart Contracts",
   "homepage": "https://docs.hiro.so/clarinet/feature-guides/clarinet-js-sdk",
   "repository": {
@@ -58,7 +58,7 @@
   "license": "GPL-3.0",
   "readme": "./README.md",
   "dependencies": {
-    "@hirosystems/clarinet-sdk-wasm": "^2.6.0",
+    "@hirosystems/clarinet-sdk-wasm": "^2.7.0",
     "@stacks/encryption": "^6.13.0",
     "@stacks/network": "^6.13.0",
     "@stacks/stacking": "^6.13.0",
