@@ -16,22 +16,14 @@ Start a local Devnet with the command:
 clarinet devnet start
 ```
 
-In another console, change the directory to `./serverless/`. After running
+In another console, change the directory to `./serverless/` and run
 
 ```bash
-cd serverless
-yarn global add serverless    # Install serverless globally
-yarn add --dev serverless-plugin-typescript@latest
 yarn                          # Install dependencies
+yarn start                    # Run the offline server
 ```
 
-and making sure that the command `serverless` is available in your `$PATH`, the lambda functions can be started locally with the following command:
-
-```bash
-serverless offline --verbose
-```
-
-Once the message `Protocol deployed` appears on the screen, transfers tokens back and forth between the Bitcoin Blockchain and the Stacks Blockchain can be performed
+Once the message `Server ready: http://localhost:3000 🚀` appears on the screen, transfers tokens back and forth between the Bitcoin Blockchain and the Stacks Blockchain can be performed
 thanks to the deployment plans:
 
 - `deployments/wrap-btc.devnet-plan.yaml`: a BTC transaction is being performed, using the following parameters:
