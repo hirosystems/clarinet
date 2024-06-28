@@ -111,7 +111,7 @@ bitcoin_controller_block_time = 30_000
 [[devnet.pox_stacking_orders]]
 start_at_cycle = 3
 duration = 12
-wallet = "wallet_1"
+wallet = "wallet_4"
 slots = 2
 btc_address = "mr1iPkD9N3RJZZxXRk7xF9d36gffa6exNC"
 
