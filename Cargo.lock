@@ -676,8 +676,8 @@ checksum = "fd16c4719339c4530435d38e511904438d07cce7950afa3718a84ac36c10e89e"
 
 [[package]]
 name = "chainhook-sdk"
-version = "0.12.8"
-source = "git+https://github.com/hirosystems/chainhook.git?branch=feat/update-pox-default-settings#ec6fa6ec1ed020fc24be56be1671f3aed3bdd54c"
+version = "0.12.10"
+source = "git+https://github.com/hirosystems/chainhook.git#bb2c99d94ec5f4a4143aeba12af51cfb8c56ad7e"
 dependencies = [
  "base58 0.2.0",
  "base64 0.21.7",
@@ -703,15 +703,15 @@ dependencies = [
  "serde-hex",
  "serde_derive",
  "serde_json",
- "stacks-codec",
+ "stacks-codec 2.4.1",
  "threadpool",
  "tokio",
 ]
 
 [[package]]
 name = "chainhook-types"
-version = "1.3.7"
-source = "git+https://github.com/hirosystems/chainhook.git?branch=feat/update-pox-default-settings#ec6fa6ec1ed020fc24be56be1671f3aed3bdd54c"
+version = "1.3.6"
+source = "git+https://github.com/hirosystems/chainhook.git#bb2c99d94ec5f4a4143aeba12af51cfb8c56ad7e"
 dependencies = [
  "hex",
  "schemars",
@@ -807,7 +807,7 @@ dependencies = [
  "regex",
  "rusqlite",
  "sha2 0.10.8",
- "stacks-common",
+ "stacks-common 0.0.2",
  "walrus",
  "wasmtime",
  "wat",
@@ -891,7 +891,7 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "serde_yaml",
- "stacks-codec",
+ "stacks-codec 2.6.0",
  "stacks-rpc-client",
  "tiny-hderive",
 ]
@@ -967,7 +967,7 @@ dependencies = [
  "serde_stacker",
  "sha2-asm 0.5.5",
  "slog",
- "stacks-common",
+ "stacks-common 0.0.2",
  "wasmtime",
 ]
 
@@ -1038,6 +1038,29 @@ dependencies = [
  "tokio-util",
  "wasm-bindgen",
  "wasm-bindgen-futures",
+]
+
+[[package]]
+name = "clarity-vm"
+version = "2.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0af203c4eea9bb753ff2798c3bcf9f3fd8ea7a24bde7222d96f82fd9beb6d165"
+dependencies = [
+ "hashbrown 0.14.3",
+ "integer-sqrt",
+ "lazy_static",
+ "rand 0.8.5",
+ "rand_chacha 0.3.1",
+ "regex",
+ "rusqlite",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "serde_stacker",
+ "sha2-asm 0.5.5",
+ "slog",
+ "stacks-common 0.0.3",
+ "wasmtime",
 ]
 
 [[package]]
@@ -2871,7 +2894,7 @@ dependencies = [
  "serde_derive",
  "serde_stacker",
  "sha2 0.10.8",
- "stacks-common",
+ "stacks-common 0.0.2",
 ]
 
 [[package]]
@@ -3598,7 +3621,7 @@ source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clar
 dependencies = [
  "clarity",
  "slog",
- "stacks-common",
+ "stacks-common 0.0.2",
 ]
 
 [[package]]
@@ -4872,6 +4895,17 @@ dependencies = [
 
 [[package]]
 name = "stacks-codec"
+version = "2.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9d5791855bf9de767f55042f1a034a2575373c6433b0965f1efac14e7215f71b"
+dependencies = [
+ "clarity-vm",
+ "serde",
+ "wsts 8.1.0",
+]
+
+[[package]]
+name = "stacks-codec"
 version = "2.6.0"
 dependencies = [
  "clarity",
@@ -4909,6 +4943,37 @@ dependencies = [
  "time",
  "winapi 0.3.9",
  "wsts 9.0.0",
+]
+
+[[package]]
+name = "stacks-common"
+version = "0.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c78cb37406e4b6a269f0b6aa0ee222922c9d30c263a43af7e005169e20edf12b"
+dependencies = [
+ "chrono",
+ "curve25519-dalek 2.0.0",
+ "ed25519-dalek",
+ "hashbrown 0.14.3",
+ "lazy_static",
+ "libc",
+ "nix 0.23.2",
+ "percent-encoding",
+ "rand 0.8.5",
+ "ripemd",
+ "rusqlite",
+ "secp256k1 0.24.3",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "sha2 0.10.8",
+ "sha3",
+ "slog",
+ "slog-json",
+ "slog-term",
+ "time",
+ "winapi 0.3.9",
+ "wsts 8.1.0",
 ]
 
 [[package]]
@@ -4957,7 +5022,7 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "serde_yaml",
- "stacks-codec",
+ "stacks-codec 2.6.0",
  "stacks-rpc-client",
  "stackslib",
  "tokio",
@@ -4978,7 +5043,7 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "sha2 0.10.8",
- "stacks-codec",
+ "stacks-codec 2.6.0",
  "tiny-hderive",
 ]
 
@@ -5016,7 +5081,7 @@ dependencies = [
  "siphasher",
  "slog",
  "slog-term",
- "stacks-common",
+ "stacks-common 0.0.2",
  "tikv-jemallocator",
  "time",
  "url",
