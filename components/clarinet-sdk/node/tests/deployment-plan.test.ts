@@ -4,7 +4,7 @@ import { describe, expect, it, beforeEach, afterEach } from "vitest";
 
 // test the built package and not the source code
 // makes it simpler to handle wasm build
-import { initSimnet } from "../dist/esm";
+import { initSimnet } from "..";
 import { Cl } from "@stacks/transactions";
 
 const nbOfBootContracts = 24;

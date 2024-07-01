@@ -20,18 +20,14 @@ use clarity::vm::variables::NativeVariables;
 use clarity::vm::{
     ClarityVersion, CostSynthesis, EvalHook, EvaluationResult, ExecutionResult, ParsedContract,
 };
+use colored::*;
+use prettytable::{Cell, Row, Table};
 use std::collections::{BTreeMap, HashMap};
 use std::fmt;
 use std::num::ParseIntError;
 
 #[cfg(feature = "cli")]
-use ansi_term::Colour;
-#[cfg(feature = "cli")]
 use clarity::vm::analysis::ContractAnalysis;
-#[cfg(feature = "cli")]
-use prettytable::{Cell, Row, Table};
-#[cfg(feature = "cli")]
-use reqwest;
 
 use super::SessionSettings;
 
@@ -99,6 +95,7 @@ pub struct CostsReport {
 #[derive(Clone, Debug)]
 pub struct Session {
     pub settings: SessionSettings,
+    pub current_epoch: StacksEpochId,
     pub contracts: BTreeMap<QualifiedContractIdentifier, ParsedContract>,
     pub interpreter: ClarityInterpreter,
     api_reference: HashMap<String, String>,
@@ -106,12 +103,11 @@ pub struct Session {
     pub costs_reports: Vec<CostsReport>,
     pub show_costs: bool,
     pub executed: Vec<String>,
-    pub current_epoch: StacksEpochId,
     keywords_reference: HashMap<String, String>,
 }
 
 impl Session {
-    pub fn new(settings: SessionSettings) -> Session {
+    pub fn new(settings: SessionSettings) -> Self {
         let tx_sender = {
             let address = match settings.initial_deployer {
                 Some(ref entry) => entry.address.clone(),
@@ -121,8 +117,9 @@ impl Session {
                 .expect("Unable to parse deployer's address")
         };
 
-        Session {
+        Self {
             interpreter: ClarityInterpreter::new(tx_sender, settings.repl_settings.clone()),
+            current_epoch: settings.epoch_id.unwrap_or(StacksEpochId::Epoch2_05),
             contracts: BTreeMap::new(),
             api_reference: build_api_reference(),
             coverage_reports: vec![],
@@ -130,7 +127,6 @@ impl Session {
             show_costs: false,
             settings,
             executed: Vec::new(),
-            current_epoch: StacksEpochId::Epoch2_05,
             keywords_reference: clarity_keywords(),
         }
     }
@@ -187,7 +183,7 @@ impl Session {
     }
 
     #[cfg(feature = "cli")]
-    pub fn handle_command(
+    pub fn process_console_input(
         &mut self,
         command: &str,
     ) -> (
@@ -199,49 +195,62 @@ impl Session {
 
         let mut reload = false;
         match command {
-            "::help" => self.display_help(&mut output),
-            "/-/" => self.easter_egg(&mut output),
-            cmd if cmd.starts_with("::functions") => self.display_functions(&mut output),
-            cmd if cmd.starts_with("::describe") => self.display_doc(&mut output, cmd),
-            cmd if cmd.starts_with("::mint_stx") => self.mint_stx(&mut output, cmd),
-            cmd if cmd.starts_with("::set_tx_sender") => {
-                self.parse_and_set_tx_sender(&mut output, cmd)
-            }
-            cmd if cmd.starts_with("::get_assets_maps") => self.get_accounts(&mut output),
-            cmd if cmd.starts_with("::get_costs") => self.get_costs(&mut output, cmd),
-            cmd if cmd.starts_with("::get_contracts") => self.get_contracts(&mut output),
-            cmd if cmd.starts_with("::get_block_height") => self.get_block_height(&mut output),
-            cmd if cmd.starts_with("::advance_chain_tip") => {
-                self.parse_and_advance_chain_tip(&mut output, cmd)
-            }
-            cmd if cmd.starts_with("::toggle_costs") => self.toggle_costs(&mut output),
-            cmd if cmd.starts_with("::toggle_timings") => self.toggle_timings(&mut output),
-            cmd if cmd.starts_with("::get_epoch") => self.get_epoch(&mut output),
-            cmd if cmd.starts_with("::set_epoch") => self.set_epoch(&mut output, cmd),
-            cmd if cmd.starts_with("::encode") => self.encode(&mut output, cmd),
-            cmd if cmd.starts_with("::decode") => self.decode(&mut output, cmd),
-
+            #[cfg(feature = "cli")]
+            cmd if cmd.starts_with("::reload") => reload = true,
+            #[cfg(feature = "cli")]
+            cmd if cmd.starts_with("::read") => self.read(&mut output, cmd),
             #[cfg(feature = "cli")]
             cmd if cmd.starts_with("::debug") => self.debug(&mut output, cmd),
             #[cfg(feature = "cli")]
             cmd if cmd.starts_with("::trace") => self.trace(&mut output, cmd),
             #[cfg(feature = "cli")]
-            cmd if cmd.starts_with("::reload") => reload = true,
-            #[cfg(feature = "cli")]
-            cmd if cmd.starts_with("::read") => self.read(&mut output, cmd),
-            cmd if cmd.starts_with("::keywords") => self.keywords(&mut output),
+            cmd if cmd.starts_with("::get_costs") => self.get_costs(&mut output, cmd),
 
             cmd if cmd.starts_with("::") => {
-                output.push(yellow!(format!("Unknown command: {}", cmd)));
+                output.push(self.handle_command(cmd));
             }
 
             snippet => {
                 let execution_result = self.run_snippet(&mut output, self.show_costs, snippet);
-                return (false, output, execution_result);
+                return (false, output, Some(execution_result));
             }
         }
 
         (reload, output, None)
+    }
+
+    pub fn handle_command(&mut self, command: &str) -> String {
+        match command {
+            "::help" => self.display_help(),
+
+            #[cfg(feature = "cli")]
+            cmd if cmd.starts_with("::functions") => self.display_functions(),
+            #[cfg(feature = "cli")]
+            cmd if cmd.starts_with("::keywords") => self.keywords(),
+            #[cfg(feature = "cli")]
+            cmd if cmd.starts_with("::describe") => self.display_doc(cmd),
+            #[cfg(feature = "cli")]
+            cmd if cmd.starts_with("::toggle_costs") => self.toggle_costs(),
+            #[cfg(feature = "cli")]
+            cmd if cmd.starts_with("::toggle_timings") => self.toggle_timings(),
+
+            cmd if cmd.starts_with("::mint_stx") => self.mint_stx(cmd),
+            cmd if cmd.starts_with("::set_tx_sender") => self.parse_and_set_tx_sender(cmd),
+            cmd if cmd.starts_with("::get_assets_maps") => {
+                self.get_accounts().unwrap_or("No account found".into())
+            }
+            cmd if cmd.starts_with("::get_contracts") => {
+                self.get_contracts().unwrap_or("No contract found".into())
+            }
+            cmd if cmd.starts_with("::get_block_height") => self.get_block_height(),
+            cmd if cmd.starts_with("::advance_chain_tip") => self.parse_and_advance_chain_tip(cmd),
+            cmd if cmd.starts_with("::get_epoch") => self.get_epoch(),
+            cmd if cmd.starts_with("::set_epoch") => self.set_epoch(cmd),
+            cmd if cmd.starts_with("::encode") => self.encode(cmd),
+            cmd if cmd.starts_with("::decode") => self.decode(cmd),
+
+            _ => "Invalid command. Try `::help`".yellow().to_string(),
+        }
     }
 
     #[cfg(feature = "cli")]
@@ -250,7 +259,7 @@ impl Session {
         output: &mut Vec<String>,
         cost_track: bool,
         cmd: &str,
-    ) -> Option<Result<ExecutionResult, Vec<Diagnostic>>> {
+    ) -> Result<ExecutionResult, Vec<Diagnostic>> {
         let (mut result, cost, execution_result) = match self.formatted_interpretation(
             cmd.to_string(),
             None,
@@ -262,9 +271,9 @@ impl Session {
                     let snippet = format!("→ .{} contract successfully stored. Use (contract-call? ...) for invoking the public functions:", contract_result.contract.contract_identifier.clone());
                     output.push(green!(snippet));
                 };
-                (output, result.cost.clone(), Some(Ok(result)))
+                (output, result.cost.clone(), Ok(result))
             }
-            Err((err_output, diagnostics)) => (err_output, None, Some(Err(diagnostics))),
+            Err((err_output, diagnostics)) => (err_output, None, Err(diagnostics)),
         };
 
         if let Some(cost) = cost {
@@ -365,11 +374,11 @@ impl Session {
                 match &result.result {
                     EvaluationResult::Contract(contract_result) => {
                         if let Some(value) = &contract_result.result {
-                            output.push(green!(format!("{}", value)));
+                            output.push(format!("{}", value).green().to_string());
                         }
                     }
                     EvaluationResult::Snippet(snippet_result) => {
-                        output.push(green!(format!("{}", snippet_result.result)))
+                        output.push(format!("{}", snippet_result.result).green().to_string())
                     }
                 }
                 Ok((output, result))
@@ -389,7 +398,7 @@ impl Session {
 
         let snippet = match cmd.split_once(' ') {
             Some((_, snippet)) => snippet,
-            _ => return output.push(red!("Usage: ::debug <expr>")),
+            _ => return output.push("Usage: ::debug <expr>".red().to_string()),
         };
 
         let mut debugger = CLIDebugger::new(&QualifiedContractIdentifier::transient(), snippet);
@@ -403,7 +412,7 @@ impl Session {
             Ok((mut output, result)) => {
                 if let EvaluationResult::Contract(contract_result) = result.result {
                     let snippet = format!("→ .{} contract successfully stored. Use (contract-call? ...) for invoking the public functions:", contract_result.contract.contract_identifier.clone());
-                    output.push(green!(snippet));
+                    output.push(snippet.green().to_string());
                 };
                 output
             }
@@ -418,7 +427,7 @@ impl Session {
 
         let snippet = match cmd.split_once(' ') {
             Some((_, snippet)) => snippet,
-            _ => return output.push(red!("Usage: ::trace <expr>")),
+            _ => return output.push("Usage: ::trace <expr>".red().to_string()),
         };
 
         let mut tracer = Tracer::new(snippet.to_string());
@@ -451,7 +460,7 @@ impl Session {
                 let recipient = match PrincipalData::parse(&account.address) {
                     Ok(recipient) => recipient,
                     _ => {
-                        output_err.push(red!("Unable to parse address to credit"));
+                        output_err.push("Unable to parse address to credit".red().to_string());
                         continue;
                     }
                 };
@@ -461,7 +470,7 @@ impl Session {
                     .mint_stx_balance(recipient, account.balance)
                 {
                     Ok(_) => {}
-                    Err(err) => output_err.push(red!(err)),
+                    Err(err) => output_err.push(err.red().to_string()),
                 };
             }
         }
@@ -476,14 +485,18 @@ impl Session {
     pub fn read(&mut self, output: &mut Vec<String>, cmd: &str) {
         let filename = match cmd.split_once(' ') {
             Some((_, filename)) => filename,
-            _ => return output.push(red!("Usage: ::read <filename>")),
+            _ => return output.push("Usage: ::read <filename>".red().to_string()),
         };
 
         match std::fs::read_to_string(filename) {
             Ok(snippet) => {
-                self.run_snippet(output, self.show_costs, &snippet);
+                let _ = self.run_snippet(output, self.show_costs, &snippet);
             }
-            Err(err) => output.push(red!(format!("unable to read {}: {}", filename, err))),
+            Err(err) => output.push(
+                format!("unable to read {}: {}", filename, err)
+                    .red()
+                    .to_string(),
+            ),
         };
     }
 
@@ -592,18 +605,18 @@ impl Session {
             clarity_version: ClarityVersion::default_for_epoch(self.current_epoch),
         };
 
-        self.set_tx_sender(sender.into());
+        self.set_tx_sender(sender);
         let execution = match self
             .interpreter
             .run(&contract_call, &mut None, true, Some(hooks))
         {
             Ok(result) => result,
             Err(e) => {
-                self.set_tx_sender(initial_tx_sender);
+                self.set_tx_sender(&initial_tx_sender);
                 return Err(e);
             }
         };
-        self.set_tx_sender(initial_tx_sender);
+        self.set_tx_sender(&initial_tx_sender);
         self.coverage_reports.push(coverage);
 
         let contract_identifier = QualifiedContractIdentifier::parse(&contract_id).unwrap();
@@ -648,7 +661,7 @@ impl Session {
 
         let clarity_version = ClarityVersion::default_for_epoch(self.current_epoch);
 
-        self.set_tx_sender(sender.into());
+        self.set_tx_sender(sender);
         let execution = match self.interpreter.call_contract_fn(
             &contract_id,
             method,
@@ -661,7 +674,7 @@ impl Session {
         ) {
             Ok(result) => result,
             Err(e) => {
-                self.set_tx_sender(initial_tx_sender);
+                self.set_tx_sender(&initial_tx_sender);
                 return Err(vec![Diagnostic {
                     level: Level::Error,
                     message: format!("Error calling contract function: {e}"),
@@ -670,7 +683,7 @@ impl Session {
                 }]);
             }
         };
-        self.set_tx_sender(initial_tx_sender);
+        self.set_tx_sender(&initial_tx_sender);
 
         if track_coverage {
             self.coverage_reports.push(coverage);
@@ -751,156 +764,152 @@ impl Session {
         keys
     }
 
-    #[cfg(feature = "cli")]
-    fn display_help(&self, output: &mut Vec<String>) {
-        let help_colour = Colour::Yellow;
+    fn display_help(&self) -> String {
+        let mut output: Vec<String> = vec![];
+
+        #[cfg(feature = "cli")]
         output.push(format!(
             "{}",
-            help_colour.paint("::help\t\t\t\t\tDisplay help")
+            "::functions\t\t\t\tDisplay all the native functions available in clarity".yellow()
+        ));
+        #[cfg(feature = "cli")]
+        output.push(format!(
+            "{}",
+            "::keywords\t\t\t\tDisplay all the native keywords available in clarity".yellow()
+        ));
+        #[cfg(feature = "cli")]
+        output.push(format!(
+            "{}",
+                "::describe <function> | <keyword>\tDisplay documentation for a given native function or keyword".yellow()
+        ));
+        #[cfg(feature = "cli")]
+        output.push(format!(
+            "{}",
+            "::toggle_costs\t\t\t\tDisplay cost analysis after every expression".yellow()
+        ));
+        #[cfg(feature = "cli")]
+        output.push(format!(
+            "{}",
+            "::toggle_timings\t\t\tDisplay the execution duration".yellow()
+        ));
+
+        output.push(format!(
+            "{}",
+            "::mint_stx <principal> <amount>\t\tMint STX balance for a given principal".yellow()
         ));
         output.push(format!(
             "{}",
-            help_colour
-                .paint("::functions\t\t\t\tDisplay all the native functions available in clarity")
+            "::set_tx_sender <principal>\t\tSet tx-sender variable to principal".yellow()
         ));
         output.push(format!(
             "{}",
-            help_colour
-                .paint("::keywords\t\t\t\tDisplay all the native keywords available in clarity")
+            "::get_assets_maps\t\t\tGet assets maps for active accounts".yellow()
         ));
         output.push(format!(
             "{}",
-            help_colour.paint(
-                "::describe <function> | <keyword>\tDisplay documentation for a given native function or keyword"
-            )
+            "::get_contracts\t\t\t\tGet contracts".yellow()
         ));
         output.push(format!(
             "{}",
-            help_colour
-                .paint("::mint_stx <principal> <amount>\t\tMint STX balance for a given principal")
+            "::get_block_height\t\t\tGet current block height".yellow()
         ));
         output.push(format!(
             "{}",
-            help_colour.paint("::set_tx_sender <principal>\t\tSet tx-sender variable to principal")
+            "::advance_chain_tip <count>\t\tSimulate mining of <count> blocks".yellow()
         ));
         output.push(format!(
             "{}",
-            help_colour.paint("::get_assets_maps\t\t\tGet assets maps for active accounts")
+            "::set_epoch <epoch>\t\t\tUpdate the current epoch".yellow()
         ));
         output.push(format!(
             "{}",
-            help_colour.paint("::get_costs <expr>\t\t\tDisplay the cost analysis")
+            "::get_epoch\t\t\t\tGet current epoch".yellow()
+        ));
+
+        #[cfg(feature = "cli")]
+        output.push(format!(
+            "{}",
+            "::debug <expr>\t\t\t\tStart an interactive debug session executing <expr>".yellow()
+        ));
+        #[cfg(feature = "cli")]
+        output.push(format!(
+            "{}",
+            "::trace <expr>\t\t\t\tGenerate an execution trace for <expr>".yellow()
+        ));
+        #[cfg(feature = "cli")]
+        output.push(format!(
+            "{}",
+            "::get_costs <expr>\t\t\tDisplay the cost analysis".yellow()
+        ));
+        #[cfg(feature = "cli")]
+        output.push(format!(
+            "{}",
+            "::reload \t\t\t\tReload the existing contract(s) in the session".yellow()
+        ));
+        #[cfg(feature = "cli")]
+        output.push(format!(
+            "{}",
+            "::read <filename>\t\t\tRead expressions from a file".yellow()
+        ));
+
+        output.push(format!(
+            "{}",
+            "::encode <expr>\t\t\t\tEncode an expression to a Clarity Value bytes representation"
+                .yellow()
         ));
         output.push(format!(
             "{}",
-            help_colour.paint("::get_contracts\t\t\t\tGet contracts")
+            "::decode <bytes>\t\t\tDecode a Clarity Value bytes representation".yellow()
         ));
-        output.push(format!(
-            "{}",
-            help_colour.paint("::get_block_height\t\t\tGet current block height")
-        ));
-        output.push(format!(
-            "{}",
-            help_colour.paint("::advance_chain_tip <count>\t\tSimulate mining of <count> blocks")
-        ));
-        output.push(format!(
-            "{}",
-            help_colour.paint("::set_epoch <2.0> | <2.05> | <2.1>\tUpdate the current epoch")
-        ));
-        output.push(format!(
-            "{}",
-            help_colour.paint("::get_epoch\t\t\t\tGet current epoch")
-        ));
-        output.push(format!(
-            "{}",
-            help_colour.paint("::toggle_costs\t\t\t\tDisplay cost analysis after every expression")
-        ));
-        output.push(format!(
-            "{}",
-            help_colour
-                .paint("::debug <expr>\t\t\t\tStart an interactive debug session executing <expr>")
-        ));
-        output.push(format!(
-            "{}",
-            help_colour.paint("::trace <expr>\t\t\t\tGenerate an execution trace for <expr>")
-        ));
-        output.push(format!(
-            "{}",
-            help_colour.paint("::reload \t\t\t\tReload the existing contract(s) in the session")
-        ));
-        output.push(format!(
-            "{}",
-            help_colour.paint("::read <filename>\t\t\tRead expressions from a file")
-        ));
-        output.push(format!(
-            "{}",
-            help_colour.paint("::encode <expr>\t\t\t\tEncode an expression to a Clarity Value bytes representation")
-        ));
-        output.push(format!(
-            "{}",
-            help_colour.paint("::decode <bytes>\t\t\tDecode a Clarity Value bytes representation")
-        ));
+
+        output.join("\n")
     }
 
-    #[cfg(feature = "cli")]
-    fn easter_egg(&self, _output: &mut [String]) {
-        let result = hiro_system_kit::nestable_block_on(fetch_message());
-        let message = result.unwrap_or("You found it!".to_string());
-        println!("{}", message);
-    }
-
-    #[cfg(feature = "cli")]
-    fn parse_and_advance_chain_tip(&mut self, output: &mut Vec<String>, command: &str) {
+    fn parse_and_advance_chain_tip(&mut self, command: &str) -> String {
         let args: Vec<_> = command.split(' ').collect();
 
         if args.len() != 2 {
-            output.push(red!("Usage: ::advance_chain_tip <count>"));
-            return;
+            return format!("{}", "Usage: ::advance_chain_tip <count>".red());
         }
 
         let count = match args[1].parse::<u32>() {
             Ok(count) => count,
             _ => {
-                output.push(red!("Unable to parse count"));
-                return;
+                return format!("{}", "Unable to parse count".red());
             }
         };
 
         let new_height = self.advance_chain_tip(count);
-        output.push(green!(format!(
-            "{} blocks simulated, new height: {}",
-            count, new_height
-        )));
+        format!("{} blocks simulated, new height: {}", count, new_height)
+            .green()
+            .to_string()
     }
 
     pub fn advance_chain_tip(&mut self, count: u32) -> u32 {
         self.interpreter.advance_chain_tip(count)
     }
 
-    #[cfg(feature = "cli")]
-    fn parse_and_set_tx_sender(&mut self, output: &mut Vec<String>, command: &str) {
+    fn parse_and_set_tx_sender(&mut self, command: &str) -> String {
         let args: Vec<_> = command.split(' ').collect();
 
         if args.len() != 2 {
-            output.push(red!("Usage: ::set_tx_sender <address>"));
-            return;
+            return format!("{}", "Usage: ::set_tx_sender <address>".red());
         }
 
-        let tx_sender = match PrincipalData::parse_standard_principal(args[1]) {
-            Ok(address) => address,
-            _ => {
-                output.push(red!("Unable to parse the address"));
-                return;
-            }
-        };
+        let tx_sender = args[1];
 
-        self.set_tx_sender(tx_sender.to_address());
-        output.push(green!(format!("tx-sender switched to {}", tx_sender)));
+        match PrincipalData::parse_standard_principal(args[1]) {
+            Ok(address) => {
+                self.interpreter.set_tx_sender(address);
+                format!("tx-sender switched to {}", tx_sender)
+            }
+            _ => format!("{}", "Unable to parse the address".red()),
+        }
     }
 
-    pub fn set_tx_sender(&mut self, address: String) {
+    pub fn set_tx_sender(&mut self, address: &str) {
         let tx_sender =
-            PrincipalData::parse_standard_principal(&address).expect("Unable to parse address");
+            PrincipalData::parse_standard_principal(address).expect("Unable to parse address");
         self.interpreter.set_tx_sender(tx_sender)
     }
 
@@ -908,13 +917,11 @@ impl Session {
         self.interpreter.get_tx_sender().to_address()
     }
 
-    #[cfg(feature = "cli")]
-    fn get_block_height(&mut self, output: &mut Vec<String>) {
+    fn get_block_height(&mut self) -> String {
         let height = self.interpreter.get_block_height();
-        output.push(green!(format!("Current height: {}", height)));
+        format!("Current height: {}", height)
     }
 
-    #[cfg(feature = "cli")]
     fn get_account_name(&self, address: &String) -> Option<&String> {
         for account in self.settings.initial_accounts.iter() {
             if &account.address == address {
@@ -928,24 +935,26 @@ impl Session {
         self.interpreter.get_assets_maps()
     }
 
-    pub fn toggle_costs(&mut self, output: &mut Vec<String>) {
+    pub fn toggle_costs(&mut self) -> String {
         self.show_costs = !self.show_costs;
-        output.push(green!(format!("Always show costs: {}", self.show_costs)))
+        format!("Always show costs: {}", self.show_costs)
     }
 
-    pub fn toggle_timings(&mut self, output: &mut Vec<String>) {
+    pub fn toggle_timings(&mut self) -> String {
         self.interpreter.repl_settings.show_timings = !self.interpreter.repl_settings.show_timings;
-        output.push(green!(format!(
+        format!(
             "Always show timings: {}",
             self.interpreter.repl_settings.show_timings
-        )))
+        )
+        .green()
+        .to_string()
     }
 
-    pub fn get_epoch(&mut self, output: &mut Vec<String>) {
-        output.push(format!("Current epoch: {}", self.current_epoch))
+    pub fn get_epoch(&mut self) -> String {
+        format!("Current epoch: {}", self.current_epoch)
     }
 
-    pub fn set_epoch(&mut self, output: &mut Vec<String>, cmd: &str) {
+    pub fn set_epoch(&mut self, cmd: &str) -> String {
         let epoch = match cmd.split_once(' ').map(|(_, epoch)| epoch) {
             Some("2.0") => StacksEpochId::Epoch20,
             Some("2.05") => StacksEpochId::Epoch2_05,
@@ -956,13 +965,13 @@ impl Session {
             Some("2.5") => StacksEpochId::Epoch25,
             Some("3.0") => StacksEpochId::Epoch30,
             _ => {
-                return output.push(red!(
-                    "Usage: ::set_epoch 2.0 | 2.05 | 2.1 | 2.2 | 2.3 | 2.4 | 2.5 | 3.0"
-                ))
+                return "Usage: ::set_epoch 2.0 | 2.05 | 2.1 | 2.2 | 2.3 | 2.4 | 2.5 | 3.0"
+                    .red()
+                    .to_string()
             }
         };
         self.update_epoch(epoch);
-        output.push(green!(format!("Epoch updated to: {epoch}")));
+        format!("Epoch updated to: {epoch}").green().to_string()
     }
 
     pub fn update_epoch(&mut self, epoch: StacksEpochId) {
@@ -973,14 +982,14 @@ impl Session {
         }
     }
 
-    pub fn encode(&mut self, output: &mut Vec<String>, cmd: &str) {
+    pub fn encode(&mut self, cmd: &str) -> String {
         let snippet = match cmd.split_once(' ') {
             Some((_, snippet)) => snippet,
-            _ => return output.push(red!("Usage: ::encode <expr>")),
+            _ => return "Usage: ::encode <expr>".red().to_string(),
         };
 
         let result = self.eval(snippet.to_string(), None, false);
-        let value = match result {
+        match result {
             Ok(result) => {
                 let mut tx_bytes = vec![];
                 let value = match result.result {
@@ -988,215 +997,182 @@ impl Session {
                         if let Some(value) = contract_result.result {
                             value
                         } else {
-                            return output.push("No value".to_string());
+                            return "No value".to_string();
                         }
                     }
                     EvaluationResult::Snippet(snippet_result) => snippet_result.result,
                 };
                 if let Err(e) = value.consensus_serialize(&mut tx_bytes) {
-                    return output.push(red!(format!("{}", e)));
+                    return format!("{}", e).red().to_string();
                 };
                 let mut s = String::with_capacity(2 * tx_bytes.len());
                 for byte in tx_bytes {
                     s = format!("{}{:02x}", s, byte);
                 }
-                green!(s)
+                s.green().to_string()
             }
             Err(diagnostics) => {
                 let lines: Vec<String> = snippet.split('\n').map(|s| s.to_string()).collect();
-                for d in diagnostics {
-                    output.append(&mut output_diagnostic(&d, "encode", &lines));
-                }
-                red!("encoding failed")
+                let mut output: Vec<String> = diagnostics
+                    .iter()
+                    .flat_map(|d| output_diagnostic(d, "encode", &lines))
+                    .collect();
+                output.push("encoding failed".into());
+                output.join("\n")
             }
-        };
-        output.push(value);
+        }
     }
 
-    pub fn decode(&mut self, output: &mut Vec<String>, cmd: &str) {
+    pub fn decode(&mut self, cmd: &str) -> String {
         let byte_string = match cmd.split_once(' ') {
             Some((_, bytes)) => bytes,
-            _ => return output.push(red!("Usage: ::decode <hex-bytes>")),
+            _ => return "Usage: ::decode <hex-bytes>".red().to_string(),
         };
         let tx_bytes = match decode_hex(byte_string) {
             Ok(tx_bytes) => tx_bytes,
-            Err(e) => return output.push(red!(format!("Parsing error: {}", e))),
+            Err(e) => return format!("Parsing error: {}", e).red().to_string(),
         };
 
         let value = match Value::consensus_deserialize(&mut &tx_bytes[..]) {
             Ok(value) => value,
-            Err(e) => return output.push(red!(format!("{}", e))),
+            Err(e) => return format!("{}", e).red().to_string(),
         };
-        output.push(green!(format!("{}", crate::utils::value_to_string(&value))));
+
+        format!("{}", crate::utils::value_to_string(&value).green())
     }
 
+    #[cfg(feature = "cli")]
     pub fn get_costs(&mut self, output: &mut Vec<String>, cmd: &str) {
         let expr = match cmd.split_once(' ') {
             Some((_, expr)) => expr,
-            _ => return output.push(red!("Usage: ::get_costs <expr>")),
+            _ => return output.push("Usage: ::get_costs <expr>".red().to_string()),
         };
 
-        self.run_snippet(output, true, expr);
+        let _ = self.run_snippet(output, true, expr);
     }
 
-    #[cfg(feature = "cli")]
-    fn get_accounts(&self, output: &mut Vec<String>) {
+    pub fn get_accounts(&self) -> Option<String> {
         let accounts = self.interpreter.get_accounts();
-        if !accounts.is_empty() {
-            let tokens = self.interpreter.get_tokens();
-            let mut headers = vec!["Address".to_string()];
+        if accounts.is_empty() {
+            return None;
+        }
+
+        let tokens = self.interpreter.get_tokens();
+        let mut headers = vec!["Address".to_string()];
+        for token in tokens.iter() {
+            if token == "STX" {
+                headers.push(String::from("uSTX"));
+            } else {
+                headers.push(String::from(token));
+            }
+        }
+
+        let mut headers_cells = vec![];
+        for header in headers.iter() {
+            headers_cells.push(Cell::new(header));
+        }
+        let mut table = Table::new();
+        table.add_row(Row::new(headers_cells));
+        for account in accounts.iter() {
+            let mut cells = vec![];
+
+            if let Some(name) = self.get_account_name(account) {
+                cells.push(Cell::new(&format!("{} ({})", account, name)));
+            } else {
+                cells.push(Cell::new(account));
+            }
+
             for token in tokens.iter() {
-                if token == "STX" {
-                    headers.push(String::from("uSTX"));
-                } else {
-                    headers.push(String::from(token));
-                }
+                let balance = self.interpreter.get_balance_for_account(account, token);
+                cells.push(Cell::new(&format!("{}", balance)));
             }
-
-            let mut headers_cells = vec![];
-            for header in headers.iter() {
-                headers_cells.push(Cell::new(header));
-            }
-            let mut table = Table::new();
-            table.add_row(Row::new(headers_cells));
-            for account in accounts.iter() {
-                let mut cells = vec![];
-
-                if let Some(name) = self.get_account_name(account) {
-                    cells.push(Cell::new(&format!("{} ({})", account, name)));
-                } else {
-                    cells.push(Cell::new(account));
-                }
-
-                for token in tokens.iter() {
-                    let balance = self.interpreter.get_balance_for_account(account, token);
-                    cells.push(Cell::new(&format!("{}", balance)));
-                }
-                table.add_row(Row::new(cells));
-            }
-            output.push(format!("{}", table));
+            table.add_row(Row::new(cells));
         }
+        Some(format!("{}", table))
     }
 
     #[cfg(feature = "cli")]
-    fn get_contracts(&self, output: &mut Vec<String>) {
-        if !self.contracts.is_empty() {
-            let mut table = Table::new();
-            table.add_row(row!["Contract identifier", "Public functions"]);
-            let contracts = self.contracts.clone();
-            for (contract_id, contract) in contracts.iter() {
-                let contract_id_str = contract_id.to_string();
-                if !contract_id_str.starts_with(BOOT_TESTNET_ADDRESS)
-                    && !contract_id_str.starts_with(BOOT_MAINNET_ADDRESS)
-                {
-                    let mut formatted_methods = vec![];
-                    for (method_name, method_args) in contract.function_args.iter() {
-                        let formatted_args = if method_args.is_empty() {
-                            String::new()
-                        } else if method_args.len() == 1 {
-                            format!(" {}", method_args.join(" "))
-                        } else {
-                            format!("\n    {}", method_args.join("\n    "))
-                        };
-                        formatted_methods.push(format!("({}{})", method_name, formatted_args));
-                    }
-                    let formatted_spec = formatted_methods.join("\n").to_string();
-                    table.add_row(Row::new(vec![
-                        Cell::new(&contract_id_str),
-                        Cell::new(&formatted_spec),
-                    ]));
-                }
-            }
-            output.push(format!("{}", table));
+    pub fn get_contracts(&self) -> Option<String> {
+        if self.contracts.is_empty() {
+            return None;
         }
-    }
 
-    #[cfg(not(feature = "cli"))]
-    fn run_snippet(&mut self, output: &mut Vec<String>, cost_track: bool, cmd: &str) {
-        let (mut result, cost) =
-            match self.formatted_interpretation(cmd.to_string(), None, cost_track, None) {
-                Ok((output, result)) => (output, result.cost.clone()),
-                Err((output, _)) => (output, None),
-            };
-
-        if let Some(cost) = cost {
-            output.push(format!(
-                "Execution: {:?}\nLimit: {:?}",
-                cost.total, cost.limit
-            ));
-        }
-        output.append(&mut result);
-    }
-
-    #[cfg(not(feature = "cli"))]
-    fn get_accounts(&self, output: &mut Vec<String>) {
-        if !self.settings.initial_accounts.is_empty() {
-            let mut initial_accounts = self.settings.initial_accounts.clone();
-            for account in initial_accounts.drain(..) {
-                output.push(format!(
-                    "{}: {} ({})",
-                    account.address, account.balance, account.name
-                ));
-            }
-        }
-    }
-
-    #[cfg(not(feature = "cli"))]
-    fn get_contracts(&self, output: &mut Vec<String>) {
-        for (contract_id, _methods) in self.contracts.iter() {
-            if !contract_id.to_string().ends_with(".pox")
-                && !contract_id.to_string().ends_with(".bns")
-                && !contract_id.to_string().ends_with(".costs")
+        let mut table = Table::new();
+        table.add_row(row!["Contract identifier", "Public functions"]);
+        let contracts = self.contracts.clone();
+        for (contract_id, contract) in contracts.iter() {
+            let contract_id_str = contract_id.to_string();
+            if !contract_id_str.starts_with(BOOT_TESTNET_ADDRESS)
+                && !contract_id_str.starts_with(BOOT_MAINNET_ADDRESS)
             {
-                output.push(contract_id.to_string());
+                let mut formatted_methods = vec![];
+                for (method_name, method_args) in contract.function_args.iter() {
+                    let formatted_args = if method_args.is_empty() {
+                        String::new()
+                    } else if method_args.len() == 1 {
+                        format!(" {}", method_args.join(" "))
+                    } else {
+                        format!("\n    {}", method_args.join("\n    "))
+                    };
+                    formatted_methods.push(format!("({}{})", method_name, formatted_args));
+                }
+                let formatted_spec = formatted_methods.join("\n").to_string();
+                table.add_row(Row::new(vec![
+                    Cell::new(&contract_id_str),
+                    Cell::new(&formatted_spec),
+                ]));
             }
         }
+        Some(format!("{}", table))
     }
 
-    #[cfg(feature = "cli")]
-    fn mint_stx(&mut self, output: &mut Vec<String>, command: &str) {
+    #[cfg(not(feature = "cli"))]
+    fn get_contracts(&self) -> Option<String> {
+        if self.contracts.is_empty() {
+            return None;
+        }
+        Some(
+            self.contracts
+                .keys()
+                .map(|contract_id| contract_id.to_string())
+                .collect::<Vec<String>>()
+                .join("\n"),
+        )
+    }
+
+    fn mint_stx(&mut self, command: &str) -> String {
         let args: Vec<_> = command.split(' ').collect();
 
         if args.len() != 3 {
-            output.push(red!("Usage: ::mint_stx <recipient address> <amount>"));
-            return;
+            return "Usage: ::mint_stx <recipient address> <amount>"
+                .red()
+                .to_string();
         }
 
         let recipient = match PrincipalData::parse(args[1]) {
             Ok(address) => address,
-            _ => {
-                output.push(red!("Unable to parse the address"));
-                return;
-            }
+            _ => return "Unable to parse the address".red().to_string(),
         };
 
         let amount: u64 = match args[2].parse() {
             Ok(recipient) => recipient,
-            _ => {
-                output.push(red!("Unable to parse the balance"));
-                return;
-            }
+            _ => return "Unable to parse the balance".red().to_string(),
         };
 
         match self.interpreter.mint_stx_balance(recipient, amount) {
-            Ok(msg) => output.push(green!(msg)),
-            Err(err) => output.push(red!(err)),
-        };
+            Ok(msg) => msg.green().to_string(),
+            Err(err) => err.red().to_string(),
+        }
     }
 
     #[cfg(feature = "cli")]
-    fn display_functions(&self, output: &mut Vec<String>) {
-        let help_colour = Colour::Yellow;
+    fn display_functions(&self) -> String {
         let api_reference_index = self.get_api_reference_index();
-        output.push(format!(
-            "{}",
-            help_colour.paint(api_reference_index.join("\n"))
-        ));
+        format!("{}", api_reference_index.join("\n").yellow())
     }
 
     #[cfg(feature = "cli")]
-    fn display_doc(&self, output: &mut Vec<String>, command: &str) {
-        let help_colour = Colour::Yellow;
+    fn display_doc(&self, command: &str) -> String {
         let keyword = {
             let mut s = command.to_string();
             s = s.replace("::describe", "");
@@ -1204,28 +1180,19 @@ impl Session {
             s
         };
 
-        let result = match self.lookup_functions_or_keywords_docs(&keyword) {
-            Some(doc) => format!("{}", help_colour.paint(doc)),
+        match self.lookup_functions_or_keywords_docs(&keyword) {
+            Some(doc) => format!("{}", doc.yellow()),
             None => format!(
                 "{}",
-                Colour::Red.paint("It looks like there aren't matches for your search")
+                "It looks like there aren't matches for your search".red()
             ),
-        };
-        output.push(result);
-    }
-
-    pub fn display_digest(&self) -> Result<String, String> {
-        let mut output = vec![];
-        self.get_contracts(&mut output);
-        self.get_accounts(&mut output);
-        Ok(output.join("\n"))
+        }
     }
 
     #[cfg(feature = "cli")]
-    fn keywords(&self, output: &mut Vec<String>) {
-        let help_colour = Colour::Yellow;
+    fn keywords(&self) -> String {
         let keywords = self.get_clarity_keywords();
-        output.push(format!("{}", help_colour.paint(keywords.join("\n"))));
+        format!("{}", keywords.join("\n").yellow())
     }
 }
 
@@ -1347,21 +1314,22 @@ mod tests {
     #[test]
     fn encode_simple() {
         let mut session = Session::new(SessionSettings::default());
-        let mut output: Vec<String> = Vec::new();
-        session.encode(&mut output, "::encode 42");
-        assert_eq!(output.len(), 1);
-        assert_eq!(output[0], green!("000000000000000000000000000000002a"));
+        let result = session.encode("::encode 42");
+        assert_eq!(
+            result,
+            "000000000000000000000000000000002a".green().to_string()
+        );
     }
 
     #[test]
     fn encode_map() {
         let mut session = Session::new(SessionSettings::default());
-        let mut output: Vec<String> = Vec::new();
-        session.encode(&mut output, "::encode { foo: \"hello\", bar: false }");
-        assert_eq!(output.len(), 1);
+        let result = session.encode("::encode { foo: \"hello\", bar: false }");
         assert_eq!(
-            output[0],
-            green!("0c00000002036261720403666f6f0d0000000568656c6c6f")
+            result,
+            "0c00000002036261720403666f6f0d0000000568656c6c6f"
+                .green()
+                .to_string()
         );
     }
 
@@ -1396,40 +1364,39 @@ mod tests {
         let mut session = Session::new(SessionSettings::default());
         let initial_epoch = session.handle_command("::get_epoch");
         // initial epoch is 2.05
-        assert_eq!(initial_epoch.1[0], "Current epoch: 2.05");
+        assert_eq!(initial_epoch, "Current epoch: 2.05");
 
         // it can be lowered to 2.0
         // it's possible that in the feature we want to start from 2.0 and forbid lowering the epoch
         // this test would have to be updated
         session.handle_command("::set_epoch 2.0");
         let current_epoch = session.handle_command("::get_epoch");
-        assert_eq!(current_epoch.1[0], "Current epoch: 2.0");
+        assert_eq!(current_epoch, "Current epoch: 2.0");
 
         session.handle_command("::set_epoch 2.4");
         let current_epoch = session.handle_command("::get_epoch");
-        assert_eq!(current_epoch.1[0], "Current epoch: 2.4");
+        assert_eq!(current_epoch, "Current epoch: 2.4");
 
         session.handle_command("::set_epoch 3.0");
         let current_epoch = session.handle_command("::get_epoch");
-        assert_eq!(current_epoch.1[0], "Current epoch: 3.0");
+        assert_eq!(current_epoch, "Current epoch: 3.0");
     }
 
     #[test]
     fn encode_error() {
         let mut session = Session::new(SessionSettings::default());
-        let mut output: Vec<String> = Vec::new();
-        session.encode(&mut output, "::encode { foo false }");
+        let result = session.encode("::encode { foo false }");
         assert_eq!(
-            output[0],
-            format_err!("Tuple literal construction expects a colon at index 1")
+            result,
+            format_err!("Tuple literal construction expects a colon at index 1\nencoding failed")
         );
 
-        session.encode(&mut output, "::encode (foo 1)");
+        let result = session.encode("::encode (foo 1)");
         assert_eq!(
-            output[2],
+            result.split('\n').next().unwrap(),
             format!(
                 "encode:1:1: {} use of unresolved function 'foo'",
-                red!("error:")
+                "error:".red()
             )
         );
     }
@@ -1437,40 +1404,35 @@ mod tests {
     #[test]
     fn decode_simple() {
         let mut session = Session::new(SessionSettings::default());
-        let mut output: Vec<String> = Vec::new();
-        session.decode(&mut output, "::decode 0000000000000000 0000000000000000 2a");
-        assert_eq!(output.len(), 1);
-        assert_eq!(output[0], green!("42"));
+
+        let result = session.decode("::decode 0000000000000000 0000000000000000 2a");
+        assert_eq!(result, "42".green().to_string());
     }
 
     #[test]
     fn decode_map() {
         let mut session = Session::new(SessionSettings::default());
-        let mut output: Vec<String> = Vec::new();
-        session.decode(
-            &mut output,
-            "::decode 0x0c00000002036261720403666f6f0d0000000568656c6c6f",
-        );
-        assert_eq!(output.len(), 1);
-        assert_eq!(output[0], green!("{bar: false, foo: \"hello\"}"));
+        let result = session.decode("::decode 0x0c00000002036261720403666f6f0d0000000568656c6c6f");
+        assert_eq!(result, "{bar: false, foo: \"hello\"}".green().to_string());
     }
 
     #[test]
     fn decode_error() {
         let mut session = Session::new(SessionSettings::default());
-        let mut output: Vec<String> = Vec::new();
-        session.decode(&mut output, "::decode 42");
-        assert_eq!(output.len(), 1);
+        let result = session.decode("::decode 42");
         assert_eq!(
-            output[0],
-            red!("Failed to decode clarity value: DeserializationError(\"Bad type prefix\")")
+            result,
+            "Failed to decode clarity value: DeserializationError(\"Bad type prefix\")"
+                .red()
+                .to_string()
         );
 
-        session.decode(&mut output, "::decode 4g");
-        assert_eq!(output.len(), 2);
+        let result = session.decode("::decode 4g");
         assert_eq!(
-            output[1],
-            red!("Parsing error: invalid digit found in string")
+            result,
+            "Parsing error: invalid digit found in string"
+                .red()
+                .to_string()
         );
     }
 
@@ -1551,23 +1513,29 @@ mod tests {
 
         // assert data-var is set to 0
         assert_eq!(
-            session.handle_command("(contract-call? .contract get-x)").1[0],
-            green!("u0")
+            session
+                .process_console_input("(contract-call? .contract get-x)")
+                .1[0],
+            "u0".green().to_string()
         );
 
         // advance chain tip and test at-block
         session.advance_chain_tip(10000);
         assert_eq!(
-            session.handle_command("(contract-call? .contract get-x)").1[0],
-            green!("u0")
+            session
+                .process_console_input("(contract-call? .contract get-x)")
+                .1[0],
+            "u0".green().to_string()
         );
-        session.handle_command("(contract-call? .contract incr)");
+        session.process_console_input("(contract-call? .contract incr)");
         assert_eq!(
-            session.handle_command("(contract-call? .contract get-x)").1[0],
-            green!("u1")
+            session
+                .process_console_input("(contract-call? .contract get-x)")
+                .1[0],
+            "u1".green().to_string()
         );
-        assert_eq!(session.handle_command("(at-block (unwrap-panic (get-block-info? id-header-hash u0)) (contract-call? .contract get-x))").1[0], green!("u0"));
-        assert_eq!(session.handle_command("(at-block (unwrap-panic (get-block-info? id-header-hash u5000)) (contract-call? .contract get-x))").1[0], green!("u0"));
+        assert_eq!(session.process_console_input("(at-block (unwrap-panic (get-block-info? id-header-hash u0)) (contract-call? .contract get-x))").1[0], "u0".green().to_string());
+        assert_eq!(session.process_console_input("(at-block (unwrap-panic (get-block-info? id-header-hash u5000)) (contract-call? .contract get-x))").1[0], "u0".green().to_string());
 
         // advance chain tip again and test at-block
         // do this twice to make sure that the lookup table is being updated properly
@@ -1575,22 +1543,18 @@ mod tests {
         session.advance_chain_tip(10);
 
         assert_eq!(
-            session.handle_command("(contract-call? .contract get-x)").1[0],
-            green!("u1")
+            session
+                .process_console_input("(contract-call? .contract get-x)")
+                .1[0],
+            "u1".green().to_string()
         );
-        session.handle_command("(contract-call? .contract incr)");
+        session.process_console_input("(contract-call? .contract incr)");
         assert_eq!(
-            session.handle_command("(contract-call? .contract get-x)").1[0],
-            green!("u2")
+            session
+                .process_console_input("(contract-call? .contract get-x)")
+                .1[0],
+            "u2".green().to_string()
         );
-        assert_eq!(session.handle_command("(at-block (unwrap-panic (get-block-info? id-header-hash u10000)) (contract-call? .contract get-x))").1[0], green!("u1"));
+        assert_eq!(session.process_console_input("(at-block (unwrap-panic (get-block-info? id-header-hash u10000)) (contract-call? .contract get-x))").1[0], "u1".green().to_string());
     }
-}
-
-#[cfg(not(feature = "wasm"))]
-async fn fetch_message() -> Result<String, reqwest::Error> {
-    let gist: &str = "https://storage.googleapis.com/hiro-public/assets/clarinet-egg.txt";
-    let response = reqwest::get(gist).await?;
-    let message = response.text().await?;
-    Ok(message)
 }

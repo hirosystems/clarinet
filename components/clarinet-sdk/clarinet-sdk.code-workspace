@@ -1,8 +1,6 @@
 {
   "folders": [{ "path": "../../" }],
   "settings": {
-    "rust-analyzer.cargo.noDefaultFeatures": true,
-    "rust-analyzer.cargo.features": ["clarinet-sdk-wasm/wasm"],
     "rust-analyzer.check.overrideCommand": [
       "cargo",
       "clippy",
@@ -10,7 +8,7 @@
       "--package=clarinet-sdk-wasm",
       "--features=wasm",
       "--target=wasm32-unknown-unknown",
-      "--message-format=json"
-    ]
-  }
+      "--message-format=json",
+    ],
+  },
 }
