@@ -198,6 +198,16 @@ pub fn update_session_with_contracts_executions(
                     session.set_tx_sender(default_tx_sender);
                 }
                 TransactionSpecification::EmulatedContractCall(tx) => {
+                    // let _ = session.call_contract_fn(
+                    //     &tx.contract_id.to_string(),
+                    //     &tx.method.to_string(),
+                    //     &tx.parameters,
+                    //     &tx.emulated_sender.to_string(),
+                    //     true,
+                    //     false,
+                    //     false,
+                    //     "deployment".to_string(),
+                    // );
                     let _ = session.invoke_contract_call(
                         &tx.contract_id.to_string(),
                         &tx.method.to_string(),
