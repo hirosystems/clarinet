@@ -112,7 +112,7 @@ fn update_session_with_genesis_accounts(
                 wallet.balance.try_into().unwrap(),
             );
             if wallet.name == "deployer" {
-                session.set_tx_sender(wallet.address.to_address());
+                session.set_tx_sender(&wallet.address.to_string());
             }
         }
     }
@@ -186,11 +186,11 @@ pub fn update_session_with_deployment_plan(
 
 fn handle_stx_transfer(session: &mut Session, tx: &StxTransferSpecification) {
     let default_tx_sender = session.get_tx_sender();
-    session.set_tx_sender(tx.expected_sender.to_string());
+    session.set_tx_sender(&tx.expected_sender.to_string());
 
     let _ = session.stx_transfer(tx.mstx_amount, &tx.recipient.to_string());
 
-    session.set_tx_sender(default_tx_sender);
+    session.set_tx_sender(&default_tx_sender);
 }
 
 fn handle_emulated_contract_publish(
@@ -201,7 +201,7 @@ fn handle_emulated_contract_publish(
     code_coverage_enabled: bool,
 ) -> Result<ExecutionResult, Vec<Diagnostic>> {
     let default_tx_sender = session.get_tx_sender();
-    session.set_tx_sender(tx.emulated_sender.to_string());
+    session.set_tx_sender(&tx.emulated_sender.to_string());
 
     let contract = ClarityContract {
         code_source: ClarityCodeSource::ContractInMemory(tx.source.clone()),
@@ -217,7 +217,7 @@ fn handle_emulated_contract_publish(
     };
     let result = session.deploy_contract(&contract, None, false, test_name, contract_ast);
 
-    session.set_tx_sender(default_tx_sender);
+    session.set_tx_sender(&default_tx_sender);
     result
 }
 
@@ -236,7 +236,7 @@ fn handle_emulated_contract_call(
     tx: &EmulatedContractCallSpecification,
 ) -> Result<ExecutionResult, Vec<Diagnostic>> {
     let default_tx_sender = session.get_tx_sender();
-    session.set_tx_sender(tx.emulated_sender.to_string());
+    session.set_tx_sender(&tx.emulated_sender.to_string());
 
     let params: Vec<SymbolicExpression> = tx
         .parameters
@@ -257,7 +257,7 @@ fn handle_emulated_contract_call(
         println!("error: {:?}", errors.first().unwrap().message);
     }
 
-    session.set_tx_sender(default_tx_sender);
+    session.set_tx_sender(&default_tx_sender);
     result
 }
 

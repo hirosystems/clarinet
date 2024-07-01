@@ -2,6 +2,7 @@ use std::convert::TryInto;
 
 use crate::analysis;
 use clarity::types::chainstate::StacksAddress;
+use clarity::types::StacksEpochId;
 use clarity::vm::types::{PrincipalData, QualifiedContractIdentifier, StandardPrincipalData};
 
 #[derive(Clone, Debug)]
@@ -49,6 +50,7 @@ pub struct SessionSettings {
     pub lazy_initial_contracts_interpretation: bool,
     pub disk_cache_enabled: bool,
     pub repl_settings: Settings,
+    pub epoch_id: Option<StacksEpochId>,
 }
 
 #[derive(Debug, Default, Clone, Deserialize, Serialize)]

@@ -1,72 +1,17 @@
 {
-  "name": "@hirosystems/clarinet-sdk",
-  "version": "2.7.0",
-  "description": "A SDK to interact with Clarity Smart Contracts",
-  "homepage": "https://docs.hiro.so/clarinet/feature-guides/clarinet-js-sdk",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/hirosystems/clarinet"
-  },
-  "engines": {
-    "node": ">=18.0.0"
-  },
-  "files": [
-    "dist",
-    "templates",
-    "vitest-helpers/src"
-  ],
-  "main": "dist/cjs/index.js",
-  "module": "dist/esm/index.js",
-  "types": "./dist/esm/index.d.ts",
-  "exports": {
-    ".": {
-      "import": {
-        "types": "./dist/esm/index.d.ts",
-        "default": "./dist/esm/index.js"
-      },
-      "require": {
-        "types": "./dist/cjs/index.d.ts",
-        "default": "./dist/cjs/index.js"
-      }
-    },
-    "./vitest": {
-      "import": {
-        "types": "./dist/esm/vitest/index.d.ts",
-        "default": "./dist/esm/vitest/index.js"
-      },
-      "require": {
-        "types": "./dist/cjs/vitest/index.d.ts",
-        "default": "./dist/cjs/vitest/index.js"
-      }
-    }
-  },
-  "bin": "./dist/cjs/bin/index.js",
-  "scripts": {
-    "clean": "rimraf dist",
-    "compile": "tsc -b ./tsconfig.json ./tsconfig.cjs.json",
-    "build": "npm run clean; npm run compile; node ./scripts/prepare-esm-package.js",
-    "prepare": "npm run build",
-    "test": "vitest run"
-  },
-  "keywords": [
-    "stacks",
-    "clarity",
-    "clarinet",
-    "tests"
+  "name": "clarinet-sdk-workpace",
+  "description": "Workspace hosting the Clarinet SDK for Node.js and Browser",
+  "private": "true",
+  "version": "",
+  "workspaces": [
+    "common",
+    "node",
+    "browser"
   ],
   "author": "hirosystems",
   "license": "GPL-3.0",
-  "readme": "./README.md",
-  "dependencies": {
-    "@hirosystems/clarinet-sdk-wasm": "^2.7.0",
-    "@stacks/encryption": "^6.13.0",
-    "@stacks/network": "^6.13.0",
-    "@stacks/stacking": "^6.13.0",
-    "@stacks/transactions": "^6.13.0",
-    "kolorist": "^1.8.0",
-    "prompts": "^2.4.2",
-    "vitest": "^1.0.4",
-    "yargs": "^17.7.2"
+  "scripts": {
+    "test": "npm test --workspaces --if-present"
   },
   "devDependencies": {
     "@types/node": "^20.4.5",

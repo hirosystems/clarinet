@@ -1,0 +1,34 @@
+{
+  "name": "@hirosystems/clarinet-sdk-browser",
+  "version": "2.8.0-beta1",
+  "description": "A SDK to interact with Clarity Smart Contracts in the browser",
+  "homepage": "https://docs.hiro.so/clarinet/feature-guides/clarinet-js-sdk",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hirosystems/clarinet.git"
+  },
+  "files": [
+    "dist"
+  ],
+  "module": "./dist/esm/browser/src/index.js",
+  "types": "./dist/esm/browser/src/index.d.ts",
+  "scripts": {
+    "clean": "rimraf dist",
+    "compile": "tsc -b ./tsconfig.json",
+    "build": "npm run clean; npm run compile",
+    "prepare": "npm run build"
+  },
+  "keywords": [
+    "stacks",
+    "clarity",
+    "clarinet",
+    "tests"
+  ],
+  "author": "hirosystems",
+  "license": "GPL-3.0",
+  "readme": "./README.md",
+  "dependencies": {
+    "@hirosystems/clarinet-sdk-wasm-browser": "2.8.0-beta1",
+    "@stacks/transactions": "^6.13.0"
+  }
+}

@@ -106,14 +106,13 @@ impl Terminal {
         println!("{}", black!("Enter \"::help\" for usage hints."));
         println!("{}", black!("Connected to a transient in-memory database."));
 
-        let output = match self.session.display_digest() {
-            Ok(output) => output,
-            Err(e) => {
-                println!("{}", e);
-                std::process::exit(1);
-            }
-        };
-        println!("{}", output);
+        if let Some(contracts) = self.session.get_contracts() {
+            println!("{contracts}");
+        }
+        if let Some(accounts) = self.session.get_accounts() {
+            println!("{accounts}");
+        }
+
         let mut editor = DefaultEditor::new().expect("Failed to initialize cli");
         let mut ctrl_c_acc = 0;
         let mut input_buffer = vec![];
@@ -131,10 +130,12 @@ impl Terminal {
                     let input = input_buffer.join(" ");
                     match complete_input(&input) {
                         Ok(Input::Complete()) => {
-                            let (reload, output, result) = self.session.handle_command(&input);
+                            let (reload, output, result) =
+                                self.session.process_console_input(&input);
 
                             if let Some(session_wasm) = &mut self.session_wasm {
-                                let (_, _, result_wasm) = session_wasm.handle_command(&input);
+                                let (_, _, result_wasm) =
+                                    session_wasm.process_console_input(&input);
 
                                 if let (Some(result), Some(result_wasm)) = (result, result_wasm) {
                                     match (result, result_wasm) {
