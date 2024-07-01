@@ -14,12 +14,17 @@ use clarity_repl::clarity::analysis::contract_interface_builder::{
     ContractInterface, ContractInterfaceFunction, ContractInterfaceFunctionAccess,
 };
 use clarity_repl::clarity::ast::ContractAST;
-use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
-use clarity_repl::clarity::{ClarityVersion, EvaluationResult, ExecutionResult, StacksEpochId};
+use clarity_repl::clarity::chainstate::StacksAddress;
+use clarity_repl::clarity::vm::types::{
+    PrincipalData, QualifiedContractIdentifier, StandardPrincipalData,
+};
+use clarity_repl::clarity::{
+    Address, ClarityVersion, EvaluationResult, ExecutionResult, StacksEpochId,
+};
 use clarity_repl::repl::clarity_values::{uint8_to_string, uint8_to_value};
 use clarity_repl::repl::session::BOOT_CONTRACTS_DATA;
 use clarity_repl::repl::{
-    clarity_values, ClarityCodeSource, ClarityContract, ContractDeployer, Session,
+    clarity_values, ClarityCodeSource, ClarityContract, ContractDeployer, Session, SessionSettings,
     DEFAULT_CLARITY_VERSION, DEFAULT_EPOCH,
 };
 use gloo_utils::format::JsValueSerdeExt;
@@ -35,17 +40,6 @@ use wasm_bindgen::JsValue;
 use crate::utils::costs::SerializableCostsReport;
 use crate::utils::events::serialize_event;
 
-#[wasm_bindgen(typescript_custom_section)]
-const SET_EPOCH: &'static str = r#"
-type EpochString = "2.0" | "2.05" | "2.1" | "2.2" | "2.3" | "2.4" | "2.5" | "3.0"
-"#;
-
-#[wasm_bindgen]
-extern "C" {
-    #[wasm_bindgen(typescript_type = "ITextStyle")]
-    pub type ITextStyle;
-}
-
 #[wasm_bindgen]
 extern "C" {
     #[wasm_bindgen(typescript_type = "Map<string, Map<string, bigint>>")]
@@ -54,6 +48,12 @@ extern "C" {
     pub type Accounts;
     #[wasm_bindgen(typescript_type = "EpochString")]
     pub type EpochString;
+    #[wasm_bindgen(typescript_type = "ClarityVersionString")]
+    pub type ClarityVersionString;
+    #[wasm_bindgen(typescript_type = "IContractAST")]
+    pub type IContractAST;
+    #[wasm_bindgen(typescript_type = "Map<string, IContractInterface>")]
+    pub type IContractInterfaces;
 }
 
 macro_rules! log {
@@ -325,6 +325,30 @@ impl SDK {
         QualifiedContractIdentifier::parse(&contract_id).map_err(|e| e.to_string())
     }
 
+    #[wasm_bindgen(js_name=getDefaultEpoch)]
+    pub fn get_default_epoch() -> EpochString {
+        EpochString {
+            obj: DEFAULT_EPOCH.to_string().into(),
+        }
+    }
+
+    #[wasm_bindgen(js_name=getDefaultClarityVersionForCurrentEpoch)]
+    pub fn default_clarity_version_for_current_epoch(&self) -> ClarityVersionString {
+        let session = self.get_session();
+        ClarityVersionString {
+            obj: ClarityVersion::default_for_epoch(session.current_epoch)
+                .to_string()
+                .into(),
+        }
+    }
+
+    #[wasm_bindgen(js_name=initEmtpySession)]
+    pub async fn init_empty_session(&mut self) -> Result<(), String> {
+        let session = Session::new(SessionSettings::default());
+        self.session = Some(session);
+        Ok(())
+    }
+
     #[wasm_bindgen(js_name=initSession)]
     pub async fn init_session(&mut self, cwd: String, manifest_path: String) -> Result<(), String> {
         let cwd_path = PathBuf::from(cwd);
@@ -483,6 +507,11 @@ impl SDK {
         Ok(cache)
     }
 
+    #[wasm_bindgen(js_name=clearCache)]
+    pub fn clear_cach(&mut self) {
+        self.cache.clear();
+    }
+
     async fn write_deployment_plan(
         &self,
         deployment_plan: &DeploymentSpecification,
@@ -577,13 +606,13 @@ impl SDK {
     }
 
     #[wasm_bindgen(js_name=getContractsInterfaces)]
-    pub fn get_contracts_interfaces(&self) -> Result<JsValue, JsError> {
+    pub fn get_contracts_interfaces(&self) -> Result<IContractInterfaces, JsError> {
         let contracts_interfaces: HashMap<String, ContractInterface> = self
             .contracts_interfaces
             .iter()
             .map(|(k, v)| (k.to_string(), v.clone()))
             .collect();
-        Ok(encode_to_js(&contracts_interfaces)?)
+        Ok(encode_to_js(&contracts_interfaces)?.unchecked_into::<IContractInterfaces>())
     }
 
     #[wasm_bindgen(js_name=getContractSource)]
@@ -595,11 +624,14 @@ impl SDK {
     }
 
     #[wasm_bindgen(js_name=getContractAST)]
-    pub fn get_contract_ast(&self, contract: &str) -> Result<JsValue, String> {
+    pub fn get_contract_ast(&self, contract: &str) -> Result<IContractAST, String> {
         let session = self.get_session();
         let contract_id = self.desugar_contract_id(contract)?;
         let contract = session.contracts.get(&contract_id).ok_or("err")?;
-        encode_to_js(&contract.ast).map_err(|e| e.to_string())
+
+        Ok(encode_to_js(&contract.ast)
+            .map_err(|e| e.to_string())?
+            .unchecked_into::<IContractAST>())
     }
 
     #[wasm_bindgen(js_name=getAssetsMap)]
@@ -757,7 +789,7 @@ impl SDK {
     ) -> Result<TransactionRes, String> {
         let session = self.get_session_mut();
         let initial_tx_sender = session.get_tx_sender();
-        session.set_tx_sender(args.sender.to_string());
+        session.set_tx_sender(&args.sender);
 
         let execution = match session.stx_transfer(args.amount, &args.recipient) {
             Ok(res) => res,
@@ -773,7 +805,7 @@ impl SDK {
         if advance_chain_tip {
             session.advance_chain_tip(1);
         }
-        session.set_tx_sender(initial_tx_sender);
+        session.set_tx_sender(&initial_tx_sender);
         Ok(execution_result_to_transaction_res(&execution))
     }
 
@@ -909,6 +941,43 @@ impl SDK {
                 message
             }
         }
+    }
+
+    #[wasm_bindgen(js_name=execute)]
+    pub fn execute(&mut self, snippet: String) -> Result<TransactionRes, String> {
+        let session = self.get_session_mut();
+        match session.eval(snippet.clone(), None, false) {
+            Ok(res) => Ok(execution_result_to_transaction_res(&res)),
+            Err(diagnostics) => {
+                let message = diagnostics
+                    .iter()
+                    .map(|d| d.message.to_string())
+                    .collect::<Vec<String>>()
+                    .join("\n");
+                Err(format!("error: {}", message))
+            }
+        }
+    }
+
+    #[wasm_bindgen(js_name=executeCommand)]
+    pub fn execute_command(&mut self, snippet: String) -> String {
+        let session = self.get_session_mut();
+        if !snippet.starts_with("::") {
+            return "error: command must start with ::".to_string();
+        }
+        session.handle_command(&snippet)
+    }
+
+    #[wasm_bindgen(js_name=mintSTX)]
+    pub fn mint_stx(&mut self, recipient: String, amount: u64) -> Result<String, String> {
+        let session = self.get_session_mut();
+
+        session.interpreter.mint_stx_balance(
+            PrincipalData::Standard(StandardPrincipalData::from(
+                StacksAddress::from_string(&recipient).unwrap(),
+            )),
+            amount,
+        )
     }
 
     #[wasm_bindgen(js_name=setCurrentTestName)]

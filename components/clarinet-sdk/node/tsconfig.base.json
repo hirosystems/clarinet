@@ -5,7 +5,7 @@
     "lib": ["es2022"],
 
     "moduleResolution": "Node",
-    "rootDir": "src",
+    "rootDir": "../",
     "resolveJsonModule": false,
     "allowJs": false,
 
@@ -19,6 +19,6 @@
     "noImplicitAny": true,
     "skipLibCheck": true
   },
-  "include": ["src"],
+  "include": ["./src", "../common/src"],
   "exclude": ["node_modules", "dist"]
 }

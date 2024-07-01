@@ -27,6 +27,6 @@ zmq = { version = "0.9.1", default-features = false }
 uuid = { version = "1.0.0", features = ["v4"] }
 hmac = { version = "0.7.1" }
 hex = { version = "0.3.2" }
-colored = { version = "1.8.0" }                                               # should use ansi_term instead
+colored = { version = "1.8.0" }
 dirs = { version = "4.0.0" }
 chrono = { version = "0.4.31" }

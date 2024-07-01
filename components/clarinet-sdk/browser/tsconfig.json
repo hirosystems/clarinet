@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "module": "esnext",
+    "outDir": "dist/esm",
+    "target": "esnext",
+
+    "lib": ["es2022"],
+
+    "moduleResolution": "Node",
+    "rootDir": "../",
+    "resolveJsonModule": false,
+    "allowJs": false,
+
+    "declaration": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "sourceMap": true,
+
+    /* Type Checking */
+    "strict": true,
+    "noImplicitAny": true,
+    "skipLibCheck": true
+  },
+  "include": ["./src", "../common/src"],
+  "exclude": ["node_modules", "dist"]
+}

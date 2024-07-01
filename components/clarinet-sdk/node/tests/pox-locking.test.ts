@@ -14,7 +14,7 @@ import {
 
 // test the built package and not the source code
 // makes it simpler to handle wasm build
-import { Simnet, initSimnet } from "../dist/esm";
+import { Simnet, initSimnet } from "..";
 
 const MAX_U128 = 340282366920938463463374607431768211455n;
 const maxAmount = MAX_U128;
@@ -76,8 +76,8 @@ describe("test pox-3", () => {
       ),
     );
 
-    const stxAccount = simnet.runSnippet(`(stx-account '${address1})`);
-    expect(stxAccount).toStrictEqual(
+    const stxAccount = simnet.execute(`(stx-account '${address1})`);
+    expect(stxAccount.result).toStrictEqual(
       Cl.tuple({
         locked: Cl.uint(ustxAmount),
         unlocked: Cl.uint(initialSTXBalance - ustxAmount),
@@ -102,8 +102,8 @@ describe("test pox-3", () => {
     simnet.callPublicFn(poxContract, "stack-stx", stackStxArgs, address1);
 
     simnet.mineEmptyBlocks(2098);
-    const stxAccountBefore = simnet.runSnippet(`(stx-account '${address1})`);
-    expect(stxAccountBefore).toStrictEqual(
+    const stxAccountBefore = simnet.execute(`(stx-account '${address1})`);
+    expect(stxAccountBefore.result).toStrictEqual(
       Cl.tuple({
         locked: Cl.uint(ustxAmount),
         unlocked: Cl.uint(initialSTXBalance - ustxAmount),
@@ -112,8 +112,8 @@ describe("test pox-3", () => {
     );
 
     simnet.mineEmptyBlocks(1);
-    const stxAccountAfter = simnet.runSnippet(`(stx-account '${address1})`);
-    expect(stxAccountAfter).toStrictEqual(
+    const stxAccountAfter = simnet.execute(`(stx-account '${address1})`);
+    expect(stxAccountAfter.result).toStrictEqual(
       Cl.tuple({
         locked: Cl.uint(0),
         unlocked: Cl.uint(initialSTXBalance),
@@ -248,8 +248,8 @@ describe("test pox-4", () => {
       ),
     );
 
-    const stxAccount = simnet.runSnippet(`(stx-account '${address1})`);
-    expect(stxAccount).toStrictEqual(
+    const stxAccount = simnet.execute(`(stx-account '${address1})`);
+    expect(stxAccount.result).toStrictEqual(
       Cl.tuple({
         locked: Cl.uint(ustxAmount),
         unlocked: Cl.uint(initialSTXBalance - ustxAmount),

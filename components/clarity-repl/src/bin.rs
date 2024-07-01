@@ -51,7 +51,7 @@ fn main() {
                 }
             };
 
-            let (_, output, _) = session.handle_command(&code_str);
+            let (_, output, _) = session.process_console_input(&code_str);
             for line in output {
                 println!("{}", line);
             }

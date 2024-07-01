@@ -117,7 +117,7 @@ pub fn update_session_with_genesis_accounts(
                 wallet.balance.try_into().unwrap(),
             );
             if wallet.name == "deployer" {
-                session.set_tx_sender(wallet.address.to_address());
+                session.set_tx_sender(&wallet.address.to_string());
             }
         }
     }
@@ -160,13 +160,13 @@ pub fn update_session_with_contracts_executions(
                 }
                 TransactionSpecification::StxTransfer(tx) => {
                     let default_tx_sender = session.get_tx_sender();
-                    session.set_tx_sender(tx.expected_sender.to_string());
+                    session.set_tx_sender(&tx.expected_sender.to_string());
                     let _ = session.stx_transfer(tx.mstx_amount, &tx.recipient.to_string());
-                    session.set_tx_sender(default_tx_sender);
+                    session.set_tx_sender(&default_tx_sender);
                 }
                 TransactionSpecification::EmulatedContractPublish(tx) => {
                     let default_tx_sender = session.get_tx_sender();
-                    session.set_tx_sender(tx.emulated_sender.to_string());
+                    session.set_tx_sender(&tx.emulated_sender.to_string());
 
                     let contract_id = QualifiedContractIdentifier::new(
                         tx.emulated_sender.clone(),
@@ -195,7 +195,7 @@ pub fn update_session_with_contracts_executions(
                         &mut contract_ast,
                     );
                     contracts.insert(contract_id, result);
-                    session.set_tx_sender(default_tx_sender);
+                    session.set_tx_sender(&default_tx_sender);
                 }
                 TransactionSpecification::EmulatedContractCall(tx) => {
                     let _ = session.invoke_contract_call(
