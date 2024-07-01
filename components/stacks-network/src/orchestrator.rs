@@ -1,12 +1,13 @@
 use bollard::container::{
     Config, CreateContainerOptions, KillContainerOptions, ListContainersOptions,
-    PruneContainersOptions, WaitContainerOptions,
+    PruneContainersOptions, RemoveContainerOptions, WaitContainerOptions,
 };
 use bollard::errors::Error as DockerError;
 use bollard::exec::CreateExecOptions;
 use bollard::image::CreateImageOptions;
+use bollard::image::ListImagesOptions;
 use bollard::models::{HostConfig, PortBinding};
-use bollard::network::{CreateNetworkOptions, PruneNetworksOptions};
+use bollard::network::{CreateNetworkOptions, ListNetworksOptions, PruneNetworksOptions};
 use bollard::service::Ipam;
 use bollard::Docker;
 use chainhook_sdk::utils::Context;
@@ -25,6 +26,81 @@ use std::time::Duration;
 
 use crate::event::{DevnetEvent, ServiceStatusData, Status};
 
+async fn create_container_if_needed(
+    docker: &Docker,
+    container_name: &str,
+    config: Config<String>,
+) -> Result<String, DockerError> {
+    // Check if the container already exists
+    let filters = HashMap::from([("name", vec![container_name])]);
+    let options = Some(ListContainersOptions {
+        all: true, // Include stopped containers
+        filters,
+        ..Default::default()
+    });
+
+    let existing_containers = docker.list_containers(options).await?;
+
+    if let Some(container) = existing_containers.first() {
+        // Container exists
+        let container_id = container.id.as_ref().unwrap();
+
+        // the existing container
+        return Ok(container_id.clone());
+
+        // Other option... Remove the existing container and create a new one
+        // docker
+        //     .remove_container(
+        //         container_id,
+        //         Some(RemoveContainerOptions {
+        //             force: true,
+        //             ..Default::default()
+        //         }),
+        //     )
+        //     .await?;
+    }
+
+    // Create a new container
+    let options = CreateContainerOptions {
+        name: container_name,
+        ..Default::default()
+    };
+
+    let container = docker.create_container(Some(options), config).await?;
+    Ok(container.id)
+}
+async fn create_image_if_needed(
+    docker: &Docker,
+    image_url: &str,
+    platform: &str,
+) -> Result<(), DockerError> {
+    // First, check if the image already exists
+    let filters = HashMap::from([("reference", vec![image_url])]);
+    let options = Some(ListImagesOptions {
+        filters,
+        ..Default::default()
+    });
+
+    let existing_images = docker.list_images(options).await?;
+
+    if existing_images.is_empty() {
+        // Image doesn't exist, so create it
+        docker
+            .create_image(
+                Some(CreateImageOptions {
+                    from_image: image_url.to_string(),
+                    platform: platform.to_string(),
+                    ..Default::default()
+                }),
+                None,
+                None,
+            )
+            .try_collect::<Vec<_>>()
+            .await?;
+    }
+
+    Ok(())
+}
 #[derive(Debug)]
 pub struct DevnetOrchestrator {
     pub name: String,
@@ -197,37 +273,70 @@ impl DevnetOrchestrator {
         // First, let's make sure that we pruned staled resources correctly
         // self.clean_previous_session().await?;
 
+        let mut existing_network_id: Option<String> = None;
+
+        // Check if network already exists
+        let existing_networks = docker
+            .list_networks(Some(ListNetworksOptions {
+                filters: {
+                    let mut filters = HashMap::new();
+                    filters.insert("name".to_string(), vec![self.network_name.clone()]);
+                    filters
+                },
+                ..Default::default()
+            }))
+            .await
+            .map_err(|e| format!("unable to list networks: {}", e))?;
+
+        if !existing_networks.is_empty() {
+            // Network already exists, use the existing one
+            existing_network_id = existing_networks[0].id.clone();
+        }
+
         let mut labels = HashMap::new();
-        labels.insert("project", self.network_name.as_str());
+        labels.insert("project".to_string(), self.network_name.clone());
 
         let mut options = HashMap::new();
-        options.insert("enable_ip_masquerade", "true");
-        options.insert("enable_icc", "true");
-        options.insert("host_binding_ipv4", "0.0.0.0");
-        options.insert("com.docker.network.bridge.enable_icc", "true");
-        options.insert("com.docker.network.bridge.enable_ip_masquerade", "true");
-        options.insert("com.docker.network.bridge.host_binding_ipv4", "0.0.0.0");
+        options.insert("enable_ip_masquerade".to_string(), "true".to_string());
+        options.insert("enable_icc".to_string(), "true".to_string());
+        options.insert("host_binding_ipv4".to_string(), "0.0.0.0".to_string());
+        options.insert(
+            "com.docker.network.bridge.enable_icc".to_string(),
+            "true".to_string(),
+        );
+        options.insert(
+            "com.docker.network.bridge.enable_ip_masquerade".to_string(),
+            "true".to_string(),
+        );
+        options.insert(
+            "com.docker.network.bridge.host_binding_ipv4".to_string(),
+            "0.0.0.0".to_string(),
+        );
 
-        let network_id = docker
-            .create_network::<&str>(CreateNetworkOptions {
-                name: &self.network_name,
-                driver: "bridge",
-                ipam: Ipam {
+        let network_id = if let Some(id) = existing_network_id {
+            id
+        } else {
+            docker
+                .create_network(CreateNetworkOptions {
+                    name: self.network_name.clone(),
+                    driver: "bridge".to_string(),
+                    ipam: Ipam {
+                        ..Default::default()
+                    },
+                    labels,
+                    options,
                     ..Default::default()
-                },
-                labels,
-                options,
-                ..Default::default()
-            })
-            .await
-            .map_err(|e| {
-                format!(
-                    "clarinet was unable to create network. Is docker running locally? (error: {})",
-                    e
-                )
-            })?
-            .id
-            .ok_or("unable to retrieve network_id")?;
+                })
+                .await
+                .map_err(|e| {
+                    format!(
+                        "clarinet was unable to create network. Is docker running locally? (error: {})",
+                        e
+                    )
+                })?
+                .id
+                .ok_or("unable to retrieve network_id")?
+        };
 
         let res = docker
             .inspect_network::<&str>(&network_id, None)
@@ -803,19 +912,13 @@ rpcport={bitcoin_node_rpc_port}
             _ => return Err("unable to get Docker client".into()),
         };
 
-        let _info = docker
-            .create_image(
-                Some(CreateImageOptions {
-                    from_image: devnet_config.bitcoin_node_image_url.clone(),
-                    platform: devnet_config.docker_platform.clone(),
-                    ..Default::default()
-                }),
-                None,
-                None,
-            )
-            .try_collect::<Vec<_>>()
-            .await
-            .map_err(|e| formatted_docker_error("unable to create bitcoind image", e))?;
+        create_image_if_needed(
+            docker,
+            &devnet_config.bitcoin_node_image_url,
+            &devnet_config.docker_platform,
+        )
+        .await
+        .map_err(|e| formatted_docker_error("unable to create bitcoind image", e))?;
 
         let config = self.prepare_bitcoin_node_config(1)?;
         let container_name = format!("bitcoin-node.{}", self.network_name);
@@ -1211,19 +1314,13 @@ start_height = {epoch_3_0}
             _ => return Err("unable to get Docker client".into()),
         };
 
-        let _info = docker
-            .create_image(
-                Some(CreateImageOptions {
-                    from_image: devnet_config.stacks_node_image_url.clone(),
-                    platform: devnet_config.docker_platform.clone(),
-                    ..Default::default()
-                }),
-                None,
-                None,
-            )
-            .try_collect::<Vec<_>>()
-            .await
-            .map_err(|e| format!("unable to create image: {}", e))?;
+        create_image_if_needed(
+            docker,
+            &devnet_config.stacks_node_image_url,
+            &devnet_config.docker_platform,
+        )
+        .await
+        .map_err(|e| formatted_docker_error("unable to create stacks node image", e))?;
 
         let config = self.prepare_stacks_node_config(boot_index)?;
 
@@ -1469,20 +1566,41 @@ events_keys = ["*"]
             },
             _ => return Err("unable to get Docker client".into()),
         };
+        // Check if the container already exists
+        let container_name = format!("subnet-node.{}", self.network_name);
+        let mut filters = HashMap::new();
+        filters.insert("name".to_string(), vec![container_name.clone()]);
 
-        let _info = docker
-            .create_image(
-                Some(CreateImageOptions {
-                    from_image: devnet_config.subnet_node_image_url.clone(),
-                    platform: devnet_config.docker_platform.clone(),
-                    ..Default::default()
-                }),
-                None,
-                None,
-            )
-            .try_collect::<Vec<_>>()
+        let existing_containers = docker
+            .list_containers(Some(ListContainersOptions {
+                all: true,
+                filters,
+                ..Default::default()
+            }))
             .await
-            .map_err(|e| format!("unable to create image: {}", e))?;
+            .map_err(|e| format!("unable to list containers: {}", e))?;
+
+        if !existing_containers.is_empty() {
+            // Container already exists, use the existing one
+            let container_id = existing_containers[0].id.as_ref().unwrap().clone();
+            ctx.try_log(|logger| {
+                slog::info!(
+                    logger,
+                    "Using existing container subnet-node: {}",
+                    container_id
+                )
+            });
+            self.subnet_node_container_id = Some(container_id);
+            return Ok(());
+        }
+
+        create_image_if_needed(
+            docker,
+            &devnet_config.subnet_node_image_url,
+            &devnet_config.docker_platform,
+        )
+        .await
+        .map_err(|e| formatted_docker_error("unable to create subnet node image", e))?;
 
         let config = self.prepare_subnet_node_config(boot_index)?;
 
@@ -1531,19 +1649,13 @@ events_keys = ["*"]
             _ => return Err("unable to get Docker client".into()),
         };
 
-        let _info = docker
-            .create_image(
-                Some(CreateImageOptions {
-                    from_image: devnet_config.stacks_api_image_url.clone(),
-                    platform: devnet_config.docker_platform.clone(),
-                    ..Default::default()
-                }),
-                None,
-                None,
-            )
-            .try_collect::<Vec<_>>()
-            .await
-            .map_err(|e| format!("unable to create image: {}", e))?;
+        create_image_if_needed(
+            docker,
+            &devnet_config.stacks_api_image_url,
+            &devnet_config.docker_platform,
+        )
+        .await
+        .map_err(|e| formatted_docker_error("unable to create subnet node image", e))?;
 
         let mut port_bindings = HashMap::new();
         port_bindings.insert(
@@ -1655,19 +1767,13 @@ events_keys = ["*"]
             _ => return Err("unable to get Docker client".into()),
         };
 
-        let _info = docker
-            .create_image(
-                Some(CreateImageOptions {
-                    from_image: devnet_config.subnet_api_image_url.clone(),
-                    platform: devnet_config.docker_platform.clone(),
-                    ..Default::default()
-                }),
-                None,
-                None,
-            )
-            .try_collect::<Vec<_>>()
-            .await
-            .map_err(|e| format!("unable to create image: {}", e))?;
+        create_image_if_needed(
+            docker,
+            &devnet_config.subnet_api_image_url,
+            &devnet_config.docker_platform,
+        )
+        .await
+        .map_err(|e| formatted_docker_error("unable to create subnet api image", e))?;
 
         let mut port_bindings = HashMap::new();
         port_bindings.insert(
@@ -1811,27 +1917,22 @@ events_keys = ["*"]
     }
 
     pub async fn prepare_postgres_container(&mut self, ctx: &Context) -> Result<(), String> {
-        let (docker, _, devnet_config) = match (&self.docker_client, &self.network_config) {
-            (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
-                Some(ref devnet_config) => (docker, network_config, devnet_config),
-                _ => return Err("unable to get devnet configuration".into()),
-            },
-            _ => return Err("unable to get Docker client".into()),
-        };
+        let (docker, network_config, devnet_config) =
+            match (&self.docker_client, &self.network_config) {
+                (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
+                    Some(ref devnet_config) => (docker, network_config, devnet_config),
+                    _ => return Err("unable to get devnet configuration".into()),
+                },
+                _ => return Err("unable to get Docker client".into()),
+            };
 
-        let _info = docker
-            .create_image(
-                Some(CreateImageOptions {
-                    from_image: devnet_config.postgres_image_url.clone(),
-                    platform: devnet_config.docker_platform.clone(),
-                    ..Default::default()
-                }),
-                None,
-                None,
-            )
-            .try_collect::<Vec<_>>()
-            .await
-            .map_err(|e| format!("unable to create image: {}", e))?;
+        create_image_if_needed(
+            docker,
+            &devnet_config.postgres_image_url,
+            &devnet_config.docker_platform,
+        )
+        .await
+        .map_err(|e| formatted_docker_error("unable to create postgres image", e))?;
 
         let mut port_bindings = HashMap::new();
         port_bindings.insert(
@@ -1843,14 +1944,12 @@ events_keys = ["*"]
         );
 
         let exposed_ports = HashMap::new();
-
         let mut labels = HashMap::new();
         labels.insert("project".to_string(), self.network_name.to_string());
 
         let config = Config {
             labels: Some(labels),
             image: Some(devnet_config.postgres_image_url.clone()),
-            // domainname: Some(self.network_name.to_string()),
             tty: None,
             exposed_ports: Some(exposed_ports),
             env: Some(vec![
@@ -1867,23 +1966,16 @@ events_keys = ["*"]
             ..Default::default()
         };
 
-        let options = CreateContainerOptions {
-            name: format!("postgres.{}", self.network_name),
-            platform: Some(devnet_config.docker_platform.to_string()),
-        };
-
-        let container = docker
-            .create_container::<String, String>(Some(options), config)
+        let container_name = format!("postgres.{}", self.network_name);
+        let container_id = create_container_if_needed(docker, &container_name, config)
             .await
-            .map_err(|e| format!("unable to create container: {}", e))?
-            .id;
+            .map_err(|e| formatted_docker_error("unable to create postgres container", e))?;
 
-        ctx.try_log(|logger| slog::info!(logger, "Created container postgres: {}", container));
-        self.postgres_container_id = Some(container);
+        ctx.try_log(|logger| slog::info!(logger, "Created container postgres: {}", container_id));
+        self.postgres_container_id = Some(container_id);
 
         Ok(())
     }
-
     pub async fn boot_postgres_container(&self, _ctx: &Context) -> Result<(), String> {
         let container = match &self.postgres_container_id {
             Some(container) => container.clone(),
@@ -1912,19 +2004,13 @@ events_keys = ["*"]
             _ => return Err("unable to get Docker client".into()),
         };
 
-        let _info = docker
-            .create_image(
-                Some(CreateImageOptions {
-                    from_image: devnet_config.stacks_explorer_image_url.clone(),
-                    platform: devnet_config.docker_platform.clone(),
-                    ..Default::default()
-                }),
-                None,
-                None,
-            )
-            .try_collect::<Vec<_>>()
-            .await
-            .map_err(|e| format!("unable to create image: {}", e))?;
+        create_image_if_needed(
+            docker,
+            &devnet_config.stacks_explorer_image_url,
+            &devnet_config.docker_platform,
+        )
+        .await
+        .map_err(|e| formatted_docker_error("unable to create stacks explorer image", e))?;
         let explorer_guest_port = 3000;
         let mut port_bindings = HashMap::new();
         port_bindings.insert(
@@ -2026,19 +2112,13 @@ events_keys = ["*"]
             _ => return Err("unable to get Docker client".into()),
         };
 
-        let _info = docker
-            .create_image(
-                Some(CreateImageOptions {
-                    from_image: devnet_config.bitcoin_explorer_image_url.clone(),
-                    platform: devnet_config.docker_platform.clone(),
-                    ..Default::default()
-                }),
-                None,
-                None,
-            )
-            .try_collect::<Vec<_>>()
-            .await
-            .map_err(|e| format!("unable to create image: {}", e))?;
+        create_image_if_needed(
+            docker,
+            &devnet_config.bitcoin_explorer_image_url,
+            &devnet_config.docker_platform,
+        )
+        .await
+        .map_err(|e| formatted_docker_error("unable to create bitcoin explorer image", e))?;
 
         let mut port_bindings = HashMap::new();
         port_bindings.insert(
