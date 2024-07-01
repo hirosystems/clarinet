@@ -4,7 +4,7 @@ import { describe, expect, it, beforeEach, afterEach } from "vitest";
 
 // test the built package and not the source code
 // makes it simpler to handle wasm build
-import { initSimnet } from "../dist/esm";
+import { initSimnet } from "..";
 
 const address1 = "ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5";
 

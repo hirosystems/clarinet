@@ -1,0 +1,75 @@
+{
+  "name": "@hirosystems/clarinet-sdk",
+  "version": "2.8.0-beta1",
+  "description": "A SDK to interact with Clarity Smart Contracts in node.js",
+  "homepage": "https://docs.hiro.so/clarinet/feature-guides/clarinet-js-sdk",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hirosystems/clarinet.git"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": [
+    "dist",
+    "templates",
+    "vitest-helpers/src"
+  ],
+  "main": "./dist/cjs/node/src/index.js",
+  "module": "./dist/esm/node/src/index.js",
+  "types": "./dist/esm/node/src/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/esm/node/src/index.d.ts",
+        "default": "./dist/esm/node/src/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/node/src/index.d.ts",
+        "default": "./dist/cjs/node/src/index.js"
+      }
+    },
+    "./vitest": {
+      "import": {
+        "types": "./dist/esm/node/src/vitest/index.d.ts",
+        "default": "./dist/esm/node/src/vitest/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/node/src/vitest/index.d.ts",
+        "default": "./dist/cjs/node/src/vitest/index.js"
+      }
+    }
+  },
+  "bin": {
+    "clarinet-sdk": "dist/cjs/node/src/bin/index.js"
+  },
+  "scripts": {
+    "clean": "rimraf dist",
+    "compile": "tsc -b ./tsconfig.json ./tsconfig.cjs.json",
+    "build": "npm run clean; npm run compile; node ./scripts/prepare-esm-package.js",
+    "prepare": "npm run build",
+    "test": "vitest run"
+  },
+  "keywords": [
+    "stacks",
+    "clarity",
+    "clarinet",
+    "tests"
+  ],
+  "author": "hirosystems",
+  "license": "GPL-3.0",
+  "readme": "./README.md",
+  "dependencies": {
+    "@hirosystems/clarinet-sdk-wasm": "2.8.0-beta1",
+    "@stacks/transactions": "^6.13.0",
+    "kolorist": "^1.8.0",
+    "prompts": "^2.4.2",
+    "vitest": "^1.0.4",
+    "yargs": "^17.7.2"
+  },
+  "devDependencies": {
+    "@stacks/encryption": "^6.13.0",
+    "@stacks/network": "^6.13.0",
+    "@stacks/stacking": "^6.13.0"
+  }
+}

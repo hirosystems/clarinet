@@ -920,7 +920,7 @@ dependencies = [
 
 [[package]]
 name = "clarinet-sdk-wasm"
-version = "2.7.0"
+version = "2.8.0-beta1"
 dependencies = [
  "clarinet-deployments",
  "clarinet-files",
@@ -1014,6 +1014,7 @@ dependencies = [
  "chrono",
  "clar2wasm",
  "clarity",
+ "colored",
  "debug_types",
  "futures",
  "getrandom 0.2.8",

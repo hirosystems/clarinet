@@ -5,7 +5,7 @@ import { describe, expect, it, beforeEach, afterEach } from "vitest";
 
 // test the built package and not the source code
 // makes it simpler to handle wasm build
-import { Simnet, initSimnet, tx } from "../dist/esm";
+import { Simnet, initSimnet, tx } from "..";
 
 const deployerAddr = "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM";
 const address1 = "ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5";
@@ -67,8 +67,8 @@ describe("basic simnet interactions", () => {
     // the latest contract in the manifest is deployed in 2.4
     expect(simnet.currentEpoch).toBe("2.4");
 
-    simnet.setEpoch("2.0");
-    expect(simnet.currentEpoch).toBe("2.0");
+    simnet.setEpoch("2.5");
+    expect(simnet.currentEpoch).toBe("2.5");
 
     // @ts-ignore
     // "0" is an invalid epoch
@@ -76,17 +76,23 @@ describe("basic simnet interactions", () => {
     simnet.setEpoch("0");
     expect(simnet.currentEpoch).toBe("2.5");
   });
+
+  it("can get default clarity version for current epoch", () => {
+    const clarityVersion = simnet.getDefaultClarityVersionForCurrentEpoch();
+    expect(clarityVersion).toBe("Clarity 2");
+  });
 });
 
 describe("simnet can run arbitrary snippets", () => {
   it("can run simple snippets", () => {
-    const res = simnet.runSnippet("(+ 1 2)");
-    expect(res).toStrictEqual(Cl.int(3));
+    const res = simnet.execute("(+ 1 2)");
+    expect(res.result).toStrictEqual(Cl.int(3));
   });
 
   it("show diagnostic in case of error", () => {
-    const res = simnet.runSnippet("(+ 1 u2)");
-    expect(res).toBe("error:\nexpecting expression of type 'int', found 'uint'");
+    expect(() => {
+      simnet.execute("(+ 1 u2)");
+    }).toThrow("error: expecting expression of type 'int', found 'uint'");
   });
 });
 
@@ -277,6 +283,7 @@ describe("simnet can get contracts info and deploy contracts", () => {
 
   it("can get contract ast", () => {
     const counterAst = simnet.getContractAST(`${deployerAddr}.counter`);
+
     expect(counterAst).toBeDefined();
     expect(counterAst.expressions).toHaveLength(11);
 
@@ -324,10 +331,10 @@ describe("simnet can get contracts info and deploy contracts", () => {
     expect(contract2Interface.epoch).toBe("Epoch24");
     expect(contract2Interface.clarity_version).toBe("Clarity2");
 
-    simnet.setEpoch("2.0");
+    simnet.setEpoch("2.5");
     simnet.deployContract("contract3", source, { clarityVersion: 1 }, deployerAddr);
     const contract3Interface = simnet.getContractsInterfaces().get(`${simnet.deployer}.contract3`)!;
-    expect(contract3Interface.epoch).toBe("Epoch20");
+    expect(contract3Interface.epoch).toBe("Epoch25");
     expect(contract3Interface.clarity_version).toBe("Clarity1");
   });
 });
@@ -340,6 +347,35 @@ describe("simnet can transfer stx", () => {
     const stxAddress2 = stxBalances?.get(address2);
     expect(stxAddress1).toBe(99999999999000n);
     expect(stxAddress2).toBe(100000000001000n);
+  });
+});
+
+describe("the simnet can execute commands", () => {
+  it("can mint_stx", () => {
+    const result = simnet.executeCommand(
+      "::mint_stx ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM 1000",
+    );
+    expect(result).toBe("→ ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM: 100000000001000 µSTX");
+  });
+
+  it("can get_assets_maps", () => {
+    simnet.executeCommand("::mint_stx ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM 1000");
+    let result = simnet.executeCommand("::get_assets_maps");
+    expect(result.split("\n")).toHaveLength(12);
+    const expected = [
+      "+-------------------------------------------+-----------------+",
+      "| Address                                   | uSTX            |",
+      "+-------------------------------------------+-----------------+",
+      "| ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM | 100000000001000 |",
+      "+-------------------------------------------+-----------------+",
+      "| ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5 | 100000000000000 |",
+      "+-------------------------------------------+-----------------+",
+      "| ST2CY5V39NHDPWSXMW9QDT3HC3GD6Q6XX4CFRK9AG | 100000000000000 |",
+      "+-------------------------------------------+-----------------+",
+      "| STNHKEPYEPJ8ET55ZZ0M5A34J0R3N5FM2CMMMAZ6  | 100000000000000 |",
+      "+-------------------------------------------+-----------------+\n",
+    ].join("\n");
+    expect(result).toBe(expected);
   });
 });
 
