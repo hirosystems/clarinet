@@ -16,14 +16,14 @@ plan:
             cost: 8400
             path: ".cache/requirements/SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.sip-010-trait-ft-standard.clar"
             clarity-version: 1
-      epoch: "2.4"
+      epoch: "2.0"
     - id: 1
       transactions:
         - contract-publish:
             contract-name: cbtc-token
             expected-sender: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM
-            cost: 13030
+            cost: 12800
             path: contracts/cbtc-token.clar
             anchor-block-only: true
-            clarity-version: 1
+            clarity-version: 2
       epoch: "2.4"
