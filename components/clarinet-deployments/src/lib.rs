@@ -54,15 +54,9 @@ pub fn setup_session_with_deployment(
     deployment: &DeploymentSpecification,
     contracts_asts: Option<&BTreeMap<QualifiedContractIdentifier, ContractAST>>,
 ) -> DeploymentGenerationArtifacts {
-    let mut session = initiate_session_from_deployment(manifest);
-    update_session_with_genesis_accounts(&mut session, deployment);
-    let UpdateSessionExecutionResult { contracts, .. } = update_session_with_contracts_executions(
-        &mut session,
-        deployment,
-        contracts_asts,
-        false,
-        None,
-    );
+    let mut session = initiate_session_from_manifest(manifest);
+    let UpdateSessionExecutionResult { contracts, .. } =
+        update_session_with_deployment_plan(&mut session, deployment, contracts_asts, false, None);
 
     let deps = BTreeMap::new();
     let mut diags = HashMap::new();
@@ -98,7 +92,7 @@ pub fn setup_session_with_deployment(
     }
 }
 
-pub fn initiate_session_from_deployment(manifest: &ProjectManifest) -> Session {
+pub fn initiate_session_from_manifest(manifest: &ProjectManifest) -> Session {
     let settings = SessionSettings {
         repl_settings: manifest.repl_settings.clone(),
         disk_cache_enabled: true,
@@ -107,7 +101,7 @@ pub fn initiate_session_from_deployment(manifest: &ProjectManifest) -> Session {
     Session::new(settings)
 }
 
-pub fn update_session_with_genesis_accounts(
+fn update_session_with_genesis_accounts(
     session: &mut Session,
     deployment: &DeploymentSpecification,
 ) {
@@ -124,20 +118,22 @@ pub fn update_session_with_genesis_accounts(
     }
 }
 
-pub fn update_session_with_contracts_executions(
+pub fn update_session_with_deployment_plan(
     session: &mut Session,
     deployment: &DeploymentSpecification,
     contracts_asts: Option<&BTreeMap<QualifiedContractIdentifier, ContractAST>>,
     code_coverage_enabled: bool,
     forced_min_epoch: Option<StacksEpochId>,
 ) -> UpdateSessionExecutionResult {
+    update_session_with_genesis_accounts(session, deployment);
+
     let boot_contracts_data = BOOT_CONTRACTS_DATA.clone();
 
     let mut boot_contracts = BTreeMap::new();
     for (contract_id, (boot_contract, ast)) in boot_contracts_data {
         let result = session
             .interpreter
-            .run(&boot_contract, &mut Some(ast), false, None);
+            .run(&boot_contract, Some(&ast), false, None);
         boot_contracts.insert(contract_id, result);
     }
 
@@ -173,10 +169,7 @@ pub fn update_session_with_contracts_executions(
                         tx.emulated_sender.clone(),
                         tx.contract_name.clone(),
                     );
-                    let mut contract_ast = contracts_asts
-                        .as_ref()
-                        .and_then(|m| m.get(&contract_id))
-                        .cloned();
+                    let contract_ast = contracts_asts.as_ref().and_then(|m| m.get(&contract_id));
                     let contract = ClarityContract {
                         code_source: ClarityCodeSource::ContractInMemory(tx.source.clone()),
                         deployer: ContractDeployer::Address(tx.emulated_sender.to_string()),
@@ -193,7 +186,7 @@ pub fn update_session_with_contracts_executions(
                             true => Some("__analysis__".to_string()),
                             false => None,
                         },
-                        &mut contract_ast,
+                        contract_ast,
                     );
                     contracts.insert(contract_id, result);
                     session.set_tx_sender(default_tx_sender);
@@ -211,7 +204,7 @@ pub fn update_session_with_contracts_executions(
                             value_to_uint8(&value)
                         })
                         .collect();
-                    let _ = session.call_contract_fn(
+                    let contract_call_result = session.call_contract_fn(
                         &tx.contract_id.to_string(),
                         &tx.method.to_string(),
                         &params,
@@ -221,6 +214,9 @@ pub fn update_session_with_contracts_executions(
                         false,
                         "deployment".to_string(),
                     );
+                    if let Err(errors) = contract_call_result {
+                        println!("error: {:?}", errors.first().unwrap().message);
+                    }
                 }
             }
         }

@@ -74,28 +74,28 @@ impl ClarityInterpreter {
     pub fn run(
         &mut self,
         contract: &ClarityContract,
-        ast: &mut Option<ContractAST>,
+        ast: Option<&ContractAST>,
         cost_track: bool,
         eval_hooks: Option<Vec<&mut dyn EvalHook>>,
     ) -> Result<ExecutionResult, Vec<Diagnostic>> {
         #[cfg(feature = "cli")]
         if self.repl_settings.clarity_wasm_mode {
-            self.run_wasm(&contract.clone(), &mut ast.clone(), cost_track, None)
+            self.run_wasm(contract, ast, cost_track, None)
         } else {
-            self.run_interpreter(&contract.clone(), &mut ast.clone(), cost_track, eval_hooks)
+            self.run_interpreter(contract, ast, cost_track, eval_hooks)
         }
         #[cfg(not(feature = "cli"))]
-        self.run_interpreter(&contract.clone(), &mut ast.clone(), cost_track, eval_hooks)
+        self.run_interpreter(contract, ast, cost_track, eval_hooks)
     }
 
     fn run_interpreter(
         &mut self,
         contract: &ClarityContract,
-        cached_ast: &mut Option<ContractAST>,
+        cached_ast: Option<&ContractAST>,
         cost_track: bool,
         eval_hooks: Option<Vec<&mut dyn EvalHook>>,
     ) -> Result<ExecutionResult, Vec<Diagnostic>> {
-        let (mut ast, mut diagnostics, success) = match cached_ast.take() {
+        let (ast, mut diagnostics, success) = match cached_ast {
             Some(ast) => (ast.clone(), vec![], true),
             None => self.build_ast(contract),
         };
@@ -106,7 +106,7 @@ impl ClarityInterpreter {
         diagnostics.append(&mut annotation_diagnostics);
 
         let (analysis, mut analysis_diagnostics) =
-            match self.run_analysis(contract, &mut ast, &annotations) {
+            match self.run_analysis(contract, &ast, &annotations) {
                 Ok((analysis, diagnostics)) => (analysis, diagnostics),
                 Err(diagnostic) => {
                     diagnostics.push(diagnostic);
@@ -119,7 +119,7 @@ impl ClarityInterpreter {
             return Err(diagnostics.to_vec());
         }
 
-        let mut result = match self.execute(contract, &mut ast, analysis, cost_track, eval_hooks) {
+        let mut result = match self.execute(contract, &ast, analysis, cost_track, eval_hooks) {
             Ok(result) => result,
             Err(e) => {
                 diagnostics.push(Diagnostic {
@@ -140,13 +140,13 @@ impl ClarityInterpreter {
     fn run_wasm(
         &mut self,
         contract: &ClarityContract,
-        ast: &mut Option<ContractAST>,
+        ast: Option<&ContractAST>,
         cost_track: bool,
         eval_hooks: Option<Vec<&mut dyn EvalHook>>,
     ) -> Result<ExecutionResult, Vec<Diagnostic>> {
         use clar2wasm::compile_contract;
 
-        let (mut ast, mut diagnostics, success) = match ast.take() {
+        let (ast, mut diagnostics, success) = match ast {
             Some(ast) => (ast.clone(), vec![], true),
             None => self.build_ast(contract),
         };
@@ -157,7 +157,7 @@ impl ClarityInterpreter {
         diagnostics.append(&mut annotation_diagnostics);
 
         let (analysis, mut analysis_diagnostics) =
-            match self.run_analysis(contract, &mut ast, &annotations) {
+            match self.run_analysis(contract, &ast, &annotations) {
                 Ok((analysis, diagnostics)) => (analysis, diagnostics),
                 Err(diagnostic) => {
                     diagnostics.push(diagnostic);
@@ -185,7 +185,7 @@ impl ClarityInterpreter {
 
         let mut result = match self.execute_wasm(
             contract,
-            &mut ast,
+            &ast,
             analysis,
             &mut module,
             cost_track,
@@ -295,7 +295,7 @@ impl ClarityInterpreter {
     pub fn run_analysis(
         &mut self,
         contract: &ClarityContract,
-        contract_ast: &mut ContractAST,
+        contract_ast: &ContractAST,
         annotations: &Vec<Annotation>,
     ) -> Result<(ContractAnalysis, Vec<Diagnostic>), Diagnostic> {
         let mut analysis_db = AnalysisDatabase::new(&mut self.datastore);
@@ -367,7 +367,7 @@ impl ClarityInterpreter {
     fn execute(
         &mut self,
         contract: &ClarityContract,
-        contract_ast: &mut ContractAST,
+        contract_ast: &ContractAST,
         analysis: ContractAnalysis,
         cost_track: bool,
         eval_hooks: Option<Vec<&mut dyn EvalHook>>,
@@ -595,7 +595,7 @@ impl ClarityInterpreter {
     fn execute_wasm(
         &mut self,
         contract: &ClarityContract,
-        contract_ast: &mut ContractAST,
+        contract_ast: &ContractAST,
         analysis: ContractAnalysis,
         wasm_module: &mut clar2wasm::Module,
         cost_track: bool,
@@ -1208,14 +1208,14 @@ mod tests {
         contract: &ClarityContract,
     ) -> Result<ExecutionResult, String> {
         let source = contract.expect_in_memory_code_source();
-        let (mut ast, ..) = interpreter.build_ast(contract);
+        let (ast, ..) = interpreter.build_ast(contract);
         let (annotations, _) = interpreter.collect_annotations(source);
 
         let (analysis, _) = interpreter
-            .run_analysis(contract, &mut ast, &annotations)
+            .run_analysis(contract, &ast, &annotations)
             .unwrap();
 
-        let result = interpreter.execute(contract, &mut ast, analysis, false, None);
+        let result = interpreter.execute(contract, &ast, analysis, false, None);
         assert!(result.is_ok());
         result
     }
@@ -1380,7 +1380,7 @@ mod tests {
         let mut interpreter =
             ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
         let contract = ClarityContract::fixture();
-        let result = interpreter.run_interpreter(&contract, &mut None, false, None);
+        let result = interpreter.run_interpreter(&contract, None, false, None);
         assert!(result.is_ok());
         assert!(result.unwrap().diagnostics.is_empty());
     }
@@ -1395,7 +1395,7 @@ mod tests {
         let contract = ClarityContractBuilder::default()
             .code_source(snippet.into())
             .build();
-        let result = interpreter.run_interpreter(&contract, &mut None, false, None);
+        let result = interpreter.run_interpreter(&contract, None, false, None);
         assert!(result.is_err());
         let diagnostics = result.unwrap_err();
         assert_eq!(diagnostics.len(), 1);
@@ -1410,7 +1410,7 @@ mod tests {
         let contract = ClarityContractBuilder::default()
             .code_source(snippet.into())
             .build();
-        let result = interpreter.run_interpreter(&contract, &mut None, false, None);
+        let result = interpreter.run_interpreter(&contract, None, false, None);
         assert!(result.is_err());
 
         let diagnostics = result.unwrap_err();
@@ -1462,14 +1462,14 @@ mod tests {
 
         let contract = ClarityContract::fixture();
         let source = contract.expect_in_memory_code_source();
-        let (mut ast, ..) = interpreter.build_ast(&contract);
+        let (ast, ..) = interpreter.build_ast(&contract);
         let (annotations, _) = interpreter.collect_annotations(source);
 
         let (analysis, _) = interpreter
-            .run_analysis(&contract, &mut ast, &annotations)
+            .run_analysis(&contract, &ast, &annotations)
             .unwrap();
 
-        let result = interpreter.execute(&contract, &mut ast, analysis, false, None);
+        let result = interpreter.execute(&contract, &ast, analysis, false, None);
         assert!(result.is_ok());
         let ExecutionResult {
             diagnostics,
@@ -1491,7 +1491,7 @@ mod tests {
         let call_contract = ClarityContractBuilder::default()
             .code_source("(contract-call? .contract incr)".to_owned())
             .build();
-        let _ = interpreter.run(&call_contract, &mut None, false, None);
+        let _ = interpreter.run(&call_contract, None, false, None);
     }
 
     #[test]
@@ -1706,7 +1706,7 @@ mod tests {
                 continue;
             }
             let res = interpreter
-                .run(&boot_contract, &mut Some(ast), false, None)
+                .run(&boot_contract, Some(&ast), false, None)
                 .unwrap_or_else(|err| {
                     dbg!(&err);
                     panic!("failed to interpret {} boot contract", &boot_contract.name)
@@ -1773,9 +1773,7 @@ mod tests {
             .epoch(StacksEpochId::Epoch25)
             .clarity_version(ClarityVersion::Clarity2)
             .build();
-        assert!(interpreter
-            .run(&call_contract, &mut None, false, None)
-            .is_ok());
+        assert!(interpreter.run(&call_contract, None, false, None).is_ok());
     }
 
     #[test]
@@ -1823,9 +1821,7 @@ mod tests {
             .epoch(StacksEpochId::Epoch30)
             .clarity_version(ClarityVersion::Clarity3)
             .build();
-        assert!(interpreter
-            .run(&call_contract, &mut None, false, None)
-            .is_ok());
+        assert!(interpreter.run(&call_contract, None, false, None).is_ok());
     }
 
     #[test]
@@ -1904,9 +1900,7 @@ mod tests {
             .epoch(StacksEpochId::Epoch30)
             .clarity_version(ClarityVersion::Clarity3)
             .build();
-        assert!(interpreter
-            .run(&call_contract, &mut None, false, None)
-            .is_ok());
+        assert!(interpreter.run(&call_contract, None, false, None).is_ok());
     }
 
     #[test]

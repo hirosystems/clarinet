@@ -149,7 +149,7 @@ impl Session {
         self.interpreter.set_tx_sender(default_tx_sender);
     }
 
-    pub fn include_boot_contracts(&mut self, mainnet: bool) {
+    fn include_boot_contracts(&mut self, mainnet: bool) {
         let boot_code = if mainnet {
             *STACKS_BOOT_CODE_MAINNET
         } else {
@@ -181,8 +181,8 @@ impl Session {
                     clarity_version,
                     epoch,
                 };
-                let _ = self.deploy_contract(&contract, None, false, None, &mut None);
                 // Result ignored, boot contracts are trusted to be valid
+                let _ = self.deploy_contract(&contract, None, false, None, None);
             }
         }
     }
@@ -503,7 +503,7 @@ impl Session {
         eval_hooks: Option<Vec<&mut dyn EvalHook>>,
         cost_track: bool,
         test_name: Option<String>,
-        ast: &mut Option<ContractAST>,
+        ast: Option<&ContractAST>,
     ) -> Result<ExecutionResult, Vec<Diagnostic>> {
         if contract.epoch != self.current_epoch {
             let diagnostic = Diagnostic {
@@ -646,7 +646,7 @@ impl Session {
 
         let result = self
             .interpreter
-            .run(&contract.clone(), &mut None, cost_track, eval_hooks);
+            .run(&contract.clone(), None, cost_track, eval_hooks);
 
         match result {
             Ok(result) => {
@@ -1428,7 +1428,7 @@ mod tests {
             epoch: StacksEpochId::Epoch2_05,
         };
 
-        let result = session.deploy_contract(&contract, None, false, None, &mut None);
+        let result = session.deploy_contract(&contract, None, false, None, None);
         assert!(result.is_err(), "Expected error for clarity mismatch");
     }
 
@@ -1446,7 +1446,7 @@ mod tests {
             .clarity_version(ClarityVersion::Clarity2)
             .build();
 
-        let result = session.deploy_contract(&contract, None, false, None, &mut None);
+        let result = session.deploy_contract(&contract, None, false, None, None);
         assert!(result.is_err());
         let err = result.unwrap_err();
         assert!(err.len() == 1);
@@ -1486,7 +1486,7 @@ mod tests {
             epoch: StacksEpochId::Epoch25,
         };
 
-        let _ = session.deploy_contract(&contract, None, false, None, &mut None);
+        let _ = session.deploy_contract(&contract, None, false, None, None);
 
         // assert data-var is set to 0
         assert_eq!(
@@ -1524,6 +1524,79 @@ mod tests {
         );
         assert_eq!(session.handle_command("(at-block (unwrap-panic (get-block-info? id-header-hash u10000)) (contract-call? .contract get-x))").1[0], green!("u1"));
     }
+
+    #[test]
+    fn can_deploy_a_contract() {
+        let settings = SessionSettings::default();
+        let mut session = Session::new(settings);
+        session.start().expect("session could not start");
+        session.update_epoch(StacksEpochId::Epoch25);
+
+        // deploy default contract
+        let contract = ClarityContractBuilder::default().build();
+        let result = session.deploy_contract(&contract, None, false, None, None);
+        assert!(result.is_ok());
+    }
+
+    // #[test]
+    // fn can_call_deployment_plan_fn() {
+    //     let settings = SessionSettings::default();
+    //     let mut session = Session::new(settings);
+    //     session.load_boot_contracts();
+    //     // session.start().expect("session could not start");
+
+    //     // call pox4 get-info
+    //     let result = session.call_contract_fn(
+    //         format!("{}.pox4", BOOT_MAINNET_ADDRESS).as_str(),
+    //         "get-info",
+    //         &[],
+    //         BOOT_TESTNET_ADDRESS,
+    //         false,
+    //         false,
+    //         false,
+    //         "test".to_string(),
+    //     );
+    //     dbg!(result);
+    // }
+
+    // #[test]
+    // fn can_call_custom_contract_fn() {
+    //     let settings = SessionSettings::default();
+    //     let mut session = Session::new(settings);
+    //     session.start().expect("session could not start");
+    //     session.update_epoch(StacksEpochId::Epoch25);
+
+    //     // deploy default contract
+    //     let contract = ClarityContractBuilder::default().build();
+    //     let _ = session.deploy_contract(&contract, None, false, None, None);
+
+    //     dbg!(&contract);
+
+    //     let result = session.call_contract_fn(
+    //         "contract",
+    //         "incr",
+    //         &[],
+    //         &session.get_tx_sender(),
+    //         false,
+    //         false,
+    //         false,
+    //         "test".to_owned(),
+    //     );
+    //     dbg!(&result);
+
+    //     let result = session.call_contract_fn(
+    //         "contract",
+    //         "get-x",
+    //         &[],
+    //         &session.get_tx_sender(),
+    //         false,
+    //         false,
+    //         false,
+    //         "test".to_owned(),
+    //     );
+
+    //     dbg!(&result);
+    // }
 }
 
 #[cfg(not(feature = "wasm"))]

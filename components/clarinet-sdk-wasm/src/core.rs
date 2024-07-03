@@ -4,8 +4,8 @@ use clarinet_deployments::types::{
     TransactionSpecification,
 };
 use clarinet_deployments::{
-    generate_default_deployment, initiate_session_from_deployment,
-    update_session_with_contracts_executions, update_session_with_genesis_accounts,
+    generate_default_deployment, initiate_session_from_manifest,
+    update_session_with_deployment_plan,
 };
 use clarinet_files::chainhook_types::StacksNetwork;
 use clarinet_files::{FileAccessor, FileLocation, ProjectManifest, WASMFileSystemAccessor};
@@ -420,9 +420,8 @@ impl SDK {
                 .await?;
         }
 
-        let mut session = initiate_session_from_deployment(&manifest);
-        update_session_with_genesis_accounts(&mut session, &deployment);
-        let executed_contracts = update_session_with_contracts_executions(
+        let mut session = initiate_session_from_manifest(&manifest);
+        let executed_contracts = update_session_with_deployment_plan(
             &mut session,
             &deployment,
             Some(&artifacts.asts),
@@ -796,13 +795,7 @@ impl SDK {
                 epoch: session.current_epoch,
             };
 
-            match session.deploy_contract(
-                &contract,
-                None,
-                false,
-                Some(args.name.clone()),
-                &mut None,
-            ) {
+            match session.deploy_contract(&contract, None, false, Some(args.name.clone()), None) {
                 Ok(res) => res,
                 Err(diagnostics) => {
                     let mut message = format!(
