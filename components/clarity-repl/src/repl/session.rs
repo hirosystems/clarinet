@@ -559,68 +559,6 @@ impl Session {
         })
     }
 
-    pub fn invoke_contract_call(
-        &mut self,
-        contract: &str,
-        method: &str,
-        args: &[String],
-        sender: &str,
-        test_name: String,
-    ) -> Result<(ExecutionResult, QualifiedContractIdentifier), Vec<Diagnostic>> {
-        let initial_tx_sender = self.get_tx_sender();
-        // Handle fully qualified contract_id and sugared syntax
-        let contract_id = if contract.starts_with('S') {
-            contract.to_string()
-        } else {
-            format!("{}.{}", initial_tx_sender, contract)
-        };
-
-        let mut hooks: Vec<&mut dyn EvalHook> = vec![];
-        let mut coverage = TestCoverageReport::new(test_name.clone());
-        hooks.push(&mut coverage);
-
-        let contract_call = format!(
-            "(contract-call? '{} {} {})",
-            contract_id,
-            method,
-            args.join(" ")
-        );
-        let contract_call = ClarityContract {
-            code_source: ClarityCodeSource::ContractInMemory(contract_call),
-            name: "contract-call".to_string(),
-            deployer: ContractDeployer::Address(sender.to_string()),
-            epoch: self.current_epoch,
-            clarity_version: ClarityVersion::default_for_epoch(self.current_epoch),
-        };
-
-        self.set_tx_sender(sender.into());
-        let execution = match self
-            .interpreter
-            .run(&contract_call, &mut None, true, Some(hooks))
-        {
-            Ok(result) => result,
-            Err(e) => {
-                self.set_tx_sender(initial_tx_sender);
-                return Err(e);
-            }
-        };
-        self.set_tx_sender(initial_tx_sender);
-        self.coverage_reports.push(coverage);
-
-        let contract_identifier = QualifiedContractIdentifier::parse(&contract_id).unwrap();
-        if let Some(ref cost) = execution.cost {
-            self.costs_reports.push(CostsReport {
-                test_name,
-                contract_id,
-                method: method.to_string(),
-                args: args.to_vec(),
-                cost_result: cost.clone(),
-            });
-        }
-
-        Ok((execution, contract_identifier))
-    }
-
     pub fn call_contract_fn(
         &mut self,
         contract: &str,

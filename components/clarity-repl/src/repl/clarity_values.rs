@@ -25,6 +25,14 @@ pub fn uint8_to_value(mut value: &[u8]) -> Value {
         .unwrap_or_else(|e| panic!("failed to parse clarity value: {}", e))
 }
 
+pub fn value_to_uint8(value: &Value) -> Vec<u8> {
+    let mut bytes = vec![];
+    value
+        .consensus_serialize(&mut bytes)
+        .unwrap_or_else(|e| panic!("failed to parse clarity value: {}", e));
+    bytes
+}
+
 pub fn value_to_string(value: &Value) -> String {
     match value {
         Value::Principal(principal_data) => {

@@ -1,4 +1,5 @@
 use clarity_repl::clarity::StacksEpochId;
+use clarity_repl::repl::clarity_values::value_to_uint8;
 use clarity_repl::repl::{ClarityCodeSource, ClarityContract, ContractDeployer};
 use clarity_repl::repl::{DEFAULT_CLARITY_VERSION, DEFAULT_EPOCH};
 
@@ -198,11 +199,26 @@ pub fn update_session_with_contracts_executions(
                     session.set_tx_sender(default_tx_sender);
                 }
                 TransactionSpecification::EmulatedContractCall(tx) => {
-                    let _ = session.invoke_contract_call(
+                    let params: Vec<Vec<u8>> = tx
+                        .parameters
+                        .iter()
+                        .map(|p| {
+                            let eval_result = session.eval(p.to_string(), None, false).unwrap();
+                            let value = match eval_result.result {
+                                EvaluationResult::Contract(_) => unreachable!(),
+                                EvaluationResult::Snippet(snippet_result) => snippet_result.result,
+                            };
+                            value_to_uint8(&value)
+                        })
+                        .collect();
+                    let _ = session.call_contract_fn(
                         &tx.contract_id.to_string(),
                         &tx.method.to_string(),
-                        &tx.parameters,
+                        &params,
                         &tx.emulated_sender.to_string(),
+                        true,
+                        false,
+                        false,
                         "deployment".to_string(),
                     );
                 }
