@@ -141,20 +141,24 @@ impl Session {
 
         let boot_testnet_deployer = BOOT_TESTNET_PRINCIPAL.clone();
         self.interpreter.set_tx_sender(boot_testnet_deployer);
-        self.include_boot_contracts(false);
+        self.deploy_boot_contracts(false);
 
         let boot_mainnet_deployer = BOOT_MAINNET_PRINCIPAL.clone();
         self.interpreter.set_tx_sender(boot_mainnet_deployer);
-        self.include_boot_contracts(true);
+        self.deploy_boot_contracts(true);
+
         self.interpreter.set_tx_sender(default_tx_sender);
     }
 
-    fn include_boot_contracts(&mut self, mainnet: bool) {
+    fn deploy_boot_contracts(&mut self, mainnet: bool) {
         let boot_code = if mainnet {
             *STACKS_BOOT_CODE_MAINNET
         } else {
             *STACKS_BOOT_CODE_TESTNET
         };
+
+        let tx_sender = self.interpreter.get_tx_sender();
+        let deployer = ContractDeployer::Address(tx_sender.to_address());
 
         for (name, code) in boot_code.iter() {
             if self
@@ -177,10 +181,11 @@ impl Session {
                 let contract = ClarityContract {
                     code_source: ClarityCodeSource::ContractInMemory(code.to_string()),
                     name: name.to_string(),
-                    deployer: ContractDeployer::DefaultDeployer,
+                    deployer: deployer.clone(),
                     clarity_version,
                     epoch,
                 };
+
                 // Result ignored, boot contracts are trusted to be valid
                 let _ = self.deploy_contract(&contract, None, false, None, None);
             }
@@ -1263,9 +1268,25 @@ fn clarity_keywords() -> HashMap<String, String> {
 #[allow(clippy::items_after_test_module)]
 #[cfg(test)]
 mod tests {
+    use clarity::vm::types::TupleData;
+
     use crate::{repl::settings::Account, test_fixtures::clarity_contract::ClarityContractBuilder};
 
     use super::*;
+
+    #[track_caller]
+    fn assert_execution_result_value(
+        result: &Result<ExecutionResult, Vec<Diagnostic>>,
+        expected_value: Value,
+    ) {
+        assert!(result.is_ok());
+        let result = result.as_ref().unwrap();
+        let result = match &result.result {
+            EvaluationResult::Contract(_) => unreachable!(),
+            EvaluationResult::Snippet(res) => res,
+        };
+        assert_eq!(result.result, expected_value);
+    }
 
     #[test]
     fn initial_accounts() {
@@ -1538,65 +1559,84 @@ mod tests {
         assert!(result.is_ok());
     }
 
-    // #[test]
-    // fn can_call_deployment_plan_fn() {
-    //     let settings = SessionSettings::default();
-    //     let mut session = Session::new(settings);
-    //     session.load_boot_contracts();
-    //     // session.start().expect("session could not start");
+    #[test]
+    fn can_call_boot_contract_fn() {
+        let settings = SessionSettings {
+            include_boot_contracts: vec!["pox-4".into()],
+            ..Default::default()
+        };
+        let mut session = Session::new(settings);
+        session.update_epoch(StacksEpochId::Epoch25);
+        session.load_boot_contracts();
 
-    //     // call pox4 get-info
-    //     let result = session.call_contract_fn(
-    //         format!("{}.pox4", BOOT_MAINNET_ADDRESS).as_str(),
-    //         "get-info",
-    //         &[],
-    //         BOOT_TESTNET_ADDRESS,
-    //         false,
-    //         false,
-    //         false,
-    //         "test".to_string(),
-    //     );
-    //     dbg!(result);
-    // }
+        let mut output: Vec<String> = vec![];
+        session.get_contracts(&mut output);
 
-    // #[test]
-    // fn can_call_custom_contract_fn() {
-    //     let settings = SessionSettings::default();
-    //     let mut session = Session::new(settings);
-    //     session.start().expect("session could not start");
-    //     session.update_epoch(StacksEpochId::Epoch25);
+        // call pox4 get-info
+        let result = session.call_contract_fn(
+            format!("{}.pox-4", BOOT_MAINNET_ADDRESS).as_str(),
+            "get-pox-info",
+            &[],
+            BOOT_TESTNET_ADDRESS,
+            false,
+            false,
+            false,
+            "test".to_string(),
+        );
+        assert_execution_result_value(
+            &result,
+            Value::okay(Value::Tuple(
+                TupleData::from_data(vec![
+                    ("min-amount-ustx".into(), Value::UInt(0)),
+                    ("reward-cycle-id".into(), Value::UInt(0)),
+                    ("prepare-cycle-length".into(), Value::UInt(50)),
+                    ("first-burnchain-block-height".into(), Value::UInt(0)),
+                    ("reward-cycle-length".into(), Value::UInt(1050)),
+                    ("total-liquid-supply-ustx".into(), Value::UInt(0)),
+                ])
+                .unwrap(),
+            ))
+            .unwrap(),
+        );
+    }
 
-    //     // deploy default contract
-    //     let contract = ClarityContractBuilder::default().build();
-    //     let _ = session.deploy_contract(&contract, None, false, None, None);
+    #[test]
+    fn can_call_custom_contract_fn() {
+        let settings = SessionSettings::default();
+        let mut session = Session::new(settings);
+        session.start().expect("session could not start");
+        session.update_epoch(StacksEpochId::Epoch25);
 
-    //     dbg!(&contract);
+        // deploy default contract
+        let contract = ClarityContractBuilder::default().build();
+        let _ = session.deploy_contract(&contract, None, false, None, None);
 
-    //     let result = session.call_contract_fn(
-    //         "contract",
-    //         "incr",
-    //         &[],
-    //         &session.get_tx_sender(),
-    //         false,
-    //         false,
-    //         false,
-    //         "test".to_owned(),
-    //     );
-    //     dbg!(&result);
+        dbg!(&contract);
 
-    //     let result = session.call_contract_fn(
-    //         "contract",
-    //         "get-x",
-    //         &[],
-    //         &session.get_tx_sender(),
-    //         false,
-    //         false,
-    //         false,
-    //         "test".to_owned(),
-    //     );
+        let result = session.call_contract_fn(
+            "contract",
+            "incr",
+            &[],
+            &session.get_tx_sender(),
+            false,
+            false,
+            false,
+            "test".to_owned(),
+        );
+        assert_execution_result_value(&result, Value::okay(Value::UInt(1)).unwrap());
 
-    //     dbg!(&result);
-    // }
+        let result = session.call_contract_fn(
+            "contract",
+            "get-x",
+            &[],
+            &session.get_tx_sender(),
+            false,
+            false,
+            false,
+            "test".to_owned(),
+        );
+        assert_execution_result_value(&result, Value::UInt(1));
+    }
 }
 
 #[cfg(not(feature = "wasm"))]

@@ -1221,26 +1221,10 @@ mod tests {
     }
 
     #[track_caller]
-    fn call_fn_and_assert_value(
-        interpreter: &mut ClarityInterpreter,
-        contract_id: &QualifiedContractIdentifier,
-        method: &str,
-        raw_args: &[Vec<u8>],
-        epoch: StacksEpochId,
-        clarity_version: ClarityVersion,
+    fn assert_execution_result_value(
+        result: Result<ExecutionResult, String>,
         expected_value: Value,
     ) {
-        let result = interpreter.call_contract_fn(
-            contract_id,
-            method,
-            raw_args,
-            epoch,
-            clarity_version,
-            false,
-            true,
-            None,
-        );
-
         assert!(result.is_ok());
         let result = result.unwrap();
         let result = match result.result {
@@ -1742,13 +1726,18 @@ mod tests {
         let contract_id =
             contract.expect_resolved_contract_identifier(Some(&StandardPrincipalData::transient()));
 
-        call_fn_and_assert_value(
-            &mut interpreter,
+        let result = interpreter.call_contract_fn(
             &contract_id,
             "get-height",
             &[],
             StacksEpochId::Epoch25,
             ClarityVersion::Clarity2,
+            false,
+            false,
+            None,
+        );
+        assert_execution_result_value(
+            result,
             Value::Tuple(
                 TupleData::from_data(vec![("block-height".into(), Value::UInt(0))]).unwrap(),
             ),
@@ -1756,13 +1745,18 @@ mod tests {
 
         interpreter.advance_chain_tip(10);
 
-        call_fn_and_assert_value(
-            &mut interpreter,
+        let result = interpreter.call_contract_fn(
             &contract_id,
             "get-height",
             &[],
             StacksEpochId::Epoch25,
             ClarityVersion::Clarity2,
+            false,
+            false,
+            None,
+        );
+        assert_execution_result_value(
+            result,
             Value::Tuple(
                 TupleData::from_data(vec![("block-height".into(), Value::UInt(10))]).unwrap(),
             ),
@@ -1804,13 +1798,18 @@ mod tests {
         let contract_id =
             contract.expect_resolved_contract_identifier(Some(&StandardPrincipalData::transient()));
 
-        call_fn_and_assert_value(
-            &mut interpreter,
+        let result = interpreter.call_contract_fn(
             &contract_id,
             "get-height",
             &[],
             StacksEpochId::Epoch30,
             ClarityVersion::Clarity2,
+            false,
+            false,
+            None,
+        );
+        assert_execution_result_value(
+            result,
             Value::Tuple(
                 TupleData::from_data(vec![("block-height".into(), Value::UInt(1))]).unwrap(),
             ),
@@ -1861,13 +1860,18 @@ mod tests {
         let contract_id =
             contract.expect_resolved_contract_identifier(Some(&StandardPrincipalData::transient()));
 
-        call_fn_and_assert_value(
-            &mut interpreter,
+        let result = interpreter.call_contract_fn(
             &contract_id,
             "get-height",
             &[],
             StacksEpochId::Epoch30,
             ClarityVersion::Clarity3,
+            false,
+            false,
+            None,
+        );
+        assert_execution_result_value(
+            result,
             Value::Tuple(
                 TupleData::from_data(vec![
                     ("stacks-block-height".into(), Value::UInt(1)),
@@ -1879,13 +1883,18 @@ mod tests {
 
         interpreter.advance_chain_tip(10);
 
-        call_fn_and_assert_value(
-            &mut interpreter,
+        let result = interpreter.call_contract_fn(
             &contract_id,
             "get-height",
             &[],
             StacksEpochId::Epoch30,
             ClarityVersion::Clarity3,
+            false,
+            false,
+            None,
+        );
+        assert_execution_result_value(
+            result,
             Value::Tuple(
                 TupleData::from_data(vec![
                     ("stacks-block-height".into(), Value::UInt(11)),
