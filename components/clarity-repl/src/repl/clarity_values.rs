@@ -166,4 +166,21 @@ mod tests {
         })));
         assert_eq!(s, "(list -321)");
     }
+
+    #[test]
+    fn test_value_to_uint8() {
+        let value = Value::Int(42);
+        let bytes = super::value_to_uint8(&value);
+        assert_eq!(
+            bytes,
+            vec![
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                0x00, 0x00, 0x2a
+            ]
+        );
+
+        let value = Value::Bool(true);
+        let bytes = super::value_to_uint8(&value);
+        assert_eq!(bytes, vec![0x03]);
+    }
 }
