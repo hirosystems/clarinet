@@ -141,7 +141,6 @@ pub fn update_session_with_deployment_plan(
     for batch in deployment.plan.batches.iter() {
         let epoch: StacksEpochId = match (batch.epoch, forced_min_epoch) {
             (Some(epoch), _) => epoch.into(),
-            (None, Some(min_epoch)) => std::cmp::max(min_epoch, DEFAULT_EPOCH),
             _ => DEFAULT_EPOCH,
         };
         session.advance_chain_tip(1);
@@ -171,7 +170,7 @@ pub fn update_session_with_deployment_plan(
                     contracts.insert(contract_id, result);
                 }
                 TransactionSpecification::EmulatedContractCall(tx) => {
-                    handle_emulated_contract_call(session, tx);
+                    let _ = handle_emulated_contract_call(session, tx);
                 }
                 TransactionSpecification::StxTransfer(tx) => {
                     handle_stx_transfer(session, tx);
@@ -222,24 +221,29 @@ fn handle_emulated_contract_publish(
     result
 }
 
-fn handle_emulated_contract_call(session: &mut Session, tx: &EmulatedContractCallSpecification) {
+/// Used to evalutate function arguments passed in deployment plans
+fn eval_clarity_string(session: &mut Session, snippet: &str) -> SymbolicExpression {
+    let eval_result = session.eval(snippet.to_string(), None, false);
+    let value = match eval_result.unwrap().result {
+        EvaluationResult::Contract(_) => unreachable!(),
+        EvaluationResult::Snippet(snippet_result) => snippet_result.result,
+    };
+    SymbolicExpression::atom_value(value)
+}
+
+fn handle_emulated_contract_call(
+    session: &mut Session,
+    tx: &EmulatedContractCallSpecification,
+) -> Result<ExecutionResult, Vec<Diagnostic>> {
     let default_tx_sender = session.get_tx_sender();
     session.set_tx_sender(tx.emulated_sender.to_string());
 
-    // params are passed as strings in deployment plan, and need to be evaluated into Clarity values
     let params: Vec<SymbolicExpression> = tx
         .parameters
         .iter()
-        .map(|p| {
-            let eval_result = session.eval(p.to_string(), None, false).unwrap();
-            let value = match eval_result.result {
-                EvaluationResult::Contract(_) => unreachable!(),
-                EvaluationResult::Snippet(snippet_result) => snippet_result.result,
-            };
-            SymbolicExpression::atom_value(value)
-        })
+        .map(|p| eval_clarity_string(session, p))
         .collect();
-    let contract_call_result = session.call_contract_fn(
+    let result = session.call_contract_fn(
         &tx.contract_id.to_string(),
         &tx.method.to_string(),
         &params,
@@ -249,11 +253,12 @@ fn handle_emulated_contract_call(session: &mut Session, tx: &EmulatedContractCal
         false,
         "deployment".to_string(),
     );
-    if let Err(errors) = contract_call_result {
+    if let Err(errors) = &result {
         println!("error: {:?}", errors.first().unwrap().message);
     }
 
     session.set_tx_sender(default_tx_sender);
+    result
 }
 
 pub async fn generate_default_deployment(
@@ -900,4 +905,184 @@ pub fn load_deployment(
         }
     };
     Ok(spec)
+}
+
+#[cfg(test)]
+mod tests {
+    use clarity_repl::repl::{clarity_values::to_raw_value, SessionSettings};
+    use stacks_codec::clarity::{vm::types::TupleData, ClarityName, ClarityVersion, Value};
+
+    use super::*;
+
+    static DEPLOYER: &str = "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM";
+
+    fn deploy_contract(
+        session: &mut Session,
+        name: &str,
+        source: &str,
+        epoch: StacksEpochId,
+    ) -> Result<ExecutionResult, Vec<Diagnostic>> {
+        let emulated_publish_spec = EmulatedContractPublishSpecification {
+            contract_name: ContractName::from(name),
+            emulated_sender: PrincipalData::parse_standard_principal(DEPLOYER).unwrap(),
+            source: source.to_string(),
+            clarity_version: ClarityVersion::Clarity2,
+            location: FileLocation::from_path_string("/contracts/contract_1.clar").unwrap(),
+        };
+
+        handle_emulated_contract_publish(session, &emulated_publish_spec, None, epoch, false)
+    }
+
+    #[test]
+    fn test_eval_clarity_string() {
+        let mut session = Session::new(SessionSettings::default());
+        let epoch = StacksEpochId::Epoch25;
+        session.update_epoch(epoch);
+
+        let result = eval_clarity_string(&mut session, "u1");
+        assert_eq!(result, SymbolicExpression::atom_value(Value::UInt(1)));
+
+        let result = eval_clarity_string(&mut session, "(+ 1 2)");
+        assert_eq!(result, SymbolicExpression::atom_value(Value::Int(3)));
+
+        let result = eval_clarity_string(&mut session, "(list u1 u2)");
+        assert_eq!(
+            result,
+            SymbolicExpression::atom_value(
+                Value::cons_list_unsanitized(vec![Value::UInt(1), Value::UInt(2)]).unwrap()
+            )
+        );
+
+        let result = eval_clarity_string(&mut session, "0x01");
+        assert_eq!(
+            result,
+            SymbolicExpression::atom_value(Value::buff_from_byte(0x01))
+        );
+    }
+
+    #[test]
+    fn test_handle_emulated_publish() {
+        let mut session = Session::new(SessionSettings::default());
+        let epoch = StacksEpochId::Epoch25;
+        session.update_epoch(epoch);
+
+        let snippet = "(define-public (plus-2 (n int)) (ok (+ n 2)))";
+        let result = deploy_contract(&mut session, "contract_1", snippet, epoch);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_handle_emulated_contract_call_with_simple_params() {
+        let mut session = Session::new(SessionSettings::default());
+        let epoch = StacksEpochId::Epoch25;
+        session.update_epoch(epoch);
+
+        let snippet = [
+            "(define-data-var x int 0)",
+            "(define-public (add (n int)) (ok (var-set x (+ (var-get x) n))))",
+        ]
+        .join("\n");
+        let result = deploy_contract(&mut session, "contract_1", &snippet, epoch);
+        assert!(result.is_ok());
+
+        let contract_id = QualifiedContractIdentifier::new(
+            PrincipalData::parse_standard_principal(DEPLOYER).unwrap(),
+            ContractName::from("contract_1"),
+        );
+
+        let contract_call_spec = EmulatedContractCallSpecification {
+            contract_id: contract_id.clone(),
+            emulated_sender: PrincipalData::parse_standard_principal(DEPLOYER).unwrap(),
+            method: ClarityName::from("add"),
+            parameters: vec!["1".to_string()],
+        };
+        let result = handle_emulated_contract_call(&mut session, &contract_call_spec);
+        assert!(result.is_ok());
+
+        let var_x = session.interpreter.get_data_var(&contract_id, "x");
+        assert_eq!(var_x, Some(to_raw_value(&Value::Int(1))));
+    }
+
+    #[test]
+    fn test_handle_emulated_contract_call_with_list() {
+        let mut session = Session::new(SessionSettings::default());
+        let epoch = StacksEpochId::Epoch25;
+        session.update_epoch(epoch);
+
+        let snippet = [
+            "(define-data-var sum int 0)",
+            "(define-public (set-sum (i int) (ns (list 10 int)))",
+            "  (ok (var-set sum (fold + ns i)))",
+            ")",
+        ]
+        .join("\n");
+        let result = deploy_contract(&mut session, "contract_1", &snippet, epoch);
+        assert!(result.is_ok());
+
+        let contract_id = QualifiedContractIdentifier::new(
+            PrincipalData::parse_standard_principal(DEPLOYER).unwrap(),
+            ContractName::from("contract_1"),
+        );
+
+        let contract_call_spec = EmulatedContractCallSpecification {
+            contract_id: contract_id.clone(),
+            emulated_sender: PrincipalData::parse_standard_principal(DEPLOYER).unwrap(),
+            method: ClarityName::from("set-sum"),
+            parameters: vec!["2".to_string(), "(list 20 20)".to_string()],
+        };
+        let result = handle_emulated_contract_call(&mut session, &contract_call_spec);
+        assert!(result.is_ok());
+
+        let var_x = session.interpreter.get_data_var(&contract_id, "sum");
+        assert_eq!(var_x, Some(to_raw_value(&Value::Int(42))));
+    }
+
+    #[test]
+    fn test_handle_emulated_contract_call_with_tuple() {
+        let mut session = Session::new(SessionSettings::default());
+        let epoch = StacksEpochId::Epoch25;
+        session.update_epoch(epoch);
+
+        let snippet = [
+            "(define-data-var data { a: int, b: uint } { a: 0, b: u0} )",
+            "(define-public (set-data (l { a: int }) (r { b: uint }))",
+            "  (ok (var-set data (merge l r)))",
+            ")",
+        ]
+        .join("\n");
+        let result = deploy_contract(&mut session, "contract_1", &snippet, epoch);
+        assert!(result.is_ok());
+
+        let contract_id = QualifiedContractIdentifier::new(
+            PrincipalData::parse_standard_principal(DEPLOYER).unwrap(),
+            ContractName::from("contract_1"),
+        );
+
+        let contract_call_spec = EmulatedContractCallSpecification {
+            contract_id: contract_id.clone(),
+            emulated_sender: PrincipalData::parse_standard_principal(DEPLOYER).unwrap(),
+            method: ClarityName::from("set-data"),
+            parameters: vec!["{ a: 2 }".to_string(), "{ b: u3 }".to_string()],
+        };
+        let result = handle_emulated_contract_call(&mut session, &contract_call_spec);
+        assert!(result.is_ok());
+
+        let data = session.interpreter.get_data_var(&contract_id, "data");
+        assert_eq!(
+            data,
+            Some(to_raw_value(&Value::Tuple(
+                TupleData::from_data(vec![
+                    (
+                        ClarityName::try_from("a".to_owned()).unwrap(),
+                        Value::Int(2),
+                    ),
+                    (
+                        ClarityName::try_from("b".to_owned()).unwrap(),
+                        Value::UInt(3),
+                    )
+                ])
+                .unwrap()
+            )))
+        );
+    }
 }
