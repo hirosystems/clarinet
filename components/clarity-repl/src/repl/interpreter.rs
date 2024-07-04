@@ -17,7 +17,6 @@ use clarity::vm::contracts::Contract;
 use clarity::vm::costs::{ExecutionCost, LimitedCostTracker};
 use clarity::vm::database::{ClarityDatabase, StoreType};
 use clarity::vm::diagnostic::{Diagnostic, Level};
-use clarity::vm::errors::Error;
 use clarity::vm::representations::SymbolicExpressionType::{Atom, List};
 use clarity::vm::representations::{Span, SymbolicExpression};
 use clarity::vm::types::{
@@ -835,7 +834,7 @@ impl ClarityInterpreter {
         &mut self,
         contract_id: &QualifiedContractIdentifier,
         method: &str,
-        raw_args: &[Vec<u8>],
+        args: &[SymbolicExpression],
         epoch: StacksEpochId,
         clarity_version: ClarityVersion,
         track_costs: bool,
@@ -890,18 +889,9 @@ impl ClarityInterpreter {
                 None,
             );
 
-            let mut args = vec![];
-            for arg in raw_args {
-                let value =
-                    Value::deserialize_read(&mut arg.as_slice(), None, false).map_err(|_| {
-                        Error::Unchecked(clarity::vm::errors::CheckErrors::InvalidUTF8Encoding)
-                    })?;
-                args.push(SymbolicExpression::atom_value(value));
-            }
-
             match allow_private {
-                true => env.execute_contract_allow_private(contract_id, method, &args, false),
-                false => env.execute_contract(contract_id, method, &args, false),
+                true => env.execute_contract_allow_private(contract_id, method, args, false),
+                false => env.execute_contract(contract_id, method, args, false),
             }
         });
 

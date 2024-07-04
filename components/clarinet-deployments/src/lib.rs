@@ -1,5 +1,5 @@
+use clarity_repl::clarity::vm::SymbolicExpression;
 use clarity_repl::clarity::StacksEpochId;
-use clarity_repl::repl::clarity_values::value_to_uint8;
 use clarity_repl::repl::{ClarityCodeSource, ClarityContract, ContractDeployer};
 use clarity_repl::repl::{DEFAULT_CLARITY_VERSION, DEFAULT_EPOCH};
 
@@ -36,10 +36,10 @@ use clarity_repl::repl::session::BOOT_CONTRACTS_DATA;
 use clarity_repl::repl::Session;
 use clarity_repl::repl::SessionSettings;
 use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
-use types::DeploymentGenerationArtifacts;
-use types::RequirementPublishSpecification;
 use types::TransactionSpecification;
 use types::{ContractPublishSpecification, EpochSpec};
+use types::{DeploymentGenerationArtifacts, StxTransferSpecification};
+use types::{EmulatedContractCallSpecification, RequirementPublishSpecification};
 
 pub type ExecutionResultMap =
     BTreeMap<QualifiedContractIdentifier, Result<ExecutionResult, Vec<Diagnostic>>>;
@@ -155,68 +155,26 @@ pub fn update_session_with_deployment_plan(
                 | TransactionSpecification::ContractPublish(_) => {
                     panic!("emulated-contract-call and emulated-contract-publish are the only operations admitted in simnet deployments")
                 }
-                TransactionSpecification::StxTransfer(tx) => {
-                    let default_tx_sender = session.get_tx_sender();
-                    session.set_tx_sender(tx.expected_sender.to_string());
-                    let _ = session.stx_transfer(tx.mstx_amount, &tx.recipient.to_string());
-                    session.set_tx_sender(default_tx_sender);
-                }
                 TransactionSpecification::EmulatedContractPublish(tx) => {
-                    let default_tx_sender = session.get_tx_sender();
-                    session.set_tx_sender(tx.emulated_sender.to_string());
-
                     let contract_id = QualifiedContractIdentifier::new(
                         tx.emulated_sender.clone(),
                         tx.contract_name.clone(),
                     );
                     let contract_ast = contracts_asts.as_ref().and_then(|m| m.get(&contract_id));
-                    let contract = ClarityContract {
-                        code_source: ClarityCodeSource::ContractInMemory(tx.source.clone()),
-                        deployer: ContractDeployer::Address(tx.emulated_sender.to_string()),
-                        name: tx.contract_name.to_string(),
-                        clarity_version: tx.clarity_version,
-                        epoch,
-                    };
-
-                    let result = session.deploy_contract(
-                        &contract,
-                        None,
-                        false,
-                        match code_coverage_enabled {
-                            true => Some("__analysis__".to_string()),
-                            false => None,
-                        },
+                    let result = handle_emulated_contract_publish(
+                        session,
+                        tx,
                         contract_ast,
+                        epoch,
+                        code_coverage_enabled,
                     );
                     contracts.insert(contract_id, result);
-                    session.set_tx_sender(default_tx_sender);
                 }
                 TransactionSpecification::EmulatedContractCall(tx) => {
-                    let params: Vec<Vec<u8>> = tx
-                        .parameters
-                        .iter()
-                        .map(|p| {
-                            let eval_result = session.eval(p.to_string(), None, false).unwrap();
-                            let value = match eval_result.result {
-                                EvaluationResult::Contract(_) => unreachable!(),
-                                EvaluationResult::Snippet(snippet_result) => snippet_result.result,
-                            };
-                            value_to_uint8(&value)
-                        })
-                        .collect();
-                    let contract_call_result = session.call_contract_fn(
-                        &tx.contract_id.to_string(),
-                        &tx.method.to_string(),
-                        &params,
-                        &tx.emulated_sender.to_string(),
-                        true,
-                        false,
-                        false,
-                        "deployment".to_string(),
-                    );
-                    if let Err(errors) = contract_call_result {
-                        println!("error: {:?}", errors.first().unwrap().message);
-                    }
+                    handle_emulated_contract_call(session, tx);
+                }
+                TransactionSpecification::StxTransfer(tx) => {
+                    handle_stx_transfer(session, tx);
                 }
             }
         }
@@ -225,6 +183,77 @@ pub fn update_session_with_deployment_plan(
         boot_contracts,
         contracts,
     }
+}
+
+fn handle_stx_transfer(session: &mut Session, tx: &StxTransferSpecification) {
+    let default_tx_sender = session.get_tx_sender();
+    session.set_tx_sender(tx.expected_sender.to_string());
+
+    let _ = session.stx_transfer(tx.mstx_amount, &tx.recipient.to_string());
+
+    session.set_tx_sender(default_tx_sender);
+}
+
+fn handle_emulated_contract_publish(
+    session: &mut Session,
+    tx: &EmulatedContractPublishSpecification,
+    contract_ast: Option<&ContractAST>,
+    epoch: StacksEpochId,
+    code_coverage_enabled: bool,
+) -> Result<ExecutionResult, Vec<Diagnostic>> {
+    let default_tx_sender = session.get_tx_sender();
+    session.set_tx_sender(tx.emulated_sender.to_string());
+
+    let contract = ClarityContract {
+        code_source: ClarityCodeSource::ContractInMemory(tx.source.clone()),
+        deployer: ContractDeployer::Address(tx.emulated_sender.to_string()),
+        name: tx.contract_name.to_string(),
+        clarity_version: tx.clarity_version,
+        epoch,
+    };
+    let test_name = if code_coverage_enabled {
+        Some("__analysis__".to_string())
+    } else {
+        None
+    };
+    let result = session.deploy_contract(&contract, None, false, test_name, contract_ast);
+
+    session.set_tx_sender(default_tx_sender);
+    result
+}
+
+fn handle_emulated_contract_call(session: &mut Session, tx: &EmulatedContractCallSpecification) {
+    let default_tx_sender = session.get_tx_sender();
+    session.set_tx_sender(tx.emulated_sender.to_string());
+
+    // params are passed as strings in deployment plan, and need to be evaluated into Clarity values
+    let params: Vec<SymbolicExpression> = tx
+        .parameters
+        .iter()
+        .map(|p| {
+            let eval_result = session.eval(p.to_string(), None, false).unwrap();
+            let value = match eval_result.result {
+                EvaluationResult::Contract(_) => unreachable!(),
+                EvaluationResult::Snippet(snippet_result) => snippet_result.result,
+            };
+            SymbolicExpression::atom_value(value)
+        })
+        .collect();
+    let contract_call_result = session.call_contract_fn(
+        &tx.contract_id.to_string(),
+        &tx.method.to_string(),
+        &params,
+        &tx.emulated_sender.to_string(),
+        true,
+        false,
+        false,
+        "deployment".to_string(),
+    );
+    if let Err(errors) = contract_call_result {
+        println!("error: {:?}", errors.first().unwrap().message);
+    }
+
+    session.set_tx_sender(default_tx_sender);
 }
 
 pub async fn generate_default_deployment(

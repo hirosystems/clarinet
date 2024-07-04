@@ -1,5 +1,4 @@
 use super::boot::{STACKS_BOOT_CODE_MAINNET, STACKS_BOOT_CODE_TESTNET};
-use super::clarity_values::uint8_to_string;
 use super::diagnostic::output_diagnostic;
 use super::{ClarityCodeSource, ClarityContract, ClarityInterpreter, ContractDeployer};
 use crate::analysis::coverage::TestCoverageReport;
@@ -20,6 +19,7 @@ use clarity::vm::types::{
 use clarity::vm::variables::NativeVariables;
 use clarity::vm::{
     ClarityVersion, CostSynthesis, EvalHook, EvaluationResult, ExecutionResult, ParsedContract,
+    SymbolicExpression,
 };
 use std::collections::{BTreeMap, HashMap};
 use std::fmt;
@@ -568,7 +568,7 @@ impl Session {
         &mut self,
         contract: &str,
         method: &str,
-        args: &[Vec<u8>],
+        args: &[SymbolicExpression],
         sender: &str,
         allow_private: bool,
         track_costs: bool,
@@ -625,7 +625,7 @@ impl Session {
                 test_name,
                 contract_id: contract_id_str,
                 method: method.to_string(),
-                args: args.iter().map(|a| uint8_to_string(a)).collect(),
+                args: args.iter().map(|a| a.to_string()).collect(),
                 cost_result: cost.clone(),
             });
         }

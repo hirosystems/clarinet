@@ -5,15 +5,10 @@ use clarity::vm::{
 use clarity::{codec::StacksMessageCodec, util::hash};
 
 pub fn to_raw_value(value: &Value) -> String {
-    let mut bytes = vec![];
-    value
-        .consensus_serialize(&mut bytes)
-        .unwrap_or_else(|e| panic!("failed to parse clarity value: {}", e));
-    let raw_value = bytes
-        .iter()
-        .map(|b| format!("{:02x}", b))
-        .collect::<Vec<String>>();
-    format!("0x{}", raw_value.join(""))
+    let hex = value
+        .serialize_to_hex()
+        .unwrap_or_else(|_e| panic!("failed to parse clarity value: {}", value));
+    format!("0x{}", hex)
 }
 
 pub fn uint8_to_string(value: &[u8]) -> String {
@@ -23,14 +18,6 @@ pub fn uint8_to_string(value: &[u8]) -> String {
 pub fn uint8_to_value(mut value: &[u8]) -> Value {
     Value::consensus_deserialize(&mut value)
         .unwrap_or_else(|e| panic!("failed to parse clarity value: {}", e))
-}
-
-pub fn value_to_uint8(value: &Value) -> Vec<u8> {
-    let mut bytes = vec![];
-    value
-        .consensus_serialize(&mut bytes)
-        .unwrap_or_else(|e| panic!("failed to parse clarity value: {}", e));
-    bytes
 }
 
 pub fn value_to_string(value: &Value) -> String {
@@ -165,22 +152,5 @@ mod tests {
             type_signature: ListTypeData::new_list(TypeSignature::IntType, 2).unwrap(),
         })));
         assert_eq!(s, "(list -321)");
-    }
-
-    #[test]
-    fn test_value_to_uint8() {
-        let value = Value::Int(42);
-        let bytes = super::value_to_uint8(&value);
-        assert_eq!(
-            bytes,
-            vec![
-                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                0x00, 0x00, 0x2a
-            ]
-        );
-
-        let value = Value::Bool(true);
-        let bytes = super::value_to_uint8(&value);
-        assert_eq!(bytes, vec![0x03]);
     }
 }

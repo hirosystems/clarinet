@@ -15,7 +15,9 @@ use clarity_repl::clarity::analysis::contract_interface_builder::{
 };
 use clarity_repl::clarity::ast::ContractAST;
 use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
-use clarity_repl::clarity::{ClarityVersion, EvaluationResult, ExecutionResult, StacksEpochId};
+use clarity_repl::clarity::{
+    ClarityVersion, EvaluationResult, ExecutionResult, StacksEpochId, SymbolicExpression,
+};
 use clarity_repl::repl::clarity_values::{uint8_to_string, uint8_to_value};
 use clarity_repl::repl::session::BOOT_CONTRACTS_DATA;
 use clarity_repl::repl::{
@@ -91,7 +93,7 @@ impl CallFnArgs {
         Self {
             contract,
             method,
-            args: args.iter().map(|a| a.to_vec()).collect::<Vec<Vec<u8>>>(),
+            args: args.iter().map(|a| a.to_vec()).collect(),
             sender,
         }
     }
@@ -675,12 +677,17 @@ impl SDK {
             track_coverage,
         } = self.options;
 
+        let parsed_args = args
+            .iter()
+            .map(|a| SymbolicExpression::atom_value(uint8_to_value(a)))
+            .collect::<Vec<SymbolicExpression>>();
+
         let session = self.get_session_mut();
         let execution = session
             .call_contract_fn(
                 contract,
                 method,
-                args,
+                &parsed_args,
                 sender,
                 allow_private,
                 track_costs,
