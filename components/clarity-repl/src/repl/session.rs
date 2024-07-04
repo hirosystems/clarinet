@@ -1305,27 +1305,6 @@ mod tests {
     }
 
     #[test]
-    fn encode_simple() {
-        let mut session = Session::new(SessionSettings::default());
-        let mut output: Vec<String> = Vec::new();
-        session.encode(&mut output, "::encode 42");
-        assert_eq!(output.len(), 1);
-        assert_eq!(output[0], green!("000000000000000000000000000000002a"));
-    }
-
-    #[test]
-    fn encode_map() {
-        let mut session = Session::new(SessionSettings::default());
-        let mut output: Vec<String> = Vec::new();
-        session.encode(&mut output, "::encode { foo: \"hello\", bar: false }");
-        assert_eq!(output.len(), 1);
-        assert_eq!(
-            output[0],
-            green!("0c00000002036261720403666f6f0d0000000568656c6c6f")
-        );
-    }
-
-    #[test]
     fn epoch_switch() {
         let mut session = Session::new(SessionSettings::default());
         session.update_epoch(StacksEpochId::Epoch20);
@@ -1348,6 +1327,27 @@ mod tests {
             res.result,
             Value::some(Value::string_ascii_from_bytes("stack".as_bytes().to_vec()).unwrap())
                 .unwrap()
+        );
+    }
+
+    #[test]
+    fn encode_simple() {
+        let mut session = Session::new(SessionSettings::default());
+        let mut output: Vec<String> = Vec::new();
+        session.encode(&mut output, "::encode 42");
+        assert_eq!(output.len(), 1);
+        assert_eq!(output[0], green!("000000000000000000000000000000002a"));
+    }
+
+    #[test]
+    fn encode_map() {
+        let mut session = Session::new(SessionSettings::default());
+        let mut output: Vec<String> = Vec::new();
+        session.encode(&mut output, "::encode { foo: \"hello\", bar: false }");
+        assert_eq!(output.len(), 1);
+        assert_eq!(
+            output[0],
+            green!("0c00000002036261720403666f6f0d0000000568656c6c6f")
         );
     }
 
@@ -1601,7 +1601,7 @@ mod tests {
     }
 
     #[test]
-    fn can_call_custom_contract_fn() {
+    fn can_call_public_contract_fn() {
         let settings = SessionSettings::default();
         let mut session = Session::new(settings);
         session.start().expect("session could not start");

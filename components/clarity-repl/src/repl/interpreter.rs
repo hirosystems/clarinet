@@ -1667,7 +1667,7 @@ mod tests {
     #[test]
     fn can_run_boot_contracts() {
         let repl_settings = Settings {
-            clarity_wasm_mode: false,
+            clarity_wasm_mode: true,
             ..Default::default()
         };
         let mut interpreter =
