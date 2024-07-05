@@ -687,3 +687,132 @@ impl Datastore {
         format!("clarity-contract::{}", contract)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use clarity::types::StacksEpoch;
+
+    use super::*;
+
+    fn get_burn_datastore() -> BurnDatastore {
+        let constants = StacksConstants {
+            burn_start_height: 0,
+            pox_prepare_length: 50,
+            pox_reward_cycle_length: 1050,
+            pox_rejection_fraction: 0,
+        };
+        BurnDatastore::new(constants)
+    }
+
+    #[test]
+    fn test_advance_chain_tip() {
+        let mut datastore = get_burn_datastore();
+        datastore.advance_chain_tip(5);
+        assert_eq!(datastore.chain_height, 5);
+    }
+
+    #[test]
+    fn test_set_current_epoch() {
+        let mut datastore = get_burn_datastore();
+        let epoch_id = StacksEpochId::Epoch25;
+        datastore.set_current_epoch(epoch_id);
+        assert_eq!(datastore.current_epoch, epoch_id);
+    }
+
+    #[test]
+    fn test_get_v1_unlock_height() {
+        let datastore = get_burn_datastore();
+        assert_eq!(datastore.get_v1_unlock_height(), 0);
+    }
+
+    #[test]
+    fn test_get_v2_unlock_height() {
+        let datastore = get_burn_datastore();
+        assert_eq!(datastore.get_v2_unlock_height(), 0);
+    }
+
+    #[test]
+    fn test_get_v3_unlock_height() {
+        let datastore = get_burn_datastore();
+        assert_eq!(datastore.get_v3_unlock_height(), 0);
+    }
+
+    #[test]
+    fn test_get_pox_3_activation_height() {
+        let datastore = get_burn_datastore();
+        assert_eq!(datastore.get_pox_3_activation_height(), 0);
+    }
+
+    #[test]
+    fn test_get_pox_4_activation_height() {
+        let datastore = get_burn_datastore();
+        assert_eq!(datastore.get_pox_4_activation_height(), 0);
+    }
+
+    #[test]
+    fn test_get_tip_burn_block_height() {
+        let mut datastore = get_burn_datastore();
+        let chain_height = 10;
+        datastore.chain_height = chain_height;
+        let tip_burn_block_height = datastore.get_tip_burn_block_height();
+        assert_eq!(tip_burn_block_height, Some(chain_height));
+    }
+
+    #[test]
+    fn test_get_burn_start_height() {
+        let datastore = get_burn_datastore();
+        assert_eq!(datastore.get_burn_start_height(), 0);
+    }
+
+    #[test]
+    fn test_get_pox_prepare_length() {
+        let datastore = get_burn_datastore();
+        assert_eq!(datastore.get_pox_prepare_length(), 50);
+    }
+
+    #[test]
+    fn test_get_pox_reward_cycle_length() {
+        let datastore = get_burn_datastore();
+        assert_eq!(datastore.get_pox_reward_cycle_length(), 1050);
+    }
+
+    #[test]
+    fn test_get_pox_rejection_fraction() {
+        let datastore = get_burn_datastore();
+        assert_eq!(datastore.get_pox_rejection_fraction(), 0);
+    }
+
+    #[test]
+    fn test_get_stacks_epoch() {
+        let datastore = get_burn_datastore();
+        let height = 10;
+        let epoch = datastore.get_stacks_epoch(height);
+        assert_eq!(
+            epoch,
+            Some(StacksEpoch {
+                epoch_id: StacksEpochId::Epoch2_05,
+                start_height: 0,
+                end_height: u64::MAX,
+                block_limit: BLOCK_LIMIT_MAINNET,
+                network_epoch: PEER_VERSION_EPOCH_2_1,
+            })
+        );
+    }
+
+    #[test]
+    fn test_get_stacks_epoch_by_epoch_id() {
+        let datastore = get_burn_datastore();
+        let epoch_id = StacksEpochId::Epoch2_05;
+        let epoch = datastore.get_stacks_epoch_by_epoch_id(&epoch_id);
+        assert_eq!(
+            epoch,
+            Some(StacksEpoch {
+                epoch_id: StacksEpochId::Epoch2_05,
+                start_height: 0,
+                end_height: u64::MAX,
+                block_limit: BLOCK_LIMIT_MAINNET,
+                network_epoch: PEER_VERSION_EPOCH_2_1,
+            })
+        );
+    }
+}
