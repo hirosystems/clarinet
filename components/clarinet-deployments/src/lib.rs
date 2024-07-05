@@ -1085,4 +1085,36 @@ mod tests {
             )))
         );
     }
+
+    #[test]
+    fn test_stx_transfer() {
+        let mut session = Session::new(SessionSettings::default());
+        let epoch = StacksEpochId::Epoch25;
+        session.update_epoch(epoch);
+
+        let sender = "ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5";
+        let receiver = "ST2CY5V39NHDPWSXMW9QDT3HC3GD6Q6XX4CFRK9AG";
+        let sender_principal = PrincipalData::parse_standard_principal(sender).unwrap();
+        let receiver_principal = PrincipalData::parse_standard_principal(receiver).unwrap();
+
+        let _ = session
+            .interpreter
+            .mint_stx_balance(PrincipalData::Standard(sender_principal.clone()), 1000000);
+
+        let stx_transfer_spec = StxTransferSpecification {
+            expected_sender: sender_principal.clone(),
+            recipient: PrincipalData::Standard(receiver_principal).clone(),
+            mstx_amount: 1000,
+            cost: 0,
+            anchor_block_only: true,
+            memo: [0u8; 34],
+        };
+
+        handle_stx_transfer(&mut session, &stx_transfer_spec);
+
+        let assets_maps = session.interpreter.get_assets_maps();
+        let stx_maps = assets_maps.get("STX").unwrap();
+        assert_eq!(*stx_maps.get(sender).unwrap(), 999000);
+        assert_eq!(*stx_maps.get(receiver).unwrap(), 1000);
+    }
 }
