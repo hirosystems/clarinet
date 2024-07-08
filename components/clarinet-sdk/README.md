@@ -13,7 +13,6 @@ Clarinet 3.x.
 ## Contributing
 
 The clarinet-sdk requires a few steps to be built and tested locally.
-We'll look into simplifying this workflow in a future version.
 
 Clone the clarinet repo and `cd` into it:
 
@@ -35,30 +34,16 @@ The SDK mainly relies on two components:
 - the TS component: `components/clarinet-sdk`
 
 To work with these two packages locally, the first one needs to be built with
-wasm-pack and linked with: [npm link](https://docs.npmjs.com/cli/v8/commands/npm-link).
-
-Install [wasm-pack](https://rustwasm.github.io/wasm-pack/installer) and run:
+wasm-pack (install [wasm-pack](https://rustwasm.github.io/wasm-pack/installer)).
 
 ```sh
-cd components/clarinet-sdk-wasm
-wasm-pack build --release --scope hirosystems --out-dir pkg-node --target nodejs
-cd pkg-node
-npm link
+# build the wasm package
+npm run build:wasm
+# install dependencies and build the node package
+npm install
+# make sure the installation works
+npm test
 ```
-
-Go to the `clarinet-sdk` directory and link the package that was just built.
-It will tell npm to use it instead of the published version. You don't need to
-repeat the steps everytime the `clarinet-sdk-wasm` changes, it only needs to be
-rebuilt with wasm-pack and npm will use it.
-
-Built the TS project:
-
-```sh
-cd ../../clarinet-sdk
-npm link @hirosystems/clarinet-sdk-wasm
-```
-
-You can now run `npm test`, it wil be using the local version of `clarinet-sdk-wasm`
 
 ### Release
 
@@ -66,5 +51,7 @@ The Node.js and browser versions can be published with this single command.
 Make sure to check the check both packages versions first.
 
 ```sh
-npm publish -w node -w browser --tag beta
+# the wasm package must be published first
+# $ npm run publish:sdk-wasm
+npm run publish:sdk
 ```

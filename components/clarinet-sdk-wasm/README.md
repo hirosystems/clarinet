@@ -18,7 +18,7 @@ Under the hood, it will run `wasm-pack build` twice, once for each target.
 npm run build:wasm
 ```
 
-Alternatively, it's also possible to build the packages separately:
+Alternatively, it's also possible to build the packages separately. It should only be done for development purpose.
 
 **Build for node**
 
@@ -31,39 +31,6 @@ wasm-pack build --release --scope hirosystems --out-dir pkg-node --target nodejs
 ```sh
 wasm-pack build --release --scope hirosystems --out-dir pkg-browser --target web
 ```
-
-
-### Use the local version of the package
-
-#### NPM overrides
-
-In most of the situations, your project won't directly depend on this package, but instead on
-`@hirosystems/clarinet-sdk` or `@hirosystems/clarinet-sdk-browser`. If you want to use a local or
-a different version of `@hirosystems/clarinet-sdk-wasm` or `@hirosystems/clarinet-sdk-wasm-browser`,
-you can use the `overrides` setting in your package.json:
-
-```json
-  "overrides": {
-    "@hirosystems/clarinet-sdk": {
-      "@hirosystems/clarinet-sdk-wasm": "file:/<absolue-path-to>/clarinet/components/clarinet-sdk-wasm/pkg-node"
-    }
-  }
-```
-
-Or for the browser:
-
-```json
-  "overrides": {
-    "@hirosystems/clarinet-sdk-browser": {
-      "@hirosystems/clarinet-sdk-wasm-browser": "file:/<absolue-path-to>/clarinet/components/clarinet-sdk-wasm/pkg-browser"
-    }
-  }
-```
-
-#### NPM link
-
-The command `npm link` can be useful to run the unit tests in the `clarinet-sdk`.
-See the contribution section of `@hirosystems/clarinet-sdk` (`../clarinet-sdk/README.md).
 
 ### Release
 

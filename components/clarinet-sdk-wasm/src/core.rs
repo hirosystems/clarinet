@@ -349,11 +349,6 @@ impl SDK {
         Ok(())
     }
 
-    #[wasm_bindgen(js_name=getId)]
-    pub fn get_id(&mut self) -> String {
-        "hello-world-1".to_string()
-    }
-
     #[wasm_bindgen(js_name=initSession)]
     pub async fn init_session(&mut self, cwd: String, manifest_path: String) -> Result<(), String> {
         let cwd_path = PathBuf::from(cwd);
