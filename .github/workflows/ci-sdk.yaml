@@ -25,7 +25,7 @@ jobs:
           persist-credentials: false
 
   build_wasm_packages:
-    name: Build WASM packages
+    name: Build Wasm packages
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -36,8 +36,21 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Setup Rust toolchain
+        run: |
+          rustup toolchain install stable --profile minimal --component rustfmt
+          echo "RUST_VERSION_HASH=$(rustc --version | sha256sum | awk '{print $1}')" >> $GITHUB_ENV
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/
+            ./target/debug/build/
+          key: ${{ runner.os }}-rust-${{ env.RUST_VERSION_HASH }}-${{ hashFiles('./Cargo.lock') }}
+
       - name: Install wasm-pack
         run: npm install -g wasm-pack
 
-      - name: Build WASM packages
+      - name: Build Wasm packages
         run: npm run build:wasm
