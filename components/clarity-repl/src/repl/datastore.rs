@@ -299,7 +299,7 @@ impl ClarityBackingStore for Datastore {
         Some(&handle_contract_call_special_cases)
     }
 
-    #[cfg(not(feature = "wasm"))]
+    #[cfg(any(feature = "cli", feature = "cli"))]
     fn get_side_store(&mut self) -> &::clarity::rusqlite::Connection {
         panic!("Datastore cannot get_side_store")
     }
