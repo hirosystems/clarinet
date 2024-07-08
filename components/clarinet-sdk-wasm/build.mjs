@@ -1,16 +1,20 @@
 #!/usr/bin/node
 
 import { spawn } from "node:child_process";
-import { readFile, rm, writeFile } from "node:fs/promises";
+import fs from "node:fs/promises";
+import path from "node:path";
+
+// directory of the current file
+const rootDir = new URL(".", import.meta.url).pathname;
 
 /**
  * build
  */
 async function build() {
   console.log("Deleting pkg-node");
-  await rmIfExists("./pkg-node");
+  await rmIfExists(path.join(rootDir, "pkg-node"));
   console.log("Deleting pkg-browser");
-  await rmIfExists("./pkg-browser");
+  await rmIfExists(path.join(rootDir, "pkg-browser"));
 
   await Promise.all([
     execCommand("wasm-pack", [
@@ -47,7 +51,9 @@ async function build() {
 export const execCommand = async (command, args) => {
   console.log(`Building ${args[5]}`);
   return new Promise((resolve, reject) => {
-    const childProcess = spawn(command, args);
+    const childProcess = spawn(command, args, {
+      cwd: rootDir,
+    });
     childProcess.stdout.on("data", (data) => {
       process.stdout.write(data.toString());
     });
@@ -69,11 +75,11 @@ export const execCommand = async (command, args) => {
 
 /**
  * rmIfExists
- * @param {string} path
+ * @param {string} dirPath
  */
-async function rmIfExists(path) {
+async function rmIfExists(dirPath) {
   try {
-    await rm(path, { recursive: true, force: true });
+    await fs.rm(dirPath, { recursive: true, force: true });
   } catch (error) {
     if (error.code !== "ENOENT") {
       throw error;
@@ -85,14 +91,14 @@ async function rmIfExists(path) {
  * updatePackageName
  */
 async function updatePackageName() {
-  const filePath = "./pkg-browser/package.json";
+  const filePath = path.join(rootDir, "pkg-browser/package.json");
 
-  const fileData = await readFile(filePath, "utf-8");
+  const fileData = await fs.readFile(filePath, "utf-8");
   const updatedData = fileData.replace(
     '"name": "@hirosystems/clarinet-sdk-wasm"',
-    '"name": "@hirosystems/clarinet-sdk-wasm-browser"'
+    '"name": "@hirosystems/clarinet-sdk-wasm-browser"',
   );
-  await writeFile(filePath, updatedData, "utf-8");
+  await fs.writeFile(filePath, updatedData, "utf-8");
   console.log("✅ Package name updated successfully.");
 }
 
@@ -101,8 +107,7 @@ try {
   console.log("\n✅ Project successfully built.\n🚀 Ready to publish.");
   console.log("Run the following commands to publish");
   console.log("\n```");
-  console.log("$ cd pkg-node && npm publish --tag beta && cd ..");
-  console.log("$ cd pkg-browser && npm publish --tag beta && cd ..");
+  console.log("$ npm run publish:sdk-wasm");
   console.log("```\n");
 } catch (error) {
   console.error("❌ Error building:", error);

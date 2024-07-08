@@ -3,7 +3,7 @@ use js_sys::{Function as JsFunction, Promise};
 use serde::{Deserialize, Serialize};
 use serde_wasm_bindgen::{from_value as decode_from_js, to_value as encode_to_js};
 use std::collections::HashMap;
-use wasm_bindgen::prelude::*;
+use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::JsFuture;
 
 #[derive(Serialize, Deserialize)]

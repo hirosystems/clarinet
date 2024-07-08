@@ -60,20 +60,12 @@ reqwest = { version = "0.11", default-features = false, features = [
     "rustls-tls",
 ] }
 
-# WASM
-wasm-bindgen = { version = "0.2.91", optional = true }
-wasm-bindgen-futures = { version = "0.4.41", optional = true }
-
 [dev-dependencies]
 test-case = "*"
 
 [lib]
 name = "clarity_repl"
 path = "src/lib.rs"
-# Default type
-# crate-type = ["lib"]
-# Use this instead for WASM builds
-crate-type = ["cdylib", "rlib"]
 
 [[bin]]
 name = "clarity-repl"
@@ -111,15 +103,8 @@ dap = [
     "log",
 ]
 wasm = [
-    "wasm-bindgen",
-    "wasm-bindgen-futures",
     "clarity/wasm",
     "clarity/developer-mode",
     "clarity/devtools",
     "pox-locking/wasm"
 ]
-
-[package.metadata.wasm-pack.profile.release.wasm-bindgen]
-debug-js-glue = false
-demangle-name-section = false
-dwarf-debug-info = false

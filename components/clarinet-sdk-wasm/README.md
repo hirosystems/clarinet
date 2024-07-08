@@ -11,6 +11,15 @@ It powers [@hirosystems/clarinet-sdk](https://npmjs.com/package/@hirosystems/cla
 
 Install [wasm-pack](https://rustwasm.github.io/wasm-pack/installer/).
 
+In the root directory of Clarinet, run the following command to build the packages for Node.js and the browser.
+Under the hood, it will run `wasm-pack build` twice, once for each target.
+
+```sh
+npm run build:wasm
+```
+
+Alternatively, it's also possible to build the packages separately:
+
 **Build for node**
 
 ```sh
@@ -23,11 +32,6 @@ wasm-pack build --release --scope hirosystems --out-dir pkg-node --target nodejs
 wasm-pack build --release --scope hirosystems --out-dir pkg-browser --target web
 ```
 
-Run this script to build **both versions**:
-
-```sh
-node build.mjs
-```
 
 ### Use the local version of the package
 
@@ -68,14 +72,12 @@ The following script will build for both target, it will also rename the package
 browser build.
 
 ```sh
-cd components/clarinet-sdk-wasm
-node build.mjs
+npm run build:wasm
 ```
 
-Once built, the packages can be released by running the following commands. Note that by default we
+Once built, the packages can be released by running the following command. Note that by default we
 release with the beta tag. 
 
 ```sh
-cd pkg-node && npm publish --tag beta && cd ..
-cd pkg-browser && npm publish --tag beta && cd ..
+npm run publish:sdk-wasm
 ```
