@@ -56,7 +56,7 @@ jobs:
       - name: Build Wasm packages
         run: npm run build:wasm
 
-  run_clarinet_js_sdk_test
+  run_clarinet_js_sdk_test:
     name: Run Clarinet JS SDK tests
     runs-on: ubuntu-latest
     needs: build_wasm_packages
