@@ -18,7 +18,6 @@
     "publish-sdk-wasm": "npm publish -w components/clarinet-sdk-wasm/pkg-node -w components/clarinet-sdk-wasm/pkg-browser --tag beta",
     "publish-sdk": "npm publish -w components/clarinet-sdk/node -w components/clarinet-sdk/browser --tag beta"
   },
-  "dependencies": {},
   "devDependencies": {
     "@types/node": "^20.4.5",
     "@types/prompts": "^2.4.5",

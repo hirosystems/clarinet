@@ -1,0 +1,43 @@
+name: CI - Clarinet SDK
+on:
+  pull_request:
+    branches:
+      - main
+    paths-ignore:
+      - "**/CHANGELOG.md"
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - "**/CHANGELOG.md"
+
+  workflow_dispatch:
+
+jobs:
+  pre_run:
+    name: Cancel previous runs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Cancel Previous Runs
+        uses: styfle/cancel-workflow-action@0.12.1
+        with:
+          access_token: ${{ github.token }}
+          persist-credentials: false
+
+  build_wasm_packages:
+    name: Build WASM packages
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install wasm-pack
+        run: npm install -g wasm-pack
+
+      - name: Build WASM packages
+        run: npm run build:wasm
