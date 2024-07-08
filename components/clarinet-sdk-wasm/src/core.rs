@@ -4,8 +4,8 @@ use clarinet_deployments::types::{
     TransactionSpecification,
 };
 use clarinet_deployments::{
-    generate_default_deployment, initiate_session_from_deployment,
-    update_session_with_contracts_executions, update_session_with_genesis_accounts,
+    generate_default_deployment, initiate_session_from_manifest,
+    update_session_with_deployment_plan,
 };
 use clarinet_files::chainhook_types::StacksNetwork;
 use clarinet_files::{FileAccessor, FileLocation, ProjectManifest, WASMFileSystemAccessor};
@@ -15,7 +15,9 @@ use clarity_repl::clarity::analysis::contract_interface_builder::{
 };
 use clarity_repl::clarity::ast::ContractAST;
 use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
-use clarity_repl::clarity::{ClarityVersion, EvaluationResult, ExecutionResult, StacksEpochId};
+use clarity_repl::clarity::{
+    ClarityVersion, EvaluationResult, ExecutionResult, StacksEpochId, SymbolicExpression,
+};
 use clarity_repl::repl::clarity_values::{uint8_to_string, uint8_to_value};
 use clarity_repl::repl::session::BOOT_CONTRACTS_DATA;
 use clarity_repl::repl::{
@@ -91,7 +93,7 @@ impl CallFnArgs {
         Self {
             contract,
             method,
-            args: args.iter().map(|a| a.to_vec()).collect::<Vec<Vec<u8>>>(),
+            args: args.iter().map(|a| a.to_vec()).collect(),
             sender,
         }
     }
@@ -420,9 +422,8 @@ impl SDK {
                 .await?;
         }
 
-        let mut session = initiate_session_from_deployment(&manifest);
-        update_session_with_genesis_accounts(&mut session, &deployment);
-        let executed_contracts = update_session_with_contracts_executions(
+        let mut session = initiate_session_from_manifest(&manifest);
+        let executed_contracts = update_session_with_deployment_plan(
             &mut session,
             &deployment,
             Some(&artifacts.asts),
@@ -676,12 +677,17 @@ impl SDK {
             track_coverage,
         } = self.options;
 
+        let parsed_args = args
+            .iter()
+            .map(|a| SymbolicExpression::atom_value(uint8_to_value(a)))
+            .collect::<Vec<SymbolicExpression>>();
+
         let session = self.get_session_mut();
         let execution = session
             .call_contract_fn(
                 contract,
                 method,
-                args,
+                &parsed_args,
                 sender,
                 allow_private,
                 track_costs,
@@ -796,13 +802,7 @@ impl SDK {
                 epoch: session.current_epoch,
             };
 
-            match session.deploy_contract(
-                &contract,
-                None,
-                false,
-                Some(args.name.clone()),
-                &mut None,
-            ) {
+            match session.deploy_contract(&contract, None, false, Some(args.name.clone()), None) {
                 Ok(res) => res,
                 Err(diagnostics) => {
                     let mut message = format!(

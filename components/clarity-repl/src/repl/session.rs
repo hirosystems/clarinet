@@ -1,8 +1,8 @@
 use super::boot::{STACKS_BOOT_CODE_MAINNET, STACKS_BOOT_CODE_TESTNET};
-use super::clarity_values::uint8_to_string;
 use super::diagnostic::output_diagnostic;
 use super::{ClarityCodeSource, ClarityContract, ClarityInterpreter, ContractDeployer};
 use crate::analysis::coverage::TestCoverageReport;
+use crate::repl::clarity_values::value_to_string;
 use crate::repl::Settings;
 use crate::utils;
 use clarity::codec::StacksMessageCodec;
@@ -19,6 +19,7 @@ use clarity::vm::types::{
 use clarity::vm::variables::NativeVariables;
 use clarity::vm::{
     ClarityVersion, CostSynthesis, EvalHook, EvaluationResult, ExecutionResult, ParsedContract,
+    SymbolicExpression,
 };
 use std::collections::{BTreeMap, HashMap};
 use std::fmt;
@@ -140,20 +141,24 @@ impl Session {
 
         let boot_testnet_deployer = BOOT_TESTNET_PRINCIPAL.clone();
         self.interpreter.set_tx_sender(boot_testnet_deployer);
-        self.include_boot_contracts(false);
+        self.deploy_boot_contracts(false);
 
         let boot_mainnet_deployer = BOOT_MAINNET_PRINCIPAL.clone();
         self.interpreter.set_tx_sender(boot_mainnet_deployer);
-        self.include_boot_contracts(true);
+        self.deploy_boot_contracts(true);
+
         self.interpreter.set_tx_sender(default_tx_sender);
     }
 
-    pub fn include_boot_contracts(&mut self, mainnet: bool) {
+    fn deploy_boot_contracts(&mut self, mainnet: bool) {
         let boot_code = if mainnet {
             *STACKS_BOOT_CODE_MAINNET
         } else {
             *STACKS_BOOT_CODE_TESTNET
         };
+
+        let tx_sender = self.interpreter.get_tx_sender();
+        let deployer = ContractDeployer::Address(tx_sender.to_address());
 
         for (name, code) in boot_code.iter() {
             if self
@@ -176,12 +181,13 @@ impl Session {
                 let contract = ClarityContract {
                     code_source: ClarityCodeSource::ContractInMemory(code.to_string()),
                     name: name.to_string(),
-                    deployer: ContractDeployer::DefaultDeployer,
+                    deployer: deployer.clone(),
                     clarity_version,
                     epoch,
                 };
-                let _ = self.deploy_contract(&contract, None, false, None, &mut None);
+
                 // Result ignored, boot contracts are trusted to be valid
+                let _ = self.deploy_contract(&contract, None, false, None, None);
             }
         }
     }
@@ -502,7 +508,7 @@ impl Session {
         eval_hooks: Option<Vec<&mut dyn EvalHook>>,
         cost_track: bool,
         test_name: Option<String>,
-        ast: &mut Option<ContractAST>,
+        ast: Option<&ContractAST>,
     ) -> Result<ExecutionResult, Vec<Diagnostic>> {
         if contract.epoch != self.current_epoch {
             let diagnostic = Diagnostic {
@@ -558,73 +564,11 @@ impl Session {
         })
     }
 
-    pub fn invoke_contract_call(
-        &mut self,
-        contract: &str,
-        method: &str,
-        args: &[String],
-        sender: &str,
-        test_name: String,
-    ) -> Result<(ExecutionResult, QualifiedContractIdentifier), Vec<Diagnostic>> {
-        let initial_tx_sender = self.get_tx_sender();
-        // Handle fully qualified contract_id and sugared syntax
-        let contract_id = if contract.starts_with('S') {
-            contract.to_string()
-        } else {
-            format!("{}.{}", initial_tx_sender, contract)
-        };
-
-        let mut hooks: Vec<&mut dyn EvalHook> = vec![];
-        let mut coverage = TestCoverageReport::new(test_name.clone());
-        hooks.push(&mut coverage);
-
-        let contract_call = format!(
-            "(contract-call? '{} {} {})",
-            contract_id,
-            method,
-            args.join(" ")
-        );
-        let contract_call = ClarityContract {
-            code_source: ClarityCodeSource::ContractInMemory(contract_call),
-            name: "contract-call".to_string(),
-            deployer: ContractDeployer::Address(sender.to_string()),
-            epoch: self.current_epoch,
-            clarity_version: ClarityVersion::default_for_epoch(self.current_epoch),
-        };
-
-        self.set_tx_sender(sender.into());
-        let execution = match self
-            .interpreter
-            .run(&contract_call, &mut None, true, Some(hooks))
-        {
-            Ok(result) => result,
-            Err(e) => {
-                self.set_tx_sender(initial_tx_sender);
-                return Err(e);
-            }
-        };
-        self.set_tx_sender(initial_tx_sender);
-        self.coverage_reports.push(coverage);
-
-        let contract_identifier = QualifiedContractIdentifier::parse(&contract_id).unwrap();
-        if let Some(ref cost) = execution.cost {
-            self.costs_reports.push(CostsReport {
-                test_name,
-                contract_id,
-                method: method.to_string(),
-                args: args.to_vec(),
-                cost_result: cost.clone(),
-            });
-        }
-
-        Ok((execution, contract_identifier))
-    }
-
     pub fn call_contract_fn(
         &mut self,
         contract: &str,
         method: &str,
-        args: &[Vec<u8>],
+        args: &[SymbolicExpression],
         sender: &str,
         allow_private: bool,
         track_costs: bool,
@@ -681,7 +625,7 @@ impl Session {
                 test_name,
                 contract_id: contract_id_str,
                 method: method.to_string(),
-                args: args.iter().map(|a| uint8_to_string(a)).collect(),
+                args: args.iter().map(|a| a.to_string()).collect(),
                 cost_result: cost.clone(),
             });
         }
@@ -707,7 +651,7 @@ impl Session {
 
         let result = self
             .interpreter
-            .run(&contract.clone(), &mut None, cost_track, eval_hooks);
+            .run(&contract.clone(), None, cost_track, eval_hooks);
 
         match result {
             Ok(result) => {
@@ -1027,7 +971,7 @@ impl Session {
             Ok(value) => value,
             Err(e) => return output.push(red!(format!("{}", e))),
         };
-        output.push(green!(format!("{}", crate::utils::value_to_string(&value))));
+        output.push(green!(format!("{}", value_to_string(&value))));
     }
 
     pub fn get_costs(&mut self, output: &mut Vec<String>, cmd: &str) {
@@ -1324,9 +1268,25 @@ fn clarity_keywords() -> HashMap<String, String> {
 #[allow(clippy::items_after_test_module)]
 #[cfg(test)]
 mod tests {
+    use clarity::vm::types::TupleData;
+
     use crate::{repl::settings::Account, test_fixtures::clarity_contract::ClarityContractBuilder};
 
     use super::*;
+
+    #[track_caller]
+    fn assert_execution_result_value(
+        result: &Result<ExecutionResult, Vec<Diagnostic>>,
+        expected_value: Value,
+    ) {
+        assert!(result.is_ok());
+        let result = result.as_ref().unwrap();
+        let result = match &result.result {
+            EvaluationResult::Contract(_) => unreachable!(),
+            EvaluationResult::Snippet(res) => res,
+        };
+        assert_eq!(result.result, expected_value);
+    }
 
     #[test]
     fn initial_accounts() {
@@ -1342,27 +1302,6 @@ mod tests {
         let _ = session.start();
         let balance = session.interpreter.get_balance_for_account(address, "STX");
         assert_eq!(balance, 1000000);
-    }
-
-    #[test]
-    fn encode_simple() {
-        let mut session = Session::new(SessionSettings::default());
-        let mut output: Vec<String> = Vec::new();
-        session.encode(&mut output, "::encode 42");
-        assert_eq!(output.len(), 1);
-        assert_eq!(output[0], green!("000000000000000000000000000000002a"));
-    }
-
-    #[test]
-    fn encode_map() {
-        let mut session = Session::new(SessionSettings::default());
-        let mut output: Vec<String> = Vec::new();
-        session.encode(&mut output, "::encode { foo: \"hello\", bar: false }");
-        assert_eq!(output.len(), 1);
-        assert_eq!(
-            output[0],
-            green!("0c00000002036261720403666f6f0d0000000568656c6c6f")
-        );
     }
 
     #[test]
@@ -1388,6 +1327,27 @@ mod tests {
             res.result,
             Value::some(Value::string_ascii_from_bytes("stack".as_bytes().to_vec()).unwrap())
                 .unwrap()
+        );
+    }
+
+    #[test]
+    fn encode_simple() {
+        let mut session = Session::new(SessionSettings::default());
+        let mut output: Vec<String> = Vec::new();
+        session.encode(&mut output, "::encode 42");
+        assert_eq!(output.len(), 1);
+        assert_eq!(output[0], green!("000000000000000000000000000000002a"));
+    }
+
+    #[test]
+    fn encode_map() {
+        let mut session = Session::new(SessionSettings::default());
+        let mut output: Vec<String> = Vec::new();
+        session.encode(&mut output, "::encode { foo: \"hello\", bar: false }");
+        assert_eq!(output.len(), 1);
+        assert_eq!(
+            output[0],
+            green!("0c00000002036261720403666f6f0d0000000568656c6c6f")
         );
     }
 
@@ -1452,7 +1412,7 @@ mod tests {
             "::decode 0x0c00000002036261720403666f6f0d0000000568656c6c6f",
         );
         assert_eq!(output.len(), 1);
-        assert_eq!(output[0], green!("{bar: false, foo: \"hello\"}"));
+        assert_eq!(output[0], green!("{ bar: false, foo: \"hello\" }"));
     }
 
     #[test]
@@ -1489,7 +1449,7 @@ mod tests {
             epoch: StacksEpochId::Epoch2_05,
         };
 
-        let result = session.deploy_contract(&contract, None, false, None, &mut None);
+        let result = session.deploy_contract(&contract, None, false, None, None);
         assert!(result.is_err(), "Expected error for clarity mismatch");
     }
 
@@ -1507,7 +1467,7 @@ mod tests {
             .clarity_version(ClarityVersion::Clarity2)
             .build();
 
-        let result = session.deploy_contract(&contract, None, false, None, &mut None);
+        let result = session.deploy_contract(&contract, None, false, None, None);
         assert!(result.is_err());
         let err = result.unwrap_err();
         assert!(err.len() == 1);
@@ -1547,7 +1507,7 @@ mod tests {
             epoch: StacksEpochId::Epoch25,
         };
 
-        let _ = session.deploy_contract(&contract, None, false, None, &mut None);
+        let _ = session.deploy_contract(&contract, None, false, None, None);
 
         // assert data-var is set to 0
         assert_eq!(
@@ -1584,6 +1544,98 @@ mod tests {
             green!("u2")
         );
         assert_eq!(session.handle_command("(at-block (unwrap-panic (get-block-info? id-header-hash u10000)) (contract-call? .contract get-x))").1[0], green!("u1"));
+    }
+
+    #[test]
+    fn can_deploy_a_contract() {
+        let settings = SessionSettings::default();
+        let mut session = Session::new(settings);
+        session.start().expect("session could not start");
+        session.update_epoch(StacksEpochId::Epoch25);
+
+        // deploy default contract
+        let contract = ClarityContractBuilder::default().build();
+        let result = session.deploy_contract(&contract, None, false, None, None);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn can_call_boot_contract_fn() {
+        let settings = SessionSettings {
+            include_boot_contracts: vec!["pox-4".into()],
+            ..Default::default()
+        };
+        let mut session = Session::new(settings);
+        session.update_epoch(StacksEpochId::Epoch25);
+        session.load_boot_contracts();
+
+        let mut output: Vec<String> = vec![];
+        session.get_contracts(&mut output);
+
+        // call pox4 get-info
+        let result = session.call_contract_fn(
+            format!("{}.pox-4", BOOT_MAINNET_ADDRESS).as_str(),
+            "get-pox-info",
+            &[],
+            BOOT_TESTNET_ADDRESS,
+            false,
+            false,
+            false,
+            "test".to_string(),
+        );
+        assert_execution_result_value(
+            &result,
+            Value::okay(Value::Tuple(
+                TupleData::from_data(vec![
+                    ("min-amount-ustx".into(), Value::UInt(0)),
+                    ("reward-cycle-id".into(), Value::UInt(0)),
+                    ("prepare-cycle-length".into(), Value::UInt(50)),
+                    ("first-burnchain-block-height".into(), Value::UInt(0)),
+                    ("reward-cycle-length".into(), Value::UInt(1050)),
+                    ("total-liquid-supply-ustx".into(), Value::UInt(0)),
+                ])
+                .unwrap(),
+            ))
+            .unwrap(),
+        );
+    }
+
+    #[test]
+    fn can_call_public_contract_fn() {
+        let settings = SessionSettings::default();
+        let mut session = Session::new(settings);
+        session.start().expect("session could not start");
+        session.update_epoch(StacksEpochId::Epoch25);
+
+        // deploy default contract
+        let contract = ClarityContractBuilder::default().build();
+        let _ = session.deploy_contract(&contract, None, false, None, None);
+
+        dbg!(&contract);
+
+        let result = session.call_contract_fn(
+            "contract",
+            "incr",
+            &[],
+            &session.get_tx_sender(),
+            false,
+            false,
+            false,
+            "test".to_owned(),
+        );
+        assert_execution_result_value(&result, Value::okay(Value::UInt(1)).unwrap());
+
+        let result = session.call_contract_fn(
+            "contract",
+            "get-x",
+            &[],
+            &session.get_tx_sender(),
+            false,
+            false,
+            false,
+            "test".to_owned(),
+        );
+        assert_execution_result_value(&result, Value::UInt(1));
     }
 }
 

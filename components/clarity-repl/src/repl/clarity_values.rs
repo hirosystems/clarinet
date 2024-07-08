@@ -5,15 +5,10 @@ use clarity::vm::{
 use clarity::{codec::StacksMessageCodec, util::hash};
 
 pub fn to_raw_value(value: &Value) -> String {
-    let mut bytes = vec![];
-    value
-        .consensus_serialize(&mut bytes)
-        .unwrap_or_else(|e| panic!("failed to parse clarity value: {}", e));
-    let raw_value = bytes
-        .iter()
-        .map(|b| format!("{:02x}", b))
-        .collect::<Vec<String>>();
-    format!("0x{}", raw_value.join(""))
+    let hex = value
+        .serialize_to_hex()
+        .unwrap_or_else(|_e| panic!("failed to parse clarity value: {}", value));
+    format!("0x{}", hex)
 }
 
 pub fn uint8_to_string(value: &[u8]) -> String {
@@ -25,7 +20,7 @@ pub fn uint8_to_value(mut value: &[u8]) -> Value {
         .unwrap_or_else(|e| panic!("failed to parse clarity value: {}", e))
 }
 
-fn value_to_string(value: &Value) -> String {
+pub fn value_to_string(value: &Value) -> String {
     match value {
         Value::Principal(principal_data) => {
             format!("'{principal_data}")
