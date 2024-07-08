@@ -15,7 +15,7 @@ In the root directory of Clarinet, run the following command to build the packag
 Under the hood, it will run `wasm-pack build` twice, once for each target.
 
 ```sh
-npm run compile-wasm
+npm run build:wasm
 ```
 
 Alternatively, it's also possible to build the packages separately:
@@ -72,12 +72,12 @@ The following script will build for both target, it will also rename the package
 browser build.
 
 ```sh
-npm run compile-wasm
+npm run build:wasm
 ```
 
 Once built, the packages can be released by running the following command. Note that by default we
 release with the beta tag. 
 
 ```sh
-npm run publish-sdk-wasm
+npm run publish:sdk-wasm
 ```
