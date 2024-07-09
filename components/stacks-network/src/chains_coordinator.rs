@@ -34,7 +34,6 @@ use clarity_repl::clarity::PublicKey;
 use hiro_system_kit;
 use hiro_system_kit::slog;
 use hiro_system_kit::yellow;
-use stacks_codec::codec;
 use stacks_rpc_client::rpc_client::PoxInfo;
 use stacks_rpc_client::StacksRpc;
 use stackslib::chainstate::stacks::address::PoxAddress;
@@ -123,7 +122,6 @@ impl DevnetEventObserverConfig {
         let event_observer_config = EventObserverConfig {
             bitcoin_rpc_proxy_enabled: true,
             registered_chainhooks: chainhooks,
-            // ingestion_port: devnet_config.orchestrator_ingestion_port,
             bitcoind_rpc_username: devnet_config.bitcoin_node_username.clone(),
             bitcoind_rpc_password: devnet_config.bitcoin_node_password.clone(),
             bitcoind_rpc_url: format!("http://{}", services_map_hosts.bitcoin_node_host),
@@ -133,10 +131,8 @@ impl DevnetEventObserverConfig {
             }),
 
             display_stacks_ingestion_logs: true,
-            // cache_path: devnet_config.working_dir.to_string(),
             bitcoin_network: BitcoinNetwork::Regtest,
             stacks_network: StacksNetwork::Devnet,
-            // data_handler_tx: None,
             prometheus_monitoring_port: None,
         };
 
@@ -198,7 +194,6 @@ pub async fn start_chains_coordinator(
         &boot_completed,
     );
 
-    // if let Some(ref hooks) = config.event_observer_config.registered_chainhooks.chainhook_config {
     let chainhooks_count = config
         .event_observer_config
         .registered_chainhooks
@@ -216,7 +211,6 @@ pub async fn start_chains_coordinator(
             )))
             .expect("Unable to terminate event observer");
     }
-    // }
 
     // Spawn event observer
     let (observer_event_tx, observer_event_rx) = crossbeam_channel::unbounded();
@@ -231,8 +225,7 @@ pub async fn start_chains_coordinator(
             observer_command_rx,
             Some(observer_event_tx_moved),
             None,
-            None, // Option<ObserverSidecar>,
-            None, // Option<StacksObserverStartupContext>,
+            None,
             ctx_moved,
         );
     });
@@ -493,7 +486,6 @@ pub async fn start_chains_coordinator(
             ObserverEvent::BitcoinPredicateTriggered(_) => {}
             ObserverEvent::StacksPredicateTriggered(_) => {}
             ObserverEvent::PredicateEnabled(_) => {}
-            ObserverEvent::PredicateInterrupted(_) => {}
         }
     }
     Ok(())
@@ -753,32 +745,9 @@ pub async fn publish_stacking_orders(
                     i.try_into().unwrap(),
                 );
 
-                let (method, mut arguments) = match extend_stacking {
-                    false => (
-                        "stack-stx",
-                        vec![
-                            ClarityValue::UInt(stx_amount.into()),
-                            pox_addr_arg,
-                            ClarityValue::UInt((bitcoin_block_height - 1).into()),
-                            ClarityValue::UInt(duration.into()),
-                        ],
-                    ),
-                    true => (
-                        "stack-extend",
-                        vec![ClarityValue::UInt(duration.into()), pox_addr_arg],
-                    ),
-                };
-
-                if pox_version >= 4 {
-                    let mut signer_key = vec![0; 33];
-                    signer_key[0] = i as u8;
-                    signer_key[1] = nonce as u8;
-                    arguments.push(ClarityValue::buff_from(signer_key).unwrap());
-                };
-
                 let tx = stacks_codec::codec::build_contract_call_transaction(
-                    pox_contract_id,
-                    method.into(),
+                    pox_contract_id_moved,
+                    method,
                     arguments,
                     nonce,
                     default_fee,
