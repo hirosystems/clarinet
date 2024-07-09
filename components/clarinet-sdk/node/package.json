@@ -48,6 +48,7 @@
     "compile": "tsc -b ./tsconfig.json ./tsconfig.cjs.json",
     "build": "npm run clean; npm run compile; node ./scripts/prepare-esm-package.js",
     "prepare": "npm run build",
+    "pretest": "tsc -b ./tsconfig.json",
     "test": "vitest run"
   },
   "keywords": [
