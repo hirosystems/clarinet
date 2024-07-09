@@ -17,12 +17,12 @@ members = [
 ]
 default-members = ["components/clarinet-cli"]
 
+# [patch.crates-io]
+# "clarity-vm" = { path = "../stacks-blockchain/clarity" }
+
 [workspace.package]
 version = "2.7.0"
 
 [patch.crates-io]
-chainhook-sdk = { git = "https://github.com/hirosystems/chainhook.git", branch="develop" }
-chainhook-types = { git = "https://github.com/hirosystems/chainhook.git", branch="develop" }
-
-[patch.'https://github.com/hirosystems/clarinet.git']
-stacks-codec = { path = "./components/stacks-codec" }
+chainhook-sdk = { git = "https://github.com/hirosystems/chainhook.git", branch="pox-config-refactor-547" }
+chainhook-types = { git = "https://github.com/hirosystems/chainhook.git", branch="pox-config-refactor-547" }
