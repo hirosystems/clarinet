@@ -28,7 +28,6 @@ There are two ways to use the sdk in the browser:
 ```js
 const simnet = await initSimnet();
 await simnet.initEmtpySession();
-
 simnet.runSnippet("(+ 1 2)")
 ```
 
@@ -37,6 +36,5 @@ simnet.runSnippet("(+ 1 2)")
 ```js
 const simnet = await initSimnet();
 await simnet.initSession("/project", "Clarinet.toml")
-
 ```
 

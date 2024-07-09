@@ -11,19 +11,12 @@ on:
     paths-ignore:
       - "**/CHANGELOG.md"
 
-  workflow_dispatch:
+# Cancel previous runs for the same workflow
+concurrency:
+  group: "${{ github.workflow }} @ ${{ github.event.pull_request.head.label || github.head_ref || github.ref }}"
+  cancel-in-progress: true
 
 jobs:
-  pre_run:
-    name: Cancel previous runs
-    runs-on: ubuntu-latest
-    steps:
-      - name: Cancel Previous Runs
-        uses: styfle/cancel-workflow-action@0.12.1
-        with:
-          access_token: ${{ github.token }}
-          persist-credentials: false
-
   build_and_test_sdk:
     name: Build and test clarinet-sdk packages
     runs-on: ubuntu-latest
