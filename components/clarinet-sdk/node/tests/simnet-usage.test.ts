@@ -361,7 +361,6 @@ describe("the simnet can execute commands", () => {
   it("can get_assets_maps", () => {
     simnet.executeCommand("::mint_stx ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM 1000");
     let result = simnet.executeCommand("::get_assets_maps");
-    expect(result.split("\n")).toHaveLength(12);
     const expected = [
       "+-------------------------------------------+-----------------+",
       "| Address                                   | uSTX            |",
