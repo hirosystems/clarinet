@@ -1,0 +1,68 @@
+name: CI - Clarinet SDK
+on:
+  pull_request:
+    branches:
+      - main
+    paths-ignore:
+      - "**/CHANGELOG.md"
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - "**/CHANGELOG.md"
+
+# Cancel previous runs for the same workflow
+concurrency:
+  group: "${{ github.workflow }} @ ${{ github.event.pull_request.head.label || github.head_ref || github.ref }}"
+  cancel-in-progress: true
+
+jobs:
+  build_and_test_sdk:
+    name: Build and test clarinet-sdk packages
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain
+        run: |
+          rustup toolchain install stable --profile minimal --component rustfmt
+          rustup target add wasm32-unknown-unknown
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup cache keys
+        run: |
+          echo "RUST_VERSION_HASH=$(rustc --version | sha256sum | awk '{print $1}')" >> $GITHUB_ENV
+          echo "NODE_VERSION_HASH=$(node --version | sha256sum | awk '{print $1}')" >> $GITHUB_ENV
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/
+            ~/target/release/build/
+            ~/target/wasm32-unknown-unknown/build/
+          key: clarinet-sdk-cargo-${{ runner.os }}-${{ env.RUST_VERSION_HASH }}-${{ hashFiles('./Cargo.lock') }}
+
+      - name: Cache npm
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/node_modules/
+          key: clarinet-sdk-npm-${{ runner.os }}-${{ env.NODE_VERSION_HASH }}-${{ hashFiles('./package-lock.json') }}
+
+      - name: Install wasm-pack
+        run: npm install -g wasm-pack
+
+      - name: Build Wasm packages
+        run: npm run build:wasm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm run test
