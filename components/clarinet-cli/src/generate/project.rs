@@ -200,7 +200,7 @@ deployment_fee_rate = 10
 mnemonic = "<YOUR PRIVATE TESTNET MNEMONIC HERE>"
 "#
         .into();
-        let name = "Testnet.toml".into();
+        let name = "settings/Testnet.toml".into();
         self.changes
             .push(self.get_changes_for_new_file(name, content));
     }
