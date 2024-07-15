@@ -325,7 +325,7 @@ impl ClarityInterpreter {
     }
 
     pub fn get_block_time(&mut self) -> u64 {
-        let block_height = self.get_block_height();
+        let block_height = self.get_stacks_block_height();
         let mut conn = ClarityDatabase::new(
             &mut self.datastore,
             &self.burn_datastore,
@@ -1106,7 +1106,7 @@ impl ClarityInterpreter {
     }
 
     pub fn set_tenure_height(&mut self) {
-        let block_height = self.get_block_height();
+        let block_height = self.get_stacks_block_height();
         let mut conn = ClarityDatabase::new(
             &mut self.datastore,
             &self.burn_datastore,
@@ -1118,8 +1118,13 @@ impl ClarityInterpreter {
         conn.commit().expect("failed to commit");
     }
 
-    pub fn get_block_height(&mut self) -> u32 {
+    pub fn get_stacks_block_height(&mut self) -> u32 {
         self.datastore.get_current_block_height()
+    }
+
+    pub fn get_burn_block_height(&mut self) -> u32 {
+        // let height = self.datastore.get_current_block_height();
+        0 // TODO
     }
 
     fn credit_token(&mut self, account: String, token: String, value: u128) {

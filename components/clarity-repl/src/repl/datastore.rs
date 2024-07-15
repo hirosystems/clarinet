@@ -54,7 +54,7 @@ pub struct BlockInfo {
     consensus_hash: ConsensusHash,
     vrf_seed: VRFSeed,
     burn_block_time: u64,
-    burn_block_height: u32,
+    pub burn_block_height: u32,
     miner: StacksAddress,
     burnchain_tokens_spent_for_block: u128,
     get_burnchain_tokens_spent_for_winning_block: u128,

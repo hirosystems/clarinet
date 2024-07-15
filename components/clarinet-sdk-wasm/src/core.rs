@@ -570,10 +570,16 @@ impl SDK {
             .expect("Session not initialised. Call initSession() first")
     }
 
-    #[wasm_bindgen(getter, js_name=blockHeight)]
-    pub fn block_height(&mut self) -> u32 {
+    #[wasm_bindgen(getter, js_name=stacksBlockHeight)]
+    pub fn stacks_block_height(&mut self) -> u32 {
         let session = self.get_session_mut();
-        session.interpreter.get_block_height()
+        session.interpreter.get_stacks_block_height()
+    }
+
+    #[wasm_bindgen(getter, js_name=burnBlockHeight)]
+    pub fn burn_block_height(&mut self) -> u32 {
+        let session = self.get_session_mut();
+        session.interpreter.get_burn_block_height()
     }
 
     #[wasm_bindgen(getter, js_name=currentEpoch)]
@@ -909,14 +915,29 @@ impl SDK {
         encode_to_js(&results).map_err(|e| format!("error: {}", e))
     }
 
-    #[wasm_bindgen(js_name=mineEmptyBlock)]
-    pub fn mine_empty_block(&mut self) -> u32 {
+    #[wasm_bindgen(js_name=mineEmptyStacksBlock)]
+    pub fn mine_empty_stacks_block(&mut self) -> u32 {
         let session = self.get_session_mut();
-        session.advance_chain_tip(1)
+        session.advance_stacks_chaintip(1)
     }
 
-    #[wasm_bindgen(js_name=mineEmptyBlocks)]
-    pub fn mine_empty_blocks(&mut self, count: Option<u32>) -> u32 {
+    #[wasm_bindgen(js_name=mineEmptyStacksBlocks)]
+    pub fn mine_empty_stacks_blocks(&mut self, count: Option<u32>) -> u32 {
+        let session = self.get_session_mut();
+        let res = session.advance_stacks_chaintip(count.unwrap_or(1));
+        if count > Some(100) {
+            session.advance_burn_chaintip(1);
+        }
+        res
+    }
+
+    #[wasm_bindgen(js_name=mineEmptyBurnBlock)]
+    pub fn mine_empty_burn_block(&mut self) -> u32 {
+        let session = self.get_session_mut();
+        session.advance_burn_chaintip(1)
+    }
+    #[wasm_bindgen(js_name=mineEmptyBurnBlocks)]
+    pub fn mine_empty_burn_blocks(&mut self, count: Option<u32>) -> u32 {
         let session = self.get_session_mut();
         session.advance_chain_tip(count.unwrap_or(1))
     }
