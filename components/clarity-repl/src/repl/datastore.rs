@@ -722,7 +722,7 @@ mod tests {
     fn test_advance_chain_tip() {
         let mut datastore = get_burn_datastore();
         datastore.advance_chain_tip(5);
-        assert_eq!(datastore.chain_height, 5);
+        assert_eq!(datastore.chain_height, 5.0);
     }
 
     #[test]
@@ -767,7 +767,7 @@ mod tests {
     fn test_get_tip_burn_block_height() {
         let mut datastore = get_burn_datastore();
         let chain_height = 10;
-        datastore.chain_height = chain_height;
+        datastore.chain_height = chain_height as f32;
         let tip_burn_block_height = datastore.get_tip_burn_block_height();
         assert_eq!(tip_burn_block_height, Some(chain_height));
     }

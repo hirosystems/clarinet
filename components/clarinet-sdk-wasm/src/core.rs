@@ -570,10 +570,16 @@ impl SDK {
             .expect("Session not initialised. Call initSession() first")
     }
 
+    #[wasm_bindgen(getter, js_name=blockHeight)]
+    pub fn block_height(&mut self) -> u32 {
+        let session = self.get_session_mut();
+        session.interpreter.get_block_height()
+    }
+
     #[wasm_bindgen(getter, js_name=stacksBlockHeight)]
     pub fn stacks_block_height(&mut self) -> u32 {
         let session = self.get_session_mut();
-        session.interpreter.get_stacks_block_height()
+        session.interpreter.get_block_height()
     }
 
     #[wasm_bindgen(getter, js_name=burnBlockHeight)]

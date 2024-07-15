@@ -250,7 +250,8 @@ impl Session {
             }
             cmd if cmd.starts_with("::get_block_height") => self.get_block_height(),
             cmd if cmd.starts_with("::get_burn_block_height") => self.get_burn_block_height(),
-            cmd if cmd.starts_with("::get_stacks_block_height") => self.get_stacks_block_height(),
+            cmd if cmd.starts_with("::get_stacks_block_height") => self.get_block_height(),
+            cmd if cmd.starts_with("::get_block_height") => self.get_block_height(),
             cmd if cmd.starts_with("::advance_stacks_chaintip") => {
                 self.parse_and_advance_stacks_chaintip(cmd)
             }
@@ -868,8 +869,8 @@ impl Session {
         self.interpreter.get_tx_sender().to_address()
     }
 
-    fn get_stacks_block_height(&mut self) -> String {
-        let height = self.interpreter.get_stacks_block_height();
+    fn get_block_height(&mut self) -> String {
+        let height = self.interpreter.get_block_height();
         format!("Current height: {}", height)
     }
 
