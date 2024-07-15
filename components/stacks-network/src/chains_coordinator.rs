@@ -6,17 +6,16 @@ use crate::event::Status;
 use crate::orchestrator::ServicesMapHosts;
 
 use base58::FromBase58;
-use chainhook_sdk::chainhooks::types::ChainhookConfig;
+use chainhook_sdk::chainhooks::types::ChainhookStore;
 use chainhook_sdk::observer::{
     start_event_observer, EventObserverConfig, ObserverCommand, ObserverEvent,
     StacksChainMempoolEvent,
 };
 use chainhook_sdk::types::BitcoinBlockSignaling;
 use chainhook_sdk::types::BitcoinChainEvent;
-use chainhook_sdk::types::BitcoinNetwork;
 use chainhook_sdk::types::StacksChainEvent;
-use chainhook_sdk::types::StacksNetwork;
 use chainhook_sdk::types::StacksNodeConfig;
+use chainhook_sdk::types::{BitcoinNetwork, StacksNetwork};
 use chainhook_sdk::utils::Context;
 use clarinet_deployments::onchain::TransactionStatus;
 use clarinet_deployments::onchain::{
@@ -35,7 +34,6 @@ use clarity_repl::clarity::PublicKey;
 use hiro_system_kit;
 use hiro_system_kit::slog;
 use hiro_system_kit::yellow;
-use stacks_codec::codec;
 use stacks_rpc_client::rpc_client::PoxInfo;
 use stacks_rpc_client::StacksRpc;
 use stackslib::chainstate::stacks::address::PoxAddress;
@@ -106,7 +104,7 @@ impl DevnetEventObserverConfig {
         manifest: ProjectManifest,
         network_manifest: Option<NetworkManifest>,
         deployment: DeploymentSpecification,
-        chainhooks: ChainhookConfig,
+        chainhooks: ChainhookStore,
         ctx: &Context,
         services_map_hosts: ServicesMapHosts,
     ) -> Self {
@@ -123,8 +121,7 @@ impl DevnetEventObserverConfig {
         };
         let event_observer_config = EventObserverConfig {
             bitcoin_rpc_proxy_enabled: true,
-            chainhook_config: Some(chainhooks),
-            ingestion_port: devnet_config.orchestrator_ingestion_port,
+            registered_chainhooks: chainhooks,
             bitcoind_rpc_username: devnet_config.bitcoin_node_username.clone(),
             bitcoind_rpc_password: devnet_config.bitcoin_node_password.clone(),
             bitcoind_rpc_url: format!("http://{}", services_map_hosts.bitcoin_node_host),
@@ -133,11 +130,9 @@ impl DevnetEventObserverConfig {
                 ingestion_port: devnet_config.orchestrator_ingestion_port,
             }),
 
-            display_logs: true,
-            cache_path: devnet_config.working_dir.to_string(),
+            display_stacks_ingestion_logs: true,
             bitcoin_network: BitcoinNetwork::Regtest,
             stacks_network: StacksNetwork::Devnet,
-            data_handler_tx: None,
             prometheus_monitoring_port: None,
         };
 
@@ -199,15 +194,22 @@ pub async fn start_chains_coordinator(
         &boot_completed,
     );
 
-    if let Some(ref hooks) = config.event_observer_config.chainhook_config {
-        let chainhooks_count = hooks.bitcoin_chainhooks.len() + hooks.stacks_chainhooks.len();
-        if chainhooks_count > 0 {
-            devnet_event_tx
-                .send(DevnetEvent::info(format!(
-                    "{chainhooks_count} chainhooks registered",
-                )))
-                .expect("Unable to terminate event observer");
-        }
+    let chainhooks_count = config
+        .event_observer_config
+        .registered_chainhooks
+        .stacks_chainhooks
+        .len()
+        + config
+            .event_observer_config
+            .registered_chainhooks
+            .bitcoin_chainhooks
+            .len();
+    if chainhooks_count > 0 {
+        devnet_event_tx
+            .send(DevnetEvent::info(format!(
+                "{chainhooks_count} chainhooks registered",
+            )))
+            .expect("Unable to terminate event observer");
     }
 
     // Spawn event observer
@@ -281,6 +283,11 @@ pub async fn start_chains_coordinator(
                     .send(DevnetEvent::error(msg))
                     .expect("Unable to terminate event observer");
                 // Terminate
+            }
+            ObserverEvent::PredicateInterrupted(_data) => {
+                devnet_event_tx
+                    .send(DevnetEvent::error("predicate interrupt".to_string())) // need to use data for the message
+                    .expect("Event observer received predicate interrupt");
             }
             ObserverEvent::Error(msg) => {
                 devnet_event_tx
@@ -479,7 +486,6 @@ pub async fn start_chains_coordinator(
             ObserverEvent::BitcoinPredicateTriggered(_) => {}
             ObserverEvent::StacksPredicateTriggered(_) => {}
             ObserverEvent::PredicateEnabled(_) => {}
-            ObserverEvent::PredicateInterrupted(_) => {}
         }
     }
     Ok(())
@@ -739,7 +745,7 @@ pub async fn publish_stacking_orders(
                     i.try_into().unwrap(),
                 );
 
-                let tx = codec::build_contrat_call_transaction(
+                let tx = stacks_codec::codec::build_contract_call_transaction(
                     pox_contract_id_moved,
                     method,
                     arguments,

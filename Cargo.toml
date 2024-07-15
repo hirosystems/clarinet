@@ -21,8 +21,6 @@ default-members = ["components/clarinet-cli"]
 version = "2.7.0"
 
 [patch.crates-io]
-chainhook-sdk = { git = "https://github.com/hirosystems/chainhook.git", branch="develop" }
-chainhook-types = { git = "https://github.com/hirosystems/chainhook.git", branch="develop" }
-
-[patch.'https://github.com/hirosystems/clarinet.git']
+chainhook-sdk = { git = "https://github.com/hirosystems/chainhook.git" }
+chainhook-types = { git = "https://github.com/hirosystems/chainhook.git" }
 stacks-codec = { path = "./components/stacks-codec" }

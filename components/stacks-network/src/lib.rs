@@ -11,8 +11,8 @@ mod orchestrator;
 mod ui;
 
 pub use chainhook_sdk::observer::MempoolAdmissionData;
-use chainhook_sdk::observer::ObserverCommand;
 pub use chainhook_sdk::{self, utils::Context};
+use chainhook_sdk::{chainhooks::types::ChainhookStore, observer::ObserverCommand};
 pub use chainhooks::{load_chainhooks, parse_chainhook_full_specification};
 use chains_coordinator::BitcoinMiningCommand;
 use clarinet_files::NetworkManifest;
@@ -26,7 +26,6 @@ use std::{
     time::Duration,
 };
 
-use chainhook_sdk::chainhooks::types::ChainhookConfig;
 use chains_coordinator::start_chains_coordinator;
 use clarinet_deployments::types::DeploymentSpecification;
 use hiro_system_kit::slog;
@@ -49,7 +48,7 @@ where
 async fn do_run_devnet(
     mut devnet: DevnetOrchestrator,
     deployment: DeploymentSpecification,
-    chainhooks: &mut Option<ChainhookConfig>,
+    chainhooks: &mut Option<ChainhookStore>,
     log_tx: Option<Sender<LogData>>,
     display_dashboard: bool,
     ctx: Context,
@@ -99,7 +98,7 @@ async fn do_run_devnet(
     // and should be able to be terminated
     let hooks = match chainhooks.take() {
         Some(hooks) => hooks,
-        _ => ChainhookConfig::new(),
+        _ => ChainhookStore::new(),
     };
     let devnet_path = devnet_config.working_dir.clone();
     let config = DevnetEventObserverConfig::new(
@@ -261,7 +260,7 @@ async fn do_run_devnet(
 pub async fn do_run_chain_coordinator(
     mut devnet: DevnetOrchestrator,
     deployment: DeploymentSpecification,
-    chainhooks: &mut Option<ChainhookConfig>,
+    chainhooks: &mut Option<ChainhookStore>,
     log_tx: Option<Sender<LogData>>,
     ctx: Context,
     orchestrator_terminated_tx: Sender<bool>,
@@ -295,7 +294,7 @@ pub async fn do_run_chain_coordinator(
 pub async fn do_run_local_devnet(
     mut devnet: DevnetOrchestrator,
     deployment: DeploymentSpecification,
-    chainhooks: &mut Option<ChainhookConfig>,
+    chainhooks: &mut Option<ChainhookStore>,
     log_tx: Option<Sender<LogData>>,
     display_dashboard: bool,
     ctx: Context,
