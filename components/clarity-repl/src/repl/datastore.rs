@@ -8,7 +8,6 @@ use clarity::types::chainstate::StacksAddress;
 use clarity::types::chainstate::StacksBlockId;
 use clarity::types::chainstate::VRFSeed;
 use clarity::types::StacksEpochId;
-use clarity::types::PEER_VERSION_EPOCH_2_1;
 use clarity::util::hash::Sha512Trunc256Sum;
 use clarity::vm::analysis::AnalysisDatabase;
 use clarity::vm::database::BurnStateDB;
@@ -21,6 +20,21 @@ use pox_locking::handle_contract_call_special_cases;
 use sha2::{Digest, Sha512_256};
 
 use super::interpreter::BLOCK_LIMIT_MAINNET;
+
+fn epoch_to_peer_version(epoch: StacksEpochId) -> u8 {
+    use clarity::consts::*;
+    match epoch {
+        StacksEpochId::Epoch10 => PEER_VERSION_EPOCH_1_0,
+        StacksEpochId::Epoch20 => PEER_VERSION_EPOCH_2_0,
+        StacksEpochId::Epoch2_05 => PEER_VERSION_EPOCH_2_05,
+        StacksEpochId::Epoch21 => PEER_VERSION_EPOCH_2_1,
+        StacksEpochId::Epoch22 => PEER_VERSION_EPOCH_2_2,
+        StacksEpochId::Epoch23 => PEER_VERSION_EPOCH_2_3,
+        StacksEpochId::Epoch24 => PEER_VERSION_EPOCH_2_4,
+        StacksEpochId::Epoch25 => PEER_VERSION_EPOCH_2_5,
+        StacksEpochId::Epoch30 => PEER_VERSION_EPOCH_3_0,
+    }
+}
 
 #[derive(Clone, Debug)]
 pub struct Datastore {
@@ -571,7 +585,7 @@ impl BurnStateDB for BurnDatastore {
             start_height: self.current_epoch_start_height.into(),
             end_height: u64::MAX,
             block_limit: BLOCK_LIMIT_MAINNET,
-            network_epoch: PEER_VERSION_EPOCH_2_1,
+            network_epoch: epoch_to_peer_version(self.current_epoch),
         })
     }
 
@@ -794,7 +808,7 @@ mod tests {
                 start_height: 0,
                 end_height: u64::MAX,
                 block_limit: BLOCK_LIMIT_MAINNET,
-                network_epoch: PEER_VERSION_EPOCH_2_1,
+                network_epoch: clarity::consts::PEER_VERSION_EPOCH_2_05,
             })
         );
     }
@@ -811,7 +825,7 @@ mod tests {
                 start_height: 0,
                 end_height: u64::MAX,
                 block_limit: BLOCK_LIMIT_MAINNET,
-                network_epoch: PEER_VERSION_EPOCH_2_1,
+                network_epoch: clarity::consts::PEER_VERSION_EPOCH_2_05,
             })
         );
     }

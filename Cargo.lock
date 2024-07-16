@@ -798,7 +798,7 @@ checksum = "702fc72eb24e5a1e48ce58027a675bc24edd52096d5397d4aea7c6dd9eca0bd1"
 [[package]]
 name = "clar2wasm"
 version = "0.1.0"
-source = "git+https://github.com/stacks-network/clarity-wasm.git?branch=chore/update-clarity#ffbf49befc00d6eb3230a8e44ebf91b621f074e4"
+source = "git+https://github.com/stacks-network/clarity-wasm.git?branch=main#09fe754d57943ff40b8da48ae6367c1e085cb1f3"
 dependencies = [
  "chrono",
  "clap",
@@ -949,7 +949,7 @@ dependencies = [
 [[package]]
 name = "clarity"
 version = "2.3.0"
-source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-develop#860d7da5af0a46b07d24cb29aa425247cf2b6820"
+source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-develop#dcd5b4ecdbb12f7ce394ae1bcb5898599caac1f8"
 dependencies = [
  "getrandom 0.2.8",
  "hashbrown 0.14.3",
@@ -2140,9 +2140,9 @@ dependencies = [
 
 [[package]]
 name = "hashlink"
-version = "0.8.4"
+version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e8094feaf31ff591f651a2664fb9cfd92bba7a60ce3197265e9482ebe753c8f7"
+checksum = "6ba4ff7128dee98c7dc9794b6a411377e1404dba1c97deb8d1a55297bd25d8af"
 dependencies = [
  "hashbrown 0.14.3",
 ]
@@ -2850,9 +2850,9 @@ dependencies = [
 
 [[package]]
 name = "libsqlite3-sys"
-version = "0.25.2"
+version = "0.28.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "29f835d03d717946d28b1d1ed632eb6f0e24a299388ee623d0c23118d3e8a7fa"
+checksum = "0c10584274047cb335c23d3e61bcef8e323adae7c5c8c760540f73610177fc3f"
 dependencies = [
  "cc",
  "pkg-config",
@@ -2862,7 +2862,7 @@ dependencies = [
 [[package]]
 name = "libstackerdb"
 version = "0.0.1"
-source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-develop#860d7da5af0a46b07d24cb29aa425247cf2b6820"
+source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-develop#dcd5b4ecdbb12f7ce394ae1bcb5898599caac1f8"
 dependencies = [
  "clarity",
  "secp256k1 0.24.3",
@@ -3593,7 +3593,7 @@ checksum = "439ee305def115ba05938db6eb1644ff94165c5ab5e9420d1c1bcedbba909391"
 [[package]]
 name = "pox-locking"
 version = "2.4.0"
-source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-develop#860d7da5af0a46b07d24cb29aa425247cf2b6820"
+source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-develop#dcd5b4ecdbb12f7ce394ae1bcb5898599caac1f8"
 dependencies = [
  "clarity",
  "slog",
@@ -4163,12 +4163,12 @@ dependencies = [
 
 [[package]]
 name = "rusqlite"
-version = "0.28.0"
+version = "0.31.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "01e213bc3ecb39ac32e81e51ebe31fd888a940515173e3a18a35f8c6e896422a"
+checksum = "b838eba278d213a8beaf485bd313fd580ca4505a00d5871caeb1457c55322cae"
 dependencies = [
- "bitflags 1.3.2",
- "fallible-iterator 0.2.0",
+ "bitflags 2.4.0",
+ "fallible-iterator 0.3.0",
  "fallible-streaming-iterator",
  "hashlink",
  "libsqlite3-sys",
@@ -4881,7 +4881,7 @@ dependencies = [
 [[package]]
 name = "stacks-common"
 version = "0.0.2"
-source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-develop#860d7da5af0a46b07d24cb29aa425247cf2b6820"
+source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-develop#dcd5b4ecdbb12f7ce394ae1bcb5898599caac1f8"
 dependencies = [
  "chrono",
  "curve25519-dalek 2.0.0",
@@ -4984,7 +4984,7 @@ dependencies = [
 [[package]]
 name = "stackslib"
 version = "0.0.1"
-source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-develop#860d7da5af0a46b07d24cb29aa425247cf2b6820"
+source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-develop#dcd5b4ecdbb12f7ce394ae1bcb5898599caac1f8"
 dependencies = [
  "chrono",
  "clar2wasm",
