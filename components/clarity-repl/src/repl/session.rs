@@ -248,7 +248,6 @@ impl Session {
             cmd if cmd.starts_with("::get_contracts") => {
                 self.get_contracts().unwrap_or("No contract found".into())
             }
-            cmd if cmd.starts_with("::get_block_height") => self.get_block_height(),
             cmd if cmd.starts_with("::get_burn_block_height") => self.get_burn_block_height(),
             cmd if cmd.starts_with("::get_stacks_block_height") => self.get_block_height(),
             cmd if cmd.starts_with("::get_block_height") => self.get_block_height(),
@@ -767,7 +766,12 @@ impl Session {
         ));
         output.push(format!(
             "{}",
-            "::advance_chain_tip <count>\t\tSimulate mining of <count> blocks".yellow()
+            "::advance_stacks_chaintip <count>\tSimulate mining of <count> stacks blocks".yellow()
+        ));
+        output.push(format!(
+            "{}",
+            "::advance_burn_chaintip <count>\t\tSimulate mining of <count> burnchain blocks"
+                .yellow()
         ));
         output.push(format!(
             "{}",
@@ -817,11 +821,11 @@ impl Session {
         output.join("\n")
     }
 
-    fn parse_and_advance_chain_tip(&mut self, command: &str) -> String {
+    fn parse_and_advance_stacks_chaintip(&mut self, command: &str) -> String {
         let args: Vec<_> = command.split(' ').collect();
 
         if args.len() != 2 {
-            return format!("{}", "Usage: ::advance_chain_tip <count>".red());
+            return format!("{}", "Usage: ::advance_stacks_chaintip <count>".red());
         }
 
         let count = match args[1].parse::<u32>() {
@@ -831,14 +835,41 @@ impl Session {
             }
         };
 
-        let new_height = self.advance_chain_tip(count);
+        let new_height = self.advance_stacks_chaintip(count);
+        format!("{} blocks simulated, new height: {}", count, new_height)
+            .green()
+            .to_string()
+    }
+    fn parse_and_advance_burn_chaintip(&mut self, command: &str) -> String {
+        let args: Vec<_> = command.split(' ').collect();
+
+        if args.len() != 2 {
+            return format!("{}", "Usage: ::advance_burn_chaintip <count>".red());
+        }
+
+        let count = match args[1].parse::<u32>() {
+            Ok(count) => count,
+            _ => {
+                return format!("{}", "Unable to parse count".red());
+            }
+        };
+
+        let new_height = self.advance_burn_chaintip(count);
         format!("{} blocks simulated, new height: {}", count, new_height)
             .green()
             .to_string()
     }
 
+    pub fn advance_stacks_chaintip(&mut self, count: u32) -> u32 {
+        self.interpreter.advance_stacks_chaintip(count)
+    }
+    pub fn advance_burn_chaintip(&mut self, count: u32) -> u32 {
+        self.interpreter.advance_burn_chaintip(count)
+    }
+    // Not exposed/documented but still supported for convenience
     pub fn advance_chain_tip(&mut self, count: u32) -> u32 {
-        self.interpreter.advance_chain_tip(count)
+        self.interpreter.advance_stacks_chaintip(count);
+        self.interpreter.advance_burn_chaintip(count)
     }
 
     fn parse_and_set_tx_sender(&mut self, command: &str) -> String {
@@ -1471,7 +1502,7 @@ mod tests {
         );
 
         // advance chain tip and test at-block
-        session.advance_chain_tip(10000);
+        session.advance_stacks_chaintip(10000);
         assert_eq!(
             session
                 .process_console_input("(contract-call? .contract get-x)")

@@ -1098,10 +1098,15 @@ impl ClarityInterpreter {
         self.tx_sender.clone()
     }
 
-    pub fn advance_chain_tip(&mut self, count: u32) -> u32 {
-        self.burn_datastore.advance_chain_tip(count);
-        let new_height = self.datastore.advance_chain_tip(count);
+    pub fn advance_burn_chaintip(&mut self, count: u32) -> u32 {
+        let new_height = self.burn_datastore.advance_chain_tip(count);
+        self.datastore.advance_chain_tip(1);
         self.set_tenure_height();
+        new_height
+    }
+    pub fn advance_stacks_chaintip(&mut self, count: u32) -> u32 {
+        let new_height = self.datastore.advance_chain_tip(count);
+        self.burn_datastore.advance_chain_tip(count / 100);
         new_height
     }
 
@@ -1123,8 +1128,7 @@ impl ClarityInterpreter {
     }
 
     pub fn get_burn_block_height(&mut self) -> u32 {
-        // let height = self.datastore.get_current_block_height();
-        0 // TODO
+        self.burn_datastore.get_current_block_height()
     }
 
     fn credit_token(&mut self, account: String, token: String, value: u128) {
@@ -1270,7 +1274,8 @@ mod tests {
             ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
         let count = 5;
         let initial_block_height = interpreter.get_block_height();
-        interpreter.advance_chain_tip(count);
+        interpreter.advance_stacks_chaintip(count);
+        interpreter.advance_burn_chaintip(count);
         assert_eq!(interpreter.get_block_height(), initial_block_height + count);
     }
 
@@ -1735,7 +1740,8 @@ mod tests {
             ),
         );
 
-        interpreter.advance_chain_tip(10);
+        interpreter.advance_stacks_chaintip(10);
+        interpreter.advance_burn_chaintip(10);
 
         let result = interpreter.call_contract_fn(
             &contract_id,
@@ -1767,7 +1773,8 @@ mod tests {
         let mut interpreter =
             ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
 
-        interpreter.advance_chain_tip(1);
+        interpreter.advance_stacks_chaintip(1);
+        interpreter.advance_burn_chaintip(1);
 
         let snippet = [
             "(define-read-only (get-height)",
@@ -1820,7 +1827,8 @@ mod tests {
         let mut interpreter =
             ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
 
-        interpreter.advance_chain_tip(1);
+        interpreter.advance_stacks_chaintip(1);
+        interpreter.advance_burn_chaintip(1);
 
         let snippet = [
             "(define-read-only (get-height)",
@@ -1873,7 +1881,8 @@ mod tests {
             ),
         );
 
-        interpreter.advance_chain_tip(10);
+        interpreter.advance_stacks_chaintip(10);
+        interpreter.advance_burn_chaintip(10);
 
         let result = interpreter.call_contract_fn(
             &contract_id,

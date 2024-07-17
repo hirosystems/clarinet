@@ -374,7 +374,10 @@ impl BurnDatastore {
         }
     }
 
-    pub fn advance_chain_tip(&mut self, count: u32) {
+    pub fn get_current_block_height(&self) -> u32 {
+        self.chain_height
+    }
+    pub fn advance_chain_tip(&mut self, count: u32) -> u32 {
         let cur_height = self.chain_height;
         let current_lookup_id = *self
             .block_id_lookup
@@ -399,6 +402,7 @@ impl BurnDatastore {
         self.chain_height += count;
         self.open_chain_tip = height_to_id(self.chain_height);
         self.current_chain_tip = self.open_chain_tip;
+        self.chain_height
     }
 
     pub fn set_current_epoch(&mut self, epoch: StacksEpochId) {
