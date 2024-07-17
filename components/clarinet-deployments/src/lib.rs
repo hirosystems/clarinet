@@ -125,16 +125,19 @@ pub fn update_session_with_deployment_plan(
     code_coverage_enabled: bool,
     forced_min_epoch: Option<StacksEpochId>,
 ) -> UpdateSessionExecutionResult {
+    session.advance_chain_tip(10);
     update_session_with_genesis_accounts(session, deployment);
 
-    let boot_contracts_data = BOOT_CONTRACTS_DATA.clone();
-
     let mut boot_contracts = BTreeMap::new();
-    for (contract_id, (boot_contract, ast)) in boot_contracts_data {
-        let result = session
-            .interpreter
-            .run(&boot_contract, Some(&ast), false, None);
-        boot_contracts.insert(contract_id, result);
+    if !session.settings.repl_settings.network_simulation.enabled {
+        let boot_contracts_data = BOOT_CONTRACTS_DATA.clone();
+
+        for (contract_id, (boot_contract, ast)) in boot_contracts_data {
+            let result = session
+                .interpreter
+                .run(&boot_contract, Some(&ast), false, None);
+            boot_contracts.insert(contract_id, result);
+        }
     }
 
     let mut contracts = BTreeMap::new();
@@ -357,17 +360,21 @@ pub async fn generate_default_deployment(
         repl_settings: manifest.repl_settings.clone(),
         ..Default::default()
     };
-
     let session = Session::new(settings.clone());
 
-    let boot_contracts_data = BOOT_CONTRACTS_DATA.clone();
+    let simnet_network_simulation =
+        network.is_simnet() && session.settings.repl_settings.network_simulation.enabled;
+
     let mut boot_contracts_ids = BTreeSet::new();
-    let mut boot_contracts_asts = BTreeMap::new();
-    for (id, (contract, ast)) in boot_contracts_data {
-        boot_contracts_ids.insert(id.clone());
-        boot_contracts_asts.insert(id, (contract.clarity_version, ast));
+    if !simnet_network_simulation {
+        let boot_contracts_data = BOOT_CONTRACTS_DATA.clone();
+        let mut boot_contracts_asts = BTreeMap::new();
+        for (id, (contract, ast)) in boot_contracts_data {
+            boot_contracts_ids.insert(id.clone());
+            boot_contracts_asts.insert(id, (contract.clarity_version, ast));
+        }
+        requirements_data.append(&mut boot_contracts_asts);
     }
-    requirements_data.append(&mut boot_contracts_asts);
 
     let mut queue = VecDeque::new();
 
@@ -443,7 +450,9 @@ pub async fn generate_default_deployment(
                             location: contract_location,
                             clarity_version,
                         };
-                        emulated_contracts_publish.insert(contract_id.clone(), data);
+                        if !simnet_network_simulation {
+                            emulated_contracts_publish.insert(contract_id.clone(), data);
+                        }
                     } else if network.either_devnet_or_testnet() {
                         let mut remap_principals = BTreeMap::new();
                         remap_principals
@@ -547,7 +556,7 @@ pub async fn generate_default_deployment(
         }
 
         // Avoid listing requirements as deployment transactions to the deployment specification on Mainnet
-        if !network.is_mainnet() {
+        if !network.is_mainnet() && !simnet_network_simulation {
             let mut ordered_contracts_ids = match ASTDependencyDetector::order_contracts(
                 &requirements_deps,
                 &contract_epochs,

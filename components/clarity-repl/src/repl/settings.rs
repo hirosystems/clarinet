@@ -53,9 +53,19 @@ pub struct SessionSettings {
     pub epoch_id: Option<StacksEpochId>,
 }
 
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct ApiUrl(String);
+
+impl Default for ApiUrl {
+    fn default() -> Self {
+        ApiUrl("http://api.hiro.so".to_string())
+    }
+}
+
 #[derive(Debug, Default, Clone, Deserialize, Serialize)]
 pub struct Settings {
     pub analysis: analysis::Settings,
+    pub network_simulation: NetworkSimulationSettings,
     #[serde(skip_serializing, skip_deserializing)]
     pub clarity_wasm_mode: bool,
     #[serde(skip_serializing, skip_deserializing)]
@@ -64,7 +74,8 @@ pub struct Settings {
 
 #[derive(Debug, Default, Clone, Deserialize, Serialize)]
 pub struct SettingsFile {
-    pub analysis: Option<analysis::SettingsFile>,
+    analysis: Option<analysis::SettingsFile>,
+    network_simulation: NetworkSimulationSettingsFile,
 }
 
 impl From<SettingsFile> for Settings {
@@ -74,10 +85,45 @@ impl From<SettingsFile> for Settings {
         } else {
             analysis::Settings::default()
         };
+
+        let network_simulation = NetworkSimulationSettings::from(file.network_simulation);
+
         Self {
             analysis,
+            network_simulation,
             clarity_wasm_mode: false,
             show_timings: false,
+        }
+    }
+}
+
+// #[derive(Debug, Default, Clone, Deserialize, Serialize)]
+// pub struct SimnetSettingsFile {
+//     network_simulation: NetworkSimulationSettingsFile,
+// }
+
+#[derive(Debug, Default, Clone, Deserialize, Serialize)]
+pub struct NetworkSimulationSettingsFile {
+    enabled: Option<bool>,
+    api_url: Option<ApiUrl>,
+}
+
+// #[derive(Debug, Default, Clone, Deserialize, Serialize)]
+// pub struct SimnetSettings {
+//     pub network_simulation: NetworkSimulationSettings,
+// }
+
+#[derive(Debug, Default, Clone, Deserialize, Serialize)]
+pub struct NetworkSimulationSettings {
+    pub enabled: bool,
+    pub api_url: ApiUrl,
+}
+
+impl From<NetworkSimulationSettingsFile> for NetworkSimulationSettings {
+    fn from(file: NetworkSimulationSettingsFile) -> Self {
+        Self {
+            enabled: file.enabled.unwrap_or_default(),
+            api_url: file.api_url.unwrap_or_default(),
         }
     }
 }
