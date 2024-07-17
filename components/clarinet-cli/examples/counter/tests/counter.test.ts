@@ -7,8 +7,7 @@ const address1 = accounts.get("wallet_1")!;
 const address2 = accounts.get("wallet_2")!;
 
 /*
-  The test below is an example. Learn more in the clarinet-sdk readme:
- https://docs.hiro.so/clarinet/introduction
+  The test below is an example. Learn more in the documentation: https://docs.hiro.so/stacks/clarinet-js-sdk
 */
 
 it("Ensure that counter can be incremented multiples times per block, accross multiple blocks", () => {
@@ -36,6 +35,11 @@ it("Ensure that counter can be incremented multiples times per block, accross mu
   const assets = simnet.getAssetsMap();
   expect(assets.get("STX")?.get(address1)).toBe(99999999999999n);
 
-  const { result } = simnet.callReadOnlyFn("counter", "read-counter", [], simnet.deployer);
+  const { result } = simnet.callReadOnlyFn(
+    "counter",
+    "read-counter",
+    [],
+    simnet.deployer,
+  );
   expect(result).toBeOk(Cl.uint(31));
 });
