@@ -2,7 +2,7 @@
   "name": "@hirosystems/clarinet-sdk",
   "version": "2.8.0-beta1",
   "description": "A SDK to interact with Clarity Smart Contracts in node.js",
-  "homepage": "https://docs.hiro.so/clarinet/feature-guides/clarinet-js-sdk",
+  "homepage": "https://www.hiro.so/clarinet",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/hirosystems/clarinet.git"
