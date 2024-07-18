@@ -2,9 +2,9 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::io::Cursor;
 
-use stacks_codec::clarity::codec::StacksMessageCodec;
-use stacks_codec::clarity::util::hash::{bytes_to_hex, hex_bytes, to_hex};
-use stacks_codec::clarity::vm::types::Value;
+use clarity::codec::StacksMessageCodec;
+use clarity::util::hash::{bytes_to_hex, hex_bytes, to_hex};
+use clarity::vm::types::Value;
 use stacks_codec::codec::{StacksTransaction, TransactionPayload};
 
 use reqwest::blocking::Client;

@@ -30,14 +30,16 @@ tokio = { version = "1.35.1", features = ["full"] }
 dirs = { version = "4.0.0" }
 clap = { version = "4.4.8", features = ["derive"] }
 serde_yaml = "0.8.23"
+
+clarity = { workspace = true }
 stackslib = { git = "https://github.com/stacks-network/stacks-core.git", branch="feat/clarity-wasm-develop", package = "stackslib" }
 chainhook-sdk = { version = "0.12" }
+
 stacks-rpc-client = { path = "../stacks-rpc-client" }
 clarinet-files = { path = "../clarinet-files", features = ["cli"] }
 clarinet-deployments = { path = "../clarinet-deployments", features = ["cli"] }
 clarinet-utils = { path = "../clarinet-utils" }
 hiro-system-kit = { path = "../hiro-system-kit", features = ["log"] }
-clarity-repl = { path = "../clarity-repl", features = ["cli"] }
 stacks-codec = { path = "../stacks-codec" }
 
 [lib]
