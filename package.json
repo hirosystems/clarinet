@@ -22,8 +22,8 @@
     "@types/node": "^20.4.5",
     "@types/prompts": "^2.4.5",
     "@types/yargs": "^17.0.24",
-    "prettier": "^3.0.3",
-    "rimraf": "^5.0.1",
+    "prettier": "^3.3.3",
+    "rimraf": "^6.0.1",
     "ts-loader": "^9.4.4",
     "typescript": "^5.1.6"
   }
