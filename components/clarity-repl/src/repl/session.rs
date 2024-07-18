@@ -864,6 +864,7 @@ impl Session {
         self.interpreter.advance_stacks_chaintip(count)
     }
     pub fn advance_burn_chaintip(&mut self, count: u32) -> u32 {
+        self.interpreter.advance_stacks_chaintip(count);
         self.interpreter.advance_burn_chaintip(count)
     }
     // Not exposed/documented but still supported for convenience

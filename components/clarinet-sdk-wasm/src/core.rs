@@ -921,6 +921,16 @@ impl SDK {
         encode_to_js(&results).map_err(|e| format!("error: {}", e))
     }
 
+    #[wasm_bindgen(js_name=mineEmptyBlock)]
+    pub fn mine_empty_block(&mut self) -> u32 {
+        self.mine_empty_burn_block();
+        self.mine_empty_stacks_block()
+    }
+    #[wasm_bindgen(js_name=mineEmptyBlocks)]
+    pub fn mine_empty_blocks(&mut self, count: Option<u32>) -> u32 {
+        self.mine_empty_burn_blocks(count);
+        self.mine_empty_stacks_blocks(count)
+    }
     #[wasm_bindgen(js_name=mineEmptyStacksBlock)]
     pub fn mine_empty_stacks_block(&mut self) -> u32 {
         let session = self.get_session_mut();
@@ -945,7 +955,7 @@ impl SDK {
     #[wasm_bindgen(js_name=mineEmptyBurnBlocks)]
     pub fn mine_empty_burn_blocks(&mut self, count: Option<u32>) -> u32 {
         let session = self.get_session_mut();
-        session.advance_chain_tip(count.unwrap_or(1))
+        session.advance_burn_chaintip(count.unwrap_or(1))
     }
 
     #[wasm_bindgen(js_name=runSnippet)]
