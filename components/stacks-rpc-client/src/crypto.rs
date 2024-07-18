@@ -1,21 +1,19 @@
 use std::str::FromStr;
 
-use crate::clarity::codec::*;
+use stacks_codec::codec::*;
 
-use crate::clarity::vm::types::{PrincipalData, QualifiedContractIdentifier, Value};
-use crate::clarity::vm::{ClarityName, ClarityVersion, ContractName};
+use clarity::address::{
+    AddressHashMode, C32_ADDRESS_VERSION_MAINNET_SINGLESIG, C32_ADDRESS_VERSION_TESTNET_SINGLESIG,
+};
+use clarity::codec::StacksMessageCodec;
+use clarity::types::chainstate::StacksAddress;
+use clarity::util::secp256k1::{MessageSignature, Secp256k1PrivateKey, Secp256k1PublicKey};
+use clarity::vm::types::{PrincipalData, QualifiedContractIdentifier};
+use clarity::vm::{ClarityName, ClarityVersion, ContractName, Value as ClarityValue};
 use hmac::Hmac;
 use libsecp256k1::{PublicKey, SecretKey};
 use pbkdf2::pbkdf2;
 use sha2::Sha512;
-use stacks_codec::clarity::address::{
-    AddressHashMode, C32_ADDRESS_VERSION_MAINNET_SINGLESIG, C32_ADDRESS_VERSION_TESTNET_SINGLESIG,
-};
-use stacks_codec::clarity::chainstate::StacksAddress;
-use stacks_codec::clarity::codec::StacksMessageCodec;
-use stacks_codec::clarity::util::secp256k1::{
-    MessageSignature, Secp256k1PrivateKey, Secp256k1PublicKey,
-};
 use tiny_hderive::bip32::ExtendedPrivKey;
 
 #[derive(Clone, Debug)]
@@ -118,7 +116,7 @@ pub fn sign_transaction_payload(
 pub fn encode_contract_call(
     contract_id: &QualifiedContractIdentifier,
     function_name: ClarityName,
-    function_args: Vec<Value>,
+    function_args: Vec<ClarityValue>,
     wallet: &Wallet,
     nonce: u64,
     tx_fee: u64,

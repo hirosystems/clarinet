@@ -16,7 +16,7 @@ categories = [
 
 [dependencies]
 clarity-repl = { path = "../clarity-repl" }
-lazy_static = "1.4.0"
+lazy_static = { workspace = true }
 regex = "1.7"
 sha2 = "0.8.1"
 sha3 = "0.8.2"

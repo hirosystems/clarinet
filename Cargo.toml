@@ -26,6 +26,9 @@ chainhook-types = { git = "https://github.com/hirosystems/chainhook.git" }
 stacks-codec = { path = "./components/stacks-codec" }
 
 [workspace.dependencies]
+# clarity-vm = { version = "2.3.0",  default-features = false, features = ["canonical", "developer-mode", "log"] }
+clarity = { git = "https://github.com/stacks-network/stacks-core.git", branch="feat/clarity-wasm-develop", package = "clarity", default-features = false }
+lazy_static = { version = "1.5.0" }
 reqwest = { version = "0.12", default-features = false, features = [
     "json",
     "rustls-tls",
