@@ -121,7 +121,8 @@ fn draw_devnet_status(f: &mut Frame, app: &mut App, area: Rect) {
 }
 
 fn draw_blocks(f: &mut Frame, app: &mut App, area: Rect) {
-    let t = Table::new(vec![], vec![] as Vec<&Constraint>)
+    let t = Table::default()
+        .widths(vec![] as Vec<&Constraint>)
         .block(Block::default().borders(Borders::ALL))
         .style(Style::default().fg(Color::White));
     f.render_widget(t, area);
@@ -131,7 +132,7 @@ fn draw_blocks(f: &mut Frame, app: &mut App, area: Rect) {
         .constraints([Constraint::Length(1), Constraint::Min(1)].as_ref())
         .split(area);
 
-    let titles = app.tabs.titles.iter().cloned().collect();
+    let titles = app.tabs.titles.iter().cloned();
     let blocks = Tabs::new(titles)
         .block(Block::default().borders(Borders::NONE))
         .divider(symbols::line::HORIZONTAL)
