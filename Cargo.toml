@@ -24,3 +24,9 @@ version = "2.7.0"
 chainhook-sdk = { git = "https://github.com/hirosystems/chainhook.git" }
 chainhook-types = { git = "https://github.com/hirosystems/chainhook.git" }
 stacks-codec = { path = "./components/stacks-codec" }
+
+[workspace.dependencies]
+reqwest = { version = "0.12", default-features = false, features = [
+    "json",
+    "rustls-tls",
+] }

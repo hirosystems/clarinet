@@ -41,19 +41,15 @@ libc = "0.2.86"
 encoding_rs = "0.8.31"
 percent-encoding = "2.1.0"
 pin-project = "1.0.5"
-reqwest = { version = "0.11", default-features = false, features = [
-    "blocking",
-    "json",
-    "rustls-tls",
-] }
+reqwest = { workspace = true, features = ["blocking"]}
 crossterm = "0.27.0"
-ratatui = { version = "0.25.0", default-features = false, features = ["crossterm"] }
+ratatui = { version = "0.27.0", default-features = false, features = ["crossterm"] }
 base58 = "0.2.0"
 ctrlc = "3.1.9"
 strum = { version = "0.23.0", features = ["derive"] }
 bitcoin = "0.29.2"
 tiny-hderive = "0.3.0"
-segment = { version = "0.1.2", optional = true }
+segment = { version = "0.2.4", optional = true }
 mac_address = { version = "1.1.2", optional = true }
 tower-lsp = { version = "0.19.0", optional = true }
 hex = "0.4.3"
