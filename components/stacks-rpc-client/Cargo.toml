@@ -9,11 +9,7 @@ edition = "2021"
 serde = "1"
 serde_json = "1"
 serde_derive = "1"
-reqwest = { version = "0.11", default-features = false, features = [
-    "blocking",
-    "json",
-    "rustls-tls",
-] }
+reqwest = { workspace = true, features = ["blocking"] }
 hmac = "0.12.0"
 pbkdf2 = { version = "0.12.2", features = ["simple"], default-features = false }
 sha2 = "0.10.0"

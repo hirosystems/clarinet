@@ -10,4 +10,4 @@ description = "Stack wire format implementation"
 clarity = { git = "https://github.com/stacks-network/stacks-core.git", branch="feat/clarity-wasm-develop", package = "clarity", default-features = false, features = ["canonical", "developer-mode", "log"] }
 
 serde = { version = "1", features = ["derive"] }
-wsts = { version = "8.1.0", default-features = false }
+wsts = { version = "9.0.0", default-features = false }
