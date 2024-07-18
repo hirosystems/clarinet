@@ -1100,14 +1100,11 @@ impl ClarityInterpreter {
 
     pub fn advance_burn_chaintip(&mut self, count: u32) -> u32 {
         let new_height = self.burn_datastore.advance_chain_tip(count);
-        self.datastore.advance_chain_tip(1);
         self.set_tenure_height();
         new_height
     }
     pub fn advance_stacks_chaintip(&mut self, count: u32) -> u32 {
-        let new_height = self.datastore.advance_chain_tip(count);
-        self.burn_datastore.advance_chain_tip(count / 100);
-        new_height
+        self.datastore.advance_chain_tip(count)
     }
 
     pub fn set_tenure_height(&mut self) {
