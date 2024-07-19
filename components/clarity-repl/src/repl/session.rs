@@ -1578,7 +1578,7 @@ mod tests {
         );
 
         // advance chain tip and test at-block
-        let _ = session.advance_stacks_chaintip(10000);
+        let _ = session.advance_chain_tip(10000);
         assert_eq!(
             session
                 .process_console_input("(contract-call? .contract get-x)")

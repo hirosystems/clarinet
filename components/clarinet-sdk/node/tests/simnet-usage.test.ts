@@ -41,16 +41,11 @@ describe("basic simnet interactions", () => {
   });
 
   it("can mine empty blocks", () => {
-    const blockHeight = simnet.stacksBlockHeight;
-    const burnBlockHeight = simnet.burnBlockHeight;
-    simnet.mineEmptyStacksBlock();
-    expect(simnet.stacksBlockHeight).toBe(blockHeight + 1);
-    expect(simnet.burnBlockHeight).toBe(burnBlockHeight);
-    simnet.mineEmptyStacksBlocks(4);
-    expect(simnet.stacksBlockHeight).toBe(blockHeight + 5);
-    simnet.mineEmptyBurnBlocks(4);
-    expect(simnet.burnBlockHeight).toBe(burnBlockHeight + 4);
-    expect(simnet.stacksBlockHeight).toBe(blockHeight + 9);
+    const blockHeight = simnet.blockHeight;
+    simnet.mineEmptyBlock();
+    expect(simnet.blockHeight).toBe(blockHeight + 1);
+    simnet.mineEmptyBlocks(4);
+    expect(simnet.blockHeight).toBe(blockHeight + 5);
   });
 
   it("exposes devnet stacks accounts", () => {

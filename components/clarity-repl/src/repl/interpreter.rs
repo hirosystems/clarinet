@@ -1100,6 +1100,7 @@ impl ClarityInterpreter {
 
     pub fn advance_burn_chaintip(&mut self, count: u32) -> u32 {
         let new_height = self.burn_datastore.advance_chain_tip(count);
+        let _ = self.datastore.advance_chain_tip(count);
         self.set_tenure_height();
         new_height
     }
@@ -1306,9 +1307,28 @@ mod tests {
         assert_eq!(interpreter.get_block_height(), initial_block_height + count);
     }
     #[test]
+    fn test_advance_chain_tip_pre_epoch3() {
+        let mut interpreter =
+            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        interpreter
+            .burn_datastore
+            .set_current_epoch(StacksEpochId::Epoch2_05);
+        let count = 5;
+        let initial_block_height = interpreter.get_block_height();
+        interpreter.advance_burn_chaintip(count);
+        assert_eq!(interpreter.get_block_height(), initial_block_height + count);
+        assert_eq!(
+            interpreter.get_burn_block_height(),
+            initial_block_height + count
+        );
+    }
+    #[test]
     fn test_advance_chain_tip() {
         let mut interpreter =
             ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        interpreter
+            .burn_datastore
+            .set_current_epoch(StacksEpochId::Epoch30);
         let count = 5;
         let initial_block_height = interpreter.get_block_height();
         interpreter.advance_burn_chaintip(count);
