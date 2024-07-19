@@ -13,7 +13,8 @@
     "components/clarinet-sdk/browser"
   ],
   "scripts": {
-    "build:wasm": "node components/clarinet-sdk-wasm/build.mjs",
+    "build:sdk-wasm": "node components/clarinet-sdk-wasm/build.mjs",
+    "build:sdk": "npm run -w components/clarinet-sdk/node -w components/clarinet-sdk/browser build",
     "test": "npm test --workspaces --if-present",
     "publish:sdk-wasm": "npm publish -w components/clarinet-sdk-wasm/pkg-node -w components/clarinet-sdk-wasm/pkg-browser --tag beta",
     "publish:sdk": "npm publish -w components/clarinet-sdk/node -w components/clarinet-sdk/browser --tag beta"

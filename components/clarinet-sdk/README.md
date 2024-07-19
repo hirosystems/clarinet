@@ -38,7 +38,7 @@ wasm-pack (install [wasm-pack](https://rustwasm.github.io/wasm-pack/installer)).
 
 ```sh
 # build the wasm package
-npm run build:wasm
+npm run build:sdk-wasm
 # install dependencies and build the node package
 npm install
 # make sure the installation works
