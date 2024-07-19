@@ -13,6 +13,8 @@ serde_yaml = "0.8.23"
 clarity-repl = { path = "../clarity-repl", default-features = false, optional = true }
 clarinet-files = { path = "../clarinet-files", default-features = false }
 stacks-rpc-client = { path = "../stacks-rpc-client", optional = true }
+clarinet-utils = { path = "../clarinet-utils", optional = true }
+stacks-codec = { path = "../stacks-codec", optional = true }
 
 # CLI
 reqwest = { workspace = true }
@@ -23,8 +25,6 @@ base58 = { version = "0.2.0", optional = true }
 base64 = "0.21.3"
 tiny-hderive = { version = "0.3.0", optional = true }
 libsecp256k1 = { version = "0.7.0", optional = true }
-clarinet_utils = { package = "clarinet-utils", path = "../clarinet-utils", optional = true }
-stacks-codec = { path = "../stacks-codec", optional = true }
 
 clarity = { workspace = true }
 
@@ -40,7 +40,7 @@ onchain = [
     "base58",
     "tiny-hderive",
     "libsecp256k1",
-    "clarinet_utils",
+    "clarinet-utils",
 ]
 
 [lib]

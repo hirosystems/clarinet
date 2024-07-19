@@ -12,11 +12,9 @@ crate-type = ["cdylib"]
 serde = "1"
 error-chain = "0.12"
 clarinet-files = { path = "../clarinet-files" }
-clarinet-utils = { path = "../clarinet-utils" }
 clarinet-deployments = { path = "../clarinet-deployments" }
 stacks-network = { path = "../stacks-network" }
 hiro-system-kit = { path = "../hiro-system-kit" }
-crossbeam-channel = "0.5.6"
 
 [dependencies.neon]
 version = "0.9.1"

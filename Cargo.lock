@@ -836,54 +836,28 @@ version = "2.7.0"
 dependencies = [
  "ansi_term",
  "atty",
- "base58 0.2.0",
- "bitcoin 0.29.2",
- "chrono",
  "clap",
  "clap_complete",
  "clarinet-deployments",
  "clarinet-files",
- "clarinet-utils",
  "clarity-lsp",
  "clarity-repl",
  "crossbeam-channel",
  "crossterm",
- "ctrlc",
  "dirs",
- "encoding_rs",
- "futures",
  "fwdansi",
- "hex",
  "hiro-system-kit 0.1.0",
- "hmac 0.12.1",
  "lazy_static",
- "libc",
- "libsecp256k1 0.7.1",
- "log",
  "mac_address",
- "mio 0.8.11",
  "nix 0.24.2",
- "num_cpus",
- "pbkdf2",
- "percent-encoding",
- "pin-project",
  "ratatui",
- "regex",
- "reqwest",
  "segment",
  "serde",
  "serde_derive",
  "serde_json",
- "sha2 0.10.8",
- "signal-hook-registry",
  "similar",
  "stacks-network",
- "strum 0.23.0",
- "tempfile",
- "termcolor",
- "tiny-hderive",
  "tokio",
- "tokio-util",
  "toml 0.5.11",
  "tower-lsp",
  "winapi 0.3.9",
@@ -1000,7 +974,6 @@ dependencies = [
  "serde",
  "serde_derive",
  "serde_json",
- "toml 0.5.11",
 ]
 
 [[package]]
@@ -1039,7 +1012,6 @@ dependencies = [
  "getrandom 0.2.8",
  "hiro-system-kit 0.1.0",
  "httparse",
- "integer-sqrt",
  "lazy_static",
  "log",
  "memchr",
@@ -1384,9 +1356,9 @@ checksum = "697c714f50560202b1f4e2e09cd50a421881c83e9025db75d15f276616f04f40"
 
 [[package]]
 name = "csv"
-version = "1.2.0"
+version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "af91f40b7355f82b0a891f50e70399475945bb0b0da4f1700ce60761c9d3e359"
+checksum = "ac574ff4d437a7b5ad237ef331c17ccca63c46479e5b5453eb8e10bb99a759fe"
 dependencies = [
  "csv-core",
  "itoa",
@@ -1396,9 +1368,9 @@ dependencies = [
 
 [[package]]
 name = "csv-core"
-version = "0.1.10"
+version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2b2466559f260f48ad25fe6317b3c8dac77b5bdb5763ac7d9d6103530663bc90"
+checksum = "5efa2b3d7902f4b634a20cae3c9c4e6209dc4779feb6863329607560143efa70"
 dependencies = [
  "memchr",
 ]
@@ -2229,7 +2201,6 @@ version = "0.1.0"
 dependencies = [
  "ansi_term",
  "atty",
- "lazy_static",
  "slog",
  "slog-async",
  "slog-atomic",
@@ -2942,7 +2913,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "abb12e687cfb44aa40f41fc3978ef76448f9b6038cad6aef4259d3c095a2382e"
 dependencies = [
  "cfg-if 1.0.0",
- "serde",
 ]
 
 [[package]]
@@ -4918,8 +4888,6 @@ version = "2.7.0"
 dependencies = [
  "clarinet-deployments",
  "clarinet-files",
- "clarinet-utils",
- "crossbeam-channel",
  "error-chain",
  "hiro-system-kit 0.1.0",
  "neon",
@@ -4938,13 +4906,11 @@ dependencies = [
  "bitcoin 0.29.2",
  "bitcoincore-rpc 0.16.0",
  "bollard",
- "bytes",
  "chainhook-sdk",
  "chrono",
  "clap",
  "clarinet-deployments",
  "clarinet-files",
- "clarinet-utils",
  "clarity",
  "crossbeam-channel",
  "crossterm",
