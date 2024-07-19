@@ -50,16 +50,7 @@ describe("basic simnet interactions", () => {
     expect(simnet.stacksBlockHeight).toBe(blockHeight + 5);
     simnet.mineEmptyBurnBlocks(4);
     expect(simnet.burnBlockHeight).toBe(burnBlockHeight + 4);
-    expect(simnet.stacksBlockHeight).toBe(blockHeight + 5);
-  });
-
-  // TODO: ???
-  it("updates burnchain after 100 stacks blocks", () => {
-    const blockHeight = simnet.stacksBlockHeight;
-    const burnBlockHeight = simnet.burnBlockHeight;
-    simnet.mineEmptyStacksBlocks(101);
-    expect(simnet.stacksBlockHeight).toBe(blockHeight + 101);
-    expect(simnet.burnBlockHeight).toBe(burnBlockHeight + 1);
+    expect(simnet.stacksBlockHeight).toBe(blockHeight + 9);
   });
 
   it("exposes devnet stacks accounts", () => {

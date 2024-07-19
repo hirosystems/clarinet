@@ -1266,14 +1266,27 @@ mod tests {
     }
 
     #[test]
+    fn test_advance_stacks_chaintip() {
+        let mut interpreter =
+            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let count = 5;
+        let initial_block_height = interpreter.get_burn_block_height();
+        interpreter.advance_stacks_chaintip(count);
+        assert_eq!(interpreter.get_burn_block_height(), initial_block_height);
+        assert_eq!(interpreter.get_block_height(), initial_block_height + count);
+    }
+    #[test]
     fn test_advance_chain_tip() {
         let mut interpreter =
             ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
         let count = 5;
         let initial_block_height = interpreter.get_block_height();
-        interpreter.advance_stacks_chaintip(count);
         interpreter.advance_burn_chaintip(count);
         assert_eq!(interpreter.get_block_height(), initial_block_height + count);
+        assert_eq!(
+            interpreter.get_burn_block_height(),
+            initial_block_height + count
+        );
     }
 
     #[test]
@@ -1737,7 +1750,6 @@ mod tests {
             ),
         );
 
-        interpreter.advance_stacks_chaintip(10);
         interpreter.advance_burn_chaintip(10);
 
         let result = interpreter.call_contract_fn(
@@ -1770,7 +1782,6 @@ mod tests {
         let mut interpreter =
             ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
 
-        interpreter.advance_stacks_chaintip(1);
         interpreter.advance_burn_chaintip(1);
 
         let snippet = [
@@ -1824,7 +1835,6 @@ mod tests {
         let mut interpreter =
             ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
 
-        interpreter.advance_stacks_chaintip(1);
         interpreter.advance_burn_chaintip(1);
 
         let snippet = [
@@ -1878,7 +1888,6 @@ mod tests {
             ),
         );
 
-        interpreter.advance_stacks_chaintip(10);
         interpreter.advance_burn_chaintip(10);
 
         let result = interpreter.call_contract_fn(

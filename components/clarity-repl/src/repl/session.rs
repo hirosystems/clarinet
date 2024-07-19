@@ -864,12 +864,11 @@ impl Session {
         self.interpreter.advance_stacks_chaintip(count)
     }
     pub fn advance_burn_chaintip(&mut self, count: u32) -> u32 {
-        self.interpreter.advance_stacks_chaintip(count);
         self.interpreter.advance_burn_chaintip(count)
     }
     // Not exposed/documented but still supported for convenience
     pub fn advance_chain_tip(&mut self, count: u32) -> u32 {
-        self.interpreter.advance_stacks_chaintip(count)
+        self.interpreter.advance_burn_chaintip(count)
     }
 
     fn parse_and_set_tx_sender(&mut self, command: &str) -> String {

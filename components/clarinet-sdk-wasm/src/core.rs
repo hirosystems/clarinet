@@ -923,13 +923,11 @@ impl SDK {
 
     #[wasm_bindgen(js_name=mineEmptyBlock)]
     pub fn mine_empty_block(&mut self) -> u32 {
-        self.mine_empty_burn_block();
-        self.mine_empty_stacks_block()
+        self.mine_empty_burn_block()
     }
     #[wasm_bindgen(js_name=mineEmptyBlocks)]
     pub fn mine_empty_blocks(&mut self, count: Option<u32>) -> u32 {
-        self.mine_empty_burn_blocks(count);
-        self.mine_empty_stacks_blocks(count)
+        self.mine_empty_burn_blocks(count)
     }
     #[wasm_bindgen(js_name=mineEmptyStacksBlock)]
     pub fn mine_empty_stacks_block(&mut self) -> u32 {
@@ -940,11 +938,7 @@ impl SDK {
     #[wasm_bindgen(js_name=mineEmptyStacksBlocks)]
     pub fn mine_empty_stacks_blocks(&mut self, count: Option<u32>) -> u32 {
         let session = self.get_session_mut();
-        let res = session.advance_stacks_chaintip(count.unwrap_or(1));
-        if count > Some(100) {
-            session.advance_burn_chaintip(1);
-        }
-        res
+        session.advance_stacks_chaintip(count.unwrap_or(1))
     }
 
     #[wasm_bindgen(js_name=mineEmptyBurnBlock)]
