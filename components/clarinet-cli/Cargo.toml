@@ -23,42 +23,17 @@ toml = { version = "0.5.6", features = ["preserve_order"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1.0.79", features = ["preserve_order"] }
 serde_derive = "1"
-log = { version = "=0.4.17", features = ["serde"] }
-signal-hook-registry = "1.4.0"
-secure_tempfile = { version = "3.8.0", package = "tempfile" }
-libsecp256k1 = "0.7.0"
-hmac = "0.12.0"
-pbkdf2 = { version = "0.12.2", features = ["simple"], default-features = false }
-futures = "0.3.12"
 tokio = { version = "1.35.1", features = ["full"] }
-tokio-util = { version = "0.7.10", features = ["io"], optional = true }
 lazy_static = { workspace = true }
 atty = "0.2.14"
-termcolor = "1.1.2"
-regex = "1.7"
 dirs = { version = "4.0.0" }
-libc = "0.2.86"
-encoding_rs = "0.8.31"
-percent-encoding = "2.1.0"
-pin-project = "1.0.5"
-reqwest = { workspace = true, features = ["blocking"]}
 crossterm = "0.27.0"
 ratatui = { version = "0.27.0", default-features = false, features = ["crossterm"] }
-base58 = "0.2.0"
-ctrlc = "3.1.9"
-strum = { version = "0.23.0", features = ["derive"] }
-bitcoin = "0.29.2"
-tiny-hderive = "0.3.0"
 segment = { version = "0.2.4", optional = true }
 mac_address = { version = "1.1.2", optional = true }
 tower-lsp = { version = "0.19.0", optional = true }
-hex = "0.4.3"
-num_cpus = "1.13.1"
-mio = "0.8"
 similar = "2.1.0"
 crossbeam-channel = "0.5.6"
-chrono = "0.4.31"
-sha2 = "0.10.0"
 
 clarity_repl = { package = "clarity-repl", path = "../clarity-repl", features = [
     "cli",
@@ -67,7 +42,6 @@ clarinet-files = { path = "../clarinet-files", features = ["cli"] }
 clarity-lsp = { path = "../clarity-lsp", features = ["cli"] }
 clarinet-deployments = { path = "../clarinet-deployments", features = ["cli"] }
 hiro-system-kit = { path = "../hiro-system-kit" }
-clarinet-utils = { path = "../clarinet-utils" }
 stacks-network = { path = "../stacks-network" }
 
 [target.'cfg(unix)'.dependencies]
@@ -107,5 +81,5 @@ path = "src/bin.rs"
 
 [features]
 default = ["cli", "telemetry"]
-cli = ["tokio-util", "clap", "clap_complete", "tower-lsp"]
+cli = ["clap", "clap_complete", "tower-lsp"]
 telemetry = ["segment", "mac_address"]
