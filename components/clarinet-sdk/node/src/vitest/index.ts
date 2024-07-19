@@ -1,3 +1,6 @@
+import path from "node:path";
+import url from "node:url";
+
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 
@@ -39,5 +42,12 @@ export function getClarinetVitestsArgv() {
     }).argv;
 }
 
-export const vitestHelpersPath = "node_modules/@hirosystems/clarinet-sdk/vitest-helpers/src/";
-export const vitestSetupFilePath = `${vitestHelpersPath}vitest.setup.ts`;
+// ensure vitest helpers can be imported even in workspace setup
+// import.meta.resolve return an url like "file:///absolute/path/to/clarinet-sdk/dist/esm/index.js"
+const sdkURL = import.meta.resolve("@hirosystems/clarinet-sdk");
+const sdkPath = url.fileURLToPath(sdkURL);
+const sdkDir = path.dirname(sdkPath);
+
+// sdkDir is in /dist/esm/node/src, hence the ../../../../
+export const vitestHelpersPath = path.join(sdkDir, "../../../../vitest-helpers/src/");
+export const vitestSetupFilePath = path.join(vitestHelpersPath, "vitest.setup.ts");

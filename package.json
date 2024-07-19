@@ -13,7 +13,8 @@
     "components/clarinet-sdk/browser"
   ],
   "scripts": {
-    "build:wasm": "node components/clarinet-sdk-wasm/build.mjs",
+    "build:sdk-wasm": "node components/clarinet-sdk-wasm/build.mjs",
+    "build:sdk": "npm run -w components/clarinet-sdk/node -w components/clarinet-sdk/browser build",
     "test": "npm test --workspaces --if-present",
     "publish:sdk-wasm": "npm publish -w components/clarinet-sdk-wasm/pkg-node -w components/clarinet-sdk-wasm/pkg-browser --tag beta",
     "publish:sdk": "npm publish -w components/clarinet-sdk/node -w components/clarinet-sdk/browser --tag beta"
@@ -22,8 +23,8 @@
     "@types/node": "^20.4.5",
     "@types/prompts": "^2.4.5",
     "@types/yargs": "^17.0.24",
-    "prettier": "^3.0.3",
-    "rimraf": "^5.0.1",
+    "prettier": "^3.3.3",
+    "rimraf": "^6.0.1",
     "ts-loader": "^9.4.4",
     "typescript": "^5.1.6"
   }

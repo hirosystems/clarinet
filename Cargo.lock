@@ -913,7 +913,7 @@ dependencies = [
 
 [[package]]
 name = "clarinet-sdk-wasm"
-version = "2.8.0-beta1"
+version = "2.8.0-beta6"
 dependencies = [
  "clarinet-deployments",
  "clarinet-files",
