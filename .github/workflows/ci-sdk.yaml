@@ -59,7 +59,7 @@ jobs:
         run: npm install -g wasm-pack
 
       - name: Build Wasm packages
-        run: npm run build:wasm
+        run: npm run build:sdk-wasm
 
       - name: Install dependencies
         run: npm ci
