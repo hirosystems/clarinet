@@ -932,13 +932,19 @@ impl SDK {
     #[wasm_bindgen(js_name=mineEmptyStacksBlock)]
     pub fn mine_empty_stacks_block(&mut self) -> u32 {
         let session = self.get_session_mut();
-        session.advance_stacks_chaintip(1)
+        match session.advance_stacks_chaintip(1) {
+            Ok(new_height) => new_height,
+            Err(msg) => panic!("{}", msg),
+        }
     }
 
     #[wasm_bindgen(js_name=mineEmptyStacksBlocks)]
     pub fn mine_empty_stacks_blocks(&mut self, count: Option<u32>) -> u32 {
         let session = self.get_session_mut();
-        session.advance_stacks_chaintip(count.unwrap_or(1))
+        match session.advance_stacks_chaintip(count.unwrap_or(1)) {
+            Ok(new_height) => new_height,
+            Err(msg) => panic!("{}", msg),
+        }
     }
 
     #[wasm_bindgen(js_name=mineEmptyBurnBlock)]

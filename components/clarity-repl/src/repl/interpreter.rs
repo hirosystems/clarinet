@@ -7,7 +7,7 @@ use crate::repl::datastore::BurnDatastore;
 use crate::repl::datastore::Datastore;
 use crate::repl::Settings;
 use clarity::consts::CHAIN_ID_TESTNET;
-use clarity::types::{StacksEpoch, StacksEpochId};
+use clarity::types::StacksEpochId;
 use clarity::vm::analysis::ContractAnalysis;
 use clarity::vm::ast::{build_ast_with_diagnostics, ContractAST};
 #[cfg(feature = "cli")]
@@ -1198,6 +1198,7 @@ impl ClarityInterpreter {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::analysis::Settings as AnalysisSettings;
     use crate::{
         repl::session::BOOT_CONTRACTS_DATA, test_fixtures::clarity_contract::ClarityContractBuilder,
     };
@@ -1274,12 +1275,33 @@ mod tests {
     }
 
     #[test]
-    fn test_advance_stacks_chaintip() {
+    fn test_advance_stacks_chaintip_pre_epoch_3() {
         let mut interpreter =
             ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        interpreter
+            .burn_datastore
+            .set_current_epoch(StacksEpochId::Epoch2_05);
         let count = 5;
         let initial_block_height = interpreter.get_burn_block_height();
-        interpreter.advance_stacks_chaintip(count);
+        assert_ne!(interpreter.advance_stacks_chaintip(count), Ok(count));
+        assert_eq!(interpreter.get_burn_block_height(), initial_block_height);
+        assert_eq!(interpreter.get_block_height(), initial_block_height);
+    }
+    #[test]
+    fn test_advance_stacks_chaintip() {
+        let wasm_settings = Settings {
+            analysis: AnalysisSettings::default(),
+            clarity_wasm_mode: true,
+            show_timings: false,
+        };
+        let mut interpreter =
+            ClarityInterpreter::new(StandardPrincipalData::transient(), wasm_settings);
+        interpreter
+            .burn_datastore
+            .set_current_epoch(StacksEpochId::Epoch30);
+        let count = 5;
+        let initial_block_height = interpreter.get_burn_block_height();
+        assert_eq!(interpreter.advance_stacks_chaintip(count), Ok(count));
         assert_eq!(interpreter.get_burn_block_height(), initial_block_height);
         assert_eq!(interpreter.get_block_height(), initial_block_height + count);
     }
