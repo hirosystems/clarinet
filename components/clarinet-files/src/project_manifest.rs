@@ -1,7 +1,8 @@
 use crate::FileAccessor;
 
 use super::FileLocation;
-use clarity_repl::clarity::{ClarityVersion, StacksEpochId};
+use clarity::types::StacksEpochId;
+use clarity::vm::ClarityVersion;
 use clarity_repl::repl;
 use clarity_repl::repl::{ClarityCodeSource, ClarityContract, ContractDeployer};
 use serde::ser::SerializeMap;

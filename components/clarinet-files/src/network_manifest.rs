@@ -4,10 +4,10 @@ use super::{FileAccessor, FileLocation};
 use bip39::{Language, Mnemonic};
 use chainhook_types::{BitcoinNetwork, StacksNetwork};
 use clarinet_utils::get_bip39_seed_from_mnemonic;
-use clarity_repl::clarity::util::hash::bytes_to_hex;
-use clarity_repl::clarity::util::secp256k1::Secp256k1PublicKey;
-use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
-use clarity_repl::clarity::{address::AddressHashMode, chainstate::StacksAddress};
+use clarity::address::AddressHashMode;
+use clarity::types::chainstate::StacksAddress;
+use clarity::util::{hash::bytes_to_hex, secp256k1::Secp256k1PublicKey};
+use clarity::vm::types::QualifiedContractIdentifier;
 use libsecp256k1::{PublicKey, SecretKey};
 use tiny_hderive::bip32::ExtendedPrivKey;
 use toml::value::Value;
@@ -698,7 +698,7 @@ impl NetworkManifest {
                 }
             };
 
-            let now = clarity_repl::clarity::util::get_epoch_time_secs();
+            let now = clarity::util::get_epoch_time_secs();
             let devnet_dir = if let Some(network_id) = devnet_config.network_id {
                 format!("stacks-devnet-{}-{}/", now, network_id)
             } else {
@@ -1002,9 +1002,9 @@ pub fn compute_addresses(
     let public_key = PublicKey::from_secret_key(&secret_key);
     let pub_key = Secp256k1PublicKey::from_slice(&public_key.serialize_compressed()).unwrap();
     let version = if networks.1.is_mainnet() {
-        clarity_repl::clarity::address::C32_ADDRESS_VERSION_MAINNET_SINGLESIG
+        clarity::address::C32_ADDRESS_VERSION_MAINNET_SINGLESIG
     } else {
-        clarity_repl::clarity::address::C32_ADDRESS_VERSION_TESTNET_SINGLESIG
+        clarity::address::C32_ADDRESS_VERSION_TESTNET_SINGLESIG
     };
 
     let stx_address = StacksAddress::from_public_keys(

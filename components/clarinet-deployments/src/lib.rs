@@ -909,8 +909,8 @@ pub fn load_deployment(
 
 #[cfg(test)]
 mod tests {
+    use clarity::vm::{types::TupleData, ClarityName, ClarityVersion, Value};
     use clarity_repl::repl::{clarity_values::to_raw_value, SessionSettings};
-    use stacks_codec::clarity::{vm::types::TupleData, ClarityName, ClarityVersion, Value};
 
     use super::*;
 

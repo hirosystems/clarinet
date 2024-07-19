@@ -900,6 +900,7 @@ dependencies = [
  "bitcoincore-rpc-json 0.16.0",
  "clarinet-files",
  "clarinet-utils",
+ "clarity",
  "clarity-repl",
  "colored",
  "libsecp256k1 0.7.1",
@@ -921,6 +922,7 @@ dependencies = [
  "bitcoin 0.29.2",
  "chainhook-types",
  "clarinet-utils",
+ "clarity",
  "clarity-repl",
  "js-sys",
  "libsecp256k1 0.7.1",
@@ -2739,9 +2741,9 @@ dependencies = [
 
 [[package]]
 name = "lazy_static"
-version = "1.4.0"
+version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
+checksum = "bbd2bcb4c963f2ddae06a2efc7e9f3591312473c50c6685e1f298068316e66fe"
 
 [[package]]
 name = "leb128"
@@ -4943,7 +4945,7 @@ dependencies = [
  "clarinet-deployments",
  "clarinet-files",
  "clarinet-utils",
- "clarity-repl",
+ "clarity",
  "crossbeam-channel",
  "crossterm",
  "ctrlc",
@@ -4969,6 +4971,7 @@ dependencies = [
 name = "stacks-rpc-client"
 version = "2.7.0"
 dependencies = [
+ "clarity",
  "hmac 0.12.1",
  "libsecp256k1 0.7.1",
  "pbkdf2",
