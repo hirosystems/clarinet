@@ -7,7 +7,7 @@ use crate::repl::datastore::BurnDatastore;
 use crate::repl::datastore::Datastore;
 use crate::repl::Settings;
 use clarity::consts::CHAIN_ID_TESTNET;
-use clarity::types::StacksEpochId;
+use clarity::types::{StacksEpoch, StacksEpochId};
 use clarity::vm::analysis::ContractAnalysis;
 use clarity::vm::ast::{build_ast_with_diagnostics, ContractAST};
 #[cfg(feature = "cli")]
@@ -1103,8 +1103,16 @@ impl ClarityInterpreter {
         self.set_tenure_height();
         new_height
     }
-    pub fn advance_stacks_chaintip(&mut self, count: u32) -> u32 {
-        self.datastore.advance_chain_tip(count)
+    pub fn advance_stacks_chaintip(&mut self, count: u32) -> Result<u32, String> {
+        let current_epoch = self.burn_datastore.get_current_epoch();
+        if current_epoch < StacksEpochId::Epoch30 {
+            Err(format!(
+                "stacks block height can't be advanced in {}",
+                current_epoch
+            ))
+        } else {
+            Ok(self.datastore.advance_chain_tip(count))
+        }
     }
 
     pub fn set_tenure_height(&mut self) {

@@ -374,6 +374,10 @@ impl BurnDatastore {
         }
     }
 
+    pub fn get_current_epoch(&self) -> StacksEpochId {
+        self.current_epoch
+    }
+
     pub fn get_current_block_height(&self) -> u32 {
         self.chain_height
     }

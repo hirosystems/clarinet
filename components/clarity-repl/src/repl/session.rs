@@ -835,10 +835,12 @@ impl Session {
             }
         };
 
-        let new_height = self.advance_stacks_chaintip(count);
-        format!("{} blocks simulated, new height: {}", count, new_height)
-            .green()
-            .to_string()
+        match self.advance_stacks_chaintip(count) {
+            Ok(new_height) => format!("{} blocks simulated, new height: {}", count, new_height)
+                .green()
+                .to_string(),
+            Err(msg) => format!("{}", msg.red()),
+        }
     }
     fn parse_and_advance_burn_chaintip(&mut self, command: &str) -> String {
         let args: Vec<_> = command.split(' ').collect();
@@ -860,7 +862,7 @@ impl Session {
             .to_string()
     }
 
-    pub fn advance_stacks_chaintip(&mut self, count: u32) -> u32 {
+    pub fn advance_stacks_chaintip(&mut self, count: u32) -> Result<u32, String> {
         self.interpreter.advance_stacks_chaintip(count)
     }
     pub fn advance_burn_chaintip(&mut self, count: u32) -> u32 {
