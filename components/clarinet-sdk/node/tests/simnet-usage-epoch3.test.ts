@@ -8,30 +8,9 @@ import { Simnet, initSimnet } from "..";
 
 let simnet: Simnet;
 
-const deploymentPlanPath = path.join(
-  process.cwd(),
-  "tests/fixtures/deployments/default.simnet-plan-3.yaml",
-);
-
-const customDeploymentPlanPath = path.join(
-  process.cwd(),
-  "tests/fixtures/deployments/custom.simnet-plan-3.yaml",
-);
-
-function deleteExistingDeploymentPlan() {
-  if (fs.existsSync(deploymentPlanPath)) {
-    fs.unlinkSync(deploymentPlanPath);
-  }
-}
-
 beforeEach(async () => {
-  deleteExistingDeploymentPlan();
-  fs.copyFileSync(customDeploymentPlanPath, deploymentPlanPath);
   simnet = await initSimnet("tests/fixtures/Clarinet.toml");
-});
-
-afterEach(() => {
-  deleteExistingDeploymentPlan();
+  simnet.setEpoch("3.0");
 });
 
 describe("basic simnet interactions", () => {
