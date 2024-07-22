@@ -934,7 +934,7 @@ impl SDK {
         let session = self.get_session_mut();
         match session.advance_stacks_chaintip(1) {
             Ok(new_height) => Ok(new_height),
-            Err(msg) => Err(msg),
+            Err(_) => Err("use mineEmptyBurnBlock in epoch lower than 3.0".to_string()),
         }
     }
 
@@ -943,7 +943,7 @@ impl SDK {
         let session = self.get_session_mut();
         match session.advance_stacks_chaintip(count.unwrap_or(1)) {
             Ok(new_height) => Ok(new_height),
-            Err(msg) => Err(msg),
+            Err(_) => Err("use mineEmptyBurnBlocks in epoch lower than 3.0".to_string()),
         }
     }
 

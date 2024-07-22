@@ -1282,9 +1282,8 @@ fn clarity_keywords() -> HashMap<String, String> {
 mod tests {
     use clarity::vm::types::TupleData;
 
-    use crate::{repl::settings::Account, test_fixtures::clarity_contract::ClarityContractBuilder};
-
     use super::*;
+    use crate::{repl::settings::Account, test_fixtures::clarity_contract::ClarityContractBuilder};
 
     #[track_caller]
     fn assert_execution_result_value(
@@ -1342,6 +1341,52 @@ mod tests {
         );
     }
 
+    #[test]
+    fn test_parse_and_advance_stacks_chaintip() {
+        let mut session = Session::new(SessionSettings::default());
+        let result = session.handle_command("::advance_stacks_chaintip 1");
+        assert_eq!(
+            result,
+            "only burn chain height can be advanced in epoch lower than 3.0"
+                .to_string()
+                .red()
+                .to_string()
+        );
+        session.handle_command("::set_epoch 3.0");
+        let _ = session.handle_command("::advance_stacks_chaintip 1");
+        let new_height = session.handle_command("::get_stacks_block_height");
+        assert_eq!(new_height, "Current height: 1");
+    }
+
+    #[test]
+    fn test_parse_and_advance_burn_chaintip_pre_epoch3() {
+        let mut session = Session::new(SessionSettings::default());
+        let result = session.handle_command("::advance_burn_chaintip 1");
+        assert_eq!(
+            result,
+            "1 blocks simulated, new height: 1"
+                .to_string()
+                .green()
+                .to_string()
+        );
+    }
+    #[test]
+    fn test_parse_and_advance_burn_chaintip_epoch3() {
+        let mut session = Session::new(SessionSettings::default());
+        session.handle_command("::set_epoch 3.0");
+        let result = session.handle_command("::advance_burn_chaintip 1");
+        assert_eq!(
+            result,
+            "1 blocks simulated, new height: 1"
+                .to_string()
+                .green()
+                .to_string()
+        );
+        let new_height = session.handle_command("::get_stacks_block_height");
+        assert_eq!(new_height, "Current height: 1");
+        let new_height = session.handle_command("::get_burn_block_height");
+        assert_eq!(new_height, "Current height: 1");
+    }
     #[test]
     fn set_epoch_command() {
         let mut session = Session::new(SessionSettings::default());

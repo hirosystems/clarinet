@@ -1107,10 +1107,7 @@ impl ClarityInterpreter {
     pub fn advance_stacks_chaintip(&mut self, count: u32) -> Result<u32, String> {
         let current_epoch = self.burn_datastore.get_current_epoch();
         if current_epoch < StacksEpochId::Epoch30 {
-            Err(format!(
-                "stacks block height can't be advanced in {}",
-                current_epoch
-            ))
+            Err("only burn chain height can be advanced in epoch lower than 3.0".to_string())
         } else {
             Ok(self.datastore.advance_chain_tip(count))
         }
