@@ -26,7 +26,7 @@ function deleteExistingDeploymentPlan() {
 
 beforeEach(async () => {
   deleteExistingDeploymentPlan();
-  await fs.copyFileSync(customDeploymentPlanPath, deploymentPlanPath);
+  fs.copyFileSync(customDeploymentPlanPath, deploymentPlanPath);
   simnet = await initSimnet("tests/fixtures/Clarinet.toml");
 });
 
@@ -39,16 +39,16 @@ describe("basic simnet interactions", () => {
     expect(simnet.blockHeight).toBe(1);
   });
 
-//   it("can mine empty blocks", () => {
-//     const blockHeight = simnet.stacksBlockHeight;
-//     const burnBlockHeight = simnet.burnBlockHeight;
-//     simnet.mineEmptyStacksBlock();
-//     expect(simnet.stacksBlockHeight).toBe(blockHeight + 1);
-//     expect(simnet.burnBlockHeight).toBe(burnBlockHeight);
-//     simnet.mineEmptyStacksBlocks(4);
-//     expect(simnet.stacksBlockHeight).toBe(blockHeight + 5);
-//     simnet.mineEmptyBurnBlocks(4);
-//     expect(simnet.burnBlockHeight).toBe(burnBlockHeight + 4);
-//     expect(simnet.stacksBlockHeight).toBe(blockHeight + 9);
-//   })
+  it("can mine empty blocks", () => {
+    const blockHeight = simnet.stacksBlockHeight;
+    const burnBlockHeight = simnet.burnBlockHeight;
+    simnet.mineEmptyStacksBlock();
+    expect(simnet.stacksBlockHeight).toBe(blockHeight + 1);
+    expect(simnet.burnBlockHeight).toBe(burnBlockHeight);
+    simnet.mineEmptyStacksBlocks(4);
+    expect(simnet.stacksBlockHeight).toBe(blockHeight + 5);
+    simnet.mineEmptyBurnBlocks(4);
+    expect(simnet.burnBlockHeight).toBe(burnBlockHeight + 4);
+    expect(simnet.stacksBlockHeight).toBe(blockHeight + 9);
+  })
 })
