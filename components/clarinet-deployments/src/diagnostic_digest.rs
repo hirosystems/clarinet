@@ -1,12 +1,10 @@
 use std::collections::HashMap;
 
-use clarity_repl::{
-    clarity::{
-        diagnostic::{Diagnostic, Level},
-        vm::types::QualifiedContractIdentifier,
-    },
-    repl::diagnostic::output_code,
+use clarity::vm::{
+    diagnostic::{Diagnostic, Level},
+    types::QualifiedContractIdentifier,
 };
+use clarity_repl::repl::diagnostic::output_code;
 use colored::*;
 
 use crate::types::DeploymentSpecification;

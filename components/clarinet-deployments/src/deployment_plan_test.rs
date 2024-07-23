@@ -1,9 +1,7 @@
 use std::collections::BTreeMap;
 
 use clarinet_files::{chainhook_types::StacksNetwork, FileLocation};
-use clarity_repl::clarity::{
-    vm::types::QualifiedContractIdentifier, ClarityName, ClarityVersion, ContractName,
-};
+use clarity::vm::{types::QualifiedContractIdentifier, ClarityName, ClarityVersion, ContractName};
 
 use crate::types::*;
 

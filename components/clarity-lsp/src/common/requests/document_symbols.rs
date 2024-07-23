@@ -1,9 +1,7 @@
 use std::collections::HashMap;
 
-use clarity_repl::{
-    analysis::ast_visitor::{traverse, ASTVisitor},
-    clarity::{representations::Span, ClarityName, SymbolicExpression, SymbolicExpressionType},
-};
+use clarity::vm::{representations::Span, ClarityName, SymbolicExpression, SymbolicExpressionType};
+use clarity_repl::analysis::ast_visitor::{traverse, ASTVisitor};
 use lsp_types::{DocumentSymbol, SymbolKind};
 use serde::{Deserialize, Serialize};
 

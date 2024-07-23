@@ -1,9 +1,8 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use crate::repl::DEFAULT_EPOCH;
-
 use super::{extract_watch_variable, AccessType, State};
+use clarinet_core::DEFAULT_EPOCH;
 use clarity::vm::callables::FunctionIdentifier;
 use clarity::vm::contexts::{ContractContext, GlobalContext};
 use clarity::vm::errors::Error;

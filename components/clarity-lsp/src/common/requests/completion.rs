@@ -1,18 +1,16 @@
 use std::{collections::HashMap, vec};
 
-use clarity_repl::{
-    analysis::ast_visitor::{traverse, ASTVisitor, TypedVar},
-    clarity::{
-        analysis::ContractAnalysis,
-        docs::{make_api_reference, make_define_reference, make_keyword_reference},
-        functions::{define::DefineFunctions, NativeFunctions},
-        variables::NativeVariables,
-        vm::types::{BlockInfoProperty, FunctionType, TypeSignature},
-        ClarityName, ClarityVersion, SymbolicExpression,
-    },
-    repl::DEFAULT_EPOCH,
+use clarinet_core::DEFAULT_EPOCH;
+use clarity::vm::{
+    analysis::ContractAnalysis,
+    docs::{make_api_reference, make_define_reference, make_keyword_reference},
+    functions::{define::DefineFunctions, NativeFunctions},
+    types::{BlockInfoProperty, FunctionType, TypeSignature},
+    variables::NativeVariables,
+    ClarityName, ClarityVersion, SymbolicExpression,
 };
-use lazy_static::lazy_static;
+
+use clarity_repl::analysis::ast_visitor::{self, traverse, ASTVisitor, TypedVar};
 use lsp_types::{
     CompletionItem, CompletionItemKind, Documentation, InsertTextFormat, MarkupContent, MarkupKind,
     Position,
@@ -245,7 +243,7 @@ impl<'a> ASTVisitor<'a> for ContractDefinedData {
         &mut self,
         expr: &'a SymbolicExpression,
         name: &'a ClarityName,
-        parameters: Option<Vec<clarity_repl::analysis::ast_visitor::TypedVar<'a>>>,
+        parameters: Option<Vec<ast_visitor::TypedVar<'a>>>,
         _body: &'a SymbolicExpression,
     ) -> bool {
         self.set_function_completion_with_bindings(expr, name, &parameters.unwrap_or_default());
@@ -256,7 +254,7 @@ impl<'a> ASTVisitor<'a> for ContractDefinedData {
         &mut self,
         expr: &'a SymbolicExpression,
         name: &'a ClarityName,
-        parameters: Option<Vec<clarity_repl::analysis::ast_visitor::TypedVar<'a>>>,
+        parameters: Option<Vec<ast_visitor::TypedVar<'a>>>,
         _body: &'a SymbolicExpression,
     ) -> bool {
         self.set_function_completion_with_bindings(expr, name, &parameters.unwrap_or_default());
@@ -267,7 +265,7 @@ impl<'a> ASTVisitor<'a> for ContractDefinedData {
         &mut self,
         expr: &'a SymbolicExpression,
         name: &'a ClarityName,
-        parameters: Option<Vec<clarity_repl::analysis::ast_visitor::TypedVar<'a>>>,
+        parameters: Option<Vec<ast_visitor::TypedVar<'a>>>,
         _body: &'a SymbolicExpression,
     ) -> bool {
         self.set_function_completion_with_bindings(expr, name, &parameters.unwrap_or_default());

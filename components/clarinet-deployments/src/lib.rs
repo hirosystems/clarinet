@@ -1,7 +1,4 @@
-use clarity_repl::clarity::vm::SymbolicExpression;
-use clarity_repl::clarity::StacksEpochId;
-use clarity_repl::repl::{ClarityCodeSource, ClarityContract, ContractDeployer};
-use clarity_repl::repl::{DEFAULT_CLARITY_VERSION, DEFAULT_EPOCH};
+use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 
 extern crate serde;
 
@@ -21,21 +18,24 @@ use self::types::{
     DeploymentSpecification, EmulatedContractPublishSpecification, GenesisSpecification,
     TransactionPlanSpecification, TransactionsBatchSpecification, WalletSpecification,
 };
+use clarinet_core::{ClarityCodeSource, ClarityContract, ContractDeployer};
+use clarinet_core::{DEFAULT_CLARITY_VERSION, DEFAULT_EPOCH};
 use clarinet_files::chainhook_types::StacksNetwork;
 use clarinet_files::{FileAccessor, FileLocation};
 use clarinet_files::{NetworkManifest, ProjectManifest};
+use clarinet_static::boot_contracts::BOOT_CONTRACTS_DATA;
+use clarity::types::StacksEpochId;
+use clarity::vm::ast::ContractAST;
+use clarity::vm::diagnostic::Diagnostic;
+use clarity::vm::types::PrincipalData;
+use clarity::vm::types::QualifiedContractIdentifier;
+use clarity::vm::ContractName;
+use clarity::vm::EvaluationResult;
+use clarity::vm::ExecutionResult;
+use clarity::vm::SymbolicExpression;
 use clarity_repl::analysis::ast_dependency_detector::{ASTDependencyDetector, DependencySet};
-use clarity_repl::clarity::vm::ast::ContractAST;
-use clarity_repl::clarity::vm::diagnostic::Diagnostic;
-use clarity_repl::clarity::vm::types::PrincipalData;
-use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
-use clarity_repl::clarity::vm::ContractName;
-use clarity_repl::clarity::vm::EvaluationResult;
-use clarity_repl::clarity::vm::ExecutionResult;
-use clarity_repl::repl::session::BOOT_CONTRACTS_DATA;
 use clarity_repl::repl::Session;
 use clarity_repl::repl::SessionSettings;
-use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 use types::TransactionSpecification;
 use types::{ContractPublishSpecification, EpochSpec};
 use types::{DeploymentGenerationArtifacts, StxTransferSpecification};

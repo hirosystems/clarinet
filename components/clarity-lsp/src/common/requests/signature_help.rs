@@ -1,4 +1,4 @@
-use clarity_repl::clarity::docs::FunctionAPI;
+use clarity::vm::docs::FunctionAPI;
 use lsp_types::{ParameterInformation, ParameterLabel, Position, SignatureInformation};
 
 use crate::state::ActiveContractData;

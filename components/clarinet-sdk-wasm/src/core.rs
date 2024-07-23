@@ -1,3 +1,6 @@
+use clarinet_core::{
+    ClarityCodeSource, ClarityContract, ContractDeployer, DEFAULT_CLARITY_VERSION, DEFAULT_EPOCH,
+};
 use clarinet_deployments::diagnostic_digest::DiagnosticsDigest;
 use clarinet_deployments::types::{
     DeploymentSpecification, DeploymentSpecificationFile, EmulatedContractPublishSpecification,
@@ -9,6 +12,7 @@ use clarinet_deployments::{
 };
 use clarinet_files::chainhook_types::StacksNetwork;
 use clarinet_files::{FileAccessor, FileLocation, ProjectManifest, WASMFileSystemAccessor};
+use clarinet_static::boot_contracts::BOOT_CONTRACTS_DATA;
 use clarity_repl::analysis::coverage::CoverageReporter;
 use clarity_repl::clarity::analysis::contract_interface_builder::{
     ContractInterface, ContractInterfaceFunction, ContractInterfaceFunctionAccess,
@@ -22,11 +26,7 @@ use clarity_repl::clarity::{
     Address, ClarityVersion, EvaluationResult, ExecutionResult, StacksEpochId, SymbolicExpression,
 };
 use clarity_repl::repl::clarity_values::{uint8_to_string, uint8_to_value};
-use clarity_repl::repl::session::BOOT_CONTRACTS_DATA;
-use clarity_repl::repl::{
-    clarity_values, ClarityCodeSource, ClarityContract, ContractDeployer, Session, SessionSettings,
-    DEFAULT_CLARITY_VERSION, DEFAULT_EPOCH,
-};
+use clarity_repl::repl::{clarity_values, Session, SessionSettings};
 use gloo_utils::format::JsValueSerdeExt;
 use js_sys::Function as JsFunction;
 use serde::{Deserialize, Serialize};

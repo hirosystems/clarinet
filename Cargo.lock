@@ -838,6 +838,7 @@ dependencies = [
  "atty",
  "clap",
  "clap_complete",
+ "clarinet-core",
  "clarinet-deployments",
  "clarinet-files",
  "clarity-lsp",
@@ -864,6 +865,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "clarinet-core"
+version = "2.7.0"
+dependencies = [
+ "clarity",
+ "hmac 0.12.1",
+ "pbkdf2",
+ "serde",
+ "sha2 0.10.8",
+]
+
+[[package]]
 name = "clarinet-deployments"
 version = "2.7.0"
 dependencies = [
@@ -872,8 +884,9 @@ dependencies = [
  "bitcoin 0.29.2",
  "bitcoincore-rpc 0.16.0",
  "bitcoincore-rpc-json 0.16.0",
+ "clarinet-core",
  "clarinet-files",
- "clarinet-utils",
+ "clarinet-static",
  "clarity",
  "clarity-repl",
  "colored",
@@ -895,7 +908,7 @@ dependencies = [
  "bip39",
  "bitcoin 0.29.2",
  "chainhook-types",
- "clarinet-utils",
+ "clarinet-core",
  "clarity",
  "clarity-repl",
  "js-sys",
@@ -915,8 +928,10 @@ dependencies = [
 name = "clarinet-sdk-wasm"
 version = "2.8.0-beta6"
 dependencies = [
+ "clarinet-core",
  "clarinet-deployments",
  "clarinet-files",
+ "clarinet-static",
  "clarity-repl",
  "colored",
  "console_error_panic_hook",
@@ -931,12 +946,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "clarinet-utils"
-version = "1.0.0"
+name = "clarinet-static"
+version = "2.7.0"
 dependencies = [
- "hmac 0.12.1",
- "pbkdf2",
- "sha2 0.10.8",
+ "clarinet-core",
+ "clarity",
+ "lazy_static",
 ]
 
 [[package]]
@@ -980,8 +995,10 @@ dependencies = [
 name = "clarity-lsp"
 version = "2.7.0"
 dependencies = [
+ "clarinet-core",
  "clarinet-deployments",
  "clarinet-files",
+ "clarity",
  "clarity-repl",
  "console_error_panic_hook",
  "js-sys",
@@ -1005,6 +1022,8 @@ dependencies = [
  "bytes",
  "chrono",
  "clar2wasm",
+ "clarinet-core",
+ "clarinet-static",
  "clarity",
  "colored",
  "debug_types",
@@ -4937,6 +4956,7 @@ dependencies = [
 name = "stacks-rpc-client"
 version = "2.7.0"
 dependencies = [
+ "clarinet-core",
  "clarity",
  "hmac 0.12.1",
  "libsecp256k1 0.7.1",

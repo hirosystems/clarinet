@@ -1,11 +1,11 @@
-use clarity_repl::clarity::{
+use std::collections::HashMap;
+
+use clarity::vm::{
     docs::{make_api_reference, make_define_reference, make_keyword_reference, FunctionAPI},
     functions::{define::DefineFunctions, NativeFunctions},
     variables::NativeVariables,
     ClarityVersion,
 };
-use lazy_static::lazy_static;
-use std::collections::HashMap;
 
 fn code(code: &str) -> String {
     ["```clarity", code.trim(), "```"].join("\n")

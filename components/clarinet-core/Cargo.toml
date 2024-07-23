@@ -1,15 +1,11 @@
 [package]
-name = "clarinet-utils"
-version = "1.0.0"
-description = "Clarinet helpers"
-license = "MIT"
+name = "clarinet-core"
 edition = "2021"
+version.workspace = true
 
 [dependencies]
+serde = { version = "1", features = ["derive"] }
+clarity = { workspace = true }
 hmac = "0.12.0"
 pbkdf2 = { version = "0.12.2", features = ["simple"], default-features = false }
 sha2 = "0.10.0"
-
-[lib]
-name = "clarinet_utils"
-path = "src/lib.rs"

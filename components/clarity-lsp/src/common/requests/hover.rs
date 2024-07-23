@@ -1,4 +1,4 @@
-use clarity_repl::clarity::SymbolicExpression;
+use clarity::vm::SymbolicExpression;
 use lsp_types::Position;
 
 use super::{api_ref::API_REF, helpers::get_expression_name_at_position};

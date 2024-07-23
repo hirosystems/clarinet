@@ -17,4 +17,6 @@ tiny-hderive = { version = "0.3.0" }
 libsecp256k1 = { version = "0.7.0" }
 
 clarity = { workspace = true }
+
 stacks-codec = { version = "2", package = "stacks-codec", path = "../stacks-codec" }
+clarinet-core ={ path = "../clarinet-core" }

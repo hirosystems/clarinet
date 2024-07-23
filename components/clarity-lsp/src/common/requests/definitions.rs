@@ -2,10 +2,12 @@ use std::collections::HashMap;
 
 use super::helpers::span_to_range;
 
+use clarity::vm::{
+    functions::define::DefineFunctions,
+    types::{QualifiedContractIdentifier, StandardPrincipalData},
+    ClarityName, SymbolicExpression,
+};
 use clarity_repl::analysis::ast_visitor::{traverse, ASTVisitor, TypedVar};
-use clarity_repl::clarity::functions::define::DefineFunctions;
-use clarity_repl::clarity::vm::types::{QualifiedContractIdentifier, StandardPrincipalData};
-use clarity_repl::clarity::{ClarityName, SymbolicExpression};
 use lsp_types::Range;
 
 #[cfg(feature = "wasm")]
@@ -77,7 +79,7 @@ impl<'a> Definitions {
 
 impl<'a> ASTVisitor<'a> for Definitions {
     fn traverse_expr(&mut self, expr: &'a SymbolicExpression) -> bool {
-        use clarity_repl::clarity::vm::representations::SymbolicExpressionType::*;
+        use clarity::vm::representations::SymbolicExpressionType::*;
         match &expr.expr {
             AtomValue(value) => self.visit_atom_value(expr, value),
             Atom(name) => self.visit_atom(expr, name),

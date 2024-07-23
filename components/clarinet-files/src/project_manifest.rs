@@ -1,16 +1,17 @@
 use crate::FileAccessor;
 
-use super::FileLocation;
-use clarity::types::StacksEpochId;
-use clarity::vm::ClarityVersion;
-use clarity_repl::repl;
-use clarity_repl::repl::{ClarityCodeSource, ClarityContract, ContractDeployer};
-use serde::ser::SerializeMap;
-use serde::{Deserializer, Serialize, Serializer};
-use serde_json::Value as JsonValue;
 use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;
 use std::str::FromStr;
+
+use super::FileLocation;
+use clarinet_core::{ClarityCodeSource, ClarityContract, ContractDeployer};
+use clarity::types::StacksEpochId;
+use clarity::vm::ClarityVersion;
+use clarity_repl::{analysis, repl};
+use serde::ser::SerializeMap;
+use serde::{Deserializer, Serialize, Serializer};
+use serde_json::Value as JsonValue;
 use toml::Value as TomlValue;
 
 pub const INVALID_CLARITY_VERSION: &str =
@@ -44,7 +45,7 @@ pub struct ProjectConfigFile {
 
     // The fields below have been moved into repl above, but are kept here for
     // backwards compatibility.
-    analysis: Option<Vec<clarity_repl::analysis::Pass>>,
+    analysis: Option<Vec<analysis::Pass>>,
     cache_dir: Option<String>,
 }
 

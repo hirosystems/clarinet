@@ -1,22 +1,21 @@
 use bitcoincore_rpc::{Auth, Client};
+use clarinet_core::get_bip39_seed_from_mnemonic;
 use clarinet_files::chainhook_types::StacksNetwork;
 use clarinet_files::{AccountConfig, NetworkManifest};
-use clarinet_utils::get_bip39_seed_from_mnemonic;
-use clarity_repl::clarity::chainstate::StacksAddress;
-use clarity_repl::clarity::codec::StacksMessageCodec;
-use clarity_repl::clarity::util::secp256k1::{
-    MessageSignature, Secp256k1PrivateKey, Secp256k1PublicKey,
-};
-use clarity_repl::clarity::vm::types::{
-    PrincipalData, QualifiedContractIdentifier, StandardPrincipalData,
-};
-use clarity_repl::clarity::vm::{ClarityName, Value};
-use clarity_repl::clarity::{ClarityVersion, ContractName, EvaluationResult};
-use clarity_repl::repl::session::{
+use clarinet_static::boot_contracts::{
     BOOT_MAINNET_ADDRESS, BOOT_TESTNET_ADDRESS, V1_BOOT_CONTRACTS, V2_BOOT_CONTRACTS,
-    V3_BOOT_CONTRACTS,
+    V3_BOOT_CONTRACTS, V4_BOOT_CONTRACTS,
 };
+use clarity::address::{
+    AddressHashMode, C32_ADDRESS_VERSION_MAINNET_SINGLESIG, C32_ADDRESS_VERSION_TESTNET_SINGLESIG,
+};
+use clarity::codec::StacksMessageCodec;
+use clarity::types::chainstate::StacksAddress;
+use clarity::util::secp256k1::{MessageSignature, Secp256k1PrivateKey, Secp256k1PublicKey};
+use clarity::vm::types::{PrincipalData, QualifiedContractIdentifier, StandardPrincipalData};
+use clarity::vm::{ClarityName, ClarityVersion, ContractName, EvaluationResult, Value};
 use clarity_repl::repl::{Session, SessionSettings};
+use libsecp256k1::{PublicKey, SecretKey};
 use reqwest::Url;
 use stacks_codec::codec::{
     SinglesigHashMode, SinglesigSpendingCondition, StacksString, StacksTransactionSigner,
@@ -30,11 +29,6 @@ use std::collections::{BTreeMap, HashSet, VecDeque};
 use std::str::FromStr;
 use std::sync::mpsc::{Receiver, Sender};
 use tiny_hderive::bip32::ExtendedPrivKey;
-
-use clarity_repl::clarity::address::{
-    AddressHashMode, C32_ADDRESS_VERSION_MAINNET_SINGLESIG, C32_ADDRESS_VERSION_TESTNET_SINGLESIG,
-};
-use libsecp256k1::{PublicKey, SecretKey};
 
 mod bitcoin_deployment;
 
@@ -395,6 +389,12 @@ pub fn apply_on_chain_deployment(
         ));
     }
     for contract in V3_BOOT_CONTRACTS {
+        contracts_ids_to_remap.insert((
+            format!("{}:{}", BOOT_MAINNET_ADDRESS, contract),
+            format!("{}:{}", BOOT_TESTNET_ADDRESS, contract),
+        ));
+    }
+    for contract in V4_BOOT_CONTRACTS {
         contracts_ids_to_remap.insert((
             format!("{}:{}", BOOT_MAINNET_ADDRESS, contract),
             format!("{}:{}", BOOT_TESTNET_ADDRESS, contract),

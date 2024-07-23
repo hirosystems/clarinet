@@ -39,6 +39,9 @@ clar2wasm = { git = "https://github.com/stacks-network/clarity-wasm.git", branch
 pox-locking = { git = "https://github.com/stacks-network/stacks-core.git", branch="feat/clarity-wasm-develop", optional = true, default-features = false }
 prettytable-rs = { version = "0.10.0" }
 
+clarinet-core = { path = "../clarinet-core"}
+clarinet-static = { path = "../clarinet-static"}
+
 # DAP Debugger
 tokio = { version = "1.35.1", features = ["full"], optional = true }
 tokio-util = { version = "0.7.10", features = ["codec"], optional = true }

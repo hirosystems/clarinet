@@ -1,20 +1,23 @@
-use clarinet_files::chainhook_types::StacksNetwork;
-use clarinet_files::{FileAccessor, FileLocation};
-use clarity_repl::clarity::util::hash::{hex_bytes, to_hex};
-use clarity_repl::clarity::vm::analysis::ContractAnalysis;
-use clarity_repl::clarity::vm::ast::ContractAST;
-use clarity_repl::clarity::vm::diagnostic::Diagnostic;
-use clarity_repl::clarity::vm::types::{
-    PrincipalData, QualifiedContractIdentifier, StandardPrincipalData,
-};
-
-use clarity_repl::analysis::ast_dependency_detector::DependencySet;
-use clarity_repl::clarity::{ClarityName, ClarityVersion, ContractName, StacksEpochId, Value};
-use clarity_repl::repl::{Session, DEFAULT_CLARITY_VERSION};
-use serde::{Deserialize, Serialize};
-use serde_yaml;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
+
+use clarinet_core::DEFAULT_CLARITY_VERSION;
+use clarinet_files::chainhook_types::StacksNetwork;
+use clarinet_files::{FileAccessor, FileLocation};
+use clarity::types::StacksEpochId;
+use clarity::util::hash::{hex_bytes, to_hex};
+use clarity::vm::analysis::ContractAnalysis;
+use clarity::vm::ast::ContractAST;
+use clarity::vm::diagnostic::Diagnostic;
+use clarity::vm::types::{PrincipalData, QualifiedContractIdentifier, StandardPrincipalData};
+use clarity::vm::ClarityName;
+use clarity::vm::ClarityVersion;
+use clarity::vm::ContractName;
+use clarity::vm::Value;
+use clarity_repl::analysis::ast_dependency_detector::DependencySet;
+use clarity_repl::repl::Session;
+use serde::{Deserialize, Serialize};
+use serde_yaml;
 
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone, Copy, Eq, PartialOrd, Ord)]
 pub enum EpochSpec {

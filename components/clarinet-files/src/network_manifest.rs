@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use super::{FileAccessor, FileLocation};
 use bip39::{Language, Mnemonic};
 use chainhook_types::{BitcoinNetwork, StacksNetwork};
-use clarinet_utils::get_bip39_seed_from_mnemonic;
+use clarinet_core::get_bip39_seed_from_mnemonic;
 use clarity::address::AddressHashMode;
 use clarity::types::chainstate::StacksAddress;
 use clarity::util::{hash::bytes_to_hex, secp256k1::Secp256k1PublicKey};

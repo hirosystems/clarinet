@@ -1,4 +1,5 @@
 use crate::common::requests::completion::check_if_should_wrap;
+use clarinet_core::{ContractDeployer, DEFAULT_CLARITY_VERSION};
 use clarinet_deployments::{
     generate_default_deployment, initiate_session_from_manifest,
     update_session_with_deployment_plan, UpdateSessionExecutionResult,
@@ -14,7 +15,6 @@ use clarity_repl::clarity::vm::ast::ContractAST;
 use clarity_repl::clarity::vm::types::{QualifiedContractIdentifier, StandardPrincipalData};
 use clarity_repl::clarity::vm::EvaluationResult;
 use clarity_repl::clarity::{ClarityName, ClarityVersion, StacksEpochId, SymbolicExpression};
-use clarity_repl::repl::{ContractDeployer, DEFAULT_CLARITY_VERSION};
 use lsp_types::{
     CompletionItem, DocumentSymbol, Hover, Location, MessageType, Position, Range, SignatureHelp,
     Url,

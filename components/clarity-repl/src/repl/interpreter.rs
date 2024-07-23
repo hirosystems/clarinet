@@ -6,6 +6,7 @@ use crate::analysis::{self};
 use crate::repl::datastore::BurnDatastore;
 use crate::repl::datastore::Datastore;
 use crate::repl::Settings;
+use clarinet_core::{ClarityContract, DEFAULT_EPOCH};
 use clarity::consts::CHAIN_ID_TESTNET;
 use clarity::types::StacksEpochId;
 use clarity::vm::analysis::ContractAnalysis;
@@ -29,7 +30,6 @@ use clarity::vm::{ContractEvaluationResult, EvalHook};
 use clarity::vm::{CostSynthesis, ExecutionResult, ParsedContract};
 
 use super::datastore::StacksConstants;
-use super::{ClarityContract, DEFAULT_EPOCH};
 
 pub const BLOCK_LIMIT_MAINNET: ExecutionCost = ExecutionCost {
     write_length: 15_000_000,
@@ -1184,9 +1184,8 @@ impl ClarityInterpreter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        repl::session::BOOT_CONTRACTS_DATA, test_fixtures::clarity_contract::ClarityContractBuilder,
-    };
+    use clarinet_core::test_fixtures::ClarityContractBuilder;
+    use clarinet_static::boot_contracts::BOOT_CONTRACTS_DATA;
     use clarity::{
         types::{chainstate::StacksAddress, Address},
         vm::{self, types::TupleData, ClarityVersion},

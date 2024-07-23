@@ -18,7 +18,7 @@ bitcoin = { version = "0.29.2", optional = true }
 
 clarity = { workspace = true }
 
-clarinet-utils = { version = "1", path = "../clarinet-utils" }
+clarinet-core = { path = "../clarinet-core" }
 clarity-repl = { path = "../clarity-repl", default-features = false, optional = true }
 
 # wasm

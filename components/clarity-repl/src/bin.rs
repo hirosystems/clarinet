@@ -6,9 +6,6 @@
 #![allow(non_upper_case_globals)]
 // todo(ludo): would love to eliminate these directives at some point.
 
-#[cfg(test)]
-pub mod test_fixtures;
-
 #[macro_use]
 extern crate serde_json;
 #[macro_use]

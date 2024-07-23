@@ -1,3 +1,10 @@
+use std::collections::HashMap;
+use std::fmt;
+use std::future::Future;
+use std::path::Path;
+use std::pin::Pin;
+use std::{borrow::BorrowMut, path::PathBuf, str::FromStr};
+
 extern crate serde;
 
 #[macro_use]
@@ -32,12 +39,6 @@ pub use project_manifest::{
     ProjectManifest, ProjectManifestFile, RequirementConfig, INVALID_CLARITY_VERSION,
 };
 use serde::ser::{Serialize, SerializeMap, Serializer};
-use std::collections::HashMap;
-use std::fmt;
-use std::future::Future;
-use std::path::Path;
-use std::pin::Pin;
-use std::{borrow::BorrowMut, path::PathBuf, str::FromStr};
 use url::Url;
 
 pub type FileAccessorResult<T> = Pin<Box<dyn Future<Output = Result<T, String>>>>;

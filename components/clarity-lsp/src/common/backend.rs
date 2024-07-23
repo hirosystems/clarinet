@@ -1,9 +1,9 @@
 use crate::lsp_types::MessageType;
 use crate::state::{build_state, EditorState, ProtocolState};
 use crate::utils::get_contract_location;
+use clarinet_core::ContractDeployer;
 use clarinet_files::{FileAccessor, FileLocation, ProjectManifest};
-use clarity_repl::clarity::diagnostic::Diagnostic;
-use clarity_repl::repl::ContractDeployer;
+use clarity::vm::diagnostic::Diagnostic;
 use lsp_types::{
     CompletionItem, CompletionParams, DocumentSymbol, DocumentSymbolParams, GotoDefinitionParams,
     Hover, HoverParams, InitializeParams, InitializeResult, Location, SignatureHelp,

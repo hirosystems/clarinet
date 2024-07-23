@@ -1,0 +1,10 @@
+[package]
+name = "clarinet-static"
+edition = "2021"
+version.workspace = true
+
+[dependencies]
+clarity = { workspace = true }
+lazy_static = { workspace = true }
+
+clarinet-core = { path = "../clarinet-core" }

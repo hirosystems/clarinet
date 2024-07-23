@@ -3,7 +3,7 @@
 use crate::analysis::annotation::{Annotation, AnnotationKind, WarningKind};
 use crate::analysis::ast_visitor::{traverse, ASTVisitor, TypedVar};
 use crate::analysis::{self, AnalysisPass, AnalysisResult};
-use crate::repl::DEFAULT_EPOCH;
+use clarinet_core::DEFAULT_EPOCH;
 use clarity::vm::analysis::analysis_db::AnalysisDatabase;
 use clarity::vm::analysis::types::ContractAnalysis;
 use clarity::vm::diagnostic::{DiagnosableError, Diagnostic, Level};

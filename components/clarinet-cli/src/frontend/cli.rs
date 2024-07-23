@@ -1,3 +1,8 @@
+use std::collections::HashMap;
+use std::fs::{self, File};
+use std::io::prelude::*;
+use std::{env, process};
+
 use crate::deployments::types::DeploymentSynthesis;
 use crate::deployments::{
     self, check_deployments, generate_default_deployment, get_absolute_deployment_path,
@@ -13,6 +18,7 @@ use crate::lsp::run_lsp;
 
 use clap::{CommandFactory, Parser, Subcommand};
 use clap_complete::{Generator, Shell};
+use clarinet_core::{ClarityCodeSource, ClarityContract, ContractDeployer, DEFAULT_EPOCH};
 use clarinet_deployments::diagnostic_digest::DiagnosticsDigest;
 use clarinet_deployments::onchain::{
     apply_on_chain_deployment, get_initial_transactions_trackers, update_deployment_costs,
@@ -34,13 +40,8 @@ use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
 use clarity_repl::clarity::ClarityVersion;
 use clarity_repl::frontend::terminal::print_clarity_wasm_warning;
 use clarity_repl::repl::diagnostic::output_diagnostic;
-use clarity_repl::repl::{ClarityCodeSource, ClarityContract, ContractDeployer, DEFAULT_EPOCH};
 use clarity_repl::{analysis, repl, Terminal};
 use stacks_network::{self, DevnetOrchestrator};
-use std::collections::HashMap;
-use std::fs::{self, File};
-use std::io::prelude::*;
-use std::{env, process};
 use toml;
 
 use super::clarinetrc::GlobalSettings;

@@ -1,7 +1,11 @@
 #![allow(unused_variables)]
 
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::iter::FromIterator;
+use std::ops::{Deref, DerefMut};
+
 use crate::analysis::ast_visitor::{traverse, ASTVisitor};
-use crate::repl::DEFAULT_EPOCH;
+use clarinet_core::DEFAULT_EPOCH;
 use clarity::types::StacksEpochId;
 pub use clarity::vm::analysis::types::ContractAnalysis;
 use clarity::vm::analysis::{CheckErrors, CheckResult};
@@ -13,9 +17,6 @@ use clarity::vm::types::{
     TraitIdentifier, TypeSignature, Value,
 };
 use clarity::vm::{ClarityName, ClarityVersion, SymbolicExpressionType};
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
-use std::iter::FromIterator;
-use std::ops::{Deref, DerefMut};
 
 use super::ast_visitor::TypedVar;
 
@@ -927,12 +928,12 @@ impl GraphWalker {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::repl::session::Session;
-    use crate::repl::{
-        ClarityCodeSource, ClarityContract, ContractDeployer, SessionSettings,
-        DEFAULT_CLARITY_VERSION, DEFAULT_EPOCH,
-    };
+    use crate::repl::{session::Session, SessionSettings};
+
     use ::clarity::vm::diagnostic::Diagnostic;
+    use clarinet_core::{
+        ClarityCodeSource, ClarityContract, ContractDeployer, DEFAULT_CLARITY_VERSION,
+    };
 
     fn build_ast(
         session: &Session,

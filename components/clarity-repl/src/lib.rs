@@ -22,9 +22,6 @@ pub mod clarity {
 pub mod repl;
 pub mod utils;
 
-#[cfg(test)]
-pub mod test_fixtures;
-
 #[cfg(feature = "cli")]
 pub mod frontend;
 
