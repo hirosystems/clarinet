@@ -88,6 +88,21 @@ describe("basic simnet interactions", () => {
   });
 });
 
+describe("simnet epoch 3", () => {
+  it("can mine empty blocks", () => {
+    simnet.setEpoch("3.0");
+    const blockHeight = simnet.stacksBlockHeight;
+    const burnBlockHeight = simnet.burnBlockHeight;
+    simnet.mineEmptyStacksBlock();
+    expect(simnet.stacksBlockHeight).toBe(blockHeight + 1);
+    expect(simnet.burnBlockHeight).toBe(burnBlockHeight);
+    simnet.mineEmptyStacksBlocks(4);
+    expect(simnet.stacksBlockHeight).toBe(blockHeight + 5);
+    simnet.mineEmptyBurnBlocks(4);
+    expect(simnet.burnBlockHeight).toBe(burnBlockHeight + 4);
+    expect(simnet.stacksBlockHeight).toBe(blockHeight + 9);
+  })
+})
 describe("simnet can run arbitrary snippets", () => {
   it("can run simple snippets", () => {
     const res = simnet.execute("(+ 1 2)");

@@ -251,6 +251,9 @@ impl Session {
             cmd if cmd.starts_with("::get_burn_block_height") => self.get_burn_block_height(),
             cmd if cmd.starts_with("::get_stacks_block_height") => self.get_block_height(),
             cmd if cmd.starts_with("::get_block_height") => self.get_block_height(),
+            cmd if cmd.starts_with("::advance_chain_tip") => {
+                self.parse_and_advance_burn_chaintip(cmd)
+            }
             cmd if cmd.starts_with("::advance_stacks_chaintip") => {
                 self.parse_and_advance_stacks_chaintip(cmd)
             }
@@ -868,7 +871,6 @@ impl Session {
     pub fn advance_burn_chaintip(&mut self, count: u32) -> u32 {
         self.interpreter.advance_burn_chaintip(count)
     }
-    // Not exposed/documented but still supported for convenience
     pub fn advance_chain_tip(&mut self, count: u32) -> u32 {
         self.interpreter.advance_burn_chaintip(count)
     }
@@ -1509,81 +1511,6 @@ mod tests {
 
     #[test]
     fn evaluate_at_block() {
-        let settings = SessionSettings {
-            include_boot_contracts: vec!["costs".into(), "costs-2".into(), "costs-3".into()],
-            ..Default::default()
-        };
-
-        let mut session = Session::new(settings);
-        session.start().expect("session could not start");
-
-        session.handle_command("::set_epoch 3.0");
-
-        // setup contract state
-        let snippet = "
-            (define-data-var x uint u0)
-            (define-read-only (get-x)
-                (var-get x))
-            (define-public (incr)
-                (begin
-                    (var-set x (+ (var-get x) u1))
-                    (ok (var-get x))))";
-
-        let contract = ClarityContract {
-            code_source: ClarityCodeSource::ContractInMemory(snippet.to_string()),
-            name: "contract".to_string(),
-            deployer: ContractDeployer::Address("ST000000000000000000002AMW42H".into()),
-            clarity_version: ClarityVersion::Clarity3,
-            epoch: StacksEpochId::Epoch30,
-        };
-
-        let _ = session.deploy_contract(&contract, None, false, None, None);
-
-        // assert data-var is set to 0
-        assert_eq!(
-            session
-                .process_console_input("(contract-call? .contract get-x)")
-                .1[0],
-            "u0".green().to_string()
-        );
-
-        // advance chain tip and test at-block
-        let _ = session.advance_stacks_chaintip(10000);
-        assert_eq!(
-            session
-                .process_console_input("(contract-call? .contract get-x)")
-                .1[0],
-            "u0".green().to_string()
-        );
-        session.process_console_input("(contract-call? .contract incr)");
-        assert_eq!(
-            session
-                .process_console_input("(contract-call? .contract get-x)")
-                .1[0],
-            "u1".green().to_string()
-        );
-
-        // advance chain tip again and test at-block
-        // do this twice to make sure that the lookup table is being updated properly
-        session.advance_chain_tip(10);
-        session.advance_chain_tip(10);
-
-        assert_eq!(
-            session
-                .process_console_input("(contract-call? .contract get-x)")
-                .1[0],
-            "u1".green().to_string()
-        );
-        session.process_console_input("(contract-call? .contract incr)");
-        assert_eq!(
-            session
-                .process_console_input("(contract-call? .contract get-x)")
-                .1[0],
-            "u2".green().to_string()
-        );
-    }
-    #[test]
-    fn evaluate_at_block_pre_epoch3() {
         let settings = SessionSettings {
             include_boot_contracts: vec!["costs".into(), "costs-2".into(), "costs-3".into()],
             ..Default::default()
