@@ -842,7 +842,10 @@ impl Session {
             Ok(new_height) => format!("{} blocks simulated, new height: {}", count, new_height)
                 .green()
                 .to_string(),
-            Err(msg) => format!("{}", msg.red()),
+            Err(_) => format!(
+                "{}",
+                "advance_stacks_chaintip can't be called in epoch lower than 3.0".red()
+            ),
         }
     }
     fn parse_and_advance_burn_chaintip(&mut self, command: &str) -> String {
@@ -1349,7 +1352,7 @@ mod tests {
         let result = session.handle_command("::advance_stacks_chaintip 1");
         assert_eq!(
             result,
-            "only burn chain height can be advanced in epoch lower than 3.0"
+            "advance_stacks_chaintip can't be called in epoch lower than 3.0"
                 .to_string()
                 .red()
                 .to_string()
