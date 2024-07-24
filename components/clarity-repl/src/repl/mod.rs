@@ -12,4 +12,3 @@ pub mod debug;
 pub use interpreter::ClarityInterpreter;
 pub use session::Session;
 pub use settings::SessionSettings;
-pub use settings::{Settings, SettingsFile};

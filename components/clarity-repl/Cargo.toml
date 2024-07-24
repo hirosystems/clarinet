@@ -23,16 +23,14 @@ categories = [
 
 [dependencies]
 ansi_term = "0.12.1" # to be replaced with colored in the future
+atty = "0.2.14"
 chrono = "0.4.31"
 colored = "2.1.0"
-lazy_static = { workspace = true }
-regex = "1.7"
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1.0.47", features = ["unbounded_depth"] }
 sha2 = "0.10"
 serde_derive = "1.0"
 getrandom = { version = "0.2.3", features = ["js"] }
-atty = "0.2.14"
 clarity = { workspace = true }
 clar2wasm = { git = "https://github.com/stacks-network/clarity-wasm.git", branch = "main", optional = true }
 # clar2wasm = { path="../../../clarity-wasm/clar2wasm", optional = true }
@@ -41,6 +39,7 @@ prettytable-rs = { version = "0.10.0" }
 
 clarinet-core = { path = "../clarinet-core"}
 clarinet-static = { path = "../clarinet-static"}
+clarity-analysis = { path = "../clarity-analysis" }
 
 # DAP Debugger
 tokio = { version = "1.35.1", features = ["full"], optional = true }

@@ -8,8 +8,7 @@
 
 #[macro_use]
 extern crate serde_json;
-#[macro_use]
-extern crate lazy_static;
+
 #[macro_use]
 extern crate serde_derive;
 #[macro_use]
@@ -17,7 +16,6 @@ extern crate prettytable;
 #[macro_use]
 extern crate hiro_system_kit;
 
-pub mod analysis;
 pub mod frontend;
 pub mod repl;
 pub mod utils;

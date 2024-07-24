@@ -14,7 +14,7 @@ members = [
     "components/stacks-codec",
     "components/stacks-devnet-js",
     "components/stacks-network",
-    "components/stacks-rpc-client",
+    "components/stacks-rpc-client", "components/clarity-analysis",
 ]
 default-members = ["components/clarinet-cli"]
 

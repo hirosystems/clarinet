@@ -7,7 +7,7 @@ use clarinet_deployments::{
 use clarinet_files::chainhook_types::StacksNetwork;
 use clarinet_files::ProjectManifest;
 use clarinet_files::{FileAccessor, FileLocation};
-use clarity_repl::analysis::ast_dependency_detector::DependencySet;
+use clarity_analysis::ast_dependency_detector::DependencySet;
 use clarity_repl::clarity::analysis::ContractAnalysis;
 use clarity_repl::clarity::ast::{build_ast_with_rules, ASTRules};
 use clarity_repl::clarity::diagnostic::{Diagnostic as ClarityDiagnostic, Level as ClarityLevel};

@@ -33,14 +33,15 @@ use clarinet_files::{
     get_manifest_location, FileLocation, NetworkManifest, ProjectManifest, ProjectManifestFile,
     RequirementConfig,
 };
-use clarity_repl::analysis::call_checker::ContractAnalysis;
+use clarity_analysis::call_checker::ContractAnalysis;
+use clarity_analysis::run_analysis;
 use clarity_repl::clarity::vm::analysis::AnalysisDatabase;
 use clarity_repl::clarity::vm::costs::LimitedCostTracker;
 use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
 use clarity_repl::clarity::ClarityVersion;
 use clarity_repl::frontend::terminal::print_clarity_wasm_warning;
 use clarity_repl::repl::diagnostic::output_diagnostic;
-use clarity_repl::{analysis, repl, Terminal};
+use clarity_repl::{repl, Terminal};
 use stacks_network::{self, DevnetOrchestrator};
 use toml;
 
@@ -1074,7 +1075,7 @@ pub fn main() {
                 contract.clarity_version,
             );
             let mut analysis_db = AnalysisDatabase::new(&mut session.interpreter.datastore);
-            let mut analysis_diagnostics = match analysis::run_analysis(
+            let mut analysis_diagnostics = match run_analysis(
                 &mut contract_analysis,
                 &mut analysis_db,
                 &annotations,

@@ -14,7 +14,7 @@ use clarity::vm::ClarityName;
 use clarity::vm::ClarityVersion;
 use clarity::vm::ContractName;
 use clarity::vm::Value;
-use clarity_repl::analysis::ast_dependency_detector::DependencySet;
+use clarity_analysis::ast_dependency_detector::DependencySet;
 use clarity_repl::repl::Session;
 use serde::{Deserialize, Serialize};
 use serde_yaml;

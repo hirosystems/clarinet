@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use clarity::vm::{representations::Span, ClarityName, SymbolicExpression, SymbolicExpressionType};
-use clarity_repl::analysis::ast_visitor::{traverse, ASTVisitor};
+use clarity_analysis::ast_visitor::{traverse, ASTVisitor};
 use lsp_types::{DocumentSymbol, SymbolKind};
 use serde::{Deserialize, Serialize};
 
@@ -217,7 +217,7 @@ impl<'a> ASTVisitor<'a> for ASTSymbols {
         &mut self,
         expr: &'a SymbolicExpression,
         name: &'a clarity_repl::clarity::ClarityName,
-        _parameters: Option<Vec<clarity_repl::analysis::ast_visitor::TypedVar<'a>>>,
+        _parameters: Option<Vec<clarity_analysis::ast_visitor::TypedVar<'a>>>,
         body: &'a SymbolicExpression,
     ) -> bool {
         self.symbols.push(build_symbol(
@@ -234,7 +234,7 @@ impl<'a> ASTVisitor<'a> for ASTSymbols {
         &mut self,
         expr: &'a clarity_repl::clarity::SymbolicExpression,
         name: &'a clarity_repl::clarity::ClarityName,
-        _parameters: Option<Vec<clarity_repl::analysis::ast_visitor::TypedVar<'a>>>,
+        _parameters: Option<Vec<clarity_analysis::ast_visitor::TypedVar<'a>>>,
         body: &'a clarity_repl::clarity::SymbolicExpression,
     ) -> bool {
         self.symbols.push(build_symbol(
@@ -251,7 +251,7 @@ impl<'a> ASTVisitor<'a> for ASTSymbols {
         &mut self,
         expr: &'a clarity_repl::clarity::SymbolicExpression,
         name: &'a clarity_repl::clarity::ClarityName,
-        _parameters: Option<Vec<clarity_repl::analysis::ast_visitor::TypedVar<'a>>>,
+        _parameters: Option<Vec<clarity_analysis::ast_visitor::TypedVar<'a>>>,
         body: &'a clarity_repl::clarity::SymbolicExpression,
     ) -> bool {
         self.symbols.push(build_symbol(

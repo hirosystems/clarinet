@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 clarinet-files = { path = "../clarinet-files", default-features = false, optional = true }
 clarity-repl = { path = "../clarity-repl", default-features = false }
+clarity-analysis = { path = "../clarity-analysis", default-features = false }
 clap = { version = "4.4.8", features = ["derive"], optional = true }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1.0.79", features = ["preserve_order"] }

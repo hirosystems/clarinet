@@ -4,7 +4,6 @@ use std::num::ParseIntError;
 
 use super::diagnostic::output_diagnostic;
 use super::ClarityInterpreter;
-use crate::analysis::coverage::TestCoverageReport;
 use crate::repl::clarity_values::value_to_string;
 use crate::utils;
 use clarinet_core::{ClarityCodeSource, ClarityContract, ContractDeployer};
@@ -26,6 +25,7 @@ use clarity::vm::{
     ClarityVersion, CostSynthesis, EvalHook, EvaluationResult, ExecutionResult, ParsedContract,
     SymbolicExpression,
 };
+use clarity_analysis::coverage::TestCoverageReport;
 use colored::*;
 use prettytable::{Cell, Row, Table};
 

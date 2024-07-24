@@ -7,7 +7,7 @@ use clarity::vm::{
     types::{QualifiedContractIdentifier, StandardPrincipalData},
     ClarityName, SymbolicExpression,
 };
-use clarity_repl::analysis::ast_visitor::{traverse, ASTVisitor, TypedVar};
+use clarity_analysis::ast_visitor::{traverse, ASTVisitor, TypedVar};
 use lsp_types::Range;
 
 #[cfg(feature = "wasm")]
@@ -364,7 +364,7 @@ impl<'a> ASTVisitor<'a> for Definitions {
         &mut self,
         expr: &'a SymbolicExpression,
         name: &'a ClarityName,
-        _parameters: Option<Vec<clarity_repl::analysis::ast_visitor::TypedVar<'a>>>,
+        _parameters: Option<Vec<clarity_analysis::ast_visitor::TypedVar<'a>>>,
         _body: &'a SymbolicExpression,
     ) -> bool {
         self.global.insert(name.clone(), span_to_range(&expr.span));
@@ -386,7 +386,7 @@ impl<'a> ASTVisitor<'a> for Definitions {
         &mut self,
         expr: &'a SymbolicExpression,
         name: &'a ClarityName,
-        _parameters: Option<Vec<clarity_repl::analysis::ast_visitor::TypedVar<'a>>>,
+        _parameters: Option<Vec<clarity_analysis::ast_visitor::TypedVar<'a>>>,
         _body: &'a SymbolicExpression,
     ) -> bool {
         self.global.insert(name.clone(), span_to_range(&expr.span));
@@ -408,7 +408,7 @@ impl<'a> ASTVisitor<'a> for Definitions {
         &mut self,
         expr: &'a SymbolicExpression,
         name: &'a ClarityName,
-        _parameters: Option<Vec<clarity_repl::analysis::ast_visitor::TypedVar<'a>>>,
+        _parameters: Option<Vec<clarity_analysis::ast_visitor::TypedVar<'a>>>,
         _body: &'a SymbolicExpression,
     ) -> bool {
         self.global.insert(name.clone(), span_to_range(&expr.span));

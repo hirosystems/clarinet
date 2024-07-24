@@ -172,3 +172,238 @@ pub fn get_bip39_seed_from_mnemonic(mnemonic: &str, password: &str) -> Result<Ve
     .map_err(|e| e.to_string())?;
     Ok(seed)
 }
+
+use clarity::types::chainstate::StacksAddress;
+
+#[derive(Debug, Default, Clone, Copy, Serialize, Deserialize)]
+pub struct CheckCheckerSettings {
+    // Strict mode sets all other options to false
+    pub strict: bool,
+    // After a filter on tx-sender, trust all inputs
+    pub trusted_sender: bool,
+    // After a filter on contract-caller, trust all inputs
+    pub trusted_caller: bool,
+    // Allow filters in callee to filter caller
+    pub callee_filter: bool,
+}
+
+#[derive(Debug, Default, Clone, Copy, Serialize, Deserialize)]
+pub struct CheckCheckerSettingsFile {
+    // Strict mode sets all other options to false
+    strict: Option<bool>,
+    // After a filter on tx-sender, trust all inputs
+    trusted_sender: Option<bool>,
+    // After a filter on contract-caller, trust all inputs
+    trusted_caller: Option<bool>,
+    // Allow filters in callee to filter caller
+    callee_filter: Option<bool>,
+}
+
+impl From<CheckCheckerSettingsFile> for CheckCheckerSettings {
+    fn from(from_file: CheckCheckerSettingsFile) -> Self {
+        if from_file.strict.unwrap_or(false) {
+            CheckCheckerSettings {
+                strict: true,
+                trusted_sender: false,
+                trusted_caller: false,
+                callee_filter: false,
+            }
+        } else {
+            CheckCheckerSettings {
+                strict: false,
+                trusted_sender: from_file.trusted_sender.unwrap_or(false),
+                trusted_caller: from_file.trusted_caller.unwrap_or(false),
+                callee_filter: from_file.callee_filter.unwrap_or(false),
+            }
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Pass {
+    All,
+    CheckChecker,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(untagged)]
+pub enum OneOrList<T> {
+    /// Allow `T` as shorthand for `[T]` in the TOML
+    One(T),
+    /// Allow more than one `T` in the TOML
+    List(Vec<T>),
+}
+
+#[derive(Debug, Default, Clone, Deserialize, Serialize)]
+pub struct AnalysisSettingsFile {
+    passes: Option<OneOrList<Pass>>,
+    check_checker: Option<CheckCheckerSettingsFile>,
+}
+
+// Each new pass should be included in this list
+static ALL_PASSES: [Pass; 1] = [Pass::CheckChecker];
+
+impl From<AnalysisSettingsFile> for AnalysisSettings {
+    fn from(from_file: AnalysisSettingsFile) -> Self {
+        let passes = if let Some(file_passes) = from_file.passes {
+            match file_passes {
+                OneOrList::One(pass) => match pass {
+                    Pass::All => ALL_PASSES.to_vec(),
+                    pass => vec![pass],
+                },
+                OneOrList::List(passes) => {
+                    if passes.contains(&Pass::All) {
+                        ALL_PASSES.to_vec()
+                    } else {
+                        passes
+                    }
+                }
+            }
+        } else {
+            vec![]
+        };
+
+        // Each pass that has its own settings should be included here.
+        let checker_settings = if let Some(checker_settings) = from_file.check_checker {
+            CheckCheckerSettings::from(checker_settings)
+        } else {
+            CheckCheckerSettings::default()
+        };
+
+        Self {
+            passes,
+            check_checker: checker_settings,
+        }
+    }
+}
+
+#[derive(Debug, Default, Clone, Deserialize, Serialize)]
+pub struct AnalysisSettings {
+    pub passes: Vec<Pass>,
+    pub check_checker: CheckCheckerSettings,
+}
+
+impl AnalysisSettings {
+    pub fn enable_all_passes(&mut self) {
+        self.passes = ALL_PASSES.to_vec();
+    }
+
+    pub fn set_passes(&mut self, passes: Vec<Pass>) {
+        for pass in passes {
+            match pass {
+                Pass::All => {
+                    self.passes = ALL_PASSES.to_vec();
+                    return;
+                }
+                pass => self.passes.push(pass),
+            };
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct InitialContract {
+    pub code: String,
+    pub name: Option<String>,
+    pub path: String,
+    pub deployer: Option<String>,
+}
+
+impl InitialContract {
+    pub fn get_contract_identifier(&self, is_mainnet: bool) -> Option<QualifiedContractIdentifier> {
+        self.name.as_ref().map(|name| QualifiedContractIdentifier {
+            issuer: self.get_deployer_principal(is_mainnet),
+            name: name.to_string().try_into().unwrap(),
+        })
+    }
+
+    pub fn get_deployer_principal(&self, is_mainnet: bool) -> StandardPrincipalData {
+        let address = match self.deployer {
+            Some(ref entry) => entry.clone(),
+            None => format!("{}", StacksAddress::burn_address(is_mainnet)),
+        };
+        PrincipalData::parse_standard_principal(&address)
+            .expect("Unable to parse deployer's address")
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct Account {
+    pub address: String,
+    pub balance: u64,
+    pub name: String,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct SessionSettings {
+    pub node: String,
+    pub include_boot_contracts: Vec<String>,
+    pub include_costs: bool,
+    pub initial_contracts: Vec<InitialContract>,
+    pub initial_accounts: Vec<Account>,
+    pub initial_deployer: Option<Account>,
+    pub scoping_contract: Option<String>,
+    pub lazy_initial_contracts_interpretation: bool,
+    pub disk_cache_enabled: bool,
+    pub repl_settings: Settings,
+    pub epoch_id: Option<StacksEpochId>,
+}
+
+#[derive(Debug, Default, Clone, Deserialize, Serialize)]
+pub struct Settings {
+    pub analysis: AnalysisSettings,
+    #[serde(skip_serializing, skip_deserializing)]
+    pub clarity_wasm_mode: bool,
+    #[serde(skip_serializing, skip_deserializing)]
+    pub show_timings: bool,
+}
+
+#[derive(Debug, Default, Clone, Deserialize, Serialize)]
+pub struct SettingsFile {
+    pub analysis: Option<AnalysisSettingsFile>,
+}
+
+impl From<SettingsFile> for Settings {
+    fn from(file: SettingsFile) -> Self {
+        let analysis = if let Some(analysis) = file.analysis {
+            AnalysisSettings::from(analysis)
+        } else {
+            AnalysisSettings::default()
+        };
+        Self {
+            analysis,
+            clarity_wasm_mode: false,
+            show_timings: false,
+        }
+    }
+}
+
+#[derive(Debug, Default, Clone, Deserialize, Serialize)]
+pub struct ReplSettings {
+    pub analysis: AnalysisSettings,
+    #[serde(skip_serializing, skip_deserializing)]
+    pub clarity_wasm_mode: bool,
+    #[serde(skip_serializing, skip_deserializing)]
+    pub show_timings: bool,
+}
+
+#[derive(Debug, Default, Clone, Deserialize, Serialize)]
+pub struct ReplSettingsFile {
+    pub analysis: Option<AnalysisSettingsFile>,
+}
+
+impl From<ReplSettingsFile> for ReplSettings {
+    fn from(file: ReplSettingsFile) -> Self {
+        let analysis = if let Some(analysis) = file.analysis {
+            AnalysisSettings::from(analysis)
+        } else {
+            AnalysisSettings::default()
+        };
+        Self {
+            analysis,
+            clarity_wasm_mode: false,
+            show_timings: false,
+        }
+    }
+}

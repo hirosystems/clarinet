@@ -841,6 +841,7 @@ dependencies = [
  "clarinet-core",
  "clarinet-deployments",
  "clarinet-files",
+ "clarity-analysis",
  "clarity-lsp",
  "clarity-repl",
  "crossbeam-channel",
@@ -888,6 +889,7 @@ dependencies = [
  "clarinet-files",
  "clarinet-static",
  "clarity",
+ "clarity-analysis",
  "clarity-repl",
  "colored",
  "libsecp256k1 0.7.1",
@@ -910,7 +912,6 @@ dependencies = [
  "chainhook-types",
  "clarinet-core",
  "clarity",
- "clarity-repl",
  "js-sys",
  "libsecp256k1 0.7.1",
  "serde",
@@ -932,6 +933,7 @@ dependencies = [
  "clarinet-deployments",
  "clarinet-files",
  "clarinet-static",
+ "clarity-analysis",
  "clarity-repl",
  "colored",
  "console_error_panic_hook",
@@ -980,11 +982,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "clarity-analysis"
+version = "2.7.0"
+dependencies = [
+ "ansi_term",
+ "atty",
+ "clarinet-core",
+ "clarity",
+ "clarity-repl",
+ "hiro-system-kit 0.1.0",
+ "lazy_static",
+ "regex",
+ "serde",
+ "serde_derive",
+]
+
+[[package]]
 name = "clarity-events"
 version = "2.7.0"
 dependencies = [
  "clap",
  "clarinet-files",
+ "clarity-analysis",
  "clarity-repl",
  "serde",
  "serde_derive",
@@ -999,6 +1018,7 @@ dependencies = [
  "clarinet-deployments",
  "clarinet-files",
  "clarity",
+ "clarity-analysis",
  "clarity-repl",
  "console_error_panic_hook",
  "js-sys",
@@ -1025,19 +1045,18 @@ dependencies = [
  "clarinet-core",
  "clarinet-static",
  "clarity",
+ "clarity-analysis",
  "colored",
  "debug_types",
  "futures",
  "getrandom 0.2.8",
  "hiro-system-kit 0.1.0",
  "httparse",
- "lazy_static",
  "log",
  "memchr",
  "pico-args",
  "pox-locking",
  "prettytable-rs",
- "regex",
  "reqwest",
  "rustyline",
  "serde",

@@ -12,6 +12,7 @@ serde_yaml = "0.8.23"
 
 clarinet-core = { path = "../clarinet-core" }
 clarinet-static = { path = "../clarinet-static" }
+clarity-analysis = { path = "../clarity-analysis" }
 clarity-repl = { path = "../clarity-repl", default-features = false, optional = true }
 clarinet-files = { path = "../clarinet-files", default-features = false }
 stacks-rpc-client = { path = "../stacks-rpc-client", optional = true }

@@ -13,7 +13,7 @@ use clarinet_deployments::{
 use clarinet_files::chainhook_types::StacksNetwork;
 use clarinet_files::{FileAccessor, FileLocation, ProjectManifest, WASMFileSystemAccessor};
 use clarinet_static::boot_contracts::BOOT_CONTRACTS_DATA;
-use clarity_repl::analysis::coverage::CoverageReporter;
+use clarity_analysis::coverage::CoverageReporter;
 use clarity_repl::clarity::analysis::contract_interface_builder::{
     ContractInterface, ContractInterfaceFunction, ContractInterfaceFunctionAccess,
 };

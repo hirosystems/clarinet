@@ -10,7 +10,7 @@ use clarity::vm::{
     ClarityName, ClarityVersion, SymbolicExpression,
 };
 
-use clarity_repl::analysis::ast_visitor::{self, traverse, ASTVisitor, TypedVar};
+use clarity_analysis::ast_visitor::{self, traverse, ASTVisitor, TypedVar};
 use lsp_types::{
     CompletionItem, CompletionItemKind, Documentation, InsertTextFormat, MarkupContent, MarkupKind,
     Position,

@@ -1,0 +1,19 @@
+[package]
+name = "clarity-analysis"
+edition = "2021"
+version.workspace = true
+
+[dependencies]
+ansi_term = "0.12.1"
+atty = "0.2.14"
+clarity = { workspace = true }
+lazy_static = { workspace = true }
+regex = "1.7"
+serde = { version = "1", features = ["derive"] }
+serde_derive = "1.0"
+
+clarinet-core = { path = "../clarinet-core" }
+hiro_system_kit = { version = "0.1.0", package = "hiro-system-kit", path = "../hiro-system-kit", default-features = false }
+
+[dev-dependencies]
+clarity-repl = { path = "../clarity-repl" }

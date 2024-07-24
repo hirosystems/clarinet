@@ -33,7 +33,7 @@ use clarity::vm::ContractName;
 use clarity::vm::EvaluationResult;
 use clarity::vm::ExecutionResult;
 use clarity::vm::SymbolicExpression;
-use clarity_repl::analysis::ast_dependency_detector::{ASTDependencyDetector, DependencySet};
+use clarity_analysis::ast_dependency_detector::{ASTDependencyDetector, DependencySet};
 use clarity_repl::repl::Session;
 use clarity_repl::repl::SessionSettings;
 use types::TransactionSpecification;

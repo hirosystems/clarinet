@@ -1,6 +1,5 @@
 use super::coverage::{CoverageReporter, TestCoverageReport};
-use crate::repl::session::Session;
-use crate::repl::SessionSettings;
+use clarity_repl::repl::{session::Session, SessionSettings};
 
 fn get_coverage_report(contract: &str, snippets: Vec<String>) -> (TestCoverageReport, String) {
     let mut session = Session::new(SessionSettings::default());

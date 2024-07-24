@@ -1,9 +1,5 @@
 use std::collections::HashMap;
 
-use crate::analysis::annotation::Annotation;
-use crate::analysis::ast_visitor::{traverse, ASTVisitor, TypedVar};
-use crate::analysis::{AnalysisPass, AnalysisResult, Settings};
-
 use clarity::vm::analysis::analysis_db::AnalysisDatabase;
 use clarity::vm::diagnostic::{Diagnostic, Level};
 use clarity::vm::representations::SymbolicExpression;
@@ -11,6 +7,10 @@ use clarity::vm::ClarityName;
 use clarity::vm::SymbolicExpressionType::List;
 
 pub use clarity::vm::analysis::types::ContractAnalysis;
+
+use crate::annotation::Annotation;
+use crate::ast_visitor::{traverse, ASTVisitor, TypedVar};
+use crate::{AnalysisPass, AnalysisResult, AnalysisSettings};
 
 pub struct CallChecker<'a> {
     diagnostics: Vec<Diagnostic>,
@@ -196,7 +196,7 @@ impl AnalysisPass for CallChecker<'_> {
         contract_analysis: &mut ContractAnalysis,
         _analysis_db: &mut AnalysisDatabase,
         _annotations: &Vec<Annotation>,
-        _settings: &Settings,
+        _settings: &AnalysisSettings,
     ) -> AnalysisResult {
         let tc = CallChecker::new();
         tc.run(contract_analysis)
@@ -205,8 +205,7 @@ impl AnalysisPass for CallChecker<'_> {
 
 #[cfg(test)]
 mod tests {
-    use crate::repl::session::Session;
-    use crate::repl::SessionSettings;
+    use clarity_repl::repl::{session::Session, SessionSettings};
 
     #[test]
     fn define_private() {

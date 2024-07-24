@@ -13,6 +13,7 @@ serde_json = "1.0"
 
 clarinet-core = { path = "../clarinet-core" }
 clarinet-files = { path = "../clarinet-files", default-features = false }
+clarity-analysis = { path = "../clarity-analysis" }
 clarity-repl = { path = "../clarity-repl", default-features = false, optional = true }
 clarinet-deployments = { path = "../clarinet-deployments", default-features = false }
 

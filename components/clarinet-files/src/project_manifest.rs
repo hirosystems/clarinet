@@ -5,10 +5,11 @@ use std::path::PathBuf;
 use std::str::FromStr;
 
 use super::FileLocation;
-use clarinet_core::{ClarityCodeSource, ClarityContract, ContractDeployer};
+use clarinet_core::{
+    ClarityCodeSource, ClarityContract, ContractDeployer, Pass, ReplSettings, ReplSettingsFile,
+};
 use clarity::types::StacksEpochId;
 use clarity::vm::ClarityVersion;
-use clarity_repl::{analysis, repl};
 use serde::ser::SerializeMap;
 use serde::{Deserializer, Serialize, Serializer};
 use serde_json::Value as JsonValue;
@@ -31,7 +32,7 @@ pub struct ClarityContractMetadata {
 pub struct ProjectManifestFile {
     project: ProjectConfigFile,
     contracts: Option<TomlValue>,
-    repl: Option<repl::SettingsFile>,
+    repl: Option<ReplSettingsFile>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -45,7 +46,7 @@ pub struct ProjectConfigFile {
 
     // The fields below have been moved into repl above, but are kept here for
     // backwards compatibility.
-    analysis: Option<Vec<analysis::Pass>>,
+    analysis: Option<Vec<Pass>>,
     cache_dir: Option<String>,
 }
 
@@ -56,7 +57,7 @@ pub struct ProjectManifest {
     #[serde(deserialize_with = "contracts_deserializer")]
     pub contracts: BTreeMap<String, ClarityContract>,
     #[serde(rename = "repl")]
-    pub repl_settings: repl::Settings,
+    pub repl_settings: ReplSettings,
     #[serde(skip_serializing)]
     #[serde(default = "default_location")]
     pub location: FileLocation,
@@ -215,9 +216,9 @@ impl ProjectManifest {
         manifest_location: &FileLocation,
     ) -> Result<ProjectManifest, String> {
         let mut repl_settings = if let Some(repl_settings) = project_manifest_file.repl {
-            repl::Settings::from(repl_settings)
+            ReplSettings::from(repl_settings)
         } else {
-            repl::Settings::default()
+            ReplSettings::default()
         };
 
         // Check for deprecated settings

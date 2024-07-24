@@ -1,4 +1,4 @@
-use clarity_repl::analysis::ast_visitor::{traverse, ASTVisitor, TypedVar};
+use clarity_analysis::ast_visitor::{traverse, ASTVisitor, TypedVar};
 use clarity_repl::clarity::analysis::type_checker::v2_05::TypeChecker;
 use clarity_repl::clarity::util::hash;
 use clarity_repl::clarity::vm::analysis::types::ContractAnalysis;

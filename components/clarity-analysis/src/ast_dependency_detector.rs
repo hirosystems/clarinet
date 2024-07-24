@@ -4,7 +4,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::iter::FromIterator;
 use std::ops::{Deref, DerefMut};
 
-use crate::analysis::ast_visitor::{traverse, ASTVisitor};
+use crate::ast_visitor::{traverse, ASTVisitor};
 use clarinet_core::DEFAULT_EPOCH;
 use clarity::types::StacksEpochId;
 pub use clarity::vm::analysis::types::ContractAnalysis;
@@ -928,7 +928,7 @@ impl GraphWalker {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::repl::{session::Session, SessionSettings};
+    use clarity_repl::repl::{session::Session, SessionSettings};
 
     use ::clarity::vm::diagnostic::Diagnostic;
     use clarinet_core::{

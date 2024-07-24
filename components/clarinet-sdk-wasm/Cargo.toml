@@ -26,6 +26,7 @@ colored = "2.1.0"
 
 clarinet-core ={ path = "../clarinet-core" }
 clarinet-static ={ path = "../clarinet-static" }
+clarity-analysis ={ path = "../clarity-analysis" }
 clarinet-files = { path = "../clarinet-files", default-features = false }
 clarity-repl = { path = "../clarity-repl", default-features = false, optional = true }
 clarinet-deployments = { path = "../clarinet-deployments", default-features = false }

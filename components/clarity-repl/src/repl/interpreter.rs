@@ -1,12 +1,6 @@
 use std::collections::{btree_map::Entry, BTreeMap, BTreeSet};
 
-use crate::analysis::annotation::{Annotation, AnnotationKind};
-use crate::analysis::ast_dependency_detector::{ASTDependencyDetector, Dependency};
-use crate::analysis::{self};
-use crate::repl::datastore::BurnDatastore;
-use crate::repl::datastore::Datastore;
-use crate::repl::Settings;
-use clarinet_core::{ClarityContract, DEFAULT_EPOCH};
+use clarinet_core::{ClarityContract, ReplSettings, DEFAULT_EPOCH};
 use clarity::consts::CHAIN_ID_TESTNET;
 use clarity::types::StacksEpochId;
 use clarity::vm::analysis::ContractAnalysis;
@@ -28,6 +22,12 @@ use clarity::vm::{eval, eval_all, EvaluationResult, SnippetEvaluationResult};
 use clarity::vm::{events::*, ClarityVersion};
 use clarity::vm::{ContractEvaluationResult, EvalHook};
 use clarity::vm::{CostSynthesis, ExecutionResult, ParsedContract};
+use clarity_analysis::annotation::{Annotation, AnnotationKind};
+use clarity_analysis::ast_dependency_detector::{ASTDependencyDetector, Dependency};
+use clarity_analysis::{self};
+
+use crate::repl::datastore::BurnDatastore;
+use crate::repl::datastore::Datastore;
 
 use super::datastore::StacksConstants;
 
@@ -43,7 +43,7 @@ pub const BLOCK_LIMIT_MAINNET: ExecutionCost = ExecutionCost {
 pub struct ClarityInterpreter {
     pub datastore: Datastore,
     pub burn_datastore: BurnDatastore,
-    pub repl_settings: Settings,
+    pub repl_settings: ReplSettings,
     tx_sender: StandardPrincipalData,
     accounts: BTreeSet<String>,
     tokens: BTreeMap<String, BTreeMap<String, u128>>,
@@ -53,7 +53,7 @@ pub struct ClarityInterpreter {
 pub struct Txid(pub [u8; 32]);
 
 impl ClarityInterpreter {
-    pub fn new(tx_sender: StandardPrincipalData, repl_settings: Settings) -> Self {
+    pub fn new(tx_sender: StandardPrincipalData, repl_settings: ReplSettings) -> Self {
         let constants = StacksConstants {
             burn_start_height: 0,
             pox_prepare_length: 50,
@@ -313,7 +313,7 @@ impl ClarityInterpreter {
         .map_err(|(error, _)| error.diagnostic)?;
 
         // Run REPL-only analyses
-        let diagnostics = analysis::run_analysis(
+        let diagnostics = clarity_analysis::run_analysis(
             &mut contract_analysis,
             &mut analysis_db,
             annotations,
@@ -1226,7 +1226,7 @@ mod tests {
     #[test]
     fn test_get_tx_sender() {
         let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+            ClarityInterpreter::new(StandardPrincipalData::transient(), ReplSettings::default());
         let tx_sender = StandardPrincipalData::transient();
         interpreter.set_tx_sender(tx_sender.clone());
         assert_eq!(interpreter.get_tx_sender(), tx_sender);
@@ -1235,7 +1235,7 @@ mod tests {
     #[test]
     fn test_set_tx_sender() {
         let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+            ClarityInterpreter::new(StandardPrincipalData::transient(), ReplSettings::default());
 
         let addr = StacksAddress::from_string("ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5").unwrap();
         let tx_sender = StandardPrincipalData::from(addr);
@@ -1246,7 +1246,7 @@ mod tests {
     #[test]
     fn test_get_block_time() {
         let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+            ClarityInterpreter::new(StandardPrincipalData::transient(), ReplSettings::default());
         let bt = interpreter.get_block_time();
         assert_ne!(bt, 0); // TODO placeholder
     }
@@ -1254,14 +1254,14 @@ mod tests {
     #[test]
     fn test_get_block_height() {
         let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+            ClarityInterpreter::new(StandardPrincipalData::transient(), ReplSettings::default());
         assert_eq!(interpreter.get_block_height(), 0);
     }
 
     #[test]
     fn test_advance_chain_tip() {
         let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+            ClarityInterpreter::new(StandardPrincipalData::transient(), ReplSettings::default());
         let count = 5;
         let initial_block_height = interpreter.get_block_height();
         interpreter.advance_chain_tip(count);
@@ -1271,7 +1271,7 @@ mod tests {
     #[test]
     fn test_get_assets_maps() {
         let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+            ClarityInterpreter::new(StandardPrincipalData::transient(), ReplSettings::default());
         let addr = "ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5";
         let amount = 1000;
         interpreter.credit_token(addr.into(), "STX".into(), amount);
@@ -1289,7 +1289,7 @@ mod tests {
     #[test]
     fn test_get_tokens() {
         let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+            ClarityInterpreter::new(StandardPrincipalData::transient(), ReplSettings::default());
         let addr = "ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5";
         interpreter.credit_token(addr.into(), "STX".into(), 1000);
 
@@ -1300,7 +1300,7 @@ mod tests {
     #[test]
     fn test_get_accounts() {
         let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+            ClarityInterpreter::new(StandardPrincipalData::transient(), ReplSettings::default());
         let addr = "ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5";
         interpreter.credit_token(addr.into(), "STX".into(), 1000);
 
@@ -1311,7 +1311,7 @@ mod tests {
     #[test]
     fn test_get_balance_for_account() {
         let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+            ClarityInterpreter::new(StandardPrincipalData::transient(), ReplSettings::default());
 
         let addr = "ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5";
         let amount = 1000;
@@ -1324,7 +1324,7 @@ mod tests {
     #[test]
     fn test_credit_any_token() {
         let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+            ClarityInterpreter::new(StandardPrincipalData::transient(), ReplSettings::default());
 
         let addr = "ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5";
         let amount = 1000;
@@ -1337,7 +1337,7 @@ mod tests {
     #[test]
     fn test_mint_stx_balance() {
         let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+            ClarityInterpreter::new(StandardPrincipalData::transient(), ReplSettings::default());
         let recipient = PrincipalData::Standard(StandardPrincipalData::transient());
         let amount = 1000;
 
@@ -1351,7 +1351,7 @@ mod tests {
     #[test]
     fn test_run_valid_contract() {
         let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+            ClarityInterpreter::new(StandardPrincipalData::transient(), ReplSettings::default());
         let contract = ClarityContract::fixture();
         let result = interpreter.run_interpreter(&contract, None, false, None);
         assert!(result.is_ok());
@@ -1361,7 +1361,7 @@ mod tests {
     #[test]
     fn test_run_invalid_contract() {
         let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+            ClarityInterpreter::new(StandardPrincipalData::transient(), ReplSettings::default());
 
         let snippet = "(define-public (add) (ok (+ u1 1)))";
         //                                            ^ should be uint
@@ -1377,7 +1377,7 @@ mod tests {
     #[test]
     fn test_run_runtime_error() {
         let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+            ClarityInterpreter::new(StandardPrincipalData::transient(), ReplSettings::default());
 
         let snippet = "(/ u1 u0)";
         let contract = ClarityContractBuilder::default()
@@ -1404,7 +1404,7 @@ mod tests {
     #[test]
     fn test_build_ast() {
         let interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+            ClarityInterpreter::new(StandardPrincipalData::transient(), ReplSettings::default());
         let contract = ClarityContract::fixture();
         let (_ast, diagnostics, success) = interpreter.build_ast(&contract);
         assert!(success);
@@ -1414,7 +1414,7 @@ mod tests {
     #[test]
     fn test_execute() {
         let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+            ClarityInterpreter::new(StandardPrincipalData::transient(), ReplSettings::default());
 
         let contract = ClarityContract::fixture();
         let result = deploy_contract(&mut interpreter, &contract);
@@ -1431,7 +1431,7 @@ mod tests {
     #[test]
     fn test_call_contract_fn() {
         let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+            ClarityInterpreter::new(StandardPrincipalData::transient(), ReplSettings::default());
 
         let contract = ClarityContract::fixture();
         let source = contract.expect_in_memory_code_source();
@@ -1456,7 +1456,7 @@ mod tests {
     #[test]
     fn test_run_both() {
         let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+            ClarityInterpreter::new(StandardPrincipalData::transient(), ReplSettings::default());
 
         let contract = ClarityContract::fixture();
         let _ = deploy_contract(&mut interpreter, &contract);
@@ -1470,7 +1470,7 @@ mod tests {
     #[test]
     fn test_get_data_var() {
         let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+            ClarityInterpreter::new(StandardPrincipalData::transient(), ReplSettings::default());
         let contract = ClarityContractBuilder::default()
             .code_source(["(define-data-var count uint u9)"].join("\n"))
             .build();
@@ -1493,7 +1493,7 @@ mod tests {
     #[test]
     fn test_get_map_entry() {
         let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+            ClarityInterpreter::new(StandardPrincipalData::transient(), ReplSettings::default());
         let contract = ClarityContractBuilder::default()
             .code_source(
                 [
@@ -1520,7 +1520,7 @@ mod tests {
     #[test]
     fn test_execute_stx_events() {
         let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+            ClarityInterpreter::new(StandardPrincipalData::transient(), ReplSettings::default());
         let account = PrincipalData::parse("S1G2081040G2081040G2081040G208105NK8PE5").unwrap();
         let _ = interpreter.mint_stx_balance(account, 100000);
 
@@ -1571,7 +1571,7 @@ mod tests {
     #[test]
     fn test_execute_ft_events() {
         let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+            ClarityInterpreter::new(StandardPrincipalData::transient(), ReplSettings::default());
 
         let contract = ClarityContractBuilder::default()
             .code_source(
@@ -1617,7 +1617,7 @@ mod tests {
     #[test]
     fn test_execute_nft_events() {
         let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+            ClarityInterpreter::new(StandardPrincipalData::transient(), ReplSettings::default());
 
         let contract = ClarityContractBuilder::default()
             .code_source(
@@ -1665,7 +1665,7 @@ mod tests {
 
     #[test]
     fn can_run_boot_contracts() {
-        let repl_settings = Settings {
+        let repl_settings = ReplSettings {
             clarity_wasm_mode: true,
             ..Default::default()
         };
@@ -1689,7 +1689,7 @@ mod tests {
     #[test]
     fn block_height_support_in_clarity2_epoch2() {
         let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+            ClarityInterpreter::new(StandardPrincipalData::transient(), ReplSettings::default());
 
         let snippet = [
             "(define-read-only (get-height)",
@@ -1759,7 +1759,7 @@ mod tests {
     #[test]
     fn block_height_support_in_clarity2_epoch3() {
         let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+            ClarityInterpreter::new(StandardPrincipalData::transient(), ReplSettings::default());
 
         interpreter.advance_chain_tip(1);
 
@@ -1812,7 +1812,7 @@ mod tests {
     #[test]
     fn block_height_support_in_clarity3_epoch3() {
         let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+            ClarityInterpreter::new(StandardPrincipalData::transient(), ReplSettings::default());
 
         interpreter.advance_chain_tip(1);
 
@@ -1901,7 +1901,7 @@ mod tests {
     #[test]
     fn can_call_a_public_function() {
         let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+            ClarityInterpreter::new(StandardPrincipalData::transient(), ReplSettings::default());
 
         let contract = ClarityContractBuilder::default()
             .code_source("(define-public (public-func) (ok true))".into())
@@ -1932,7 +1932,7 @@ mod tests {
     #[test]
     fn can_call_a_private_function() {
         let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+            ClarityInterpreter::new(StandardPrincipalData::transient(), ReplSettings::default());
 
         let contract = ClarityContractBuilder::default()
             .code_source("(define-private (private-func) true)".into())
@@ -1963,7 +1963,7 @@ mod tests {
     #[test]
     fn can_not_call_a_private_function_without_allow_private() {
         let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+            ClarityInterpreter::new(StandardPrincipalData::transient(), ReplSettings::default());
 
         let contract = ClarityContractBuilder::default()
             .code_source("(define-private (private-func) true)".into())

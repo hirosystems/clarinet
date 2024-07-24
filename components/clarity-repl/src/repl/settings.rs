@@ -1,6 +1,6 @@
 use std::convert::TryInto;
 
-use crate::analysis;
+use clarinet_core::ReplSettings;
 use clarity::types::chainstate::StacksAddress;
 use clarity::types::StacksEpochId;
 use clarity::vm::types::{PrincipalData, QualifiedContractIdentifier, StandardPrincipalData};
@@ -49,35 +49,6 @@ pub struct SessionSettings {
     pub scoping_contract: Option<String>,
     pub lazy_initial_contracts_interpretation: bool,
     pub disk_cache_enabled: bool,
-    pub repl_settings: Settings,
+    pub repl_settings: ReplSettings,
     pub epoch_id: Option<StacksEpochId>,
-}
-
-#[derive(Debug, Default, Clone, Deserialize, Serialize)]
-pub struct Settings {
-    pub analysis: analysis::Settings,
-    #[serde(skip_serializing, skip_deserializing)]
-    pub clarity_wasm_mode: bool,
-    #[serde(skip_serializing, skip_deserializing)]
-    pub show_timings: bool,
-}
-
-#[derive(Debug, Default, Clone, Deserialize, Serialize)]
-pub struct SettingsFile {
-    pub analysis: Option<analysis::SettingsFile>,
-}
-
-impl From<SettingsFile> for Settings {
-    fn from(file: SettingsFile) -> Self {
-        let analysis = if let Some(analysis) = file.analysis {
-            analysis::Settings::from(analysis)
-        } else {
-            analysis::Settings::default()
-        };
-        Self {
-            analysis,
-            clarity_wasm_mode: false,
-            show_timings: false,
-        }
-    }
 }
