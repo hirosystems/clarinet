@@ -1098,25 +1098,25 @@ impl ClarityInterpreter {
         self.tx_sender.clone()
     }
 
-    pub fn advance_chaintip(&mut self, count: u32) -> u32 {
+    pub fn advance_chain_tip(&mut self, count: u32) -> u32 {
         let current_epoch = self.burn_datastore.get_current_epoch();
         if current_epoch < StacksEpochId::Epoch30 {
-            self.advance_burn_chaintip(count)
+            self.advance_burn_chain_tip(count)
         } else {
-            match self.advance_stacks_chaintip(count) {
+            match self.advance_stacks_chain_tip(count) {
                 Ok(count) => count,
                 Err(_) => unreachable!("Epoch checked already"),
             }
         }
     }
 
-    pub fn advance_burn_chaintip(&mut self, count: u32) -> u32 {
+    pub fn advance_burn_chain_tip(&mut self, count: u32) -> u32 {
         let new_height = self.burn_datastore.advance_chain_tip(count);
         let _ = self.datastore.advance_chain_tip(count);
         self.set_tenure_height();
         new_height
     }
-    pub fn advance_stacks_chaintip(&mut self, count: u32) -> Result<u32, String> {
+    pub fn advance_stacks_chain_tip(&mut self, count: u32) -> Result<u32, String> {
         let current_epoch = self.burn_datastore.get_current_epoch();
         if current_epoch < StacksEpochId::Epoch30 {
             Err("only burn chain height can be advanced in epoch lower than 3.0".to_string())
@@ -1285,7 +1285,7 @@ mod tests {
     }
 
     #[test]
-    fn test_advance_stacks_chaintip_pre_epoch_3() {
+    fn test_advance_stacks_chain_tip_pre_epoch_3() {
         let mut interpreter =
             ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
         interpreter
@@ -1293,12 +1293,12 @@ mod tests {
             .set_current_epoch(StacksEpochId::Epoch2_05);
         let count = 5;
         let initial_block_height = interpreter.get_burn_block_height();
-        assert_ne!(interpreter.advance_stacks_chaintip(count), Ok(count));
+        assert_ne!(interpreter.advance_stacks_chain_tip(count), Ok(count));
         assert_eq!(interpreter.get_burn_block_height(), initial_block_height);
         assert_eq!(interpreter.get_block_height(), initial_block_height);
     }
     #[test]
-    fn test_advance_stacks_chaintip() {
+    fn test_advance_stacks_chain_tip() {
         let wasm_settings = Settings {
             analysis: AnalysisSettings::default(),
             clarity_wasm_mode: true,
@@ -1311,7 +1311,7 @@ mod tests {
             .set_current_epoch(StacksEpochId::Epoch30);
         let count = 5;
         let initial_block_height = interpreter.get_burn_block_height();
-        assert_eq!(interpreter.advance_stacks_chaintip(count), Ok(count));
+        assert_eq!(interpreter.advance_stacks_chain_tip(count), Ok(count));
         assert_eq!(interpreter.get_burn_block_height(), initial_block_height);
         assert_eq!(interpreter.get_block_height(), initial_block_height + count);
     }
@@ -1324,7 +1324,7 @@ mod tests {
             .set_current_epoch(StacksEpochId::Epoch2_05);
         let count = 5;
         let initial_block_height = interpreter.get_block_height();
-        interpreter.advance_burn_chaintip(count);
+        interpreter.advance_burn_chain_tip(count);
         assert_eq!(interpreter.get_block_height(), initial_block_height + count);
         assert_eq!(
             interpreter.get_burn_block_height(),
@@ -1340,7 +1340,7 @@ mod tests {
             .set_current_epoch(StacksEpochId::Epoch30);
         let count = 5;
         let initial_block_height = interpreter.get_block_height();
-        interpreter.advance_burn_chaintip(count);
+        interpreter.advance_burn_chain_tip(count);
         assert_eq!(interpreter.get_block_height(), initial_block_height + count);
         assert_eq!(
             interpreter.get_burn_block_height(),
@@ -1809,7 +1809,7 @@ mod tests {
             ),
         );
 
-        interpreter.advance_burn_chaintip(10);
+        interpreter.advance_burn_chain_tip(10);
 
         let result = interpreter.call_contract_fn(
             &contract_id,
@@ -1841,7 +1841,7 @@ mod tests {
         let mut interpreter =
             ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
 
-        interpreter.advance_burn_chaintip(1);
+        interpreter.advance_burn_chain_tip(1);
 
         let snippet = [
             "(define-read-only (get-height)",
@@ -1894,7 +1894,7 @@ mod tests {
         let mut interpreter =
             ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
 
-        interpreter.advance_burn_chaintip(1);
+        interpreter.advance_burn_chain_tip(1);
 
         let snippet = [
             "(define-read-only (get-height)",
@@ -1947,7 +1947,7 @@ mod tests {
             ),
         );
 
-        interpreter.advance_burn_chaintip(10);
+        interpreter.advance_burn_chain_tip(10);
 
         let result = interpreter.call_contract_fn(
             &contract_id,

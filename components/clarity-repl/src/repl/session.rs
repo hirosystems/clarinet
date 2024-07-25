@@ -251,12 +251,12 @@ impl Session {
             cmd if cmd.starts_with("::get_burn_block_height") => self.get_burn_block_height(),
             cmd if cmd.starts_with("::get_stacks_block_height") => self.get_block_height(),
             cmd if cmd.starts_with("::get_block_height") => self.get_block_height(),
-            cmd if cmd.starts_with("::advance_chain_tip") => self.parse_and_advance_chaintip(cmd),
-            cmd if cmd.starts_with("::advance_stacks_chaintip") => {
-                self.parse_and_advance_stacks_chaintip(cmd)
+            cmd if cmd.starts_with("::advance_chain_tip") => self.parse_and_advance_chain_tip(cmd),
+            cmd if cmd.starts_with("::advance_stacks_chain_tip") => {
+                self.parse_and_advance_stacks_chain_tip(cmd)
             }
-            cmd if cmd.starts_with("::advance_burn_chaintip") => {
-                self.parse_and_advance_burn_chaintip(cmd)
+            cmd if cmd.starts_with("::advance_burn_chain_tip") => {
+                self.parse_and_advance_burn_chain_tip(cmd)
             }
             cmd if cmd.starts_with("::get_epoch") => self.get_epoch(),
             cmd if cmd.starts_with("::set_epoch") => self.set_epoch(cmd),
@@ -767,11 +767,11 @@ impl Session {
         ));
         output.push(format!(
             "{}",
-            "::advance_stacks_chaintip <count>\tSimulate mining of <count> stacks blocks".yellow()
+            "::advance_stacks_chain_tip <count>\tSimulate mining of <count> stacks blocks".yellow()
         ));
         output.push(format!(
             "{}",
-            "::advance_burn_chaintip <count>\t\tSimulate mining of <count> burnchain blocks"
+            "::advance_burn_chain_tip <count>\t\tSimulate mining of <count> burnchain blocks"
                 .yellow()
         ));
         output.push(format!(
@@ -822,11 +822,11 @@ impl Session {
         output.join("\n")
     }
 
-    fn parse_and_advance_stacks_chaintip(&mut self, command: &str) -> String {
+    fn parse_and_advance_stacks_chain_tip(&mut self, command: &str) -> String {
         let args: Vec<_> = command.split(' ').collect();
 
         if args.len() != 2 {
-            return format!("{}", "Usage: ::advance_stacks_chaintip <count>".red());
+            return format!("{}", "Usage: ::advance_stacks_chain_tip <count>".red());
         }
 
         let count = match args[1].parse::<u32>() {
@@ -836,18 +836,18 @@ impl Session {
             }
         };
 
-        match self.advance_stacks_chaintip(count) {
+        match self.advance_stacks_chain_tip(count) {
             Ok(new_height) => format!("{} blocks simulated, new height: {}", count, new_height)
                 .green()
                 .to_string(),
             Err(_) => format!(
                 "{}",
-                "advance_stacks_chaintip can't be called in epoch lower than 3.0".red()
+                "advance_stacks_chain_tip can't be called in epoch lower than 3.0".red()
             ),
         }
     }
 
-    fn parse_and_advance_chaintip(&mut self, command: &str) -> String {
+    fn parse_and_advance_chain_tip(&mut self, command: &str) -> String {
         let args: Vec<_> = command.split(' ').collect();
 
         if args.len() != 2 {
@@ -866,11 +866,11 @@ impl Session {
             .green()
             .to_string()
     }
-    fn parse_and_advance_burn_chaintip(&mut self, command: &str) -> String {
+    fn parse_and_advance_burn_chain_tip(&mut self, command: &str) -> String {
         let args: Vec<_> = command.split(' ').collect();
 
         if args.len() != 2 {
-            return format!("{}", "Usage: ::advance_burn_chaintip <count>".red());
+            return format!("{}", "Usage: ::advance_burn_chain_tip <count>".red());
         }
 
         let count = match args[1].parse::<u32>() {
@@ -880,20 +880,20 @@ impl Session {
             }
         };
 
-        let new_height = self.advance_burn_chaintip(count);
+        let new_height = self.advance_burn_chain_tip(count);
         format!("{} blocks simulated, new height: {}", count, new_height)
             .green()
             .to_string()
     }
 
-    pub fn advance_stacks_chaintip(&mut self, count: u32) -> Result<u32, String> {
-        self.interpreter.advance_stacks_chaintip(count)
+    pub fn advance_stacks_chain_tip(&mut self, count: u32) -> Result<u32, String> {
+        self.interpreter.advance_stacks_chain_tip(count)
     }
-    pub fn advance_burn_chaintip(&mut self, count: u32) -> u32 {
-        self.interpreter.advance_burn_chaintip(count)
+    pub fn advance_burn_chain_tip(&mut self, count: u32) -> u32 {
+        self.interpreter.advance_burn_chain_tip(count)
     }
     pub fn advance_chain_tip(&mut self, count: u32) -> u32 {
-        self.interpreter.advance_chaintip(count)
+        self.interpreter.advance_chain_tip(count)
     }
 
     fn parse_and_set_tx_sender(&mut self, command: &str) -> String {
@@ -1365,26 +1365,26 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_and_advance_stacks_chaintip() {
+    fn test_parse_and_advance_stacks_chain_tip() {
         let mut session = Session::new(SessionSettings::default());
-        let result = session.handle_command("::advance_stacks_chaintip 1");
+        let result = session.handle_command("::advance_stacks_chain_tip 1");
         assert_eq!(
             result,
-            "advance_stacks_chaintip can't be called in epoch lower than 3.0"
+            "advance_stacks_chain_tip can't be called in epoch lower than 3.0"
                 .to_string()
                 .red()
                 .to_string()
         );
         session.handle_command("::set_epoch 3.0");
-        let _ = session.handle_command("::advance_stacks_chaintip 1");
+        let _ = session.handle_command("::advance_stacks_chain_tip 1");
         let new_height = session.handle_command("::get_stacks_block_height");
         assert_eq!(new_height, "Current height: 1");
     }
 
     #[test]
-    fn test_parse_and_advance_burn_chaintip_pre_epoch3() {
+    fn test_parse_and_advance_burn_chain_tip_pre_epoch3() {
         let mut session = Session::new(SessionSettings::default());
-        let result = session.handle_command("::advance_burn_chaintip 1");
+        let result = session.handle_command("::advance_burn_chain_tip 1");
         assert_eq!(
             result,
             "1 blocks simulated, new height: 1"
@@ -1392,7 +1392,7 @@ mod tests {
                 .green()
                 .to_string()
         );
-        // before epoch 3 this acts the same as burn_chaintip
+        // before epoch 3 this acts the same as burn_chain_tip
         let result = session.handle_command("::advance_chain_tip 1");
         assert_eq!(
             result,
@@ -1404,10 +1404,10 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_and_advance_burn_chaintip_epoch3() {
+    fn test_parse_and_advance_burn_chain_tip_epoch3() {
         let mut session = Session::new(SessionSettings::default());
         session.handle_command("::set_epoch 3.0");
-        let result = session.handle_command("::advance_burn_chaintip 1");
+        let result = session.handle_command("::advance_burn_chain_tip 1");
         assert_eq!(
             result,
             "1 blocks simulated, new height: 1"
