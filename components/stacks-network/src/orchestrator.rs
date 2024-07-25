@@ -1435,7 +1435,7 @@ start_height = {epoch_3_0}
         &self,
         boot_index: u32,
     ) -> Result<Config<String>, String> {
-        let (network_config, devnet_config) = match &self.network_config {
+        let (_, devnet_config) = match &self.network_config {
             Some(ref network_config) => match network_config.devnet {
                 Some(ref devnet_config) => (network_config, devnet_config),
                 _ => return Err("unable to get devnet configuration".into()),
@@ -1476,17 +1476,6 @@ bootstrap_node = "{boostrap_node_public_key}@host.docker.internal:{stacks_node_p
             stacks_follower_p2p_port = devnet_config.stacks_follower_p2p_port,
             stacks_node_p2p_port = devnet_config.stacks_node_p2p_port,
         );
-
-        for (_, account) in network_config.accounts.iter() {
-            stacks_follower_conf.push_str(&format!(
-                r#"
-[[ustx_balance]]
-address = "{}"
-amount = {}
-"#,
-                account.stx_address, account.balance
-            ));
-        }
 
         stacks_follower_conf.push_str(&format!(
             r#"
