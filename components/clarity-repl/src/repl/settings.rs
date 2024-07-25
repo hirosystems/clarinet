@@ -1,6 +1,7 @@
 use std::convert::TryInto;
 
 use crate::analysis;
+use clarity::address::b58::from;
 use clarity::types::chainstate::StacksAddress;
 use clarity::types::StacksEpochId;
 use clarity::vm::types::{PrincipalData, QualifiedContractIdentifier, StandardPrincipalData};
@@ -75,18 +76,20 @@ pub struct Settings {
 #[derive(Debug, Default, Clone, Deserialize, Serialize)]
 pub struct SettingsFile {
     analysis: Option<analysis::SettingsFile>,
-    network_simulation: NetworkSimulationSettingsFile,
+    network_simulation: Option<NetworkSimulationSettingsFile>,
 }
 
 impl From<SettingsFile> for Settings {
     fn from(file: SettingsFile) -> Self {
-        let analysis = if let Some(analysis) = file.analysis {
-            analysis::Settings::from(analysis)
-        } else {
-            analysis::Settings::default()
-        };
+        let analysis = file
+            .analysis
+            .map(analysis::Settings::from)
+            .unwrap_or_default();
 
-        let network_simulation = NetworkSimulationSettings::from(file.network_simulation);
+        let network_simulation = file
+            .network_simulation
+            .map(NetworkSimulationSettings::from)
+            .unwrap_or_default();
 
         Self {
             analysis,
