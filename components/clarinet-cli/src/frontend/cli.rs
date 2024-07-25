@@ -40,6 +40,7 @@ use stacks_network::{self, DevnetOrchestrator};
 use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::prelude::*;
+use std::path::PathBuf;
 use std::{env, process};
 use toml;
 
@@ -364,6 +365,9 @@ struct DevnetStart {
     /// Display streams of logs instead of terminal UI dashboard
     #[clap(long = "no-dashboard")]
     pub no_dashboard: bool,
+    /// Override any present Clarinet.toml manifest with default settings
+    #[clap(long = "default-settings")]
+    pub default_settings: bool,
     /// If specified, use this deployment file
     #[clap(long = "deployment-plan-path", short = 'p')]
     pub deployment_plan_path: Option<String>,
@@ -1788,7 +1792,19 @@ fn display_deploy_hint() {
 }
 
 fn devnet_start(cmd: DevnetStart, global_settings: GlobalSettings) {
-    let manifest = load_manifest_or_exit(cmd.manifest_path);
+    let manifest = if cmd.default_settings {
+        let project_root_location = FileLocation::from_path(
+            // PathBuf::from(".");
+            std::env::current_dir().expect("Failed to get current directory"),
+        );
+        println!("Using default project manifest");
+        ProjectManifest::default_project_manifest(
+            global_settings.enable_telemetry.unwrap_or(false),
+            project_root_location,
+        )
+    } else {
+        load_manifest_or_exit(cmd.manifest_path)
+    };
     println!("Computing deployment plan");
     let result = match cmd.deployment_plan_path {
         None => {
