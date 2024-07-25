@@ -767,11 +767,15 @@ impl Session {
         ));
         output.push(format!(
             "{}",
+            "::advance_chain_tip <count>\t\tSimulate mining of <count> blocks".yellow()
+        ));
+        output.push(format!(
+            "{}",
             "::advance_stacks_chain_tip <count>\tSimulate mining of <count> stacks blocks".yellow()
         ));
         output.push(format!(
             "{}",
-            "::advance_burn_chain_tip <count>\t\tSimulate mining of <count> burnchain blocks"
+            "::advance_burn_chain_tip <count>\tSimulate mining of <count> burnchain blocks"
                 .yellow()
         ));
         output.push(format!(
