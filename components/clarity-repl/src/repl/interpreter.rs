@@ -1098,6 +1098,18 @@ impl ClarityInterpreter {
         self.tx_sender.clone()
     }
 
+    pub fn advance_chaintip(&mut self, count: u32) -> u32 {
+        let current_epoch = self.burn_datastore.get_current_epoch();
+        if current_epoch < StacksEpochId::Epoch30 {
+            self.advance_burn_chaintip(count)
+        } else {
+            match self.advance_stacks_chaintip(count) {
+                Ok(count) => count,
+                Err(_) => unreachable!("Epoch checked already"),
+            }
+        }
+    }
+
     pub fn advance_burn_chaintip(&mut self, count: u32) -> u32 {
         let new_height = self.burn_datastore.advance_chain_tip(count);
         let _ = self.datastore.advance_chain_tip(count);
