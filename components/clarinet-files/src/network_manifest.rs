@@ -86,6 +86,9 @@ pub struct DevnetConfigFile {
     pub stacks_node_first_attempt_time_ms: Option<u32>,
     pub stacks_node_subsequent_attempt_time_ms: Option<u32>,
     pub stacks_node_env_vars: Option<Vec<String>>,
+    pub stacks_follower_p2p_port: Option<u16>,
+    pub stacks_follower_rpc_port: Option<u16>,
+    pub stacks_follower_env_vars: Option<Vec<String>>,
     pub stacks_api_env_vars: Option<Vec<String>>,
     pub stacks_explorer_env_vars: Option<Vec<String>>,
     pub subnet_node_env_vars: Option<Vec<String>>,
@@ -114,6 +117,7 @@ pub struct DevnetConfigFile {
     pub bitcoin_node_image_url: Option<String>,
     pub bitcoin_explorer_image_url: Option<String>,
     pub stacks_node_image_url: Option<String>,
+    pub stacks_follower_image_url: Option<String>,
     pub stacks_signer_image_url: Option<String>,
     pub stacks_api_image_url: Option<String>,
     pub stacks_explorer_image_url: Option<String>,
@@ -121,6 +125,7 @@ pub struct DevnetConfigFile {
     pub disable_bitcoin_explorer: Option<bool>,
     pub disable_stacks_explorer: Option<bool>,
     pub disable_stacks_api: Option<bool>,
+    pub disable_stacks_follower: Option<bool>,
     pub bind_containers_volumes: Option<bool>,
     pub enable_subnet_node: Option<bool>,
     pub subnet_node_image_url: Option<String>,
@@ -243,6 +248,9 @@ pub struct DevnetConfig {
     pub stacks_node_subsequent_attempt_time_ms: u32,
     pub stacks_node_events_observers: Vec<String>,
     pub stacks_node_env_vars: Vec<String>,
+    pub stacks_follower_p2p_port: u16,
+    pub stacks_follower_rpc_port: u16,
+    pub stacks_follower_env_vars: Vec<String>,
     pub stacks_api_port: u16,
     pub stacks_api_events_port: u16,
     pub stacks_api_env_vars: Vec<String>,
@@ -273,6 +281,7 @@ pub struct DevnetConfig {
     pub execute_script: Vec<ExecuteScript>,
     pub bitcoin_node_image_url: String,
     pub stacks_node_image_url: String,
+    pub stacks_follower_image_url: String,
     pub stacks_signer_image_url: String,
     pub stacks_api_image_url: String,
     pub stacks_explorer_image_url: String,
@@ -281,6 +290,7 @@ pub struct DevnetConfig {
     pub disable_bitcoin_explorer: bool,
     pub disable_stacks_explorer: bool,
     pub disable_stacks_api: bool,
+    pub disable_stacks_follower: bool,
     pub bind_containers_volumes: bool,
     pub enable_subnet_node: bool,
     pub subnet_node_image_url: String,
@@ -510,6 +520,14 @@ impl NetworkManifest {
                     devnet_config.stacks_node_events_observers = Some(val.clone());
                 }
 
+                if let Some(val) = devnet_override.stacks_follower_p2p_port {
+                    devnet_config.stacks_follower_p2p_port = Some(val);
+                }
+
+                if let Some(val) = devnet_override.stacks_follower_rpc_port {
+                    devnet_config.stacks_follower_rpc_port = Some(val);
+                }
+
                 if let Some(val) = devnet_override.stacks_api_port {
                     devnet_config.stacks_api_port = Some(val);
                 }
@@ -588,6 +606,10 @@ impl NetworkManifest {
 
                 if let Some(ref val) = devnet_override.stacks_node_image_url {
                     devnet_config.stacks_node_image_url = Some(val.clone());
+                }
+
+                if let Some(ref val) = devnet_override.stacks_follower_image_url {
+                    devnet_config.stacks_follower_image_url = Some(val.clone());
                 }
 
                 if let Some(ref val) = devnet_override.stacks_api_image_url {
@@ -835,6 +857,8 @@ impl NetworkManifest {
                 stacks_node_subsequent_attempt_time_ms: devnet_config
                     .stacks_node_subsequent_attempt_time_ms
                     .unwrap_or(1_000),
+                stacks_follower_p2p_port: devnet_config.stacks_follower_p2p_port.unwrap_or(21444),
+                stacks_follower_rpc_port: devnet_config.stacks_follower_rpc_port.unwrap_or(21443),
                 stacks_api_port: devnet_config.stacks_api_port.unwrap_or(3999),
                 stacks_api_events_port: devnet_config.stacks_api_events_port.unwrap_or(3700),
                 stacks_explorer_port: devnet_config.stacks_explorer_port.unwrap_or(8000),
@@ -883,6 +907,10 @@ impl NetworkManifest {
                     .stacks_node_image_url
                     .take()
                     .unwrap_or(DEFAULT_STACKS_NODE_IMAGE.to_string()),
+                stacks_follower_image_url: devnet_config
+                    .stacks_follower_image_url
+                    .take()
+                    .unwrap_or(DEFAULT_STACKS_NODE_IMAGE.to_string()),
                 stacks_signer_image_url: devnet_config
                     .stacks_signer_image_url
                     .take()
@@ -906,6 +934,7 @@ impl NetworkManifest {
                 pox_stacking_orders: devnet_config.pox_stacking_orders.take().unwrap_or_default(),
                 disable_bitcoin_explorer: devnet_config.disable_bitcoin_explorer.unwrap_or(false),
                 disable_stacks_api: devnet_config.disable_stacks_api.unwrap_or(false),
+                disable_stacks_follower: devnet_config.disable_stacks_follower.unwrap_or(true),
                 disable_stacks_explorer: devnet_config.disable_stacks_explorer.unwrap_or(false),
                 bind_containers_volumes: devnet_config.bind_containers_volumes.unwrap_or(false),
                 enable_subnet_node,
@@ -950,6 +979,10 @@ impl NetworkManifest {
                 epoch_3_0: devnet_config.epoch_3_0.unwrap_or(DEFAULT_EPOCH_3_0),
                 stacks_node_env_vars: devnet_config
                     .stacks_node_env_vars
+                    .take()
+                    .unwrap_or_default(),
+                stacks_follower_env_vars: devnet_config
+                    .stacks_follower_env_vars
                     .take()
                     .unwrap_or_default(),
                 stacks_api_env_vars: devnet_config.stacks_api_env_vars.take().unwrap_or_default(),

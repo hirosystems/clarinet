@@ -34,6 +34,7 @@ pub struct DevnetOrchestrator {
     pub termination_success_tx: Option<Sender<bool>>,
     pub can_exit: bool,
     stacks_node_container_id: Option<String>,
+    stacks_follower_container_id: Option<String>,
     stacks_signer_1_container_id: Option<String>,
     stacks_signer_2_container_id: Option<String>,
     stacks_api_container_id: Option<String>,
@@ -154,6 +155,7 @@ impl DevnetOrchestrator {
             can_exit: true,
             termination_success_tx: None,
             stacks_node_container_id: None,
+            stacks_follower_container_id: None,
             stacks_signer_1_container_id: None,
             stacks_signer_2_container_id: None,
             stacks_api_container_id: None,
@@ -301,6 +303,7 @@ impl DevnetOrchestrator {
         let mut devnet_path = PathBuf::from(&devnet_config.working_dir);
         devnet_path.push("data");
 
+        let disable_stacks_follower = devnet_config.disable_stacks_follower;
         let disable_stacks_api = devnet_config.disable_stacks_api;
         let disable_stacks_explorer = devnet_config.disable_stacks_explorer;
         let disable_bitcoin_explorer = devnet_config.disable_bitcoin_explorer;
@@ -575,6 +578,44 @@ impl DevnetOrchestrator {
                 return Err(message);
             }
         };
+
+        // Start stacks-follower
+        if !disable_stacks_follower {
+            let _ = event_tx.send(DevnetEvent::info("Starting stacks-follower".to_string()));
+            send_status_update(
+                &event_tx,
+                enable_subnet_node,
+                "stacks-follower",
+                Status::Yellow,
+                "updating image",
+            );
+            match self
+                .prepare_stacks_follower_container(boot_index, ctx)
+                .await
+            {
+                Ok(_) => {}
+                Err(message) => {
+                    let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
+                    self.kill(ctx, Some(&message)).await;
+                    return Err(message);
+                }
+            };
+            send_status_update(
+                &event_tx,
+                enable_subnet_node,
+                "stacks-follower",
+                Status::Yellow,
+                "booting",
+            );
+            match self.boot_stacks_follower_container().await {
+                Ok(_) => {}
+                Err(message) => {
+                    let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
+                    self.kill(ctx, Some(&message)).await;
+                    return Err(message);
+                }
+            };
+        }
 
         // Start stacks-signer-1
         let _ = event_tx.send(DevnetEvent::info("Starting stacks-signer-1".to_string()));
@@ -1373,6 +1414,280 @@ start_height = {epoch_3_0}
 
     pub async fn boot_stacks_node_container(&mut self) -> Result<(), String> {
         let container = match &self.stacks_node_container_id {
+            Some(container) => container.clone(),
+            _ => return Err("unable to boot container".to_string()),
+        };
+
+        let docker = match &self.docker_client {
+            Some(ref docker) => docker,
+            _ => return Err("unable to get Docker client".into()),
+        };
+
+        docker
+            .start_container::<String>(&container, None)
+            .await
+            .map_err(|e| formatted_docker_error("unable to start stacks-node container", e))?;
+
+        Ok(())
+    }
+
+    pub fn prepare_stacks_follower_config(
+        &self,
+        boot_index: u32,
+    ) -> Result<Config<String>, String> {
+        let (network_config, devnet_config) = match &self.network_config {
+            Some(ref network_config) => match network_config.devnet {
+                Some(ref devnet_config) => (network_config, devnet_config),
+                _ => return Err("unable to get devnet configuration".into()),
+            },
+            _ => return Err("unable to get Docker client".into()),
+        };
+
+        let mut port_bindings = HashMap::new();
+        port_bindings.insert(
+            format!("{}/tcp", devnet_config.stacks_follower_p2p_port),
+            Some(vec![PortBinding {
+                host_ip: Some(String::from("0.0.0.0")),
+                host_port: Some(format!("{}/tcp", devnet_config.stacks_follower_p2p_port)),
+            }]),
+        );
+        port_bindings.insert(
+            format!("{}/tcp", devnet_config.stacks_follower_rpc_port),
+            Some(vec![PortBinding {
+                host_ip: Some(String::from("0.0.0.0")),
+                host_port: Some(format!("{}/tcp", devnet_config.stacks_follower_rpc_port)),
+            }]),
+        );
+
+        let boostrap_node_public_key =
+            "0239810ebf35e6f6c26062c99f3e183708d377720617c90a986859ec9c95d00be9";
+
+        let mut stacks_follower_conf = format!(
+            r#"
+[node]
+working_dir = "/devnet"
+rpc_bind = "0.0.0.0:{stacks_follower_rpc_port}"
+p2p_bind = "0.0.0.0:{stacks_follower_p2p_port}"
+seed = "9e446f6b0c6a96cf2190e54bcd5a8569c3e386f091605499464389b8d4e0bfc201"
+local_peer_seed = "9e446f6b0c6a96cf2190e54bcd5a8569c3e386f091605499464389b8d4e0bfc201"
+bootstrap_node = "{boostrap_node_public_key}@host.docker.internal:{stacks_node_p2p_port}"
+"#,
+            stacks_follower_rpc_port = devnet_config.stacks_follower_rpc_port,
+            stacks_follower_p2p_port = devnet_config.stacks_follower_p2p_port,
+            stacks_node_p2p_port = devnet_config.stacks_node_p2p_port,
+        );
+
+        for (_, account) in network_config.accounts.iter() {
+            stacks_follower_conf.push_str(&format!(
+                r#"
+[[ustx_balance]]
+address = "{}"
+amount = {}
+"#,
+                account.stx_address, account.balance
+            ));
+        }
+
+        stacks_follower_conf.push_str(&format!(
+            r#"
+[burnchain]
+chain = "bitcoin"
+mode = "{burnchain_mode}"
+magic_bytes = "T3"
+first_burn_block_height = 100
+pox_prepare_length = 5
+pox_reward_length = 20
+burn_fee_cap = 20_000
+poll_time_secs = 1
+timeout = 30
+peer_host = "host.docker.internal"
+rpc_ssl = false
+wallet_name = "{miner_wallet_name}"
+username = "{bitcoin_node_username}"
+password = "{bitcoin_node_password}"
+rpc_port = {orchestrator_ingestion_port}
+peer_port = {bitcoin_node_p2p_port}
+"#,
+            burnchain_mode = "nakamoto-neon",
+            bitcoin_node_username = devnet_config.bitcoin_node_username,
+            bitcoin_node_password = devnet_config.bitcoin_node_password,
+            bitcoin_node_p2p_port = devnet_config.bitcoin_node_p2p_port,
+            orchestrator_ingestion_port = devnet_config.orchestrator_ingestion_port,
+            miner_wallet_name = devnet_config.miner_wallet_name,
+        ));
+
+        stacks_follower_conf.push_str(&format!(
+            r#"
+[[burnchain.epochs]]
+epoch_name = "1.0"
+start_height = 0
+
+[[burnchain.epochs]]
+epoch_name = "2.0"
+start_height = {epoch_2_0}
+
+[[burnchain.epochs]]
+epoch_name = "2.05"
+start_height = {epoch_2_05}
+
+[[burnchain.epochs]]
+epoch_name = "2.1"
+start_height = {epoch_2_1}
+
+[[burnchain.epochs]]
+epoch_name = "2.2"
+start_height = {epoch_2_2}
+
+[[burnchain.epochs]]
+epoch_name = "2.3"
+start_height = {epoch_2_3}
+
+[[burnchain.epochs]]
+epoch_name = "2.4"
+start_height = {epoch_2_4}
+
+[[burnchain.epochs]]
+epoch_name = "2.5"
+start_height = {epoch_2_5}
+
+[[burnchain.epochs]]
+epoch_name = "3.0"
+start_height = {epoch_3_0}
+"#,
+            epoch_2_0 = devnet_config.epoch_2_0,
+            epoch_2_05 = devnet_config.epoch_2_05,
+            epoch_2_1 = devnet_config.epoch_2_1,
+            epoch_2_2 = devnet_config.epoch_2_2,
+            epoch_2_3 = devnet_config.epoch_2_3,
+            epoch_2_4 = devnet_config.epoch_2_4,
+            epoch_2_5 = devnet_config.epoch_2_5,
+            epoch_3_0 = devnet_config.epoch_3_0,
+        ));
+
+        let mut stacks_follower_conf_path = PathBuf::from(&devnet_config.working_dir);
+        stacks_follower_conf_path.push("conf/Follower.toml");
+        let mut file = File::create(stacks_follower_conf_path)
+            .map_err(|e| format!("unable to create Follower.toml: {:?}", e))?;
+        file.write_all(stacks_follower_conf.as_bytes())
+            .map_err(|e| format!("unable to write Follower.toml: {:?}", e))?;
+
+        let mut stacks_follower_data_path = PathBuf::from(&devnet_config.working_dir);
+        stacks_follower_data_path.push("data");
+        stacks_follower_data_path.push(format!("{}", boot_index));
+        stacks_follower_data_path.push("stacks");
+        fs::create_dir_all(stacks_follower_data_path)
+            .map_err(|e| format!("unable to create stacks directory: {:?}", e))?;
+
+        let mut exposed_ports = HashMap::new();
+        exposed_ports.insert(
+            format!("{}/tcp", devnet_config.stacks_follower_rpc_port),
+            HashMap::new(),
+        );
+        exposed_ports.insert(
+            format!("{}/tcp", devnet_config.stacks_follower_p2p_port),
+            HashMap::new(),
+        );
+
+        let mut labels = HashMap::new();
+        labels.insert("project".to_string(), self.network_name.to_string());
+        labels.insert("reset".to_string(), "true".to_string());
+
+        let mut binds = vec![format!(
+            "{}/conf:/src/stacks-follower/",
+            devnet_config.working_dir
+        )];
+
+        if devnet_config.bind_containers_volumes {
+            binds.push(format!(
+                "{}/data/{}/stacks:/devnet/",
+                devnet_config.working_dir, boot_index
+            ))
+        }
+
+        let mut env = vec![
+            "STACKS_LOG_PP=1".to_string(),
+            "BLOCKSTACK_USE_TEST_GENESIS_CHAINSTATE=1".to_string(),
+        ];
+        env.append(&mut devnet_config.stacks_follower_env_vars.clone());
+        env.append(&mut devnet_config.stacks_follower_env_vars.clone());
+
+        let config = Config {
+            labels: Some(labels),
+            image: Some(devnet_config.stacks_follower_image_url.clone()),
+            // domainname: Some(self.network_name.to_string()),
+            tty: None,
+            exposed_ports: Some(exposed_ports),
+            entrypoint: Some(vec![
+                "stacks-node".into(),
+                "start".into(),
+                "--config".into(),
+                "/src/stacks-follower/Follower.toml".into(),
+            ]),
+            env: Some(env),
+            host_config: Some(HostConfig {
+                auto_remove: Some(true),
+                binds: Some(binds),
+                network_mode: Some(self.network_name.clone()),
+                port_bindings: Some(port_bindings),
+                extra_hosts: Some(vec!["host.docker.internal:host-gateway".into()]),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+
+        Ok(config)
+    }
+
+    pub async fn prepare_stacks_follower_container(
+        &mut self,
+        boot_index: u32,
+        ctx: &Context,
+    ) -> Result<(), String> {
+        let (docker, devnet_config) = match (&self.docker_client, &self.network_config) {
+            (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
+                Some(ref devnet_config) => (docker, devnet_config),
+                _ => return Err("unable to get devnet configuration".into()),
+            },
+            _ => return Err("unable to get Docker client".into()),
+        };
+
+        let _info = docker
+            .create_image(
+                Some(CreateImageOptions {
+                    from_image: devnet_config.stacks_follower_image_url.clone(),
+                    platform: devnet_config.docker_platform.clone(),
+                    ..Default::default()
+                }),
+                None,
+                None,
+            )
+            .try_collect::<Vec<_>>()
+            .await
+            .map_err(|e| format!("unable to create image: {}", e))?;
+
+        let config = self.prepare_stacks_follower_config(boot_index)?;
+
+        let options = CreateContainerOptions {
+            name: format!("stacks-follower.{}", self.network_name),
+            platform: Some(devnet_config.docker_platform.to_string()),
+        };
+
+        let container = docker
+            .create_container::<String, String>(Some(options), config)
+            .await
+            .map_err(|e| format!("unable to create container: {}", e))?
+            .id;
+
+        ctx.try_log(|logger| {
+            slog::info!(logger, "Created container stacks-follower: {}", container)
+        });
+        self.stacks_follower_container_id = Some(container.clone());
+
+        Ok(())
+    }
+
+    pub async fn boot_stacks_follower_container(&mut self) -> Result<(), String> {
+        let container = match &self.stacks_follower_container_id {
             Some(container) => container.clone(),
             _ => return Err("unable to boot container".to_string()),
         };
@@ -2437,8 +2752,9 @@ events_keys = ["*"]
     }
 
     pub async fn stop_containers(&self) -> Result<(), String> {
-        let containers_ids = match (
+        let containers_id = [
             &self.stacks_node_container_id,
+            &self.stacks_follower_container_id,
             &self.stacks_signer_1_container_id,
             &self.stacks_signer_2_container_id,
             &self.stacks_api_container_id,
@@ -2446,61 +2762,26 @@ events_keys = ["*"]
             &self.bitcoin_node_container_id,
             &self.bitcoin_explorer_container_id,
             &self.postgres_container_id,
-        ) {
-            (Some(c1), Some(c2), Some(c3), Some(c4), Some(c5), Some(c6), Some(c7), Some(c8)) => {
-                (c1, c2, c3, c4, c5, c6, c7, c8)
-            }
-            _ => return Err("unable to boot container".to_string()),
+        ]
+        .iter()
+        .flat_map(|c| c.as_ref())
+        .collect::<Vec<_>>();
+
+        let stacks_node_c_id = match &self.stacks_node_container_id {
+            Some(c) => c,
+            _ => return Err("unable to get stacks-node container id".to_string()),
         };
-        let (
-            stacks_node_c_id,
-            stacks_signer_1_c_id,
-            stacks_signer_2_c_id,
-            stacks_api_c_id,
-            stacks_explorer_c_id,
-            bitcoin_node_c_id,
-            bitcoin_explorer_c_id,
-            postgres_c_id,
-        ) = containers_ids;
 
         let docker = match &self.docker_client {
             Some(ref docker) => docker,
             _ => return Err("unable to get Docker client".into()),
         };
 
-        let options = KillContainerOptions { signal: "SIGKILL" };
-
-        let _ = docker
-            .kill_container(stacks_node_c_id, Some(options.clone()))
-            .await;
-
-        let _ = docker
-            .kill_container(stacks_signer_1_c_id, Some(options.clone()))
-            .await;
-
-        let _ = docker
-            .kill_container(stacks_signer_2_c_id, Some(options.clone()))
-            .await;
-
-        let _ = docker
-            .kill_container(stacks_api_c_id, Some(options.clone()))
-            .await;
-
-        let _ = docker
-            .kill_container(stacks_explorer_c_id, Some(options.clone()))
-            .await;
-
-        let _ = docker
-            .kill_container(bitcoin_node_c_id, Some(options.clone()))
-            .await;
-
-        let _ = docker
-            .kill_container(bitcoin_explorer_c_id, Some(options.clone()))
-            .await;
-
-        let _ = docker
-            .kill_container(postgres_c_id, Some(options.clone()))
-            .await;
+        for id in containers_id {
+            let _ = docker
+                .kill_container(id, Some(KillContainerOptions { signal: "SIGKILL" }))
+                .await;
+        }
 
         let _ = docker
             .wait_container(stacks_node_c_id, None::<WaitContainerOptions<String>>)
@@ -2619,6 +2900,7 @@ events_keys = ["*"]
             self.stacks_api_container_id.clone(),
             self.postgres_container_id.clone(),
             self.stacks_node_container_id.clone(),
+            self.stacks_follower_container_id.clone(),
             self.stacks_signer_1_container_id.clone(),
             self.stacks_signer_2_container_id.clone(),
             self.subnet_node_container_id.clone(),
