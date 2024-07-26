@@ -40,7 +40,6 @@ impl GetChangesForRmContract {
         }
         let change = FileDeletion {
             comment: format!("{} tests/{}", red!("Deleted file"), name),
-            name,
             path: f.to_string(),
         };
         self.changes.push(Changes::RemoveFile(change));
@@ -56,7 +55,6 @@ impl GetChangesForRmContract {
         }
         let change = FileDeletion {
             comment: format!("{} contracts/{}", red!("Deleted file"), name),
-            name,
             path: f.to_string(),
         };
         self.changes.push(Changes::RemoveFile(change));
@@ -159,7 +157,6 @@ impl GetChangesForNewContract {
         }
         let change = FileCreation {
             comment: format!("{} contracts/{}", green!("Created file"), name),
-            name,
             content,
             path: new_file.to_string(),
         };
@@ -201,7 +198,6 @@ describe("example tests", () => {
         }
         let change = FileCreation {
             comment: format!("{} tests/{}", green!("Created file"), name),
-            name,
             content,
             path: new_file.to_string(),
         };

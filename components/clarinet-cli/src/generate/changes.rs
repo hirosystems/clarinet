@@ -5,7 +5,6 @@ use std::collections::HashMap;
 #[derive(Clone, Debug)]
 pub struct FileCreation {
     pub comment: String,
-    pub name: String,
     pub content: String,
     pub path: String,
 }
@@ -13,14 +12,12 @@ pub struct FileCreation {
 #[derive(Clone, Debug)]
 pub struct FileDeletion {
     pub comment: String,
-    pub name: String,
     pub path: String,
 }
 
 #[derive(Clone, Debug)]
 pub struct DirectoryCreation {
     pub comment: String,
-    pub name: String,
     pub path: String,
 }
 

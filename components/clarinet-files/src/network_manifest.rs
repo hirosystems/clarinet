@@ -475,10 +475,7 @@ impl NetworkManifest {
         };
 
         let devnet = if networks.1.is_devnet() {
-            let mut devnet_config = match network_manifest_file.devnet.take() {
-                Some(conf) => conf,
-                _ => DevnetConfigFile::default(),
-            };
+            let mut devnet_config = network_manifest_file.devnet.take().unwrap_or_default();
 
             if let Some(ref devnet_override) = devnet_override {
                 if let Some(ref val) = devnet_override.name {
@@ -764,7 +761,7 @@ impl NetworkManifest {
             let stacks_node_events_observers = devnet_config
                 .stacks_node_events_observers
                 .take()
-                .unwrap_or(vec![]);
+                .unwrap_or_default();
 
             let subnet_contract_id = devnet_config
                 .subnet_contract_id
@@ -877,7 +874,7 @@ impl NetworkManifest {
                     .subnet_api_postgres_database
                     .take()
                     .unwrap_or("subnet_api".to_string()),
-                execute_script: devnet_config.execute_script.take().unwrap_or(vec![]),
+                execute_script: devnet_config.execute_script.take().unwrap_or_default(),
                 bitcoin_node_image_url: devnet_config
                     .bitcoin_node_image_url
                     .take()
@@ -906,7 +903,7 @@ impl NetworkManifest {
                     .bitcoin_explorer_image_url
                     .take()
                     .unwrap_or(DEFAULT_BITCOIN_EXPLORER_IMAGE.to_string()),
-                pox_stacking_orders: devnet_config.pox_stacking_orders.take().unwrap_or(vec![]),
+                pox_stacking_orders: devnet_config.pox_stacking_orders.take().unwrap_or_default(),
                 disable_bitcoin_explorer: devnet_config.disable_bitcoin_explorer.unwrap_or(false),
                 disable_stacks_api: devnet_config.disable_stacks_api.unwrap_or(false),
                 disable_stacks_explorer: devnet_config.disable_stacks_explorer.unwrap_or(false),
@@ -927,7 +924,7 @@ impl NetworkManifest {
                 subnet_node_events_observers: devnet_config
                     .subnet_node_events_observers
                     .take()
-                    .unwrap_or(vec![]),
+                    .unwrap_or_default(),
                 subnet_contract_id,
                 remapped_subnet_contract_id,
                 subnet_api_image_url: devnet_config
@@ -951,14 +948,20 @@ impl NetworkManifest {
                 epoch_2_4: devnet_config.epoch_2_4.unwrap_or(DEFAULT_EPOCH_2_4),
                 epoch_2_5: devnet_config.epoch_2_5.unwrap_or(DEFAULT_EPOCH_2_5),
                 epoch_3_0: devnet_config.epoch_3_0.unwrap_or(DEFAULT_EPOCH_3_0),
-                stacks_node_env_vars: devnet_config.stacks_node_env_vars.take().unwrap_or(vec![]),
-                stacks_api_env_vars: devnet_config.stacks_api_env_vars.take().unwrap_or(vec![]),
+                stacks_node_env_vars: devnet_config
+                    .stacks_node_env_vars
+                    .take()
+                    .unwrap_or_default(),
+                stacks_api_env_vars: devnet_config.stacks_api_env_vars.take().unwrap_or_default(),
                 stacks_explorer_env_vars: devnet_config
                     .stacks_explorer_env_vars
                     .take()
-                    .unwrap_or(vec![]),
-                subnet_node_env_vars: devnet_config.subnet_node_env_vars.take().unwrap_or(vec![]),
-                subnet_api_env_vars: devnet_config.subnet_api_env_vars.take().unwrap_or(vec![]),
+                    .unwrap_or_default(),
+                subnet_node_env_vars: devnet_config
+                    .subnet_node_env_vars
+                    .take()
+                    .unwrap_or_default(),
+                subnet_api_env_vars: devnet_config.subnet_api_env_vars.take().unwrap_or_default(),
                 use_docker_gateway_routing: devnet_config
                     .use_docker_gateway_routing
                     .unwrap_or(false),
