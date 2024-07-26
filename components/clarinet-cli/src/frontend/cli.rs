@@ -1600,10 +1600,7 @@ fn execute_changes(changes: Vec<Changes>) -> bool {
                     }
                 };
 
-                let mut requirements = match config.project.requirements.take() {
-                    Some(requirements) => requirements,
-                    None => vec![],
-                };
+                let mut requirements = config.project.requirements.take().unwrap_or_default();
                 for requirement in options.requirements_to_add.drain(..) {
                     if !requirements.contains(&requirement) {
                         requirements.push(requirement);

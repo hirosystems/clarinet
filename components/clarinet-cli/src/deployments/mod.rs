@@ -9,14 +9,6 @@ use clarinet_deployments::types::{DeploymentGenerationArtifacts, DeploymentSpeci
 use clarinet_files::chainhook_types::StacksNetwork;
 use clarinet_files::{FileLocation, ProjectManifest};
 
-#[derive(Deserialize, Debug)]
-pub struct Balance {
-    pub balance: String,
-    pub nonce: u64,
-    pub balance_proof: String,
-    pub nonce_proof: String,
-}
-
 pub fn get_absolute_deployment_path(
     manifest: &ProjectManifest,
     relative_deployment_path: &str,

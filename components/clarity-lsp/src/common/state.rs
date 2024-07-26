@@ -578,22 +578,13 @@ impl ProtocolState {
                 Some(deps) => deps,
                 None => DependencySet::new(),
             };
-            let diags = match diags.remove(&contract_id) {
-                Some(diags) => diags,
-                None => vec![],
-            };
-            let analysis = match analyses.remove(&contract_id) {
-                Some(analysis) => analysis,
-                None => None,
-            };
+            let diags = diags.remove(&contract_id).unwrap_or_default();
+            let analysis = analyses.remove(&contract_id).unwrap_or_default();
             let clarity_version = match clarity_versions.remove(&contract_id) {
                 Some(analysis) => analysis,
                 None => DEFAULT_CLARITY_VERSION,
             };
-            let definitions = match definitions.remove(&contract_id) {
-                Some(definitions) => definitions,
-                None => HashMap::new(),
-            };
+            let definitions = definitions.remove(&contract_id).unwrap_or_default();
 
             let contract_state = ContractState::new(
                 contract_id.clone(),

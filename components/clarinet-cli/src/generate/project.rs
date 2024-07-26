@@ -62,7 +62,6 @@ impl GetChangesForNewProject {
     fn create_root_directory(&mut self) {
         let change = DirectoryCreation {
             comment: format!("{} {}", green!("Created directory"), self.project_name),
-            name: self.project_name.clone(),
             path: self.project_path.clone(),
         };
         self.changes.push(Changes::AddDirectory(change));
@@ -522,7 +521,6 @@ export default defineConfig({
         let dir = format!("{}/{}", self.project_path, name);
         Changes::AddDirectory(DirectoryCreation {
             comment: format!("{} {}", green!("Created directory"), name),
-            name,
             path: dir,
         })
     }
@@ -532,7 +530,6 @@ export default defineConfig({
 
         Changes::AddFile(FileCreation {
             comment: format!("{} {}", green!("Created file"), name),
-            name,
             content,
             path,
         })
