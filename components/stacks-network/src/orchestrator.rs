@@ -1108,10 +1108,10 @@ microblock_frequency = 1000
 # inv_sync_interval = 10
 # download_interval = 10
 # walk_interval = 10
-disable_block_download = true
-disable_inbound_handshakes = true
-disable_inbound_walks = true
-public_ip_address = "1.1.1.1:1234"
+# disable_block_download = true
+# disable_inbound_handshakes = true
+# disable_inbound_walks = true
+# public_ip_address = "1.1.1.1:1234"
 block_proposal_token = "12345"
 
 [miner]
@@ -1435,7 +1435,7 @@ start_height = {epoch_3_0}
         &self,
         boot_index: u32,
     ) -> Result<Config<String>, String> {
-        let (_, devnet_config) = match &self.network_config {
+        let (network_config, devnet_config) = match &self.network_config {
             Some(ref network_config) => match network_config.devnet {
                 Some(ref devnet_config) => (network_config, devnet_config),
                 _ => return Err("unable to get devnet configuration".into()),
@@ -1476,6 +1476,18 @@ bootstrap_node = "{boostrap_node_public_key}@host.docker.internal:{stacks_node_p
             stacks_follower_p2p_port = devnet_config.stacks_follower_p2p_port,
             stacks_node_p2p_port = devnet_config.stacks_node_p2p_port,
         );
+
+        for (_, account) in network_config.accounts.iter() {
+            stacks_follower_conf.push_str(&format!(
+                r#"
+[[ustx_balance]]
+address = "{}"
+amount = {}
+"#,
+                account.stx_address, account.balance
+            ));
+        }
+
 
         stacks_follower_conf.push_str(&format!(
             r#"
