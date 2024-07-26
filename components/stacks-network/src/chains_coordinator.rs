@@ -308,7 +308,7 @@ pub async fn start_chains_coordinator(
                         let bitcoin_block_height = tip.block_identifier.index;
                         let log = format!("Bitcoin block #{} received", bitcoin_block_height);
                         let comment =
-                            format!("mining blocks (chaintip = #{})", bitcoin_block_height);
+                            format!("mining blocks (chain_tip = #{})", bitcoin_block_height);
 
                         // Stacking orders can't be published until devnet is ready
                         if bitcoin_block_height >= DEFAULT_FIRST_BURN_HEADER_HEIGHT + 10 {
@@ -337,8 +337,10 @@ pub async fn start_chains_coordinator(
                             "Bitcoin reorg received (new height: {})",
                             tip.block_identifier.index
                         );
-                        let status =
-                            format!("mining blocks (chaintip = #{})", tip.block_identifier.index);
+                        let status = format!(
+                            "mining blocks (chain_tip = #{})",
+                            tip.block_identifier.index
+                        );
                         (log, status)
                     }
                 };
@@ -399,7 +401,7 @@ pub async fn start_chains_coordinator(
                     "stacks-node",
                     Status::Green,
                     &format!(
-                        "mining blocks (chaintip = #{})",
+                        "mining blocks (chain_tip = #{})",
                         known_tip.block.block_identifier.index
                     ),
                 );
