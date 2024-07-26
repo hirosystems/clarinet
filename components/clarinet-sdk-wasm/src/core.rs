@@ -576,6 +576,18 @@ impl SDK {
         session.interpreter.get_block_height()
     }
 
+    #[wasm_bindgen(getter, js_name=stacksBlockHeight)]
+    pub fn stacks_block_height(&mut self) -> u32 {
+        let session = self.get_session_mut();
+        session.interpreter.get_block_height()
+    }
+
+    #[wasm_bindgen(getter, js_name=burnBlockHeight)]
+    pub fn burn_block_height(&mut self) -> u32 {
+        let session = self.get_session_mut();
+        session.interpreter.get_burn_block_height()
+    }
+
     #[wasm_bindgen(getter, js_name=currentEpoch)]
     pub fn current_epoch(&mut self) -> String {
         let session = self.get_session_mut();
@@ -911,14 +923,39 @@ impl SDK {
 
     #[wasm_bindgen(js_name=mineEmptyBlock)]
     pub fn mine_empty_block(&mut self) -> u32 {
-        let session = self.get_session_mut();
-        session.advance_chain_tip(1)
+        self.mine_empty_burn_block()
     }
-
     #[wasm_bindgen(js_name=mineEmptyBlocks)]
     pub fn mine_empty_blocks(&mut self, count: Option<u32>) -> u32 {
+        self.mine_empty_burn_blocks(count)
+    }
+    #[wasm_bindgen(js_name=mineEmptyStacksBlock)]
+    pub fn mine_empty_stacks_block(&mut self) -> Result<u32, String> {
         let session = self.get_session_mut();
-        session.advance_chain_tip(count.unwrap_or(1))
+        match session.advance_stacks_chain_tip(1) {
+            Ok(new_height) => Ok(new_height),
+            Err(_) => Err("use mineEmptyBurnBlock in epoch lower than 3.0".to_string()),
+        }
+    }
+
+    #[wasm_bindgen(js_name=mineEmptyStacksBlocks)]
+    pub fn mine_empty_stacks_blocks(&mut self, count: Option<u32>) -> Result<u32, String> {
+        let session = self.get_session_mut();
+        match session.advance_stacks_chain_tip(count.unwrap_or(1)) {
+            Ok(new_height) => Ok(new_height),
+            Err(_) => Err("use mineEmptyBurnBlocks in epoch lower than 3.0".to_string()),
+        }
+    }
+
+    #[wasm_bindgen(js_name=mineEmptyBurnBlock)]
+    pub fn mine_empty_burn_block(&mut self) -> u32 {
+        let session = self.get_session_mut();
+        session.advance_burn_chain_tip(1)
+    }
+    #[wasm_bindgen(js_name=mineEmptyBurnBlocks)]
+    pub fn mine_empty_burn_blocks(&mut self, count: Option<u32>) -> u32 {
+        let session = self.get_session_mut();
+        session.advance_burn_chain_tip(count.unwrap_or(1))
     }
 
     #[wasm_bindgen(js_name=runSnippet)]

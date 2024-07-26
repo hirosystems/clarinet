@@ -1099,10 +1099,30 @@ impl ClarityInterpreter {
     }
 
     pub fn advance_chain_tip(&mut self, count: u32) -> u32 {
-        self.burn_datastore.advance_chain_tip(count);
-        let new_height = self.datastore.advance_chain_tip(count);
+        let current_epoch = self.burn_datastore.get_current_epoch();
+        if current_epoch < StacksEpochId::Epoch30 {
+            self.advance_burn_chain_tip(count)
+        } else {
+            match self.advance_stacks_chain_tip(count) {
+                Ok(count) => count,
+                Err(_) => unreachable!("Epoch checked already"),
+            }
+        }
+    }
+
+    pub fn advance_burn_chain_tip(&mut self, count: u32) -> u32 {
+        let new_height = self.burn_datastore.advance_chain_tip(count);
+        let _ = self.datastore.advance_chain_tip(count);
         self.set_tenure_height();
         new_height
+    }
+    pub fn advance_stacks_chain_tip(&mut self, count: u32) -> Result<u32, String> {
+        let current_epoch = self.burn_datastore.get_current_epoch();
+        if current_epoch < StacksEpochId::Epoch30 {
+            Err("only burn chain height can be advanced in epoch lower than 3.0".to_string())
+        } else {
+            Ok(self.datastore.advance_chain_tip(count))
+        }
     }
 
     pub fn set_tenure_height(&mut self) {
@@ -1120,6 +1140,10 @@ impl ClarityInterpreter {
 
     pub fn get_block_height(&mut self) -> u32 {
         self.datastore.get_current_block_height()
+    }
+
+    pub fn get_burn_block_height(&mut self) -> u32 {
+        self.burn_datastore.get_current_block_height()
     }
 
     fn credit_token(&mut self, account: String, token: String, value: u128) {
@@ -1184,6 +1208,7 @@ impl ClarityInterpreter {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::analysis::Settings as AnalysisSettings;
     use crate::{
         repl::session::BOOT_CONTRACTS_DATA, test_fixtures::clarity_contract::ClarityContractBuilder,
     };
@@ -1260,13 +1285,67 @@ mod tests {
     }
 
     #[test]
+    fn test_advance_stacks_chain_tip_pre_epoch_3() {
+        let mut interpreter =
+            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        interpreter
+            .burn_datastore
+            .set_current_epoch(StacksEpochId::Epoch2_05);
+        let count = 5;
+        let initial_block_height = interpreter.get_burn_block_height();
+        assert_ne!(interpreter.advance_stacks_chain_tip(count), Ok(count));
+        assert_eq!(interpreter.get_burn_block_height(), initial_block_height);
+        assert_eq!(interpreter.get_block_height(), initial_block_height);
+    }
+    #[test]
+    fn test_advance_stacks_chain_tip() {
+        let wasm_settings = Settings {
+            analysis: AnalysisSettings::default(),
+            clarity_wasm_mode: true,
+            show_timings: false,
+        };
+        let mut interpreter =
+            ClarityInterpreter::new(StandardPrincipalData::transient(), wasm_settings);
+        interpreter
+            .burn_datastore
+            .set_current_epoch(StacksEpochId::Epoch30);
+        let count = 5;
+        let initial_block_height = interpreter.get_burn_block_height();
+        assert_eq!(interpreter.advance_stacks_chain_tip(count), Ok(count));
+        assert_eq!(interpreter.get_burn_block_height(), initial_block_height);
+        assert_eq!(interpreter.get_block_height(), initial_block_height + count);
+    }
+    #[test]
+    fn test_advance_chain_tip_pre_epoch3() {
+        let mut interpreter =
+            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        interpreter
+            .burn_datastore
+            .set_current_epoch(StacksEpochId::Epoch2_05);
+        let count = 5;
+        let initial_block_height = interpreter.get_block_height();
+        interpreter.advance_burn_chain_tip(count);
+        assert_eq!(interpreter.get_block_height(), initial_block_height + count);
+        assert_eq!(
+            interpreter.get_burn_block_height(),
+            initial_block_height + count
+        );
+    }
+    #[test]
     fn test_advance_chain_tip() {
         let mut interpreter =
             ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        interpreter
+            .burn_datastore
+            .set_current_epoch(StacksEpochId::Epoch30);
         let count = 5;
         let initial_block_height = interpreter.get_block_height();
-        interpreter.advance_chain_tip(count);
+        interpreter.advance_burn_chain_tip(count);
         assert_eq!(interpreter.get_block_height(), initial_block_height + count);
+        assert_eq!(
+            interpreter.get_burn_block_height(),
+            initial_block_height + count
+        );
     }
 
     #[test]
@@ -1730,7 +1809,7 @@ mod tests {
             ),
         );
 
-        interpreter.advance_chain_tip(10);
+        interpreter.advance_burn_chain_tip(10);
 
         let result = interpreter.call_contract_fn(
             &contract_id,
@@ -1762,7 +1841,7 @@ mod tests {
         let mut interpreter =
             ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
 
-        interpreter.advance_chain_tip(1);
+        interpreter.advance_burn_chain_tip(1);
 
         let snippet = [
             "(define-read-only (get-height)",
@@ -1815,7 +1894,7 @@ mod tests {
         let mut interpreter =
             ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
 
-        interpreter.advance_chain_tip(1);
+        interpreter.advance_burn_chain_tip(1);
 
         let snippet = [
             "(define-read-only (get-height)",
@@ -1868,7 +1947,7 @@ mod tests {
             ),
         );
 
-        interpreter.advance_chain_tip(10);
+        interpreter.advance_burn_chain_tip(10);
 
         let result = interpreter.call_contract_fn(
             &contract_id,

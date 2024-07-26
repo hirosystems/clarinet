@@ -353,10 +353,7 @@ impl EvalHook for TestCoverageReport {
         expr: &SymbolicExpression,
     ) {
         let contract = &env.contract_context.contract_identifier;
-        let mut contract_report = match self.contracts_coverage.remove(contract) {
-            Some(e) => e,
-            _ => HashMap::new(),
-        };
+        let mut contract_report = self.contracts_coverage.remove(contract).unwrap_or_default();
         report_eval(&mut contract_report, expr);
         self.contracts_coverage
             .insert(contract.clone(), contract_report);
