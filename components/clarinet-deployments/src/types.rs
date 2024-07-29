@@ -921,6 +921,21 @@ pub struct DeploymentSpecification {
     pub contracts: BTreeMap<QualifiedContractIdentifier, (String, FileLocation)>,
 }
 
+impl Default for DeploymentSpecification {
+    fn default() -> Self {
+        DeploymentSpecification {
+            id: 1,
+            name: "Default".to_string(),
+            network: StacksNetwork::Devnet,
+            stacks_node: None,
+            bitcoin_node: None,
+            genesis: None,
+            plan: TransactionPlanSpecification { batches: vec![] },
+            contracts: BTreeMap::new(),
+        }
+    }
+}
+
 pub mod contracts_serde {
     use base64::{engine::general_purpose::STANDARD as b64, Engine as _};
     use clarinet_files::FileLocation;

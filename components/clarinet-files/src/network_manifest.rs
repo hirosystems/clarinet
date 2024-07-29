@@ -183,6 +183,22 @@ pub struct NetworkManifest {
     pub devnet: Option<DevnetConfig>,
 }
 
+impl Default for NetworkManifest {
+    fn default() -> Self {
+        Self {
+            network: NetworkConfig {
+                name: "Default".to_string(),
+                stacks_node_rpc_address: None,
+                bitcoin_node_rpc_address: None,
+                deployment_fee_rate: 1,
+                sats_per_bytes: 1,
+            },
+            accounts: BTreeMap::new(),
+            devnet: None, // Some(DevnetConfig::default()), // this is not really optional
+        }
+    }
+}
+
 pub mod accounts_serde {
     use std::collections::BTreeMap;
 

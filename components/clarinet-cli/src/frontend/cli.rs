@@ -40,7 +40,6 @@ use stacks_network::{self, DevnetOrchestrator};
 use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::prelude::*;
-use std::path::PathBuf;
 use std::{env, process};
 use toml;
 
@@ -1791,7 +1790,6 @@ fn display_deploy_hint() {
 fn devnet_start(cmd: DevnetStart, global_settings: GlobalSettings) {
     let manifest = if cmd.default_settings {
         let project_root_location = FileLocation::from_path(
-            // PathBuf::from(".");
             std::env::current_dir().expect("Failed to get current directory"),
         );
         println!("Using default project manifest");
@@ -1816,6 +1814,8 @@ fn devnet_start(cmd: DevnetStart, global_settings: GlobalSettings) {
                 let deployment: ConfigurationPackage = serde_json::from_reader(package_file)
                     .expect("error while reading deployment specification");
                 Some(Ok(deployment.deployment_plan))
+            } else if cmd.default_settings {
+                Some(Ok(DeploymentSpecification::default()))
             } else {
                 load_deployment_if_exists(
                     &manifest,
@@ -1862,6 +1862,7 @@ fn devnet_start(cmd: DevnetStart, global_settings: GlobalSettings) {
             }
         }
         Some(deployment_plan_path) => {
+            println!("before get absolute");
             let deployment_path = get_absolute_deployment_path(&manifest, &deployment_plan_path)
                 .expect("unable to retrieve deployment");
             load_deployment(&manifest, &deployment_path)
@@ -1876,13 +1877,14 @@ fn devnet_start(cmd: DevnetStart, global_settings: GlobalSettings) {
         }
     };
 
-    let orchestrator = match DevnetOrchestrator::new(manifest, None, None, true) {
-        Ok(orchestrator) => orchestrator,
-        Err(e) => {
-            eprintln!("{}", format_err!(e));
-            process::exit(1);
-        }
-    };
+    let orchestrator =
+        match DevnetOrchestrator::new(manifest, Some(NetworkManifest::default()), None, true) {
+            Ok(orchestrator) => orchestrator,
+            Err(e) => {
+                eprintln!("{}", format_err!(e));
+                process::exit(1);
+            }
+        };
 
     if orchestrator.manifest.project.telemetry {
         #[cfg(feature = "telemetry")]
@@ -1893,7 +1895,14 @@ fn devnet_start(cmd: DevnetStart, global_settings: GlobalSettings) {
             ),
         ));
     }
-    match start(orchestrator, deployment, None, !cmd.no_dashboard) {
+    println!("before start");
+    match start(
+        orchestrator,
+        deployment,
+        None,
+        !cmd.no_dashboard,
+        cmd.default_settings,
+    ) {
         Err(e) => {
             eprintln!("{}", format_err!(e));
             process::exit(1);
