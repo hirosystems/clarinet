@@ -112,8 +112,7 @@ fn draw_devnet_status(f: &mut Frame, app: &mut App, area: Rect) {
         .style(Style::default().fg(Color::White))
         .borders(Borders::ALL)
         .title("Stacks Devnet");
-    let mut inner_area = block.inner(area);
-    inner_area.height = inner_area.height.saturating_sub(1);
+    let inner_area = block.inner(area);
     f.render_widget(block, area);
 
     let logs_component = List::new(logs).direction(ListDirection::BottomToTop);

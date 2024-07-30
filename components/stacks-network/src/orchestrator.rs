@@ -1059,7 +1059,7 @@ local_peer_seed = "{miner_secret_key_hex}"
 pox_sync_sample_secs = 0
 wait_time_for_blocks = 0
 wait_time_for_microblocks = 0
-next_initiative_delay = 4000
+next_initiative_delay = {next_initiative_delay}
 mine_microblocks = false
 microblock_frequency = 1000
 
@@ -1086,6 +1086,7 @@ mining_key = "19ec1c3e31d139c989a23a27eac60d1abfad5277d3ae9604242514c738258efa01
             stacks_node_rpc_port = devnet_config.stacks_node_rpc_port,
             stacks_node_p2p_port = devnet_config.stacks_node_p2p_port,
             miner_secret_key_hex = devnet_config.miner_secret_key_hex,
+            next_initiative_delay = devnet_config.stacks_node_next_initiative_delay,
             first_attempt_time_ms = devnet_config.stacks_node_first_attempt_time_ms,
             subsequent_attempt_time_ms = devnet_config.stacks_node_subsequent_attempt_time_ms,
             miner_coinbase_recipient = devnet_config.miner_coinbase_recipient,
@@ -2757,6 +2758,7 @@ events_keys = ["*"]
 
         let mut error_count = 0;
         loop {
+            let _ = devnet_event_tx.send(DevnetEvent::info("A - Generating blocks".to_string()));
             let rpc_call = base_builder(
                 &bitcoin_node_url,
                 &devnet_config.bitcoin_node_username,
@@ -2789,6 +2791,7 @@ events_keys = ["*"]
 
         let mut error_count = 0;
         loop {
+            let _ = devnet_event_tx.send(DevnetEvent::info("B - Generating blocks".to_string()));
             let rpc_call = base_builder(
                 &bitcoin_node_url,
                 &devnet_config.bitcoin_node_username,
@@ -2821,6 +2824,7 @@ events_keys = ["*"]
 
         let mut error_count = 0;
         loop {
+            let _ = devnet_event_tx.send(DevnetEvent::info("C - Generating blocks".to_string()));
             let rpc_call = base_builder(
                 &bitcoin_node_url,
                 &devnet_config.bitcoin_node_username,
