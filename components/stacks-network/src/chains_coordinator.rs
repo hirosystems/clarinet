@@ -439,7 +439,7 @@ pub async fn start_chains_coordinator(
                 if !boot_completed.load(Ordering::SeqCst) {
                     let _ = devnet_event_tx
                         .send(DevnetEvent::info("1 - Waiting for boot mining".to_string()));
-                    std::thread::sleep(std::time::Duration::from_millis(2000));
+                    std::thread::sleep(std::time::Duration::from_secs(1));
                     let _ = devnet_event_tx
                         .send(DevnetEvent::info("1 - Trigger boot mining".to_string()));
                     let res = mine_bitcoin_block(
