@@ -86,6 +86,7 @@ pub struct DevnetConfigFile {
     pub stacks_node_first_attempt_time_ms: Option<u32>,
     pub stacks_node_subsequent_attempt_time_ms: Option<u32>,
     pub stacks_node_env_vars: Option<Vec<String>>,
+    pub stacks_node_next_initiative_delay: Option<u16>,
     pub stacks_api_env_vars: Option<Vec<String>>,
     pub stacks_explorer_env_vars: Option<Vec<String>>,
     pub subnet_node_env_vars: Option<Vec<String>>,
@@ -243,6 +244,7 @@ pub struct DevnetConfig {
     pub stacks_node_subsequent_attempt_time_ms: u32,
     pub stacks_node_events_observers: Vec<String>,
     pub stacks_node_env_vars: Vec<String>,
+    pub stacks_node_next_initiative_delay: u16,
     pub stacks_api_port: u16,
     pub stacks_api_events_port: u16,
     pub stacks_api_env_vars: Vec<String>,
@@ -508,6 +510,10 @@ impl NetworkManifest {
 
                 if let Some(ref val) = devnet_override.stacks_node_events_observers {
                     devnet_config.stacks_node_events_observers = Some(val.clone());
+                }
+
+                if let Some(val) = devnet_override.stacks_node_next_initiative_delay {
+                    devnet_config.stacks_node_next_initiative_delay = Some(val);
                 }
 
                 if let Some(val) = devnet_override.stacks_api_port {
@@ -835,6 +841,9 @@ impl NetworkManifest {
                 stacks_node_subsequent_attempt_time_ms: devnet_config
                     .stacks_node_subsequent_attempt_time_ms
                     .unwrap_or(1_000),
+                stacks_node_next_initiative_delay: devnet_config
+                    .stacks_node_next_initiative_delay
+                    .unwrap_or(4000),
                 stacks_api_port: devnet_config.stacks_api_port.unwrap_or(3999),
                 stacks_api_events_port: devnet_config.stacks_api_events_port.unwrap_or(3700),
                 stacks_explorer_port: devnet_config.stacks_explorer_port.unwrap_or(8000),

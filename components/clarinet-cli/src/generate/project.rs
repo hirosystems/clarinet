@@ -341,7 +341,6 @@ disable_stacks_api = false
 # subnet_api_image_url = "{default_subnet_api_image}"
 # subnet_api_postgres_database = "subnet_api"
 
-# For testing in epoch 2.1 / using Clarity2
 # epoch_2_0 = {DEFAULT_EPOCH_2_0}
 # epoch_2_05 = {DEFAULT_EPOCH_2_05}
 # epoch_2_1 = {DEFAULT_EPOCH_2_1}
@@ -349,6 +348,7 @@ disable_stacks_api = false
 # epoch_2_3 = {DEFAULT_EPOCH_2_3}
 # epoch_2_4 = {DEFAULT_EPOCH_2_4}
 # epoch_2_5 = {DEFAULT_EPOCH_2_5}
+# epoch_3_0 = 144
 
 
 # Send some stacking orders
