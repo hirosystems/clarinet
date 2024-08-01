@@ -693,7 +693,7 @@ checksum = "fd16c4719339c4530435d38e511904438d07cce7950afa3718a84ac36c10e89e"
 [[package]]
 name = "chainhook-sdk"
 version = "0.12.11"
-source = "git+https://github.com/hirosystems/chainhook.git#138b3eaf103ae922cc3202f34d43ced370d1ba18"
+source = "git+https://github.com/hirosystems/chainhook.git#c9675894655293167be51d29d3c935eb10c3e195"
 dependencies = [
  "base58 0.2.0",
  "base64 0.21.7",
@@ -728,7 +728,7 @@ dependencies = [
 [[package]]
 name = "chainhook-types"
 version = "1.3.7"
-source = "git+https://github.com/hirosystems/chainhook.git#138b3eaf103ae922cc3202f34d43ced370d1ba18"
+source = "git+https://github.com/hirosystems/chainhook.git#c9675894655293167be51d29d3c935eb10c3e195"
 dependencies = [
  "hex",
  "schemars",
@@ -815,7 +815,7 @@ checksum = "4b82cf0babdbd58558212896d1a4272303a57bdb245c2bf1147185fb45640e70"
 [[package]]
 name = "clar2wasm"
 version = "0.1.0"
-source = "git+https://github.com/stacks-network/clarity-wasm.git?branch=main#a25cd4086a1817b62f7eb4eb2a40791e62fcfbb3"
+source = "git+https://github.com/stacks-network/clarity-wasm.git?branch=main#8ce55662ed0c8ebd467b19bad8e7047f21154986"
 dependencies = [
  "chrono",
  "clap",
@@ -832,7 +832,7 @@ dependencies = [
 
 [[package]]
 name = "clarinet-cli"
-version = "2.7.0"
+version = "2.8.0"
 dependencies = [
  "ansi_term",
  "atty",
@@ -865,7 +865,7 @@ dependencies = [
 
 [[package]]
 name = "clarinet-deployments"
-version = "2.7.0"
+version = "2.8.0"
 dependencies = [
  "base58 0.2.0",
  "base64 0.21.7",
@@ -890,7 +890,7 @@ dependencies = [
 
 [[package]]
 name = "clarinet-files"
-version = "2.7.0"
+version = "2.8.0"
 dependencies = [
  "bip39",
  "bitcoin 0.29.2",
@@ -913,7 +913,7 @@ dependencies = [
 
 [[package]]
 name = "clarinet-sdk-wasm"
-version = "2.8.0-beta6"
+version = "2.8.0"
 dependencies = [
  "clarinet-deployments",
  "clarinet-files",
@@ -942,7 +942,7 @@ dependencies = [
 [[package]]
 name = "clarity"
 version = "2.3.0"
-source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-develop#6eb4a2377cb8d18275280530abb6044dee9081ee"
+source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-develop#716041844d450d28526156d3d0462f5e8eea08e8"
 dependencies = [
  "getrandom 0.2.8",
  "hashbrown 0.14.3",
@@ -966,7 +966,7 @@ dependencies = [
 
 [[package]]
 name = "clarity-events"
-version = "2.7.0"
+version = "2.8.0"
 dependencies = [
  "clap",
  "clarinet-files",
@@ -978,7 +978,7 @@ dependencies = [
 
 [[package]]
 name = "clarity-lsp"
-version = "2.7.0"
+version = "2.8.0"
 dependencies = [
  "clarinet-deployments",
  "clarinet-files",
@@ -998,7 +998,7 @@ dependencies = [
 
 [[package]]
 name = "clarity-repl"
-version = "2.7.0"
+version = "2.8.0"
 dependencies = [
  "ansi_term",
  "atty",
@@ -2864,7 +2864,7 @@ dependencies = [
 [[package]]
 name = "libstackerdb"
 version = "0.0.1"
-source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-develop#6eb4a2377cb8d18275280530abb6044dee9081ee"
+source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-develop#716041844d450d28526156d3d0462f5e8eea08e8"
 dependencies = [
  "clarity",
  "secp256k1 0.24.3",
@@ -3582,7 +3582,7 @@ checksum = "439ee305def115ba05938db6eb1644ff94165c5ab5e9420d1c1bcedbba909391"
 [[package]]
 name = "pox-locking"
 version = "2.4.0"
-source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-develop#6eb4a2377cb8d18275280530abb6044dee9081ee"
+source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-develop#716041844d450d28526156d3d0462f5e8eea08e8"
 dependencies = [
  "clarity",
  "slog",
@@ -4843,7 +4843,7 @@ dependencies = [
 
 [[package]]
 name = "stacks-codec"
-version = "2.7.0"
+version = "2.8.0"
 dependencies = [
  "clarity",
  "serde",
@@ -4853,7 +4853,7 @@ dependencies = [
 [[package]]
 name = "stacks-common"
 version = "0.0.2"
-source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-develop#6eb4a2377cb8d18275280530abb6044dee9081ee"
+source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-develop#716041844d450d28526156d3d0462f5e8eea08e8"
 dependencies = [
  "chrono",
  "curve25519-dalek 2.0.0",
@@ -4884,7 +4884,7 @@ dependencies = [
 
 [[package]]
 name = "stacks-devnet-js"
-version = "2.7.0"
+version = "2.8.0"
 dependencies = [
  "clarinet-deployments",
  "clarinet-files",
@@ -4898,7 +4898,7 @@ dependencies = [
 
 [[package]]
 name = "stacks-network"
-version = "2.7.0"
+version = "2.8.0"
 dependencies = [
  "ansi_term",
  "atty",
@@ -4935,7 +4935,7 @@ dependencies = [
 
 [[package]]
 name = "stacks-rpc-client"
-version = "2.7.0"
+version = "2.8.0"
 dependencies = [
  "clarity",
  "hmac 0.12.1",
@@ -4953,7 +4953,7 @@ dependencies = [
 [[package]]
 name = "stackslib"
 version = "0.0.1"
-source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-develop#6eb4a2377cb8d18275280530abb6044dee9081ee"
+source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-develop#716041844d450d28526156d3d0462f5e8eea08e8"
 dependencies = [
  "chrono",
  "clar2wasm",
