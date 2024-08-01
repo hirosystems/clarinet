@@ -1,6 +1,7 @@
 use std::convert::TryInto;
 
 use crate::analysis;
+use clarity::address::b58::from;
 use clarity::types::chainstate::StacksAddress;
 use clarity::types::StacksEpochId;
 use clarity::vm::types::{PrincipalData, QualifiedContractIdentifier, StandardPrincipalData};
@@ -53,9 +54,19 @@ pub struct SessionSettings {
     pub epoch_id: Option<StacksEpochId>,
 }
 
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct ApiUrl(String);
+
+impl Default for ApiUrl {
+    fn default() -> Self {
+        ApiUrl("http://api.hiro.so".to_string())
+    }
+}
+
 #[derive(Debug, Default, Clone, Deserialize, Serialize)]
 pub struct Settings {
     pub analysis: analysis::Settings,
+    pub network_simulation: NetworkSimulationSettings,
     #[serde(skip_serializing, skip_deserializing)]
     pub clarity_wasm_mode: bool,
     #[serde(skip_serializing, skip_deserializing)]
@@ -64,20 +75,58 @@ pub struct Settings {
 
 #[derive(Debug, Default, Clone, Deserialize, Serialize)]
 pub struct SettingsFile {
-    pub analysis: Option<analysis::SettingsFile>,
+    analysis: Option<analysis::SettingsFile>,
+    network_simulation: Option<NetworkSimulationSettingsFile>,
 }
 
 impl From<SettingsFile> for Settings {
     fn from(file: SettingsFile) -> Self {
-        let analysis = if let Some(analysis) = file.analysis {
-            analysis::Settings::from(analysis)
-        } else {
-            analysis::Settings::default()
-        };
+        let analysis = file
+            .analysis
+            .map(analysis::Settings::from)
+            .unwrap_or_default();
+
+        let network_simulation = file
+            .network_simulation
+            .map(NetworkSimulationSettings::from)
+            .unwrap_or_default();
+
         Self {
             analysis,
+            network_simulation,
             clarity_wasm_mode: false,
             show_timings: false,
+        }
+    }
+}
+
+// #[derive(Debug, Default, Clone, Deserialize, Serialize)]
+// pub struct SimnetSettingsFile {
+//     network_simulation: NetworkSimulationSettingsFile,
+// }
+
+#[derive(Debug, Default, Clone, Deserialize, Serialize)]
+pub struct NetworkSimulationSettingsFile {
+    enabled: Option<bool>,
+    api_url: Option<ApiUrl>,
+}
+
+// #[derive(Debug, Default, Clone, Deserialize, Serialize)]
+// pub struct SimnetSettings {
+//     pub network_simulation: NetworkSimulationSettings,
+// }
+
+#[derive(Debug, Default, Clone, Deserialize, Serialize)]
+pub struct NetworkSimulationSettings {
+    pub enabled: bool,
+    pub api_url: ApiUrl,
+}
+
+impl From<NetworkSimulationSettingsFile> for NetworkSimulationSettings {
+    fn from(file: NetworkSimulationSettingsFile) -> Self {
+        Self {
+            enabled: file.enabled.unwrap_or_default(),
+            api_url: file.api_url.unwrap_or_default(),
         }
     }
 }

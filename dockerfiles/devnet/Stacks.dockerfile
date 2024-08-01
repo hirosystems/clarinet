@@ -3,14 +3,14 @@ FROM rust:bookworm as builder
 ARG GIT_COMMIT
 RUN test -n "$GIT_COMMIT" || (echo "GIT_COMMIT not set" && false)
 
-RUN echo "Building stacks-node from commit: https://github.com/stacks-network/stacks-blockchain/commit/$GIT_COMMIT"
+RUN echo "Building stacks-node from commit: https://github.com/hugocaillard/stacks-core/commit/$GIT_COMMIT"
 
 RUN apt-get update && apt-get install -y libclang-dev
 RUN rustup toolchain install stable
 
 WORKDIR /stacks
 RUN git init && \
-    git remote add origin https://github.com/stacks-network/stacks-blockchain.git && \
+    git remote add origin https://github.com/hugocaillard/stacks-core.git && \
     git -c protocol.version=2 fetch --depth=1 origin "$GIT_COMMIT" && \
     git reset --hard FETCH_HEAD
 
