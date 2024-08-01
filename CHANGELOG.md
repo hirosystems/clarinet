@@ -1,3 +1,26 @@
+# [2.8.0](https://github.com/hirosystems/clarinet/compare/v2.7.0...v2.8.0) (2024-08-01)
+
+##### New Features
+
+*  Add `stacks_node_next_initiative_delay` in devnet config (#1523) (56f7c469)
+*  Advance burn and stacks chain tips independently (#1506) (efeadc5c)
+*  Clarinet sdk browser (#1448) (19824418)
+
+##### Chores
+
+*  Update time version (#1525) (428afdc6)
+*  Clippy warning v1.80 (#1518) (445ea332)
+*  Update reqwest and tokio version and other dependencies (#1510) (bce1a301)
+
+##### Documentation Changes
+
+*  Fix cbtc example (#1492) (978ee627)
+
+##### Bug Fixes
+
+*  Improve vitest matcher sources resolver (#1514) (0cd1b950)
+*  Testnet.toml path in project creation template (#1504) (b37d9f82)
+
 # [2.7.0](https://github.com/hirosystems/clarinet/compare/v2.6.0...v2.7.0) (2024-06-28)
 
 ##### New Features
