@@ -1,7 +1,6 @@
 [package]
 name = "clarinet-sdk-wasm"
-# version.workspace = true
-version = "2.8.0-beta6"
+version.workspace = true
 edition = "2021"
 license = "GPL-3.0"
 repository = "https://github.com/hirosystems/clarinet"

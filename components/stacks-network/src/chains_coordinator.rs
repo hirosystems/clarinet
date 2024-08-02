@@ -6,6 +6,7 @@ use crate::event::Status;
 use crate::orchestrator::ServicesMapHosts;
 
 use base58::FromBase58;
+use bitcoincore_rpc::bitcoin::Address;
 use chainhook_sdk::chainhooks::types::ChainhookStore;
 use chainhook_sdk::observer::{
     start_event_observer, EventObserverConfig, ObserverCommand, ObserverEvent,
@@ -34,6 +35,7 @@ use clarity::vm::Value as ClarityValue;
 use hiro_system_kit;
 use hiro_system_kit::slog;
 use hiro_system_kit::yellow;
+use serde_json::json;
 use stacks_rpc_client::rpc_client::PoxInfo;
 use stacks_rpc_client::StacksRpc;
 use stackslib::chainstate::stacks::address::PoxAddress;
@@ -44,6 +46,7 @@ use stackslib::util_lib::signed_structured_data::pox4::make_pox_4_signer_key_sig
 use stackslib::util_lib::signed_structured_data::pox4::Pox4SignatureTopic;
 use std::convert::TryFrom;
 use std::str;
+use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Arc;
@@ -804,14 +807,9 @@ pub async fn mine_bitcoin_block(
     bitcoin_node_password: &str,
     miner_btc_address: &str,
 ) -> Result<(), String> {
-    use bitcoincore_rpc::bitcoin::Address;
-    use reqwest::Client as HttpClient;
-    use serde_json::json;
-    use std::str::FromStr;
-
     let miner_address = Address::from_str(miner_btc_address).unwrap();
-    let _ = HttpClient::builder()
-        .timeout(Duration::from_secs(5))
+    let _ = reqwest::Client::builder()
+        .timeout(Duration::from_secs(2))
         .build()
         .expect("Unable to build http client")
         .post(format!("http://{}", bitcoin_node_host))

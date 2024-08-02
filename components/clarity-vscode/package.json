@@ -8,7 +8,7 @@
   "homepage": "https://github.com/hirosystems/clarinet",
   "bugs": "https://github.com/hirosystems/clarinet/issues",
   "license": "GPL-3.0-only",
-  "version": "1.13.0",
+  "version": "1.14.0",
   "workspaces": [
     "client",
     "server",
@@ -237,14 +237,14 @@
     ]
   },
   "devDependencies": {
-    "@swc/cli": "^0.3.6",
+    "@swc/cli": "0.4.0",
     "@swc/core": "^1.2.218",
     "@types/chai": "^4.3.1",
     "@types/mocha": "^10.0.0",
     "@types/webpack-env": "^1.17.0",
     "@typescript-eslint/eslint-plugin": "^7.14.1",
     "@typescript-eslint/parser": "^7.14.1",
-    "@vscode/test-web": "^0.0.55",
+    "@vscode/test-web": "0.0.56",
     "@vscode/vsce": "^2.19.0",
     "@wasm-tool/wasm-pack-plugin": "^1.6.0",
     "chai": "^5.0.3",
