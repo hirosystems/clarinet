@@ -111,13 +111,15 @@ impl DevnetEventObserverConfig {
         ctx.try_log(|logger| slog::info!(logger, "Checking contracts"));
         let network_manifest = match network_manifest {
             Some(n) => n,
-            None => NetworkManifest::from_project_manifest_location(
+            None => match NetworkManifest::from_project_manifest_location(
                 &manifest.location,
                 &StacksNetwork::Devnet.get_networks(),
                 Some(&manifest.project.cache_location),
                 None,
-            )
-            .expect("unable to load network manifest"),
+            ) {
+                Ok(manifest) => manifest,
+                Err(_err) => NetworkManifest::default(),
+            },
         };
         let event_observer_config = EventObserverConfig {
             bitcoin_rpc_proxy_enabled: true,

@@ -330,6 +330,8 @@ pub struct DevnetConfig {
     pub use_docker_gateway_routing: bool,
     pub docker_platform: String,
 }
+
+// Note: Ideally this should be used to merge with file reading code so that we don't have to unwrap_or the defaults everywhere
 impl Default for DevnetConfig {
     fn default() -> Self {
         let (miner_stx_address, miner_btc_address, miner_secret_key_hex) =
@@ -342,7 +344,7 @@ impl Default for DevnetConfig {
             compute_default_addresses(DEFAULT_SUBNET_MNEMONIC, DEFAULT_DERIVATION_PATH);
 
         DevnetConfig {
-            name: "default".to_string(),
+            name: "default.devnet".to_string(),
             network_id: None,
             orchestrator_ingestion_port: 20445,
             orchestrator_control_port: 20446,
@@ -358,12 +360,12 @@ impl Default for DevnetConfig {
             stacks_node_events_observers: vec![],
             stacks_node_env_vars: vec![],
             stacks_api_port: 3999,
-            stacks_api_events_port: 1,
+            stacks_api_events_port: 3700,
             stacks_api_env_vars: vec![],
-            stacks_explorer_port: 1,
+            stacks_explorer_port: 8000,
             stacks_explorer_env_vars: vec![],
-            bitcoin_explorer_port: 1,
-            bitcoin_controller_block_time: 1,
+            bitcoin_explorer_port: 8001,
+            bitcoin_controller_block_time: 60_000,
             bitcoin_controller_automining_disabled: false,
             miner_stx_address: miner_stx_address.clone(),
             miner_secret_key_hex,
@@ -377,7 +379,7 @@ impl Default for DevnetConfig {
             faucet_btc_address: faucet_btc_address.clone(),
             faucet_mnemonic: DEFAULT_FAUCET_MNEMONIC.to_string(),
             faucet_derivation_path: DEFAULT_DERIVATION_PATH.to_string(),
-            working_dir: ".".to_string(),
+            working_dir: "./.cache".to_string(),
             postgres_port: 5432,
             postgres_username: "postgres".to_string(),
             postgres_password: "postgres".to_string(),

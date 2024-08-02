@@ -46,7 +46,6 @@ pub fn start(
             },
         )
     };
-    println!("after hooks");
 
     let (logger, working_dir) = if !default_settings {
         let working_dir = devnet

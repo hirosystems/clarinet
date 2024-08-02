@@ -1895,7 +1895,6 @@ fn devnet_start(cmd: DevnetStart, global_settings: GlobalSettings) {
             ),
         ));
     }
-    println!("before start");
     match start(
         orchestrator,
         deployment,
