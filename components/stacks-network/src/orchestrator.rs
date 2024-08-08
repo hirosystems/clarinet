@@ -688,12 +688,21 @@ impl DevnetOrchestrator {
                     return Err(message);
                 }
             };
+            let explorer_url = format!("http://localhost:{}", stacks_explorer_port);
+            let full_explorer_url = format!(
+                "{}/?chain=testnet&api=http://localhost:{}",
+                explorer_url, stacks_api_port,
+            );
+
             send_status_update(
                 &event_tx,
                 enable_subnet_node,
                 "stacks-explorer",
                 Status::Green,
-                &format!("http://localhost:{}", stacks_explorer_port),
+                &format!(
+                    "\u{1b}]8;;{}\u{1b}\\{}\u{1b}]8;;\u{1b}\\", // magic terminal string to show urls
+                    &full_explorer_url, &explorer_url
+                ),
             );
         }
 
