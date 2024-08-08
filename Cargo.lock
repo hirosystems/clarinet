@@ -815,7 +815,7 @@ checksum = "4b82cf0babdbd58558212896d1a4272303a57bdb245c2bf1147185fb45640e70"
 [[package]]
 name = "clar2wasm"
 version = "0.1.0"
-source = "git+https://github.com/stacks-network/clarity-wasm.git?branch=main#8ce55662ed0c8ebd467b19bad8e7047f21154986"
+source = "git+https://github.com/stacks-network/clarity-wasm.git?branch=main#40e9008226ec0cfd510fe98a55dc5d298338f2ea"
 dependencies = [
  "chrono",
  "clap",
@@ -942,7 +942,7 @@ dependencies = [
 [[package]]
 name = "clarity"
 version = "2.3.0"
-source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-develop#716041844d450d28526156d3d0462f5e8eea08e8"
+source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-develop#cbcc7bbac26fb945d44901fe5139cc7e379609c7"
 dependencies = [
  "getrandom 0.2.8",
  "hashbrown 0.14.3",
@@ -2864,7 +2864,7 @@ dependencies = [
 [[package]]
 name = "libstackerdb"
 version = "0.0.1"
-source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-develop#716041844d450d28526156d3d0462f5e8eea08e8"
+source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-develop#cbcc7bbac26fb945d44901fe5139cc7e379609c7"
 dependencies = [
  "clarity",
  "secp256k1 0.24.3",
@@ -3582,7 +3582,7 @@ checksum = "439ee305def115ba05938db6eb1644ff94165c5ab5e9420d1c1bcedbba909391"
 [[package]]
 name = "pox-locking"
 version = "2.4.0"
-source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-develop#716041844d450d28526156d3d0462f5e8eea08e8"
+source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-develop#cbcc7bbac26fb945d44901fe5139cc7e379609c7"
 dependencies = [
  "clarity",
  "slog",
@@ -4853,7 +4853,7 @@ dependencies = [
 [[package]]
 name = "stacks-common"
 version = "0.0.2"
-source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-develop#716041844d450d28526156d3d0462f5e8eea08e8"
+source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-develop#cbcc7bbac26fb945d44901fe5139cc7e379609c7"
 dependencies = [
  "chrono",
  "curve25519-dalek 2.0.0",
@@ -4953,7 +4953,7 @@ dependencies = [
 [[package]]
 name = "stackslib"
 version = "0.0.1"
-source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-develop#716041844d450d28526156d3d0462f5e8eea08e8"
+source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-develop#cbcc7bbac26fb945d44901fe5139cc7e379609c7"
 dependencies = [
  "chrono",
  "clar2wasm",

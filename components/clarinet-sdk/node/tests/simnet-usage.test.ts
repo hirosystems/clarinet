@@ -49,9 +49,9 @@ describe("basic simnet interactions", () => {
   });
   it("can not mine empty stacks block in pre-3.0", () => {
     expect(() => simnet.mineEmptyStacksBlock()).toThrowError(
-      "use mineEmptyBurnBlock in epoch lower than 3.0"
+      "use mineEmptyBurnBlock in epoch lower than 3.0",
     );
-  })
+  });
 
   it("exposes devnet stacks accounts", () => {
     const accounts = simnet.getAccounts();
@@ -101,8 +101,8 @@ describe("simnet epoch 3", () => {
     simnet.mineEmptyBurnBlocks(4);
     expect(simnet.burnBlockHeight).toBe(burnBlockHeight + 4);
     expect(simnet.stacksBlockHeight).toBe(blockHeight + 9);
-  })
-})
+  });
+});
 describe("simnet can run arbitrary snippets", () => {
   it("can run simple snippets", () => {
     const res = simnet.execute("(+ 1 2)");
@@ -292,7 +292,7 @@ describe("simnet can get contracts info and deploy contracts", () => {
 
   it("can get contract source", () => {
     const counterSource = simnet.getContractSource(`${deployerAddr}.counter`);
-    expect(counterSource?.startsWith("(define-data-var count")).toBe(true);
+    expect(counterSource?.startsWith(";; counter contract")).toBe(true);
 
     const counterSourceShortAddr = simnet.getContractSource("counter");
     expect(counterSourceShortAddr).toBe(counterSource);
@@ -309,6 +309,16 @@ describe("simnet can get contracts info and deploy contracts", () => {
 
     const getWithShortAddr = simnet.getContractAST("counter");
     expect(getWithShortAddr).toBeDefined();
+  });
+
+  it("can get commets in ast", () => {
+    const counterAst = simnet.getContractAST(`${deployerAddr}.counter`);
+
+    expect(counterAst).toBeDefined();
+    expect(counterAst.expressions).toHaveLength(11);
+
+    // @ts-ignore
+    expect(counterAst.expressions[0].pre_comments[0][0]).toBe("counter contract");
   });
 
   it("can deploy contracts as snippets", () => {
