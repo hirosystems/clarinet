@@ -1313,6 +1313,16 @@ mod tests {
     use crate::{repl::settings::Account, test_fixtures::clarity_contract::ClarityContractBuilder};
 
     #[track_caller]
+    fn run_session_snippet(session: &mut Session, snippet: &str) -> Value {
+        let execution_res = session.eval(snippet.to_string(), None, false).unwrap();
+        let res = match execution_res.result {
+            EvaluationResult::Contract(_) => unreachable!(),
+            EvaluationResult::Snippet(res) => res,
+        };
+        res.result
+    }
+
+    #[track_caller]
     fn assert_execution_result_value(
         result: &Result<ExecutionResult, Vec<Diagnostic>>,
         expected_value: Value,
@@ -1714,5 +1724,66 @@ mod tests {
             "test".to_owned(),
         );
         assert_execution_result_value(&result, Value::UInt(1));
+    }
+
+    #[test]
+    fn current_block_info_is_none() {
+        let settings = SessionSettings::default();
+        let mut session = Session::new(settings);
+        session.start().expect("session could not start");
+        session.update_epoch(StacksEpochId::Epoch25);
+
+        session.advance_chain_tip(5);
+        let result = run_session_snippet(&mut session, "(get-block-info? time block-height)");
+        assert_eq!(result, Value::none());
+    }
+
+    #[test]
+    fn block_time_is_realistic_in_epoch_2_5() {
+        let settings = SessionSettings::default();
+        let mut session = Session::new(settings);
+        session.start().expect("session could not start");
+        session.update_epoch(StacksEpochId::Epoch25);
+
+        session.advance_chain_tip(4);
+
+        let result = run_session_snippet(&mut session, "(get-block-info? time u2)");
+        let time_block_1 = match result.expect_optional() {
+            Ok(Some(Value::UInt(time))) => time,
+            _ => panic!("Unexpected result"),
+        };
+
+        let result = run_session_snippet(&mut session, "(get-block-info? time u3)");
+        let time_block_2 = match result.expect_optional() {
+            Ok(Some(Value::UInt(time))) => time,
+            _ => panic!("Unexpected result"),
+        };
+
+        println!("{}", time_block_2 - time_block_1);
+        assert!(time_block_2 - time_block_1 == 600);
+    }
+
+    #[test]
+    fn block_time_is_realistic_in_epoch_3_0() {
+        let settings = SessionSettings::default();
+        let mut session = Session::new(settings);
+        session.start().expect("session could not start");
+        session.update_epoch(StacksEpochId::Epoch30);
+
+        session.advance_burn_chain_tip(4);
+
+        let result = run_session_snippet(&mut session, "(get-tenure-info? time u2)");
+        let time_block_1 = match result.expect_optional() {
+            Ok(Some(Value::UInt(time))) => time,
+            _ => panic!("Unexpected result"),
+        };
+
+        let result = run_session_snippet(&mut session, "(get-tenure-info? time u3)");
+        let time_block_2 = match result.expect_optional() {
+            Ok(Some(Value::UInt(time))) => time,
+            _ => panic!("Unexpected result"),
+        };
+
+        assert!(time_block_2 - time_block_1 == 600);
     }
 }

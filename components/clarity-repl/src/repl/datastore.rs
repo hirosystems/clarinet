@@ -122,7 +122,7 @@ fn height_to_block(height: u32, genesis_time: Option<u64>) -> BlockInfo {
         buffer[0] = 4;
         VRFSeed(buffer)
     };
-    let time_since_genesis: u64 = (height * 1800).into();
+    let time_since_genesis: u64 = (height * 600).into();
     let burn_block_time: u64 = genesis_time + time_since_genesis;
     let burn_block_height = height;
     let miner = StacksAddress::burn_address(true);
