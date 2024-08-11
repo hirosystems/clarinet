@@ -353,6 +353,7 @@ pub async fn start_chains_coordinator(
                 send_status_update(
                     &devnet_event_tx,
                     enable_subnet_node,
+                    &None,
                     "bitcoin-node",
                     Status::Green,
                     &comment,
@@ -401,6 +402,7 @@ pub async fn start_chains_coordinator(
                 send_status_update(
                     &devnet_event_tx,
                     enable_subnet_node,
+                    &None,
                     "stacks-node",
                     Status::Green,
                     &format!(
@@ -473,6 +475,7 @@ pub async fn start_chains_coordinator(
                                 send_status_update(
                                     &devnet_event_tx,
                                     enable_subnet_node,
+                                    &None,
                                     "subnet-node",
                                     Status::Green,
                                     "⚡️",

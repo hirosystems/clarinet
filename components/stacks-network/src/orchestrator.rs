@@ -13,7 +13,7 @@ use chainhook_sdk::utils::Context;
 use clarinet_files::chainhook_types::StacksNetwork;
 use clarinet_files::{DevnetConfigFile, NetworkManifest, ProjectManifest};
 use futures::stream::TryStreamExt;
-use hiro_system_kit::slog;
+use hiro_system_kit::{slog, slog_term, Drain};
 use reqwest::RequestBuilder;
 use serde_json::Value as JsonValue;
 use std::collections::HashMap;
@@ -33,6 +33,7 @@ pub struct DevnetOrchestrator {
     pub network_config: Option<NetworkManifest>,
     pub termination_success_tx: Option<Sender<bool>>,
     pub can_exit: bool,
+    pub logger: Option<slog::Logger>,
     stacks_node_container_id: Option<String>,
     stacks_signer_1_container_id: Option<String>,
     stacks_signer_2_container_id: Option<String>,
@@ -75,6 +76,7 @@ impl DevnetOrchestrator {
         network_manifest: Option<NetworkManifest>,
         devnet_override: Option<DevnetConfigFile>,
         should_use_docker: bool,
+        log_to_stdout: bool,
     ) -> Result<DevnetOrchestrator, String> {
         let mut network_config = match network_manifest {
             Some(n) => Ok(n),
@@ -145,6 +147,14 @@ impl DevnetOrchestrator {
             false => None,
         };
 
+        let logger = if log_to_stdout {
+            let plain = slog_term::PlainSyncDecorator::new(std::io::stdout());
+            let logger =
+                slog::Logger::root(slog_term::FullFormat::new(plain).build().fuse(), slog::o!());
+            Some(logger)
+        } else {
+            None
+        };
         Ok(DevnetOrchestrator {
             name,
             network_name,
@@ -152,6 +162,7 @@ impl DevnetOrchestrator {
             network_config: Some(network_config),
             docker_client,
             can_exit: true,
+            logger: logger,
             termination_success_tx: None,
             stacks_node_container_id: None,
             stacks_signer_1_container_id: None,
@@ -319,6 +330,7 @@ impl DevnetOrchestrator {
         send_status_update(
             &event_tx,
             enable_subnet_node,
+            &self.logger,
             "bitcoin-node",
             Status::Red,
             "initializing",
@@ -327,6 +339,7 @@ impl DevnetOrchestrator {
         send_status_update(
             &event_tx,
             enable_subnet_node,
+            &self.logger,
             "stacks-node",
             Status::Red,
             "initializing",
@@ -335,6 +348,7 @@ impl DevnetOrchestrator {
         send_status_update(
             &event_tx,
             enable_subnet_node,
+            &self.logger,
             "stacks-signer-1",
             Status::Red,
             "initializing",
@@ -342,6 +356,7 @@ impl DevnetOrchestrator {
         send_status_update(
             &event_tx,
             enable_subnet_node,
+            &self.logger,
             "stacks-signer-2",
             Status::Red,
             "initializing",
@@ -350,6 +365,7 @@ impl DevnetOrchestrator {
         send_status_update(
             &event_tx,
             enable_subnet_node,
+            &self.logger,
             "stacks-api",
             Status::Red,
             "initializing",
@@ -357,6 +373,7 @@ impl DevnetOrchestrator {
         send_status_update(
             &event_tx,
             enable_subnet_node,
+            &self.logger,
             "stacks-explorer",
             Status::Red,
             "initializing",
@@ -364,6 +381,7 @@ impl DevnetOrchestrator {
         send_status_update(
             &event_tx,
             enable_subnet_node,
+            &self.logger,
             "bitcoin-explorer",
             Status::Red,
             "initializing",
@@ -373,6 +391,7 @@ impl DevnetOrchestrator {
             send_status_update(
                 &event_tx,
                 enable_subnet_node,
+                &self.logger,
                 "subnet-node",
                 Status::Red,
                 "initializing",
@@ -380,6 +399,7 @@ impl DevnetOrchestrator {
             send_status_update(
                 &event_tx,
                 enable_subnet_node,
+                &self.logger,
                 "subnet-api",
                 Status::Red,
                 "initializing",
@@ -396,6 +416,7 @@ impl DevnetOrchestrator {
         send_status_update(
             &event_tx,
             enable_subnet_node,
+            &self.logger,
             "bitcoin-node",
             Status::Yellow,
             "preparing container",
@@ -411,6 +432,7 @@ impl DevnetOrchestrator {
         send_status_update(
             &event_tx,
             enable_subnet_node,
+            &self.logger,
             "bitcoin-node",
             Status::Yellow,
             "booting",
@@ -432,6 +454,7 @@ impl DevnetOrchestrator {
             send_status_update(
                 &event_tx,
                 enable_subnet_node,
+                &self.logger,
                 "stacks-api",
                 Status::Yellow,
                 "preparing postgres container",
@@ -456,6 +479,7 @@ impl DevnetOrchestrator {
             send_status_update(
                 &event_tx,
                 enable_subnet_node,
+                &self.logger,
                 "stacks-api",
                 Status::Yellow,
                 "preparing container",
@@ -473,6 +497,7 @@ impl DevnetOrchestrator {
             send_status_update(
                 &event_tx,
                 enable_subnet_node,
+                &self.logger,
                 "stacks-api",
                 Status::Green,
                 &format!("http://localhost:{}/doc", stacks_api_port),
@@ -502,6 +527,7 @@ impl DevnetOrchestrator {
             send_status_update(
                 &event_tx,
                 enable_subnet_node,
+                &self.logger,
                 "subnet-node",
                 Status::Yellow,
                 "booting",
@@ -528,6 +554,7 @@ impl DevnetOrchestrator {
                 send_status_update(
                     &event_tx,
                     enable_subnet_node,
+                    &self.logger,
                     "subnet-api",
                     Status::Green,
                     &format!("http://localhost:{}/doc", subnet_api_port),
@@ -548,6 +575,7 @@ impl DevnetOrchestrator {
         send_status_update(
             &event_tx,
             enable_subnet_node,
+            &self.logger,
             "stacks-node",
             Status::Yellow,
             "updating image",
@@ -563,6 +591,7 @@ impl DevnetOrchestrator {
         send_status_update(
             &event_tx,
             enable_subnet_node,
+            &self.logger,
             "stacks-node",
             Status::Yellow,
             "booting",
@@ -581,6 +610,7 @@ impl DevnetOrchestrator {
         send_status_update(
             &event_tx,
             enable_subnet_node,
+            &self.logger,
             "stacks-signer-1",
             Status::Yellow,
             "updating image",
@@ -599,6 +629,7 @@ impl DevnetOrchestrator {
         send_status_update(
             &event_tx,
             enable_subnet_node,
+            &self.logger,
             "stacks-signer-1",
             Status::Yellow,
             "booting",
@@ -614,6 +645,7 @@ impl DevnetOrchestrator {
         send_status_update(
             &event_tx,
             enable_subnet_node,
+            &self.logger,
             "stacks-signer-1",
             Status::Green,
             "running",
@@ -624,6 +656,7 @@ impl DevnetOrchestrator {
         send_status_update(
             &event_tx,
             enable_subnet_node,
+            &self.logger,
             "stacks-signer-2",
             Status::Yellow,
             "updating image",
@@ -642,6 +675,7 @@ impl DevnetOrchestrator {
         send_status_update(
             &event_tx,
             enable_subnet_node,
+            &self.logger,
             "stacks-signer-2",
             Status::Yellow,
             "booting",
@@ -657,6 +691,7 @@ impl DevnetOrchestrator {
         send_status_update(
             &event_tx,
             enable_subnet_node,
+            &self.logger,
             "stacks-signer-2",
             Status::Green,
             "running",
@@ -667,6 +702,7 @@ impl DevnetOrchestrator {
             send_status_update(
                 &event_tx,
                 enable_subnet_node,
+                &self.logger,
                 "stacks-explorer",
                 Status::Yellow,
                 "preparing container",
@@ -691,6 +727,7 @@ impl DevnetOrchestrator {
             send_status_update(
                 &event_tx,
                 enable_subnet_node,
+                &self.logger,
                 "stacks-explorer",
                 Status::Green,
                 &format!("http://localhost:{}", stacks_explorer_port),
@@ -702,6 +739,7 @@ impl DevnetOrchestrator {
             send_status_update(
                 &event_tx,
                 enable_subnet_node,
+                &self.logger,
                 "bitcoin-explorer",
                 Status::Yellow,
                 "preparing container",
@@ -726,6 +764,7 @@ impl DevnetOrchestrator {
             send_status_update(
                 &event_tx,
                 enable_subnet_node,
+                &self.logger,
                 "bitcoin-explorer",
                 Status::Green,
                 &format!("http://localhost:{}", bitcoin_explorer_port),
@@ -743,6 +782,7 @@ impl DevnetOrchestrator {
                     send_status_update(
                         &event_tx,
                         enable_subnet_node,
+                        &self.logger,
                         "bitcoin-node",
                         Status::Yellow,
                         "restarting",
@@ -751,6 +791,7 @@ impl DevnetOrchestrator {
                     send_status_update(
                         &event_tx,
                         enable_subnet_node,
+                        &self.logger,
                         "stacks-node",
                         Status::Yellow,
                         "restarting",
