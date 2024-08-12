@@ -52,7 +52,8 @@ fn main() {
             .unwrap_or_else(|e| panic!("Devnet.toml file malformatted {:?}", e));
 
     let orchestrator =
-        DevnetOrchestrator::new(manifest, Some(network_manifest.clone()), None, false).unwrap();
+        DevnetOrchestrator::new(manifest, Some(network_manifest.clone()), None, false, false)
+            .unwrap();
 
     let deployment_specification_file_content = deployment_location
         .read_content()

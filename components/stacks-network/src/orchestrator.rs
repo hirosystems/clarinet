@@ -162,7 +162,7 @@ impl DevnetOrchestrator {
             network_config: Some(network_config),
             docker_client,
             can_exit: true,
-            logger: logger,
+            logger,
             termination_success_tx: None,
             stacks_node_container_id: None,
             stacks_signer_1_container_id: None,
