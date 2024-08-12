@@ -1860,7 +1860,7 @@ fn devnet_start(cmd: DevnetStart, global_settings: GlobalSettings) {
         }
     };
 
-    let orchestrator = match DevnetOrchestrator::new(manifest, None, None, true) {
+    let orchestrator = match DevnetOrchestrator::new(manifest, None, None, true, cmd.no_dashboard) {
         Ok(orchestrator) => orchestrator,
         Err(e) => {
             eprintln!("{}", format_err!(e));

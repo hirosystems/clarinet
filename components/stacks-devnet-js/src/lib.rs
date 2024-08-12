@@ -115,15 +115,16 @@ impl StacksDevnet {
             read_deployment_or_generate_default(&manifest, &StacksNetwork::Devnet)
                 .expect("Unable to generate deployment");
         let working_dir = devnet_overrides.working_dir.clone();
-        let devnet = match DevnetOrchestrator::new(manifest, None, Some(devnet_overrides), true) {
-            Ok(devnet) => devnet,
-            Err(message) => {
-                if logs_enabled {
-                    println!("Fatal error: {}", message);
+        let devnet =
+            match DevnetOrchestrator::new(manifest, None, Some(devnet_overrides), true, false) {
+                Ok(devnet) => devnet,
+                Err(message) => {
+                    if logs_enabled {
+                        println!("Fatal error: {}", message);
+                    }
+                    std::process::exit(1);
                 }
-                std::process::exit(1);
-            }
-        };
+            };
         let ctx: Option<Context> = match working_dir {
             Some(working_dir) => match PathBuf::from_str(&working_dir) {
                 Ok(mut log_path) => {
