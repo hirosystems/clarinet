@@ -1,0 +1,898 @@
+#compdef clarinet
+
+autoload -U is-at-least
+
+_clarinet() {
+    typeset -A opt_args
+    typeset -a _arguments_options
+    local ret=1
+
+    if is-at-least 5.2; then
+        _arguments_options=(-s -S -C)
+    else
+        _arguments_options=(-s -C)
+    fi
+
+    local context curcontext="$curcontext" state line
+    _arguments "${_arguments_options[@]}" \
+'-h[Print help (see more with '\''--help'\'')]' \
+'--help[Print help (see more with '\''--help'\'')]' \
+'-V[Print version]' \
+'--version[Print version]' \
+":: :_clarinet_commands" \
+"*::: :->clarinet" \
+&& ret=0
+    case $state in
+    (clarinet)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:clarinet-command-$line[1]:"
+        case $line[1] in
+            (completions)
+_arguments "${_arguments_options[@]}" \
+'-h[Print help]' \
+'--help[Print help]' \
+':shell -- Specify which shell to generation completions script for:(bash elvish fish powershell zsh)' \
+&& ret=0
+;;
+(new)
+_arguments "${_arguments_options[@]}" \
+'--disable-telemetry[Do not provide developer usage telemetry for this project]' \
+'-h[Print help]' \
+'--help[Print help]' \
+':name -- Project'\''s name:' \
+&& ret=0
+;;
+(contracts)
+_arguments "${_arguments_options[@]}" \
+'-h[Print help]' \
+'--help[Print help]' \
+":: :_clarinet__contracts_commands" \
+"*::: :->contracts" \
+&& ret=0
+
+    case $state in
+    (contracts)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:clarinet-contracts-command-$line[1]:"
+        case $line[1] in
+            (new)
+_arguments "${_arguments_options[@]}" \
+'-m+[Path to Clarinet.toml]:MANIFEST_PATH: ' \
+'--manifest-path=[Path to Clarinet.toml]:MANIFEST_PATH: ' \
+'-h[Print help]' \
+'--help[Print help]' \
+':name -- Contract'\''s name:' \
+&& ret=0
+;;
+(rm)
+_arguments "${_arguments_options[@]}" \
+'-m+[Path to Clarinet.toml]:MANIFEST_PATH: ' \
+'--manifest-path=[Path to Clarinet.toml]:MANIFEST_PATH: ' \
+'-h[Print help]' \
+'--help[Print help]' \
+':name -- Contract'\''s name:' \
+&& ret=0
+;;
+(help)
+_arguments "${_arguments_options[@]}" \
+":: :_clarinet__contracts__help_commands" \
+"*::: :->help" \
+&& ret=0
+
+    case $state in
+    (help)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:clarinet-contracts-help-command-$line[1]:"
+        case $line[1] in
+            (new)
+_arguments "${_arguments_options[@]}" \
+&& ret=0
+;;
+(rm)
+_arguments "${_arguments_options[@]}" \
+&& ret=0
+;;
+(help)
+_arguments "${_arguments_options[@]}" \
+&& ret=0
+;;
+        esac
+    ;;
+esac
+;;
+        esac
+    ;;
+esac
+;;
+(requirements)
+_arguments "${_arguments_options[@]}" \
+'-h[Print help]' \
+'--help[Print help]' \
+":: :_clarinet__requirements_commands" \
+"*::: :->requirements" \
+&& ret=0
+
+    case $state in
+    (requirements)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:clarinet-requirements-command-$line[1]:"
+        case $line[1] in
+            (add)
+_arguments "${_arguments_options[@]}" \
+'-m+[Path to Clarinet.toml]:MANIFEST_PATH: ' \
+'--manifest-path=[Path to Clarinet.toml]:MANIFEST_PATH: ' \
+'-h[Print help]' \
+'--help[Print help]' \
+':contract_id -- Contract id (ex. "SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.nft-trait"):' \
+&& ret=0
+;;
+(help)
+_arguments "${_arguments_options[@]}" \
+":: :_clarinet__requirements__help_commands" \
+"*::: :->help" \
+&& ret=0
+
+    case $state in
+    (help)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:clarinet-requirements-help-command-$line[1]:"
+        case $line[1] in
+            (add)
+_arguments "${_arguments_options[@]}" \
+&& ret=0
+;;
+(help)
+_arguments "${_arguments_options[@]}" \
+&& ret=0
+;;
+        esac
+    ;;
+esac
+;;
+        esac
+    ;;
+esac
+;;
+(chainhooks)
+_arguments "${_arguments_options[@]}" \
+'-h[Print help]' \
+'--help[Print help]' \
+&& ret=0
+;;
+(deployments)
+_arguments "${_arguments_options[@]}" \
+'-h[Print help]' \
+'--help[Print help]' \
+":: :_clarinet__deployments_commands" \
+"*::: :->deployments" \
+&& ret=0
+
+    case $state in
+    (deployments)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:clarinet-deployments-command-$line[1]:"
+        case $line[1] in
+            (check)
+_arguments "${_arguments_options[@]}" \
+'-m+[Path to Clarinet.toml]:MANIFEST_PATH: ' \
+'--manifest-path=[Path to Clarinet.toml]:MANIFEST_PATH: ' \
+'-h[Print help]' \
+'--help[Print help]' \
+&& ret=0
+;;
+(generate)
+_arguments "${_arguments_options[@]}" \
+'-m+[Path to Clarinet.toml]:MANIFEST_PATH: ' \
+'--manifest-path=[Path to Clarinet.toml]:MANIFEST_PATH: ' \
+'(--devnet --testnet --mainnet)--simnet[Generate a deployment file for simnet environments (console, tests)]' \
+'(--simnet --testnet --mainnet)--devnet[Generate a deployment file for devnet, using settings/Devnet.toml]' \
+'(--simnet --devnet --mainnet)--testnet[Generate a deployment file for devnet, using settings/Testnet.toml]' \
+'(--simnet --testnet --devnet)--mainnet[Generate a deployment file for devnet, using settings/Mainnet.toml]' \
+'(--devnet --testnet --mainnet)--no-batch[Generate a deployment file without trying to batch transactions (simnet only)]' \
+'(--medium-cost --high-cost --manual-cost)--low-cost[Compute and set cost, using low priority (network connection required)]' \
+'(--low-cost --high-cost --manual-cost)--medium-cost[Compute and set cost, using medium priority (network connection required)]' \
+'(--low-cost --medium-cost --manual-cost)--high-cost[Compute and set cost, using high priority (network connection required)]' \
+'(--low-cost --medium-cost --high-cost)--manual-cost[Leave cost estimation manual]' \
+'-h[Print help]' \
+'--help[Print help]' \
+&& ret=0
+;;
+(apply)
+_arguments "${_arguments_options[@]}" \
+'-m+[Path to Clarinet.toml]:MANIFEST_PATH: ' \
+'--manifest-path=[Path to Clarinet.toml]:MANIFEST_PATH: ' \
+'(--devnet --testnet --mainnet)-p+[Apply deployment plan specified]:DEPLOYMENT_PLAN_PATH: ' \
+'(--devnet --testnet --mainnet)--deployment-plan-path=[Apply deployment plan specified]:DEPLOYMENT_PLAN_PATH: ' \
+'(-p --deployment-plan-path --testnet --mainnet)--devnet[Apply default deployment settings/default.devnet-plan.toml]' \
+'(-p --deployment-plan-path --devnet --mainnet)--testnet[Apply default deployment settings/default.testnet-plan.toml]' \
+'(-p --deployment-plan-path --testnet --devnet)--mainnet[Apply default deployment settings/default.mainnet-plan.toml]' \
+'--no-dashboard[Display streams of logs instead of terminal UI dashboard]' \
+'(-c --use-computed-deployment-plan)-d[Use on disk deployment plan (prevent updates computing)]' \
+'(-c --use-computed-deployment-plan)--use-on-disk-deployment-plan[Use on disk deployment plan (prevent updates computing)]' \
+'(-d --use-on-disk-deployment-plan)-c[Use computed deployment plan (will overwrite on disk version if any update)]' \
+'(-d --use-on-disk-deployment-plan)--use-computed-deployment-plan[Use computed deployment plan (will overwrite on disk version if any update)]' \
+'-h[Print help]' \
+'--help[Print help]' \
+&& ret=0
+;;
+(help)
+_arguments "${_arguments_options[@]}" \
+":: :_clarinet__deployments__help_commands" \
+"*::: :->help" \
+&& ret=0
+
+    case $state in
+    (help)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:clarinet-deployments-help-command-$line[1]:"
+        case $line[1] in
+            (check)
+_arguments "${_arguments_options[@]}" \
+&& ret=0
+;;
+(generate)
+_arguments "${_arguments_options[@]}" \
+&& ret=0
+;;
+(apply)
+_arguments "${_arguments_options[@]}" \
+&& ret=0
+;;
+(help)
+_arguments "${_arguments_options[@]}" \
+&& ret=0
+;;
+        esac
+    ;;
+esac
+;;
+        esac
+    ;;
+esac
+;;
+(console)
+_arguments "${_arguments_options[@]}" \
+'-m+[Path to Clarinet.toml]:MANIFEST_PATH: ' \
+'--manifest-path=[Path to Clarinet.toml]:MANIFEST_PATH: ' \
+'-p+[If specified, use this deployment file]:DEPLOYMENT_PLAN_PATH: ' \
+'--deployment-plan-path=[If specified, use this deployment file]:DEPLOYMENT_PLAN_PATH: ' \
+'(-c --use-computed-deployment-plan)-d[Use on disk deployment plan (prevent updates computing)]' \
+'(-c --use-computed-deployment-plan)--use-on-disk-deployment-plan[Use on disk deployment plan (prevent updates computing)]' \
+'(-d --use-on-disk-deployment-plan)-c[Use computed deployment plan (will overwrite on disk version if any update)]' \
+'(-d --use-on-disk-deployment-plan)--use-computed-deployment-plan[Use computed deployment plan (will overwrite on disk version if any update)]' \
+'--enable-clarity-wasm[Allow the Clarity Wasm preview to run in parallel with the Clarity interpreter (beta)]' \
+'-h[Print help]' \
+'--help[Print help]' \
+&& ret=0
+;;
+(check)
+_arguments "${_arguments_options[@]}" \
+'-m+[Path to Clarinet.toml]:MANIFEST_PATH: ' \
+'--manifest-path=[Path to Clarinet.toml]:MANIFEST_PATH: ' \
+'-h[Print help]' \
+'--help[Print help]' \
+&& ret=0
+;;
+(integrate)
+_arguments "${_arguments_options[@]}" \
+'-m+[Path to Clarinet.toml]:MANIFEST_PATH: ' \
+'--manifest-path=[Path to Clarinet.toml]:MANIFEST_PATH: ' \
+'-p+[If specified, use this deployment file]:DEPLOYMENT_PLAN_PATH: ' \
+'--deployment-plan-path=[If specified, use this deployment file]:DEPLOYMENT_PLAN_PATH: ' \
+'(-c --use-computed-deployment-plan -m --manifest-path)--package=[Path to Package.json produced by '\''clarinet devnet package'\'']:PACKAGE: ' \
+'--no-dashboard[Display streams of logs instead of terminal UI dashboard]' \
+'(-c --use-computed-deployment-plan)-d[Use on disk deployment plan (prevent updates computing)]' \
+'(-c --use-computed-deployment-plan)--use-on-disk-deployment-plan[Use on disk deployment plan (prevent updates computing)]' \
+'(-d --use-on-disk-deployment-plan)-c[Use computed deployment plan (will overwrite on disk version if any update)]' \
+'(-d --use-on-disk-deployment-plan)--use-computed-deployment-plan[Use computed deployment plan (will overwrite on disk version if any update)]' \
+'-h[Print help]' \
+'--help[Print help]' \
+&& ret=0
+;;
+(devnet)
+_arguments "${_arguments_options[@]}" \
+'-h[Print help]' \
+'--help[Print help]' \
+":: :_clarinet__devnet_commands" \
+"*::: :->devnet" \
+&& ret=0
+
+    case $state in
+    (devnet)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:clarinet-devnet-command-$line[1]:"
+        case $line[1] in
+            (package)
+_arguments "${_arguments_options[@]}" \
+'-n+[Output json file name]:PACKAGE_FILE_NAME: ' \
+'--name=[Output json file name]:PACKAGE_FILE_NAME: ' \
+'-m+[]:MANIFEST_PATH: ' \
+'--manifest-path=[]:MANIFEST_PATH: ' \
+'-h[Print help]' \
+'--help[Print help]' \
+&& ret=0
+;;
+(start)
+_arguments "${_arguments_options[@]}" \
+'-m+[Path to Clarinet.toml]:MANIFEST_PATH: ' \
+'--manifest-path=[Path to Clarinet.toml]:MANIFEST_PATH: ' \
+'-p+[If specified, use this deployment file]:DEPLOYMENT_PLAN_PATH: ' \
+'--deployment-plan-path=[If specified, use this deployment file]:DEPLOYMENT_PLAN_PATH: ' \
+'(-c --use-computed-deployment-plan -m --manifest-path)--package=[Path to Package.json produced by '\''clarinet devnet package'\'']:PACKAGE: ' \
+'--no-dashboard[Display streams of logs instead of terminal UI dashboard]' \
+'(-c --use-computed-deployment-plan)-d[Use on disk deployment plan (prevent updates computing)]' \
+'(-c --use-computed-deployment-plan)--use-on-disk-deployment-plan[Use on disk deployment plan (prevent updates computing)]' \
+'(-d --use-on-disk-deployment-plan)-c[Use computed deployment plan (will overwrite on disk version if any update)]' \
+'(-d --use-on-disk-deployment-plan)--use-computed-deployment-plan[Use computed deployment plan (will overwrite on disk version if any update)]' \
+'-h[Print help]' \
+'--help[Print help]' \
+&& ret=0
+;;
+(help)
+_arguments "${_arguments_options[@]}" \
+":: :_clarinet__devnet__help_commands" \
+"*::: :->help" \
+&& ret=0
+
+    case $state in
+    (help)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:clarinet-devnet-help-command-$line[1]:"
+        case $line[1] in
+            (package)
+_arguments "${_arguments_options[@]}" \
+&& ret=0
+;;
+(start)
+_arguments "${_arguments_options[@]}" \
+&& ret=0
+;;
+(help)
+_arguments "${_arguments_options[@]}" \
+&& ret=0
+;;
+        esac
+    ;;
+esac
+;;
+        esac
+    ;;
+esac
+;;
+(lsp)
+_arguments "${_arguments_options[@]}" \
+'-h[Print help]' \
+'--help[Print help]' \
+&& ret=0
+;;
+(dap)
+_arguments "${_arguments_options[@]}" \
+'-h[Print help]' \
+'--help[Print help]' \
+&& ret=0
+;;
+(help)
+_arguments "${_arguments_options[@]}" \
+":: :_clarinet__help_commands" \
+"*::: :->help" \
+&& ret=0
+
+    case $state in
+    (help)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:clarinet-help-command-$line[1]:"
+        case $line[1] in
+            (completions)
+_arguments "${_arguments_options[@]}" \
+&& ret=0
+;;
+(new)
+_arguments "${_arguments_options[@]}" \
+&& ret=0
+;;
+(contracts)
+_arguments "${_arguments_options[@]}" \
+":: :_clarinet__help__contracts_commands" \
+"*::: :->contracts" \
+&& ret=0
+
+    case $state in
+    (contracts)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:clarinet-help-contracts-command-$line[1]:"
+        case $line[1] in
+            (new)
+_arguments "${_arguments_options[@]}" \
+&& ret=0
+;;
+(rm)
+_arguments "${_arguments_options[@]}" \
+&& ret=0
+;;
+        esac
+    ;;
+esac
+;;
+(requirements)
+_arguments "${_arguments_options[@]}" \
+":: :_clarinet__help__requirements_commands" \
+"*::: :->requirements" \
+&& ret=0
+
+    case $state in
+    (requirements)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:clarinet-help-requirements-command-$line[1]:"
+        case $line[1] in
+            (add)
+_arguments "${_arguments_options[@]}" \
+&& ret=0
+;;
+        esac
+    ;;
+esac
+;;
+(chainhooks)
+_arguments "${_arguments_options[@]}" \
+&& ret=0
+;;
+(deployments)
+_arguments "${_arguments_options[@]}" \
+":: :_clarinet__help__deployments_commands" \
+"*::: :->deployments" \
+&& ret=0
+
+    case $state in
+    (deployments)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:clarinet-help-deployments-command-$line[1]:"
+        case $line[1] in
+            (check)
+_arguments "${_arguments_options[@]}" \
+&& ret=0
+;;
+(generate)
+_arguments "${_arguments_options[@]}" \
+&& ret=0
+;;
+(apply)
+_arguments "${_arguments_options[@]}" \
+&& ret=0
+;;
+        esac
+    ;;
+esac
+;;
+(console)
+_arguments "${_arguments_options[@]}" \
+&& ret=0
+;;
+(check)
+_arguments "${_arguments_options[@]}" \
+&& ret=0
+;;
+(integrate)
+_arguments "${_arguments_options[@]}" \
+&& ret=0
+;;
+(devnet)
+_arguments "${_arguments_options[@]}" \
+":: :_clarinet__help__devnet_commands" \
+"*::: :->devnet" \
+&& ret=0
+
+    case $state in
+    (devnet)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:clarinet-help-devnet-command-$line[1]:"
+        case $line[1] in
+            (package)
+_arguments "${_arguments_options[@]}" \
+&& ret=0
+;;
+(start)
+_arguments "${_arguments_options[@]}" \
+&& ret=0
+;;
+        esac
+    ;;
+esac
+;;
+(lsp)
+_arguments "${_arguments_options[@]}" \
+&& ret=0
+;;
+(dap)
+_arguments "${_arguments_options[@]}" \
+&& ret=0
+;;
+(help)
+_arguments "${_arguments_options[@]}" \
+&& ret=0
+;;
+        esac
+    ;;
+esac
+;;
+        esac
+    ;;
+esac
+}
+
+(( $+functions[_clarinet_commands] )) ||
+_clarinet_commands() {
+    local commands; commands=(
+'completions:Generate shell completions scripts' \
+'new:Create and scaffold a new project' \
+'contracts:Subcommands for working with contracts' \
+'requirements:Interact with contracts deployed on Mainnet' \
+'chainhooks:Subcommands for working with chainhooks (deprecated)' \
+'deployments:Manage contracts deployments on Simnet/Devnet/Testnet/Mainnet' \
+'console:Load contracts in a REPL for an interactive session' \
+'check:Check contracts syntax' \
+'integrate:Start a local Devnet network for interacting with your contracts from your browser' \
+'devnet:Subcommands for Devnet usage' \
+'lsp:Get Clarity autocompletion and inline errors from your code editor (VSCode, vim, emacs, etc)' \
+'dap:Step by step debugging and breakpoints from your code editor (VSCode, vim, emacs, etc)' \
+'help:Print this message or the help of the given subcommand(s)' \
+    )
+    _describe -t commands 'clarinet commands' commands "$@"
+}
+(( $+functions[_add_commands] )) ||
+_add_commands() {
+    local commands; commands=()
+    _describe -t commands 'add commands' commands "$@"
+}
+(( $+functions[_clarinet__help__requirements__add_commands] )) ||
+_clarinet__help__requirements__add_commands() {
+    local commands; commands=()
+    _describe -t commands 'clarinet help requirements add commands' commands "$@"
+}
+(( $+functions[_clarinet__requirements__help__add_commands] )) ||
+_clarinet__requirements__help__add_commands() {
+    local commands; commands=()
+    _describe -t commands 'clarinet requirements help add commands' commands "$@"
+}
+(( $+functions[_apply_commands] )) ||
+_apply_commands() {
+    local commands; commands=()
+    _describe -t commands 'apply commands' commands "$@"
+}
+(( $+functions[_clarinet__deployments__help__apply_commands] )) ||
+_clarinet__deployments__help__apply_commands() {
+    local commands; commands=()
+    _describe -t commands 'clarinet deployments help apply commands' commands "$@"
+}
+(( $+functions[_clarinet__help__deployments__apply_commands] )) ||
+_clarinet__help__deployments__apply_commands() {
+    local commands; commands=()
+    _describe -t commands 'clarinet help deployments apply commands' commands "$@"
+}
+(( $+functions[_clarinet__chainhooks_commands] )) ||
+_clarinet__chainhooks_commands() {
+    local commands; commands=()
+    _describe -t commands 'clarinet chainhooks commands' commands "$@"
+}
+(( $+functions[_clarinet__help__chainhooks_commands] )) ||
+_clarinet__help__chainhooks_commands() {
+    local commands; commands=()
+    _describe -t commands 'clarinet help chainhooks commands' commands "$@"
+}
+(( $+functions[_check_commands] )) ||
+_check_commands() {
+    local commands; commands=()
+    _describe -t commands 'check commands' commands "$@"
+}
+(( $+functions[_clarinet__deployments__help__check_commands] )) ||
+_clarinet__deployments__help__check_commands() {
+    local commands; commands=()
+    _describe -t commands 'clarinet deployments help check commands' commands "$@"
+}
+(( $+functions[_clarinet__help__check_commands] )) ||
+_clarinet__help__check_commands() {
+    local commands; commands=()
+    _describe -t commands 'clarinet help check commands' commands "$@"
+}
+(( $+functions[_clarinet__help__deployments__check_commands] )) ||
+_clarinet__help__deployments__check_commands() {
+    local commands; commands=()
+    _describe -t commands 'clarinet help deployments check commands' commands "$@"
+}
+(( $+functions[_clarinet__help__completions_commands] )) ||
+_clarinet__help__completions_commands() {
+    local commands; commands=()
+    _describe -t commands 'clarinet help completions commands' commands "$@"
+}
+(( $+functions[_completions_commands] )) ||
+_completions_commands() {
+    local commands; commands=()
+    _describe -t commands 'completions commands' commands "$@"
+}
+(( $+functions[_clarinet__help__console_commands] )) ||
+_clarinet__help__console_commands() {
+    local commands; commands=()
+    _describe -t commands 'clarinet help console commands' commands "$@"
+}
+(( $+functions[_console_commands] )) ||
+_console_commands() {
+    local commands; commands=()
+    _describe -t commands 'console commands' commands "$@"
+}
+(( $+functions[_clarinet__contracts_commands] )) ||
+_clarinet__contracts_commands() {
+    local commands; commands=(
+'new:Generate files and settings for a new contract' \
+'rm:Remove files and settings for a contract' \
+'help:Print this message or the help of the given subcommand(s)' \
+    )
+    _describe -t commands 'clarinet contracts commands' commands "$@"
+}
+(( $+functions[_clarinet__help__contracts_commands] )) ||
+_clarinet__help__contracts_commands() {
+    local commands; commands=(
+'new:Generate files and settings for a new contract' \
+'rm:Remove files and settings for a contract' \
+    )
+    _describe -t commands 'clarinet help contracts commands' commands "$@"
+}
+(( $+functions[_clarinet__help__dap_commands] )) ||
+_clarinet__help__dap_commands() {
+    local commands; commands=()
+    _describe -t commands 'clarinet help dap commands' commands "$@"
+}
+(( $+functions[_dap_commands] )) ||
+_dap_commands() {
+    local commands; commands=()
+    _describe -t commands 'dap commands' commands "$@"
+}
+(( $+functions[_clarinet__deployments_commands] )) ||
+_clarinet__deployments_commands() {
+    local commands; commands=(
+'check:Check deployments format' \
+'generate:Generate new deployment' \
+'apply:Apply deployment' \
+'help:Print this message or the help of the given subcommand(s)' \
+    )
+    _describe -t commands 'clarinet deployments commands' commands "$@"
+}
+(( $+functions[_clarinet__help__deployments_commands] )) ||
+_clarinet__help__deployments_commands() {
+    local commands; commands=(
+'check:Check deployments format' \
+'generate:Generate new deployment' \
+'apply:Apply deployment' \
+    )
+    _describe -t commands 'clarinet help deployments commands' commands "$@"
+}
+(( $+functions[_clarinet__devnet_commands] )) ||
+_clarinet__devnet_commands() {
+    local commands; commands=(
+'package:Generate package of all required devnet artifacts' \
+'start:Start a local Devnet network for interacting with your contracts from your browser' \
+'help:Print this message or the help of the given subcommand(s)' \
+    )
+    _describe -t commands 'clarinet devnet commands' commands "$@"
+}
+(( $+functions[_clarinet__help__devnet_commands] )) ||
+_clarinet__help__devnet_commands() {
+    local commands; commands=(
+'package:Generate package of all required devnet artifacts' \
+'start:Start a local Devnet network for interacting with your contracts from your browser' \
+    )
+    _describe -t commands 'clarinet help devnet commands' commands "$@"
+}
+(( $+functions[_clarinet__deployments__help__generate_commands] )) ||
+_clarinet__deployments__help__generate_commands() {
+    local commands; commands=()
+    _describe -t commands 'clarinet deployments help generate commands' commands "$@"
+}
+(( $+functions[_clarinet__help__deployments__generate_commands] )) ||
+_clarinet__help__deployments__generate_commands() {
+    local commands; commands=()
+    _describe -t commands 'clarinet help deployments generate commands' commands "$@"
+}
+(( $+functions[_generate_commands] )) ||
+_generate_commands() {
+    local commands; commands=()
+    _describe -t commands 'generate commands' commands "$@"
+}
+(( $+functions[_clarinet__contracts__help_commands] )) ||
+_clarinet__contracts__help_commands() {
+    local commands; commands=(
+'new:Generate files and settings for a new contract' \
+'rm:Remove files and settings for a contract' \
+'help:Print this message or the help of the given subcommand(s)' \
+    )
+    _describe -t commands 'clarinet contracts help commands' commands "$@"
+}
+(( $+functions[_clarinet__contracts__help__help_commands] )) ||
+_clarinet__contracts__help__help_commands() {
+    local commands; commands=()
+    _describe -t commands 'clarinet contracts help help commands' commands "$@"
+}
+(( $+functions[_clarinet__deployments__help_commands] )) ||
+_clarinet__deployments__help_commands() {
+    local commands; commands=(
+'check:Check deployments format' \
+'generate:Generate new deployment' \
+'apply:Apply deployment' \
+'help:Print this message or the help of the given subcommand(s)' \
+    )
+    _describe -t commands 'clarinet deployments help commands' commands "$@"
+}
+(( $+functions[_clarinet__deployments__help__help_commands] )) ||
+_clarinet__deployments__help__help_commands() {
+    local commands; commands=()
+    _describe -t commands 'clarinet deployments help help commands' commands "$@"
+}
+(( $+functions[_clarinet__devnet__help_commands] )) ||
+_clarinet__devnet__help_commands() {
+    local commands; commands=(
+'package:Generate package of all required devnet artifacts' \
+'start:Start a local Devnet network for interacting with your contracts from your browser' \
+'help:Print this message or the help of the given subcommand(s)' \
+    )
+    _describe -t commands 'clarinet devnet help commands' commands "$@"
+}
+(( $+functions[_clarinet__devnet__help__help_commands] )) ||
+_clarinet__devnet__help__help_commands() {
+    local commands; commands=()
+    _describe -t commands 'clarinet devnet help help commands' commands "$@"
+}
+(( $+functions[_clarinet__help_commands] )) ||
+_clarinet__help_commands() {
+    local commands; commands=(
+'completions:Generate shell completions scripts' \
+'new:Create and scaffold a new project' \
+'contracts:Subcommands for working with contracts' \
+'requirements:Interact with contracts deployed on Mainnet' \
+'chainhooks:Subcommands for working with chainhooks (deprecated)' \
+'deployments:Manage contracts deployments on Simnet/Devnet/Testnet/Mainnet' \
+'console:Load contracts in a REPL for an interactive session' \
+'check:Check contracts syntax' \
+'integrate:Start a local Devnet network for interacting with your contracts from your browser' \
+'devnet:Subcommands for Devnet usage' \
+'lsp:Get Clarity autocompletion and inline errors from your code editor (VSCode, vim, emacs, etc)' \
+'dap:Step by step debugging and breakpoints from your code editor (VSCode, vim, emacs, etc)' \
+'help:Print this message or the help of the given subcommand(s)' \
+    )
+    _describe -t commands 'clarinet help commands' commands "$@"
+}
+(( $+functions[_clarinet__help__help_commands] )) ||
+_clarinet__help__help_commands() {
+    local commands; commands=()
+    _describe -t commands 'clarinet help help commands' commands "$@"
+}
+(( $+functions[_clarinet__requirements__help_commands] )) ||
+_clarinet__requirements__help_commands() {
+    local commands; commands=(
+'add:Interact with contracts published on Mainnet' \
+'help:Print this message or the help of the given subcommand(s)' \
+    )
+    _describe -t commands 'clarinet requirements help commands' commands "$@"
+}
+(( $+functions[_clarinet__requirements__help__help_commands] )) ||
+_clarinet__requirements__help__help_commands() {
+    local commands; commands=()
+    _describe -t commands 'clarinet requirements help help commands' commands "$@"
+}
+(( $+functions[_clarinet__help__integrate_commands] )) ||
+_clarinet__help__integrate_commands() {
+    local commands; commands=()
+    _describe -t commands 'clarinet help integrate commands' commands "$@"
+}
+(( $+functions[_integrate_commands] )) ||
+_integrate_commands() {
+    local commands; commands=()
+    _describe -t commands 'integrate commands' commands "$@"
+}
+(( $+functions[_clarinet__help__lsp_commands] )) ||
+_clarinet__help__lsp_commands() {
+    local commands; commands=()
+    _describe -t commands 'clarinet help lsp commands' commands "$@"
+}
+(( $+functions[_lsp_commands] )) ||
+_lsp_commands() {
+    local commands; commands=()
+    _describe -t commands 'lsp commands' commands "$@"
+}
+(( $+functions[_clarinet__contracts__help__new_commands] )) ||
+_clarinet__contracts__help__new_commands() {
+    local commands; commands=()
+    _describe -t commands 'clarinet contracts help new commands' commands "$@"
+}
+(( $+functions[_clarinet__help__contracts__new_commands] )) ||
+_clarinet__help__contracts__new_commands() {
+    local commands; commands=()
+    _describe -t commands 'clarinet help contracts new commands' commands "$@"
+}
+(( $+functions[_clarinet__help__new_commands] )) ||
+_clarinet__help__new_commands() {
+    local commands; commands=()
+    _describe -t commands 'clarinet help new commands' commands "$@"
+}
+(( $+functions[_new_commands] )) ||
+_new_commands() {
+    local commands; commands=()
+    _describe -t commands 'new commands' commands "$@"
+}
+(( $+functions[_clarinet__devnet__help__package_commands] )) ||
+_clarinet__devnet__help__package_commands() {
+    local commands; commands=()
+    _describe -t commands 'clarinet devnet help package commands' commands "$@"
+}
+(( $+functions[_clarinet__help__devnet__package_commands] )) ||
+_clarinet__help__devnet__package_commands() {
+    local commands; commands=()
+    _describe -t commands 'clarinet help devnet package commands' commands "$@"
+}
+(( $+functions[_package_commands] )) ||
+_package_commands() {
+    local commands; commands=()
+    _describe -t commands 'package commands' commands "$@"
+}
+(( $+functions[_clarinet__help__requirements_commands] )) ||
+_clarinet__help__requirements_commands() {
+    local commands; commands=(
+'add:Interact with contracts published on Mainnet' \
+    )
+    _describe -t commands 'clarinet help requirements commands' commands "$@"
+}
+(( $+functions[_clarinet__requirements_commands] )) ||
+_clarinet__requirements_commands() {
+    local commands; commands=(
+'add:Interact with contracts published on Mainnet' \
+'help:Print this message or the help of the given subcommand(s)' \
+    )
+    _describe -t commands 'clarinet requirements commands' commands "$@"
+}
+(( $+functions[_clarinet__contracts__help__rm_commands] )) ||
+_clarinet__contracts__help__rm_commands() {
+    local commands; commands=()
+    _describe -t commands 'clarinet contracts help rm commands' commands "$@"
+}
+(( $+functions[_clarinet__help__contracts__rm_commands] )) ||
+_clarinet__help__contracts__rm_commands() {
+    local commands; commands=()
+    _describe -t commands 'clarinet help contracts rm commands' commands "$@"
+}
+(( $+functions[_rm_commands] )) ||
+_rm_commands() {
+    local commands; commands=()
+    _describe -t commands 'rm commands' commands "$@"
+}
+(( $+functions[_clarinet__devnet__help__start_commands] )) ||
+_clarinet__devnet__help__start_commands() {
+    local commands; commands=()
+    _describe -t commands 'clarinet devnet help start commands' commands "$@"
+}
+(( $+functions[_clarinet__help__devnet__start_commands] )) ||
+_clarinet__help__devnet__start_commands() {
+    local commands; commands=()
+    _describe -t commands 'clarinet help devnet start commands' commands "$@"
+}
+(( $+functions[_start_commands] )) ||
+_start_commands() {
+    local commands; commands=()
+    _describe -t commands 'start commands' commands "$@"
+}
+
+if [ "$funcstack[1]" = "_clarinet" ]; then
+    _clarinet "$@"
+else
+    compdef _clarinet clarinet
+fi
