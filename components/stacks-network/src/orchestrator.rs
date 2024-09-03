@@ -1112,7 +1112,7 @@ disable_block_download = true
 disable_inbound_handshakes = true
 disable_inbound_walks = true
 public_ip_address = "1.1.1.1:1234"
-block_proposal_token = "12345"
+auth_token = "12345"
 
 [miner]
 min_tx_fee = 1
