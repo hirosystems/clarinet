@@ -151,7 +151,7 @@ describe("test pox-3", () => {
 describe("test pox-4", () => {
   const poxContract = `${poxDeployer}.pox-4`;
 
-  // wallet_1, wallet_2, wallet_3 private keys
+  // wallet_1 and wallet_2 private keys
   const stackingKeys = [
     "7287ba251d44a4d3fd9276c88ce34c5c52a038955511cccaf77e61068649c17801",
     "530d9f61984c888536871c6573073bdfc0058896dc1adfe9a6a10dfacadc209101",

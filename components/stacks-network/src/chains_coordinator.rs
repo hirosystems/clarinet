@@ -251,9 +251,8 @@ pub async fn start_chains_coordinator(
     let chains_coordinator_commands_oper = sel.recv(&chains_coordinator_commands_rx);
     let observer_event_oper = sel.recv(&observer_event_rx);
 
-    let DevnetConfig {
-        enable_subnet_node, ..
-    } = config.devnet_config;
+    let enable_subnet_node = config.devnet_config.enable_subnet_node;
+    let stacks_signers_keys = config.devnet_config.stacks_signers_keys.clone();
 
     loop {
         let oper = sel.select();
@@ -314,7 +313,9 @@ pub async fn start_chains_coordinator(
                             format!("mining blocks (chain_tip = #{})", bitcoin_block_height);
 
                         // Stacking orders can't be published until devnet is ready
-                        if bitcoin_block_height >= DEFAULT_FIRST_BURN_HEADER_HEIGHT + 10 {
+                        if !stacks_signers_keys.is_empty()
+                            && bitcoin_block_height >= DEFAULT_FIRST_BURN_HEADER_HEIGHT + 10
+                        {
                             let res = publish_stacking_orders(
                                 &config.devnet_config,
                                 &devnet_event_tx,
@@ -688,17 +689,6 @@ pub async fn publish_stacking_orders(
         .and_then(|version| version.parse().ok())
         .unwrap_or(1); // pox 1 contract is `pox.clar`
 
-    let default_signing_keys = [
-        StacksPrivateKey::from_hex(
-            "7287ba251d44a4d3fd9276c88ce34c5c52a038955511cccaf77e61068649c17801",
-        )
-        .unwrap(),
-        StacksPrivateKey::from_hex(
-            "530d9f61984c888536871c6573073bdfc0058896dc1adfe9a6a10dfacadc209101",
-        )
-        .unwrap(),
-    ];
-
     let mut transactions = 0;
     for (i, pox_stacking_order) in devnet_config.pox_stacking_orders.iter().enumerate() {
         if !should_publish_stacking_orders(&current_cycle, pox_stacking_order) {
@@ -729,6 +719,9 @@ pub async fn publish_stacking_orders(
         let btc_address_moved = pox_stacking_order.btc_address.clone();
         let duration = pox_stacking_order.duration;
 
+        let signer_key =
+            devnet_config.stacks_signers_keys[i % devnet_config.stacks_signers_keys.len()];
+
         let stacking_result =
             hiro_system_kit::thread_named("Stacking orders handler").spawn(move || {
                 let default_fee = fee_rate * 1000;
@@ -745,7 +738,7 @@ pub async fn publish_stacking_orders(
                     pox_version,
                     bitcoin_block_height,
                     current_cycle.into(),
-                    &default_signing_keys[i % 2],
+                    &signer_key,
                     extend_stacking,
                     &btc_address_moved,
                     stx_amount,

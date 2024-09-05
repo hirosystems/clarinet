@@ -9,9 +9,12 @@ use bollard::models::{HostConfig, PortBinding};
 use bollard::network::{CreateNetworkOptions, PruneNetworksOptions};
 use bollard::service::Ipam;
 use bollard::Docker;
+use chainhook_sdk::bitcoin::hex::DisplayHex;
 use chainhook_sdk::utils::Context;
 use clarinet_files::chainhook_types::StacksNetwork;
 use clarinet_files::{DevnetConfigFile, NetworkManifest, ProjectManifest};
+use clarity::types::chainstate::StacksPrivateKey;
+use clarity::types::PrivateKey;
 use futures::stream::TryStreamExt;
 use hiro_system_kit::{slog, slog_term, Drain};
 use reqwest::RequestBuilder;
@@ -35,8 +38,7 @@ pub struct DevnetOrchestrator {
     pub can_exit: bool,
     pub logger: Option<slog::Logger>,
     stacks_node_container_id: Option<String>,
-    stacks_signer_1_container_id: Option<String>,
-    stacks_signer_2_container_id: Option<String>,
+    stacks_signers_containers_ids: Vec<String>,
     stacks_api_container_id: Option<String>,
     stacks_explorer_container_id: Option<String>,
     bitcoin_node_container_id: Option<String>,
@@ -47,17 +49,6 @@ pub struct DevnetOrchestrator {
     docker_client: Option<Docker>,
     services_map_hosts: Option<ServicesMapHosts>,
 }
-
-// pub enum DevnetServices {
-//     BitcoinNode,
-//     StacksNode,
-//     StacksApi,
-//     StacksExplorer,
-//     BitcoinExplorer,
-//     SubnetNode,
-//     SubnetApi,
-// }
-
 #[derive(Clone, Debug)]
 pub struct ServicesMapHosts {
     pub bitcoin_node_host: String,
@@ -165,8 +156,7 @@ impl DevnetOrchestrator {
             logger,
             termination_success_tx: None,
             stacks_node_container_id: None,
-            stacks_signer_1_container_id: None,
-            stacks_signer_2_container_id: None,
+            stacks_signers_containers_ids: vec![],
             stacks_api_container_id: None,
             stacks_explorer_container_id: None,
             bitcoin_node_container_id: None,
@@ -312,6 +302,8 @@ impl DevnetOrchestrator {
         let mut devnet_path = PathBuf::from(&devnet_config.working_dir);
         devnet_path.push("data");
 
+        let signers_keys = devnet_config.stacks_signers_keys.clone();
+
         let disable_stacks_api = devnet_config.disable_stacks_api;
         let disable_stacks_explorer = devnet_config.disable_stacks_explorer;
         let disable_bitcoin_explorer = devnet_config.disable_bitcoin_explorer;
@@ -349,15 +341,7 @@ impl DevnetOrchestrator {
             &event_tx,
             enable_subnet_node,
             &self.logger,
-            "stacks-signer-1",
-            Status::Red,
-            "initializing",
-        );
-        send_status_update(
-            &event_tx,
-            enable_subnet_node,
-            &self.logger,
-            "stacks-signer-2",
+            "stacks-signers",
             Status::Red,
             "initializing",
         );
@@ -605,96 +589,57 @@ impl DevnetOrchestrator {
             }
         };
 
-        // Start stacks-signer-1
-        let _ = event_tx.send(DevnetEvent::info("Starting stacks-signer-1".to_string()));
-        send_status_update(
-            &event_tx,
-            enable_subnet_node,
-            &self.logger,
-            "stacks-signer-1",
-            Status::Yellow,
-            "updating image",
+        for (i, signer_key) in signers_keys.clone().iter().enumerate() {
+            let _ = event_tx.send(DevnetEvent::info(format!("Starting stacks-signer-{}", i)));
+            send_status_update(
+                &event_tx,
+                enable_subnet_node,
+                &self.logger,
+                "stacks-signers",
+                Status::Yellow,
+                "updating image",
+            );
+            match self
+                .prepare_stacks_signer_container(boot_index, ctx, i as u32, signer_key)
+                .await
+            {
+                Ok(_) => {}
+                Err(message) => {
+                    let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
+                    self.kill(ctx, Some(&message)).await;
+                    return Err(message);
+                }
+            };
+            send_status_update(
+                &event_tx,
+                enable_subnet_node,
+                &self.logger,
+                "stacks-signers",
+                Status::Yellow,
+                &format!("booting signer {}", i),
+            );
+            match self.boot_stacks_signer_container(i as u32).await {
+                Ok(_) => {}
+                Err(message) => {
+                    let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
+                    self.kill(ctx, Some(&message)).await;
+                    return Err(message);
+                }
+            };
+        }
+        let signers_count = signers_keys.len();
+        let message = format!(
+            "{} signer{} running",
+            signers_count,
+            if signers_count > 1 { "s" } else { "" }
         );
-        match self
-            .prepare_stacks_signer_container(boot_index, ctx, 1)
-            .await
-        {
-            Ok(_) => {}
-            Err(message) => {
-                let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
-                self.kill(ctx, Some(&message)).await;
-                return Err(message);
-            }
-        };
         send_status_update(
             &event_tx,
             enable_subnet_node,
             &self.logger,
-            "stacks-signer-1",
-            Status::Yellow,
-            "booting",
-        );
-        match self.boot_stacks_signer_container(1).await {
-            Ok(_) => {}
-            Err(message) => {
-                let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
-                self.kill(ctx, Some(&message)).await;
-                return Err(message);
-            }
-        };
-        send_status_update(
-            &event_tx,
-            enable_subnet_node,
-            &self.logger,
-            "stacks-signer-1",
+            "stacks-signers",
             Status::Green,
-            "running",
-        );
-
-        // Start stacks-signer-2
-        let _ = event_tx.send(DevnetEvent::info("Starting stacks-signer-2".to_string()));
-        send_status_update(
-            &event_tx,
-            enable_subnet_node,
-            &self.logger,
-            "stacks-signer-2",
-            Status::Yellow,
-            "updating image",
-        );
-        match self
-            .prepare_stacks_signer_container(boot_index, ctx, 2)
-            .await
-        {
-            Ok(_) => {}
-            Err(message) => {
-                let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
-                self.kill(ctx, Some(&message)).await;
-                return Err(message);
-            }
-        };
-        send_status_update(
-            &event_tx,
-            enable_subnet_node,
-            &self.logger,
-            "stacks-signer-2",
-            Status::Yellow,
-            "booting",
-        );
-        match self.boot_stacks_signer_container(2).await {
-            Ok(_) => {}
-            Err(message) => {
-                let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
-                self.kill(ctx, Some(&message)).await;
-                return Err(message);
-            }
-        };
-        send_status_update(
-            &event_tx,
-            enable_subnet_node,
-            &self.logger,
-            "stacks-signer-2",
-            Status::Green,
-            "running",
+            &message,
         );
 
         // Start stacks-explorer
@@ -1144,28 +1089,23 @@ amount = {}
             ));
         }
 
-        // add the 2 signers event observers
-        stacks_conf.push_str(&format!(
-            r#"
+        for i in 0..devnet_config.stacks_signers_keys.len() {
+            // the endpoints are
+            // `stacks-signer-0.<network>:30000`
+            // `stacks-signer-1.<network>:30001`
+            // ...
+            stacks_conf.push_str(&format!(
+                r#"
 [[events_observer]]
-endpoint = "stacks-signer-1.{}:30001"
+endpoint = "stacks-signer-{i}.{}:{}"
 retry_count = 255
 include_data_events = false
 events_keys = ["stackerdb", "block_proposal", "burn_blocks"]
 "#,
-            self.network_name
-        ));
-
-        stacks_conf.push_str(&format!(
-            r#"
-[[events_observer]]
-endpoint = "stacks-signer-2.{}:30002"
-retry_count = 255
-include_data_events = false
-events_keys = ["stackerdb", "block_proposal", "burn_blocks"]
-"#,
-            self.network_name
-        ));
+                self.network_name,
+                30000 + i
+            ));
+        }
 
         stacks_conf.push_str(&format!(
             r#"
@@ -1436,6 +1376,7 @@ start_height = {epoch_3_0}
         &self,
         boot_index: u32,
         signer_id: u32,
+        signer_key: &StacksPrivateKey,
     ) -> Result<Config<String>, String> {
         let devnet_config = match &self.network_config {
             Some(ref network_config) => match network_config.devnet {
@@ -1445,26 +1386,21 @@ start_height = {epoch_3_0}
             _ => return Err("unable to initialize bitcoin node".to_string()),
         };
 
-        // the default wallet_1 and wallet_2 are the default signers
-        let default_signing_keys = [
-            "7287ba251d44a4d3fd9276c88ce34c5c52a038955511cccaf77e61068649c17801",
-            "530d9f61984c888536871c6573073bdfc0058896dc1adfe9a6a10dfacadc209101",
-        ];
-
         let signer_conf = format!(
             r#"
 stacks_private_key = "{signer_private_key}"
 node_host = "stacks-node.{network_name}:{stacks_node_rpc_port}" # eg "127.0.0.1:20443"
 # must be added as event_observer in node config:
-endpoint = "0.0.0.0:3000{signer_id}"
+endpoint = "0.0.0.0:{port}"
 network = "testnet"
 auth_password = "12345"
 db_path = "stacks-signer-{signer_id}.sqlite"
 "#,
-            signer_private_key = default_signing_keys[(signer_id - 1) as usize],
+            signer_private_key = signer_key.to_bytes().to_lower_hex_string(),
             // signer_private_key = devnet_config.signer_private_key,
             network_name = self.network_name,
-            stacks_node_rpc_port = devnet_config.stacks_node_rpc_port
+            stacks_node_rpc_port = devnet_config.stacks_node_rpc_port,
+            port = 30000 + signer_id,
         );
         let mut signer_conf_path = PathBuf::from(&devnet_config.working_dir);
         signer_conf_path.push(format!("conf/Signer-{signer_id}.toml"));
@@ -1496,9 +1432,11 @@ db_path = "stacks-signer-{signer_id}.sqlite"
             ))
         }
 
+        let env = devnet_config.stacks_signers_env_vars.clone();
+
         let config = Config {
             labels: Some(labels),
-            image: Some(devnet_config.stacks_signer_image_url.clone()),
+            image: Some(devnet_config.stacks_signers_image_url.clone()),
             // domainname: Some(self.network_name.to_string()),
             tty: None,
             exposed_ports: None,
@@ -1508,7 +1446,7 @@ db_path = "stacks-signer-{signer_id}.sqlite"
                 "--config".into(),
                 format!("/src/stacks-signer/Signer-{signer_id}.toml"),
             ]),
-            env: None,
+            env: Some(env),
             host_config: Some(HostConfig {
                 auto_remove: Some(true),
                 binds: Some(binds),
@@ -1528,6 +1466,7 @@ db_path = "stacks-signer-{signer_id}.sqlite"
         boot_index: u32,
         ctx: &Context,
         signer_id: u32,
+        signer_key: &StacksPrivateKey,
     ) -> Result<(), String> {
         let (docker, devnet_config) = match (&self.docker_client, &self.network_config) {
             (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
@@ -1540,7 +1479,7 @@ db_path = "stacks-signer-{signer_id}.sqlite"
         let _info = docker
             .create_image(
                 Some(CreateImageOptions {
-                    from_image: devnet_config.stacks_signer_image_url.clone(),
+                    from_image: devnet_config.stacks_signers_image_url.clone(),
                     platform: devnet_config.docker_platform.clone(),
                     ..Default::default()
                 }),
@@ -1551,7 +1490,7 @@ db_path = "stacks-signer-{signer_id}.sqlite"
             .await
             .map_err(|e| format!("unable to create image: {}", e))?;
 
-        let config = self.prepare_stacks_signer_config(boot_index, signer_id)?;
+        let config = self.prepare_stacks_signer_config(boot_index, signer_id, signer_key)?;
 
         let options = CreateContainerOptions {
             name: format!("stacks-signer-{signer_id}.{}", self.network_name),
@@ -1571,28 +1510,13 @@ db_path = "stacks-signer-{signer_id}.sqlite"
                 container
             )
         });
-        if signer_id == 1 {
-            self.stacks_signer_1_container_id = Some(container.clone());
-        } else {
-            self.stacks_signer_2_container_id = Some(container.clone());
-        }
-        // self.stacks_signer_container_id = Some(container.clone());
+        self.stacks_signers_containers_ids.push(container.clone());
 
         Ok(())
     }
 
     pub async fn boot_stacks_signer_container(&mut self, signer_id: u32) -> Result<(), String> {
-        let container = match signer_id {
-            1 => match &self.stacks_signer_1_container_id {
-                Some(container) => container.clone(),
-                _ => return Err("unable to boot container".to_string()),
-            },
-            2 => match &self.stacks_signer_2_container_id {
-                Some(container) => container.clone(),
-                _ => return Err("unable to boot container".to_string()),
-            },
-            _ => return Err("invalid signer_id".to_string()),
-        };
+        let container = self.stacks_signers_containers_ids[signer_id as usize].clone();
 
         let docker = match &self.docker_client {
             Some(ref docker) => docker,
@@ -1771,7 +1695,6 @@ events_keys = ["*"]
         let mut env = vec![
             "STACKS_LOG_PP=1".to_string(),
             "STACKS_LOG_DEBUG=1".to_string(),
-            // "BLOCKSTACK_USE_TEST_GENESIS_CHAINSTATE=1".to_string(),
         ];
         env.append(&mut devnet_config.subnet_node_env_vars.clone());
 
@@ -2481,23 +2404,20 @@ events_keys = ["*"]
     pub async fn stop_containers(&self) -> Result<(), String> {
         let containers_ids = match (
             &self.stacks_node_container_id,
-            &self.stacks_signer_1_container_id,
-            &self.stacks_signer_2_container_id,
             &self.stacks_api_container_id,
             &self.stacks_explorer_container_id,
             &self.bitcoin_node_container_id,
             &self.bitcoin_explorer_container_id,
             &self.postgres_container_id,
         ) {
-            (Some(c1), Some(c2), Some(c3), Some(c4), Some(c5), Some(c6), Some(c7), Some(c8)) => {
-                (c1, c2, c3, c4, c5, c6, c7, c8)
+            (Some(c1), Some(c2), Some(c3), Some(c4), Some(c5), Some(c6)) => {
+                (c1, c2, c3, c4, c5, c6)
             }
-            _ => return Err("unable to boot container".to_string()),
+            _ => return Err("unable to get containers".to_string()),
         };
+
         let (
             stacks_node_c_id,
-            stacks_signer_1_c_id,
-            stacks_signer_2_c_id,
             stacks_api_c_id,
             stacks_explorer_c_id,
             bitcoin_node_c_id,
@@ -2512,16 +2432,16 @@ events_keys = ["*"]
 
         let options = KillContainerOptions { signal: "SIGKILL" };
 
+        // kill all signers
+        for container_id in &self.stacks_signers_containers_ids {
+            let _ = docker
+                .kill_container(container_id, Some(options.clone()))
+                .await;
+        }
+
+        // kill other containers
         let _ = docker
             .kill_container(stacks_node_c_id, Some(options.clone()))
-            .await;
-
-        let _ = docker
-            .kill_container(stacks_signer_1_c_id, Some(options.clone()))
-            .await;
-
-        let _ = docker
-            .kill_container(stacks_signer_2_c_id, Some(options.clone()))
             .await;
 
         let _ = docker
@@ -2661,13 +2581,17 @@ events_keys = ["*"]
             self.stacks_api_container_id.clone(),
             self.postgres_container_id.clone(),
             self.stacks_node_container_id.clone(),
-            self.stacks_signer_1_container_id.clone(),
-            self.stacks_signer_2_container_id.clone(),
             self.subnet_node_container_id.clone(),
             self.subnet_api_container_id.clone(),
         ];
 
-        for container_id in container_ids.into_iter().flatten() {
+        let signers_container_ids = self.stacks_signers_containers_ids.clone();
+
+        for container_id in container_ids
+            .into_iter()
+            .flatten()
+            .chain(signers_container_ids)
+        {
             let _ = docker.kill_container(&container_id, options.clone()).await;
             ctx.try_log(|logger| slog::info!(logger, "Terminating container: {}", &container_id));
             let _ = docker.remove_container(&container_id, None).await;
