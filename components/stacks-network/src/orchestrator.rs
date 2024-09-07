@@ -1066,8 +1066,8 @@ second_attempt_time_ms = {subsequent_attempt_time_ms}
 block_reward_recipient = "{miner_coinbase_recipient}"
 wait_for_block_download = false
 microblock_attempt_time_ms = 10
+pre_nakamoto_mock_signing = false
 mining_key = "19ec1c3e31d139c989a23a27eac60d1abfad5277d3ae9604242514c738258efa01"
-# microblock_attempt_time_ms = 15000
 "#,
             stacks_node_rpc_port = devnet_config.stacks_node_rpc_port,
             stacks_node_p2p_port = devnet_config.stacks_node_p2p_port,
