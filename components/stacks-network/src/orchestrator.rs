@@ -1098,8 +1098,6 @@ amount = {}
                 r#"
 [[events_observer]]
 endpoint = "stacks-signer-{i}.{}:{}"
-retry_count = 255
-include_data_events = false
 events_keys = ["stackerdb", "block_proposal", "burn_blocks"]
 "#,
                 self.network_name,
@@ -1109,13 +1107,11 @@ events_keys = ["stackerdb", "block_proposal", "burn_blocks"]
 
         stacks_conf.push_str(&format!(
             r#"
-# Add orchestrator (docker-host) as an event observer
-[[events_observer]]
-endpoint = "host.docker.internal:{orchestrator_ingestion_port}"
-retry_count = 255
-include_data_events = true
-events_keys = ["*"]
-"#,
+        # Add orchestrator (docker-host) as an event observer
+        [[events_observer]]
+        endpoint = "host.docker.internal:{orchestrator_ingestion_port}"
+        events_keys = ["burn_blocks", "memtx"]
+        "#,
             orchestrator_ingestion_port = devnet_config.orchestrator_ingestion_port,
         ));
 
@@ -1125,8 +1121,6 @@ events_keys = ["*"]
 # Add stacks-api as an event observer
 [[events_observer]]
 endpoint = "stacks-api.{}:{}"
-retry_count = 255
-include_data_events = false
 events_keys = ["*"]
 "#,
                 self.network_name, devnet_config.stacks_api_events_port
@@ -1139,7 +1133,6 @@ events_keys = ["*"]
 # Add subnet-node as an event observer
 [[events_observer]]
 endpoint = "subnet-node.{}:{}"
-retry_count = 255
 events_keys = ["*"]
 "#,
                 self.network_name, devnet_config.subnet_events_ingestion_port
@@ -1151,7 +1144,6 @@ events_keys = ["*"]
                 r#"
 [[events_observer]]
 endpoint = "{}"
-retry_count = 255
 events_keys = ["*"]
 "#,
                 chains_coordinator,
@@ -1600,7 +1592,6 @@ observer_port = {subnet_events_ingestion_port}
 # Add orchestrator (docker-host) as an event observer
 # [[events_observer]]
 # endpoint = "host.docker.internal:{orchestrator_port}"
-# retry_count = 255
 # include_data_events = true
 # events_keys = ["*"]
 "#,
@@ -1623,7 +1614,6 @@ observer_port = {subnet_events_ingestion_port}
                 r#"
 [[events_observer]]
 endpoint = "{}"
-retry_count = 255
 events_keys = ["*"]
 "#,
                 events_observer,
@@ -1636,7 +1626,6 @@ events_keys = ["*"]
 # Add subnet-api as an event observer
 [[events_observer]]
 endpoint = "subnet-api.{}:{}"
-retry_count = 255
 include_data_events = false
 events_keys = ["*"]
 "#,

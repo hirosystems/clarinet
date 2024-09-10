@@ -655,10 +655,9 @@ pub async fn publish_stacking_orders(
             Ok(pox_info) => Some(pox_info),
             Err(e) => {
                 let _ = devnet_event_tx.send(DevnetEvent::warning(format!(
-                    "Unable to parse pox info: {}",
+                    "unable to parse pox info: {}",
                     e
                 )));
-
                 None
             }
         },
