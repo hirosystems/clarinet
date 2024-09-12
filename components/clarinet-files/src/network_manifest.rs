@@ -5,10 +5,12 @@ use bip39::{Language, Mnemonic};
 use chainhook_types::{BitcoinNetwork, StacksNetwork};
 use clarinet_utils::get_bip39_seed_from_mnemonic;
 use clarity::address::AddressHashMode;
-use clarity::types::chainstate::StacksAddress;
+use clarity::types::chainstate::{StacksAddress, StacksPrivateKey};
 use clarity::util::{hash::bytes_to_hex, secp256k1::Secp256k1PublicKey};
 use clarity::vm::types::QualifiedContractIdentifier;
+use lazy_static::lazy_static;
 use libsecp256k1::{PublicKey, SecretKey};
+use serde::Serialize;
 use tiny_hderive::bip32::ExtendedPrivKey;
 use toml::value::Value;
 
@@ -44,8 +46,8 @@ pub const DEFAULT_EPOCH_2_2: u64 = 102;
 pub const DEFAULT_EPOCH_2_3: u64 = 103;
 pub const DEFAULT_EPOCH_2_4: u64 = 104;
 pub const DEFAULT_EPOCH_2_5: u64 = 108;
-// Epoch 3.0 isn't stable for now, let's focus on running 2.5
-pub const DEFAULT_EPOCH_3_0: u64 = 100001;
+// Mainnet run on  Epoch 2.5, which shoud remain the default for devnet
+pub const DEFAULT_EPOCH_3_0: u64 = 1000001;
 
 // Currently, the pox-4 contract has these values hardcoded:
 // https://github.com/stacks-network/stacks-core/blob/e09ab931e2f15ff70f3bb5c2f4d7afb[…]42bd7bec6/stackslib/src/chainstate/stacks/boot/pox-testnet.clar
@@ -53,6 +55,19 @@ pub const DEFAULT_EPOCH_3_0: u64 = 100001;
 pub const DEFAULT_POX_PREPARE_LENGTH: u64 = 4;
 pub const DEFAULT_POX_REWARD_LENGTH: u64 = 10;
 pub const DEFAULT_FIRST_BURN_HEADER_HEIGHT: u64 = 100;
+
+lazy_static! {
+    pub static ref DEFAULT_PRIVATE_KEYS: [StacksPrivateKey; 2] = [
+        StacksPrivateKey::from_hex(
+            "7287ba251d44a4d3fd9276c88ce34c5c52a038955511cccaf77e61068649c17801",
+        )
+        .unwrap(),
+        StacksPrivateKey::from_hex(
+            "530d9f61984c888536871c6573073bdfc0058896dc1adfe9a6a10dfacadc209101",
+        )
+        .unwrap(),
+    ];
+}
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct NetworkManifestFile {
@@ -87,6 +102,8 @@ pub struct DevnetConfigFile {
     pub stacks_node_subsequent_attempt_time_ms: Option<u32>,
     pub stacks_node_env_vars: Option<Vec<String>>,
     pub stacks_node_next_initiative_delay: Option<u16>,
+    pub stacks_signers_keys: Option<Vec<String>>,
+    pub stacks_signers_env_vars: Option<Vec<String>>,
     pub stacks_api_env_vars: Option<Vec<String>>,
     pub stacks_explorer_env_vars: Option<Vec<String>>,
     pub subnet_node_env_vars: Option<Vec<String>>,
@@ -104,6 +121,7 @@ pub struct DevnetConfigFile {
     pub faucet_derivation_path: Option<String>,
     pub bitcoin_controller_block_time: Option<u32>,
     pub bitcoin_controller_automining_disabled: Option<bool>,
+    pub pre_nakamoto_mock_signing: Option<bool>,
     pub working_dir: Option<String>,
     pub postgres_port: Option<u16>,
     pub postgres_username: Option<String>,
@@ -248,6 +266,8 @@ pub struct DevnetConfig {
     pub stacks_api_port: u16,
     pub stacks_api_events_port: u16,
     pub stacks_api_env_vars: Vec<String>,
+    pub stacks_signers_keys: Vec<StacksPrivateKey>,
+    pub stacks_signers_env_vars: Vec<String>,
     pub stacks_explorer_port: u16,
     pub stacks_explorer_env_vars: Vec<String>,
     pub bitcoin_explorer_port: u16,
@@ -265,6 +285,7 @@ pub struct DevnetConfig {
     pub faucet_btc_address: String,
     pub faucet_mnemonic: String,
     pub faucet_derivation_path: String,
+    pub pre_nakamoto_mock_signing: bool,
     pub working_dir: String,
     pub postgres_port: u16,
     pub postgres_username: String,
@@ -275,7 +296,7 @@ pub struct DevnetConfig {
     pub execute_script: Vec<ExecuteScript>,
     pub bitcoin_node_image_url: String,
     pub stacks_node_image_url: String,
-    pub stacks_signer_image_url: String,
+    pub stacks_signers_image_url: String,
     pub stacks_api_image_url: String,
     pub stacks_explorer_image_url: String,
     pub postgres_image_url: String,
@@ -857,6 +878,9 @@ impl NetworkManifest {
                     .miner_coinbase_recipient
                     .unwrap_or(miner_stx_address),
                 miner_wallet_name: devnet_config.miner_wallet_name.unwrap_or("".to_string()),
+                pre_nakamoto_mock_signing: devnet_config
+                    .pre_nakamoto_mock_signing
+                    .unwrap_or_default(),
                 faucet_btc_address,
                 faucet_stx_address,
                 faucet_mnemonic,
@@ -892,7 +916,7 @@ impl NetworkManifest {
                     .stacks_node_image_url
                     .take()
                     .unwrap_or(DEFAULT_STACKS_NODE_IMAGE.to_string()),
-                stacks_signer_image_url: devnet_config
+                stacks_signers_image_url: devnet_config
                     .stacks_signer_image_url
                     .take()
                     .unwrap_or(DEFAULT_STACKS_SIGNER_IMAGE.to_string()),
@@ -959,6 +983,19 @@ impl NetworkManifest {
                 epoch_3_0: devnet_config.epoch_3_0.unwrap_or(DEFAULT_EPOCH_3_0),
                 stacks_node_env_vars: devnet_config
                     .stacks_node_env_vars
+                    .take()
+                    .unwrap_or_default(),
+                stacks_signers_keys: devnet_config
+                    .stacks_signers_keys
+                    .take()
+                    .map(|keys| {
+                        keys.into_iter()
+                            .map(|key| StacksPrivateKey::from_hex(&key).unwrap())
+                            .collect::<Vec<clarity::util::secp256k1::Secp256k1PrivateKey>>()
+                    })
+                    .unwrap_or(DEFAULT_PRIVATE_KEYS.to_vec()),
+                stacks_signers_env_vars: devnet_config
+                    .stacks_signers_env_vars
                     .take()
                     .unwrap_or_default(),
                 stacks_api_env_vars: devnet_config.stacks_api_env_vars.take().unwrap_or_default(),

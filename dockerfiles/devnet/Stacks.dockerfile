@@ -5,16 +5,13 @@ RUN test -n "$GIT_COMMIT" || (echo "GIT_COMMIT not set" && false)
 
 RUN echo "Building stacks-node from commit: https://github.com/stacks-network/stacks-blockchain/commit/$GIT_COMMIT"
 
-RUN apt-get update && apt-get install -y libclang-dev
-RUN rustup toolchain install stable
-
 WORKDIR /stacks
 RUN git init && \
     git remote add origin https://github.com/stacks-network/stacks-blockchain.git && \
-    git -c protocol.version=2 fetch --depth=1 origin "$GIT_COMMIT" && \
+    git fetch --depth=1 origin "$GIT_COMMIT" && \
     git reset --hard FETCH_HEAD
 
-RUN cargo build --release --package stacks-node --bin stacks-node
+RUN cargo build --package stacks-node --bin stacks-node --features monitoring_prom,slog_json --release
 
 FROM debian:bookworm-slim
 
