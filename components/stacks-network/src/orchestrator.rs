@@ -1595,7 +1595,6 @@ observer_port = {subnet_events_ingestion_port}
 # Add orchestrator (docker-host) as an event observer
 # [[events_observer]]
 # endpoint = "host.docker.internal:{orchestrator_port}"
-# include_data_events = true
 # events_keys = ["*"]
 "#,
             subnet_node_rpc_port = devnet_config.subnet_node_rpc_port,
@@ -1629,7 +1628,6 @@ events_keys = ["*"]
 # Add subnet-api as an event observer
 [[events_observer]]
 endpoint = "subnet-api.{}:{}"
-include_data_events = false
 events_keys = ["*"]
 "#,
                 self.network_name, devnet_config.subnet_api_events_port
