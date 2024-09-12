@@ -1069,7 +1069,7 @@ second_attempt_time_ms = {subsequent_attempt_time_ms}
 block_reward_recipient = "{miner_coinbase_recipient}"
 wait_for_block_download = false
 microblock_attempt_time_ms = 10
-pre_nakamoto_mock_signing = false
+pre_nakamoto_mock_signing = {pre_nakamoto_mock_signing}
 mining_key = "19ec1c3e31d139c989a23a27eac60d1abfad5277d3ae9604242514c738258efa01"
 "#,
             stacks_node_rpc_port = devnet_config.stacks_node_rpc_port,
@@ -1079,6 +1079,7 @@ mining_key = "19ec1c3e31d139c989a23a27eac60d1abfad5277d3ae9604242514c738258efa01
             first_attempt_time_ms = devnet_config.stacks_node_first_attempt_time_ms,
             subsequent_attempt_time_ms = devnet_config.stacks_node_subsequent_attempt_time_ms,
             miner_coinbase_recipient = devnet_config.miner_coinbase_recipient,
+            pre_nakamoto_mock_signing = devnet_config.pre_nakamoto_mock_signing,
         );
 
         for (_, account) in network_config.accounts.iter() {

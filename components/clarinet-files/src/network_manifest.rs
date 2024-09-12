@@ -121,7 +121,7 @@ pub struct DevnetConfigFile {
     pub faucet_derivation_path: Option<String>,
     pub bitcoin_controller_block_time: Option<u32>,
     pub bitcoin_controller_automining_disabled: Option<bool>,
-    pub pre_nakamoto_block_signing: Option<bool>,
+    pub pre_nakamoto_mock_signing: Option<bool>,
     pub working_dir: Option<String>,
     pub postgres_port: Option<u16>,
     pub postgres_username: Option<String>,
@@ -285,7 +285,7 @@ pub struct DevnetConfig {
     pub faucet_btc_address: String,
     pub faucet_mnemonic: String,
     pub faucet_derivation_path: String,
-    pub pre_nakamoto_block_signing: bool,
+    pub pre_nakamoto_mock_signing: bool,
     pub working_dir: String,
     pub postgres_port: u16,
     pub postgres_username: String,
@@ -878,8 +878,8 @@ impl NetworkManifest {
                     .miner_coinbase_recipient
                     .unwrap_or(miner_stx_address),
                 miner_wallet_name: devnet_config.miner_wallet_name.unwrap_or("".to_string()),
-                pre_nakamoto_block_signing: devnet_config
-                    .pre_nakamoto_block_signing
+                pre_nakamoto_mock_signing: devnet_config
+                    .pre_nakamoto_mock_signing
                     .unwrap_or_default(),
                 faucet_btc_address,
                 faucet_stx_address,
