@@ -2849,7 +2849,7 @@ events_keys = ["*"]
 
         let mut error_count = 0;
         loop {
-            let descriptor = format!("addr({})", miner_address);
+            let descriptor = format!("addr({})", miner_address.assume_checked_ref());
             let rpc_result: JsonValue = base_builder(
                 &bitcoin_node_url,
                 &devnet_config.bitcoin_node_username,
@@ -2926,7 +2926,7 @@ events_keys = ["*"]
 
         let mut error_count = 0;
         loop {
-            let descriptor = format!("addr({})", faucet_address);
+            let descriptor = format!("addr({})", faucet_address.assume_checked_ref());
             let rpc_result: JsonValue = base_builder(
                 &bitcoin_node_url,
                 &devnet_config.bitcoin_node_username,
@@ -3007,7 +3007,7 @@ events_keys = ["*"]
 
             let mut error_count = 0;
             loop {
-                let descriptor = format!("addr({})", address);
+                let descriptor = format!("addr({})", address.assume_checked_ref());
                 let rpc_result: JsonValue = base_builder(
                     &bitcoin_node_url,
                     &devnet_config.bitcoin_node_username,
