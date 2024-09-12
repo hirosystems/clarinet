@@ -1058,6 +1058,9 @@ disable_inbound_handshakes = true
 disable_inbound_walks = true
 public_ip_address = "1.1.1.1:1234"
 auth_token = "12345"
+# block_proposal_token has been replaced by auth_token
+# we keep it for backward compatibility
+block_proposal_token = "12345"
 
 [miner]
 min_tx_fee = 1
@@ -1107,11 +1110,11 @@ events_keys = ["stackerdb", "block_proposal", "burn_blocks"]
 
         stacks_conf.push_str(&format!(
             r#"
-        # Add orchestrator (docker-host) as an event observer
-        [[events_observer]]
-        endpoint = "host.docker.internal:{orchestrator_ingestion_port}"
-        events_keys = ["burn_blocks", "memtx"]
-        "#,
+# Add orchestrator (docker-host) as an event observer
+[[events_observer]]
+endpoint = "host.docker.internal:{orchestrator_ingestion_port}"
+events_keys = ["burn_blocks", "memtx"]
+"#,
             orchestrator_ingestion_port = devnet_config.orchestrator_ingestion_port,
         ));
 
@@ -1154,14 +1157,14 @@ events_keys = ["*"]
             r#"
 [burnchain]
 chain = "bitcoin"
-mode = "{burnchain_mode}"
+mode = "krypton"
 magic_bytes = "T3"
 first_burn_block_height = 100
 pox_prepare_length = 5
 pox_reward_length = 20
 burn_fee_cap = 20_000
 poll_time_secs = 1
-timeout = 30
+timeout = 2
 peer_host = "host.docker.internal"
 rpc_ssl = false
 wallet_name = "{miner_wallet_name}"
@@ -1170,7 +1173,6 @@ password = "{bitcoin_node_password}"
 rpc_port = {orchestrator_ingestion_port}
 peer_port = {bitcoin_node_p2p_port}
 "#,
-            burnchain_mode = "nakamoto-neon",
             bitcoin_node_username = devnet_config.bitcoin_node_username,
             bitcoin_node_password = devnet_config.bitcoin_node_password,
             bitcoin_node_p2p_port = devnet_config.bitcoin_node_p2p_port,

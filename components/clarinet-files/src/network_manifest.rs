@@ -8,6 +8,7 @@ use clarity::address::AddressHashMode;
 use clarity::types::chainstate::{StacksAddress, StacksPrivateKey};
 use clarity::util::{hash::bytes_to_hex, secp256k1::Secp256k1PublicKey};
 use clarity::vm::types::QualifiedContractIdentifier;
+use lazy_static::lazy_static;
 use libsecp256k1::{PublicKey, SecretKey};
 use serde::Serialize;
 use tiny_hderive::bip32::ExtendedPrivKey;
@@ -45,8 +46,8 @@ pub const DEFAULT_EPOCH_2_2: u64 = 102;
 pub const DEFAULT_EPOCH_2_3: u64 = 103;
 pub const DEFAULT_EPOCH_2_4: u64 = 104;
 pub const DEFAULT_EPOCH_2_5: u64 = 108;
-// Epoch 3.0 isn't stable for now, let's focus on running 2.5
-pub const DEFAULT_EPOCH_3_0: u64 = 100001;
+// Mainnet run on  Epoch 2.5, which shoud remain the default for devnet
+pub const DEFAULT_EPOCH_3_0: u64 = 1000001;
 
 // Currently, the pox-4 contract has these values hardcoded:
 // https://github.com/stacks-network/stacks-core/blob/e09ab931e2f15ff70f3bb5c2f4d7afb[…]42bd7bec6/stackslib/src/chainstate/stacks/boot/pox-testnet.clar
@@ -54,6 +55,19 @@ pub const DEFAULT_EPOCH_3_0: u64 = 100001;
 pub const DEFAULT_POX_PREPARE_LENGTH: u64 = 4;
 pub const DEFAULT_POX_REWARD_LENGTH: u64 = 10;
 pub const DEFAULT_FIRST_BURN_HEADER_HEIGHT: u64 = 100;
+
+lazy_static! {
+    pub static ref DEFAULT_PRIVATE_KEYS: [StacksPrivateKey; 2] = [
+        StacksPrivateKey::from_hex(
+            "7287ba251d44a4d3fd9276c88ce34c5c52a038955511cccaf77e61068649c17801",
+        )
+        .unwrap(),
+        StacksPrivateKey::from_hex(
+            "530d9f61984c888536871c6573073bdfc0058896dc1adfe9a6a10dfacadc209101",
+        )
+        .unwrap(),
+    ];
+}
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct NetworkManifestFile {
@@ -107,6 +121,7 @@ pub struct DevnetConfigFile {
     pub faucet_derivation_path: Option<String>,
     pub bitcoin_controller_block_time: Option<u32>,
     pub bitcoin_controller_automining_disabled: Option<bool>,
+    pub pre_nakamoto_block_signing: Option<bool>,
     pub working_dir: Option<String>,
     pub postgres_port: Option<u16>,
     pub postgres_username: Option<String>,
@@ -270,6 +285,7 @@ pub struct DevnetConfig {
     pub faucet_btc_address: String,
     pub faucet_mnemonic: String,
     pub faucet_derivation_path: String,
+    pub pre_nakamoto_block_signing: bool,
     pub working_dir: String,
     pub postgres_port: u16,
     pub postgres_username: String,
@@ -862,6 +878,9 @@ impl NetworkManifest {
                     .miner_coinbase_recipient
                     .unwrap_or(miner_stx_address),
                 miner_wallet_name: devnet_config.miner_wallet_name.unwrap_or("".to_string()),
+                pre_nakamoto_block_signing: devnet_config
+                    .pre_nakamoto_block_signing
+                    .unwrap_or_default(),
                 faucet_btc_address,
                 faucet_stx_address,
                 faucet_mnemonic,
@@ -972,18 +991,9 @@ impl NetworkManifest {
                     .map(|keys| {
                         keys.into_iter()
                             .map(|key| StacksPrivateKey::from_hex(&key).unwrap())
-                            .collect()
+                            .collect::<Vec<clarity::util::secp256k1::Secp256k1PrivateKey>>()
                     })
-                    .unwrap_or(vec![
-                        StacksPrivateKey::from_hex(
-                            "7287ba251d44a4d3fd9276c88ce34c5c52a038955511cccaf77e61068649c17801",
-                        )
-                        .unwrap(),
-                        StacksPrivateKey::from_hex(
-                            "530d9f61984c888536871c6573073bdfc0058896dc1adfe9a6a10dfacadc209101",
-                        )
-                        .unwrap(),
-                    ]),
+                    .unwrap_or(DEFAULT_PRIVATE_KEYS.to_vec()),
                 stacks_signers_env_vars: devnet_config
                     .stacks_signers_env_vars
                     .take()
