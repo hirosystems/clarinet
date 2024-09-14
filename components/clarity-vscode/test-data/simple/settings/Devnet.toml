@@ -17,6 +17,7 @@ balance = 100_000_000_000_000
 [devnet]
 disable_stacks_explorer = false
 disable_stacks_api = false
+disable_postgres = false
 
 # Send some stacking orders
 [[devnet.pox_stacking_orders]]

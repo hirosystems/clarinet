@@ -75,6 +75,7 @@ balance = 100_000_000_000_000
 [devnet]
 disable_stacks_explorer = true
 disable_stacks_api = true
+disable_postgres = true
 # disable_bitcoin_explorer = true
 # working_dir = "tmp/devnet"
 # stacks_node_events_observers = ["host.docker.internal:8002"]
