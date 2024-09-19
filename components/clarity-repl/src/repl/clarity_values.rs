@@ -22,47 +22,52 @@ pub fn uint8_to_value(mut value: &[u8]) -> Value {
 
 pub fn value_to_string(value: &Value) -> String {
     match value {
-        Value::Principal(principal_data) => {
-            format!("'{principal_data}")
-        }
+        Value::Principal(principal_data) => format!("'{}", principal_data),
         Value::Tuple(tup_data) => {
-            let mut data = Vec::new();
-            for (name, value) in tup_data.data_map.iter() {
-                data.push(format!("{}: {}", &**name, value_to_string(value)))
-            }
-            format!("{{ {} }}", data.join(", "))
+            let data = tup_data
+                .data_map
+                .iter()
+                .map(|(name, value)| format!("{}: {}", name, value_to_string(value)))
+                .collect::<Vec<_>>()
+                .join(", ");
+            format!("{{ {} }}", data)
         }
-        Value::Optional(opt_data) => match opt_data.data {
-            Some(ref x) => format!("(some {})", value_to_string(x)),
+        Value::Optional(opt_data) => match &opt_data.data {
+            Some(x) => format!("(some {})", value_to_string(x)),
             None => "none".to_string(),
         },
-        Value::Response(res_data) => match res_data.committed {
-            true => format!("(ok {})", value_to_string(&res_data.data)),
-            false => format!("(err {})", value_to_string(&res_data.data)),
-        },
-        Value::Sequence(SequenceData::String(CharType::ASCII(data))) => {
-            format!("\"{}\"", String::from_utf8(data.data.clone()).unwrap())
+        Value::Response(res_data) => {
+            let committed = if res_data.committed { "ok" } else { "err" };
+            format!("({} {})", committed, value_to_string(&res_data.data))
         }
-        Value::Sequence(SequenceData::String(CharType::UTF8(data))) => {
-            let mut result = String::new();
-            for c in data.data.iter() {
-                if c.len() > 1 {
-                    // escape extended charset
-                    result.push_str(&format!("\\u{{{}}}", hash::to_hex(&c[..])));
-                } else {
-                    result.push(c[0] as char)
-                }
-            }
-            format!("u\"{result}\"")
+        Value::Sequence(SequenceData::String(CharType::ASCII(ascii_data))) => {
+            format!("\"{}\"", String::from_utf8_lossy(&ascii_data.data))
+        }
+        Value::Sequence(SequenceData::String(CharType::UTF8(utf8_data))) => {
+            let result = utf8_data
+                .data
+                .iter()
+                .map(|c| {
+                    if c.len() > 1 {
+                        format!("\\u{{{}}}", hash::to_hex(&c[..]))
+                    } else {
+                        (c[0] as char).to_string()
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join("");
+            format!("u\"{}\"", result)
         }
         Value::Sequence(SequenceData::List(list_data)) => {
-            let mut data = Vec::new();
-            for value in list_data.data.iter() {
-                data.push(value_to_string(value))
-            }
-            format!("(list {})", data.join(" "))
+            let data = list_data
+                .data
+                .iter()
+                .map(value_to_string)
+                .collect::<Vec<_>>()
+                .join(" ");
+            format!("(list {})", data)
         }
-        _ => format!("{value}"),
+        _ => format!("{}", value),
     }
 }
 

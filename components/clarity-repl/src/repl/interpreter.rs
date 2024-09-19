@@ -3,7 +3,7 @@ use std::collections::{btree_map::Entry, BTreeMap, BTreeSet};
 use crate::analysis::annotation::{Annotation, AnnotationKind};
 use crate::analysis::ast_dependency_detector::{ASTDependencyDetector, Dependency};
 use crate::analysis::{self};
-use crate::repl::datastore::BurnDatastore;
+use crate::repl::datastore::ClarityDatastore;
 use crate::repl::datastore::Datastore;
 use crate::repl::Settings;
 use clarity::consts::CHAIN_ID_TESTNET;
@@ -28,7 +28,6 @@ use clarity::vm::{events::*, ClarityVersion};
 use clarity::vm::{ContractEvaluationResult, EvalHook};
 use clarity::vm::{CostSynthesis, ExecutionResult, ParsedContract};
 
-use super::datastore::StacksConstants;
 use super::{ClarityContract, DEFAULT_EPOCH};
 
 pub const BLOCK_LIMIT_MAINNET: ExecutionCost = ExecutionCost {
@@ -41,8 +40,8 @@ pub const BLOCK_LIMIT_MAINNET: ExecutionCost = ExecutionCost {
 
 #[derive(Clone, Debug)]
 pub struct ClarityInterpreter {
+    pub clarity_datastore: ClarityDatastore,
     pub datastore: Datastore,
-    pub burn_datastore: BurnDatastore,
     pub repl_settings: Settings,
     tx_sender: StandardPrincipalData,
     accounts: BTreeSet<String>,
@@ -54,19 +53,13 @@ pub struct Txid(pub [u8; 32]);
 
 impl ClarityInterpreter {
     pub fn new(tx_sender: StandardPrincipalData, repl_settings: Settings) -> Self {
-        let constants = StacksConstants {
-            burn_start_height: 0,
-            pox_prepare_length: 50,
-            pox_reward_cycle_length: 1050,
-            pox_rejection_fraction: 0,
-        };
         Self {
             tx_sender,
             repl_settings,
-            datastore: Datastore::new(),
+            clarity_datastore: ClarityDatastore::new(),
             accounts: BTreeSet::new(),
             tokens: BTreeMap::new(),
-            burn_datastore: BurnDatastore::new(constants),
+            datastore: Datastore::default(),
         }
     }
 
@@ -297,7 +290,7 @@ impl ClarityInterpreter {
         contract_ast: &ContractAST,
         annotations: &Vec<Annotation>,
     ) -> Result<(ContractAnalysis, Vec<Diagnostic>), Diagnostic> {
-        let mut analysis_db = AnalysisDatabase::new(&mut self.datastore);
+        let mut analysis_db = AnalysisDatabase::new(&mut self.clarity_datastore);
 
         // Run standard clarity analyses
         let mut contract_analysis = clarity::vm::analysis::run_analysis(
@@ -327,9 +320,9 @@ impl ClarityInterpreter {
     pub fn get_block_time(&mut self) -> u64 {
         let block_height = self.get_block_height();
         let mut conn = ClarityDatabase::new(
-            &mut self.datastore,
-            &self.burn_datastore,
-            &self.burn_datastore,
+            &mut self.clarity_datastore,
+            &self.datastore,
+            &self.datastore,
         );
         conn.get_block_time(block_height)
             .expect("unable to get block time")
@@ -342,7 +335,7 @@ impl ClarityInterpreter {
     ) -> Option<String> {
         let key = ClarityDatabase::make_key_for_trip(contract_id, StoreType::Variable, var_name);
         let value_hex = self
-            .datastore
+            .clarity_datastore
             .get_data(&key)
             .expect("failed to get key from datastore")?;
         Some(format!("0x{value_hex}"))
@@ -357,7 +350,7 @@ impl ClarityInterpreter {
         let key =
             ClarityDatabase::make_key_for_data_map_entry(contract_id, map_name, map_key).unwrap();
         let value_hex = self
-            .datastore
+            .clarity_datastore
             .get_data(&key)
             .expect("failed to get map entry from datastore")?;
         Some(format!("0x{value_hex}"))
@@ -377,9 +370,9 @@ impl ClarityInterpreter {
             ContractContext::new(contract_id.clone(), contract.clarity_version);
 
         let mut conn = ClarityDatabase::new(
-            &mut self.datastore,
-            &self.burn_datastore,
-            &self.burn_datastore,
+            &mut self.clarity_datastore,
+            &self.datastore,
+            &self.datastore,
         );
         let tx_sender: PrincipalData = self.tx_sender.clone().into();
         conn.begin();
@@ -581,7 +574,7 @@ impl ClarityInterpreter {
         }
 
         if contract_saved {
-            let mut analysis_db = AnalysisDatabase::new(&mut self.datastore);
+            let mut analysis_db = AnalysisDatabase::new(&mut self.clarity_datastore);
             analysis_db
                 .execute(|db| db.insert_contract(&contract_id, &analysis))
                 .expect("Unable to save data");
@@ -606,9 +599,9 @@ impl ClarityInterpreter {
             ContractContext::new(contract_id.clone(), contract.clarity_version);
 
         let mut conn = ClarityDatabase::new(
-            &mut self.datastore,
-            &self.burn_datastore,
-            &self.burn_datastore,
+            &mut self.clarity_datastore,
+            &self.datastore,
+            &self.datastore,
         );
         let tx_sender: PrincipalData = self.tx_sender.clone().into();
         conn.begin();
@@ -821,7 +814,7 @@ impl ClarityInterpreter {
         }
 
         if contract_saved {
-            let mut analysis_db = AnalysisDatabase::new(&mut self.datastore);
+            let mut analysis_db = AnalysisDatabase::new(&mut self.clarity_datastore);
             analysis_db
                 .execute(|db| db.insert_contract(&contract_id, &analysis))
                 .expect("Unable to save data");
@@ -842,9 +835,9 @@ impl ClarityInterpreter {
         eval_hooks: Option<Vec<&mut dyn EvalHook>>,
     ) -> Result<ExecutionResult, String> {
         let mut conn = ClarityDatabase::new(
-            &mut self.datastore,
-            &self.burn_datastore,
-            &self.burn_datastore,
+            &mut self.clarity_datastore,
+            &self.datastore,
+            &self.datastore,
         );
         let tx_sender: PrincipalData = self.tx_sender.clone().into();
         conn.begin();
@@ -1055,9 +1048,9 @@ impl ClarityInterpreter {
     ) -> Result<String, String> {
         let final_balance = {
             let conn = ClarityDatabase::new(
-                &mut self.datastore,
-                &self.burn_datastore,
-                &self.burn_datastore,
+                &mut self.clarity_datastore,
+                &self.datastore,
+                &self.datastore,
             );
 
             let mut global_context = GlobalContext::new(
@@ -1098,8 +1091,12 @@ impl ClarityInterpreter {
         self.tx_sender.clone()
     }
 
+    pub fn set_current_epoch(&mut self, epoch: StacksEpochId) {
+        self.datastore.set_current_epoch(epoch);
+    }
+
     pub fn advance_chain_tip(&mut self, count: u32) -> u32 {
-        let current_epoch = self.burn_datastore.get_current_epoch();
+        let current_epoch = self.datastore.get_current_epoch();
         if current_epoch < StacksEpochId::Epoch30 {
             self.advance_burn_chain_tip(count)
         } else {
@@ -1111,26 +1108,31 @@ impl ClarityInterpreter {
     }
 
     pub fn advance_burn_chain_tip(&mut self, count: u32) -> u32 {
-        let new_height = self.burn_datastore.advance_chain_tip(count);
-        let _ = self.datastore.advance_chain_tip(count);
+        let new_height = self
+            .datastore
+            .advance_burn_chain_tip(&mut self.clarity_datastore, count);
+        // let _ = self.datastore.advance_stacks_chain_tip(count);
         self.set_tenure_height();
         new_height
     }
+
     pub fn advance_stacks_chain_tip(&mut self, count: u32) -> Result<u32, String> {
-        let current_epoch = self.burn_datastore.get_current_epoch();
+        let current_epoch = self.datastore.get_current_epoch();
         if current_epoch < StacksEpochId::Epoch30 {
             Err("only burn chain height can be advanced in epoch lower than 3.0".to_string())
         } else {
-            Ok(self.datastore.advance_chain_tip(count))
+            Ok(self
+                .datastore
+                .advance_stacks_chain_tip(&mut self.clarity_datastore, count))
         }
     }
 
     pub fn set_tenure_height(&mut self) {
         let burn_block_height = self.get_burn_block_height();
         let mut conn = ClarityDatabase::new(
-            &mut self.datastore,
-            &self.burn_datastore,
-            &self.burn_datastore,
+            &mut self.clarity_datastore,
+            &self.datastore,
+            &self.datastore,
         );
         conn.begin();
         conn.put_data("_stx-data::tenure_height", &burn_block_height)
@@ -1139,11 +1141,11 @@ impl ClarityInterpreter {
     }
 
     pub fn get_block_height(&mut self) -> u32 {
-        self.datastore.get_current_block_height()
+        self.datastore.get_current_stacks_block_height()
     }
 
     pub fn get_burn_block_height(&mut self) -> u32 {
-        self.burn_datastore.get_current_block_height()
+        self.datastore.get_current_burn_block_height()
     }
 
     fn credit_token(&mut self, account: String, token: String, value: u128) {
@@ -1289,7 +1291,7 @@ mod tests {
         let mut interpreter =
             ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
         interpreter
-            .burn_datastore
+            .datastore
             .set_current_epoch(StacksEpochId::Epoch2_05);
         let count = 5;
         let initial_block_height = interpreter.get_burn_block_height();
@@ -1297,6 +1299,7 @@ mod tests {
         assert_eq!(interpreter.get_burn_block_height(), initial_block_height);
         assert_eq!(interpreter.get_block_height(), initial_block_height);
     }
+
     #[test]
     fn test_advance_stacks_chain_tip() {
         let wasm_settings = Settings {
@@ -1307,20 +1310,24 @@ mod tests {
         let mut interpreter =
             ClarityInterpreter::new(StandardPrincipalData::transient(), wasm_settings);
         interpreter
-            .burn_datastore
+            .datastore
             .set_current_epoch(StacksEpochId::Epoch30);
         let count = 5;
         let initial_block_height = interpreter.get_burn_block_height();
-        assert_eq!(interpreter.advance_stacks_chain_tip(count), Ok(count));
+
+        let result = interpreter.advance_stacks_chain_tip(count);
+        assert_eq!(result, Ok(count));
+
         assert_eq!(interpreter.get_burn_block_height(), initial_block_height);
         assert_eq!(interpreter.get_block_height(), initial_block_height + count);
     }
+
     #[test]
     fn test_advance_chain_tip_pre_epoch3() {
         let mut interpreter =
             ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
         interpreter
-            .burn_datastore
+            .datastore
             .set_current_epoch(StacksEpochId::Epoch2_05);
         let count = 5;
         let initial_block_height = interpreter.get_block_height();
@@ -1331,12 +1338,13 @@ mod tests {
             initial_block_height + count
         );
     }
+
     #[test]
     fn test_advance_chain_tip() {
         let mut interpreter =
             ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
         interpreter
-            .burn_datastore
+            .datastore
             .set_current_epoch(StacksEpochId::Epoch30);
         let count = 5;
         let initial_block_height = interpreter.get_block_height();

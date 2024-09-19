@@ -392,7 +392,7 @@ impl Session {
                         }
                     }
                     EvaluationResult::Snippet(snippet_result) => {
-                        output.push(format!("{}", snippet_result.result).green().to_string())
+                        output.push(value_to_string(&snippet_result.result).green().to_string())
                     }
                 }
                 Ok((output, result))
@@ -826,6 +826,46 @@ impl Session {
         output.join("\n")
     }
 
+    fn parse_and_advance_chain_tip(&mut self, command: &str) -> String {
+        let args: Vec<_> = command.split(' ').collect();
+
+        if args.len() != 2 {
+            return format!("{}", "Usage: ::advance_chain_tip <count>".red());
+        }
+
+        let count = match args[1].parse::<u32>() {
+            Ok(count) => count,
+            _ => {
+                return format!("{}", "Unable to parse count".red());
+            }
+        };
+
+        let new_height = self.advance_chain_tip(count);
+        format!("{} blocks simulated, new height: {}", count, new_height)
+            .green()
+            .to_string()
+    }
+
+    fn parse_and_advance_burn_chain_tip(&mut self, command: &str) -> String {
+        let args: Vec<_> = command.split(' ').collect();
+
+        if args.len() != 2 {
+            return format!("{}", "Usage: ::advance_burn_chain_tip <count>".red());
+        }
+
+        let count = match args[1].parse::<u32>() {
+            Ok(count) => count,
+            _ => {
+                return format!("{}", "Unable to parse count".red());
+            }
+        };
+
+        let new_height = self.advance_burn_chain_tip(count);
+        format!("{} blocks simulated, new height: {}", count, new_height)
+            .green()
+            .to_string()
+    }
+
     fn parse_and_advance_stacks_chain_tip(&mut self, command: &str) -> String {
         let args: Vec<_> = command.split(' ').collect();
 
@@ -851,53 +891,16 @@ impl Session {
         }
     }
 
-    fn parse_and_advance_chain_tip(&mut self, command: &str) -> String {
-        let args: Vec<_> = command.split(' ').collect();
-
-        if args.len() != 2 {
-            return format!("{}", "Usage: ::advance_chain_tip <count>".red());
-        }
-
-        let count = match args[1].parse::<u32>() {
-            Ok(count) => count,
-            _ => {
-                return format!("{}", "Unable to parse count".red());
-            }
-        };
-
-        let new_height = self.advance_chain_tip(count);
-        format!("{} blocks simulated, new height: {}", count, new_height)
-            .green()
-            .to_string()
+    pub fn advance_chain_tip(&mut self, count: u32) -> u32 {
+        self.interpreter.advance_chain_tip(count)
     }
-    fn parse_and_advance_burn_chain_tip(&mut self, command: &str) -> String {
-        let args: Vec<_> = command.split(' ').collect();
 
-        if args.len() != 2 {
-            return format!("{}", "Usage: ::advance_burn_chain_tip <count>".red());
-        }
-
-        let count = match args[1].parse::<u32>() {
-            Ok(count) => count,
-            _ => {
-                return format!("{}", "Unable to parse count".red());
-            }
-        };
-
-        let new_height = self.advance_burn_chain_tip(count);
-        format!("{} blocks simulated, new height: {}", count, new_height)
-            .green()
-            .to_string()
+    pub fn advance_burn_chain_tip(&mut self, count: u32) -> u32 {
+        self.interpreter.advance_burn_chain_tip(count)
     }
 
     pub fn advance_stacks_chain_tip(&mut self, count: u32) -> Result<u32, String> {
         self.interpreter.advance_stacks_chain_tip(count)
-    }
-    pub fn advance_burn_chain_tip(&mut self, count: u32) -> u32 {
-        self.interpreter.advance_burn_chain_tip(count)
-    }
-    pub fn advance_chain_tip(&mut self, count: u32) -> u32 {
-        self.interpreter.advance_chain_tip(count)
     }
 
     fn parse_and_set_tx_sender(&mut self, command: &str) -> String {
@@ -992,7 +995,7 @@ impl Session {
 
     pub fn update_epoch(&mut self, epoch: StacksEpochId) {
         self.current_epoch = epoch;
-        self.interpreter.burn_datastore.set_current_epoch(epoch);
+        self.interpreter.set_current_epoch(epoch);
         if epoch >= StacksEpochId::Epoch30 {
             self.interpreter.set_tenure_height();
         }
@@ -1438,6 +1441,7 @@ mod tests {
         let new_height = session.handle_command("::get_burn_block_height");
         assert_eq!(new_height, "Current height: 1");
     }
+
     #[test]
     fn set_epoch_command() {
         let mut session = Session::new(SessionSettings::default());
@@ -1759,7 +1763,6 @@ mod tests {
             _ => panic!("Unexpected result"),
         };
 
-        println!("{}", time_block_2 - time_block_1);
         assert!(time_block_2 - time_block_1 == 600);
     }
 

@@ -1072,7 +1072,7 @@ pub fn main() {
                 contract.epoch,
                 contract.clarity_version,
             );
-            let mut analysis_db = AnalysisDatabase::new(&mut session.interpreter.datastore);
+            let mut analysis_db = AnalysisDatabase::new(&mut session.interpreter.clarity_datastore);
             let mut analysis_diagnostics = match analysis::run_analysis(
                 &mut contract_analysis,
                 &mut analysis_db,
