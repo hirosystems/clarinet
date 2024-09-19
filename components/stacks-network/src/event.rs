@@ -86,11 +86,10 @@ pub fn send_status_update(
         "stacks-node" => 1,
         "stacks-signers" => 2,
         "stacks-api" => 3,
-        "postgres" => 4,
-        "subnet-node" => 5,
-        "subnet-api" => 6,
-        "stacks-explorer" => subnet_services + 5,
-        "bitcoin-explorer" => subnet_services + 6,
+        "subnet-node" => 4,
+        "subnet-api" => 5,
+        "stacks-explorer" => subnet_services + 4,
+        "bitcoin-explorer" => subnet_services + 5,
         _ => return,
     };
 
