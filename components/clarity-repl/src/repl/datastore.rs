@@ -47,7 +47,7 @@ pub struct ClarityDatastore {
 }
 
 #[derive(Clone, Debug)]
-pub struct BurnBlockInfo {
+struct BurnBlockInfo {
     burn_block_time: u64,
     burn_block_height: u32,
 }
@@ -59,11 +59,6 @@ pub struct StacksBlockInfo {
     consensus_hash: ConsensusHash,
     vrf_seed: VRFSeed,
     stacks_block_time: u64,
-    miner: StacksAddress,
-    burnchain_tokens_spent_for_block: u128,
-    get_burnchain_tokens_spent_for_winning_block: u128,
-    tokens_earned_for_block: u128,
-    pox_payout_addrs: (Vec<TupleData>, u128),
 }
 
 #[derive(Clone, Debug)]
@@ -76,6 +71,7 @@ pub struct StacksConstants {
 
 #[derive(Clone, Debug)]
 pub struct Datastore {
+    genesis_id: StacksBlockId,
     burn_chain_height: u32,
     burn_blocks: HashMap<BurnchainHeaderHash, BurnBlockInfo>,
     stacks_chain_height: u32,
@@ -85,7 +81,6 @@ pub struct Datastore {
     current_epoch: StacksEpochId,
     current_epoch_start_height: u32,
     constants: StacksConstants,
-    genesis_time: u64,
 }
 
 // fn height_to_hashed_bytes(height: u32) -> [u8; 32] {
@@ -364,12 +359,7 @@ impl Datastore {
             burn_block_header_hash: first_burn_block_header_hash,
             consensus_hash: ConsensusHash([0x00; 20]),
             vrf_seed: VRFSeed([0x00; 32]),
-            stacks_block_time: genesis_time,
-            miner: StacksAddress::burn_address(false),
-            burnchain_tokens_spent_for_block: 0,
-            get_burnchain_tokens_spent_for_winning_block: 0,
-            tokens_earned_for_block: 0,
-            pox_payout_addrs: (vec![], 0),
+            stacks_block_time: genesis_time + 10,
         };
 
         let sortition_lookup = HashMap::from([(sortition_id, id)]);
@@ -378,6 +368,7 @@ impl Datastore {
         let stacks_blocks = HashMap::from([(id, genesis_block)]);
 
         Datastore {
+            genesis_id: id,
             burn_chain_height: 0,
             burn_blocks,
             stacks_chain_height: 0,
@@ -387,7 +378,6 @@ impl Datastore {
             current_epoch: StacksEpochId::Epoch2_05,
             current_epoch_start_height: 0,
             constants,
-            genesis_time,
         }
     }
 
@@ -403,9 +393,23 @@ impl Datastore {
         self.burn_chain_height
     }
 
-    fn build_stacks_block(&self) -> StacksBlockInfo {
+    fn build_next_stacks_block(&self, clarity_datastore: &ClarityDatastore) -> StacksBlockInfo {
         let burn_chain_height = self.burn_chain_height;
         let stacks_block_height = self.stacks_chain_height;
+
+        let last_stacks_block = self
+            .stacks_blocks
+            .get(&clarity_datastore.current_chain_tip)
+            .expect("current chain tip missing in stacks block table");
+        let last_burn_block = self
+            .burn_blocks
+            .get(&height_to_burn_block_header_hash(burn_chain_height))
+            .expect("burn block missing in burn block table");
+
+        let last_block_time = std::cmp::max(
+            last_stacks_block.stacks_block_time,
+            last_burn_block.burn_block_time,
+        );
 
         let bytes = height_to_hashed_bytes(stacks_block_height);
 
@@ -425,13 +429,7 @@ impl Datastore {
             buffer[0] = 4;
             VRFSeed(buffer)
         };
-        let time_since_genesis: u64 = (stacks_block_height * 600).into();
-        let stacks_block_time: u64 = self.genesis_time + time_since_genesis;
-        let miner = StacksAddress::burn_address(true);
-        let burnchain_tokens_spent_for_block = 2000;
-        let get_burnchain_tokens_spent_for_winning_block = 2000;
-        let tokens_earned_for_block = 5000;
-        let pox_payout_addrs = (vec![], 0_u128);
+        let stacks_block_time: u64 = last_block_time + 10;
 
         StacksBlockInfo {
             block_header_hash,
@@ -439,11 +437,6 @@ impl Datastore {
             consensus_hash,
             vrf_seed,
             stacks_block_time,
-            miner,
-            burnchain_tokens_spent_for_block,
-            get_burnchain_tokens_spent_for_winning_block,
-            tokens_earned_for_block,
-            pox_payout_addrs,
         }
     }
 
@@ -452,13 +445,25 @@ impl Datastore {
         clarity_datastore: &mut ClarityDatastore,
         count: u32,
     ) -> u32 {
-        let genesis_time = self.genesis_time;
-
         for _ in 1..=count {
+            let last_stacks_block = self
+                .stacks_blocks
+                .get(&clarity_datastore.current_chain_tip)
+                .unwrap();
+            let last_burn_block = self
+                .burn_blocks
+                .get(&last_stacks_block.burn_block_header_hash)
+                .unwrap();
+
+            let mut next_burn_block_time = last_burn_block.burn_block_time + 600;
+            if last_stacks_block.stacks_block_time > next_burn_block_time {
+                next_burn_block_time = last_stacks_block.stacks_block_time + 10;
+            }
+
             let height = self.burn_chain_height + 1;
             let hash = height_to_burn_block_header_hash(height);
             let burn_block_info = BurnBlockInfo {
-                burn_block_time: genesis_time + ((height * 600) as u64),
+                burn_block_time: next_burn_block_time,
                 burn_block_height: height,
             };
 
@@ -480,23 +485,27 @@ impl Datastore {
             .get(&clarity_datastore.open_chain_tip)
             .expect("Open chain tip missing in block id lookup table");
 
-        for i in 1..=count {
-            let height = self.stacks_chain_height + i;
-            let bytes = height_to_hashed_bytes(height);
+        for _ in 1..=count {
+            self.stacks_chain_height += 1;
+
+            let bytes = height_to_hashed_bytes(self.stacks_chain_height);
             let id = StacksBlockId(bytes);
             let sortition_id = SortitionId(bytes);
-            let block_info = self.build_stacks_block();
-            clarity_datastore
-                .block_id_lookup
-                .insert(id, current_lookup_id);
-            clarity_datastore.height_at_chain_tip.insert(id, height);
+            let block_info = self.build_next_stacks_block(clarity_datastore);
+
             self.sortition_lookup.insert(sortition_id, id);
             self.consensus_hash_lookup
                 .insert(block_info.consensus_hash, sortition_id);
             self.stacks_blocks.insert(id, block_info);
+
+            clarity_datastore
+                .block_id_lookup
+                .insert(id, current_lookup_id);
+            clarity_datastore
+                .height_at_chain_tip
+                .insert(id, self.stacks_chain_height);
         }
 
-        self.stacks_chain_height += count;
         clarity_datastore.open_chain_tip = height_to_id(self.stacks_chain_height);
         clarity_datastore.current_chain_tip = clarity_datastore.open_chain_tip;
         self.stacks_chain_height
@@ -573,7 +582,10 @@ impl HeadersDB for Datastore {
         id_bhh: &StacksBlockId,
         _epoch_id: &StacksEpochId,
     ) -> Option<StacksAddress> {
-        self.stacks_blocks.get(id_bhh).map(|id| id.miner)
+        if self.get_burn_block_height_for_block(id_bhh).is_some() {
+            return StacksAddress::burn_address(id_bhh != &self.genesis_id).into();
+        }
+        None
     }
 
     fn get_burnchain_tokens_spent_for_block(
@@ -581,9 +593,13 @@ impl HeadersDB for Datastore {
         id_bhh: &StacksBlockId,
         _epoch_id: &StacksEpochId,
     ) -> Option<u128> {
-        self.stacks_blocks
-            .get(id_bhh)
-            .map(|id| id.burnchain_tokens_spent_for_block)
+        if id_bhh == &self.genesis_id {
+            return Some(0);
+        };
+        if self.get_burn_block_height_for_block(id_bhh).is_some() {
+            return Some(2000);
+        };
+        None
     }
 
     fn get_burnchain_tokens_spent_for_winning_block(
@@ -591,9 +607,10 @@ impl HeadersDB for Datastore {
         id_bhh: &StacksBlockId,
         _epoch_id: &StacksEpochId,
     ) -> Option<u128> {
-        self.stacks_blocks
-            .get(id_bhh)
-            .map(|id| id.get_burnchain_tokens_spent_for_winning_block)
+        if id_bhh == &self.genesis_id {
+            return Some(0);
+        };
+        None
     }
 
     fn get_tokens_earned_for_block(
@@ -601,9 +618,13 @@ impl HeadersDB for Datastore {
         id_bhh: &StacksBlockId,
         _epoch_id: &StacksEpochId,
     ) -> Option<u128> {
-        self.stacks_blocks
-            .get(id_bhh)
-            .map(|id| id.tokens_earned_for_block)
+        if id_bhh == &self.genesis_id {
+            return Some(0);
+        };
+        if self.get_burn_block_height_for_block(id_bhh).is_some() {
+            return Some(5000);
+        }
+        None
     }
 }
 
@@ -708,13 +729,14 @@ impl BurnStateDB for Datastore {
     /// Get the PoX payout addresses for a given burnchain block
     fn get_pox_payout_addrs(
         &self,
-        _height: u32,
-        sortition_id: &SortitionId,
+        height: u32,
+        _sortition_id: &SortitionId,
     ) -> Option<(Vec<TupleData>, u128)> {
-        self.sortition_lookup
-            .get(sortition_id)
-            .and_then(|id| self.stacks_blocks.get(id))
-            .map(|block_info| block_info.pox_payout_addrs.clone())
+        if height <= self.burn_chain_height {
+            Some((vec![], 0))
+        } else {
+            None
+        }
     }
 
     fn get_ast_rules(&self, _height: u32) -> clarity::vm::ast::ASTRules {

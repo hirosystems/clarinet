@@ -1095,23 +1095,10 @@ impl ClarityInterpreter {
         self.datastore.set_current_epoch(epoch);
     }
 
-    pub fn advance_chain_tip(&mut self, count: u32) -> u32 {
-        let current_epoch = self.datastore.get_current_epoch();
-        if current_epoch < StacksEpochId::Epoch30 {
-            self.advance_burn_chain_tip(count)
-        } else {
-            match self.advance_stacks_chain_tip(count) {
-                Ok(count) => count,
-                Err(_) => unreachable!("Epoch checked already"),
-            }
-        }
-    }
-
     pub fn advance_burn_chain_tip(&mut self, count: u32) -> u32 {
         let new_height = self
             .datastore
             .advance_burn_chain_tip(&mut self.clarity_datastore, count);
-        // let _ = self.datastore.advance_stacks_chain_tip(count);
         self.set_tenure_height();
         new_height
     }
