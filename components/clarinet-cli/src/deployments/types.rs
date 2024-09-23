@@ -48,7 +48,7 @@ impl Display for DeploymentSynthesis {
         let base: u64 = 10;
         let int_part = self.total_cost / base.pow(6);
         let frac_part = self.total_cost % base.pow(6);
-        let formatted_total_cost = format!("{}.{:08}", int_part, frac_part);
+        let formatted_total_cost = format!("{}.{:06}", int_part, frac_part);
         write!(
             f,
             "{}\n\n{}\n{}",
