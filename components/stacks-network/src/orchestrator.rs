@@ -357,16 +357,6 @@ impl DevnetOrchestrator {
                 "initializing",
             );
         }
-        if !disable_postgres {
-            send_status_update(
-                &event_tx,
-                enable_subnet_node,
-                &self.logger,
-                "postgres",
-                Status::Red,
-                "initializing",
-            );
-        }
         if !disable_stacks_explorer {
             send_status_update(
                 &event_tx,
@@ -451,15 +441,6 @@ impl DevnetOrchestrator {
 
         // Start postgres container
         if !disable_postgres {
-            // Start postgres
-            send_status_update(
-                &event_tx,
-                enable_subnet_node,
-                &self.logger,
-                "postgres",
-                Status::Yellow,
-                "preparing postgres container",
-            );
             let _ = event_tx.send(DevnetEvent::info("Starting postgres".to_string()));
             match self.prepare_postgres_container(ctx).await {
                 Ok(_) => {}
