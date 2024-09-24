@@ -83,10 +83,6 @@ pub struct Datastore {
     constants: StacksConstants,
 }
 
-// fn height_to_hashed_bytes(height: u32) -> [u8; 32] {
-//     let hash = Sha512_256::digest(height.to_be_bytes());
-//     hash.into()
-// }
 fn height_to_hashed_bytes(height: u32) -> [u8; 32] {
     let input_bytes = height.to_be_bytes();
     let mut hasher = Sha512_256::new();
