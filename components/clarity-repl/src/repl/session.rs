@@ -1394,7 +1394,7 @@ mod tests {
         session.handle_command("::set_epoch 3.0");
         let _ = session.handle_command("::advance_stacks_chain_tip 1");
         let new_height = session.handle_command("::get_stacks_block_height");
-        assert_eq!(new_height, "Current height: 1");
+        assert_eq!(new_height, "Current height: 2");
     }
 
     #[test]
@@ -1426,24 +1426,25 @@ mod tests {
         let result = session.handle_command("::advance_burn_chain_tip 1");
         assert_eq!(
             result,
-            "new burn height: 1\nnew stacks height: 1"
+            "new burn height: 2\nnew stacks height: 2"
                 .to_string()
                 .green()
                 .to_string()
         );
         let new_height = session.handle_command("::get_stacks_block_height");
-        assert_eq!(new_height, "Current height: 1");
+        assert_eq!(new_height, "Current height: 2");
         // advance_chain_tip will only affect stacks height in epoch 3 or greater
         let _ = session.handle_command("::advance_chain_tip 1");
         let new_height = session.handle_command("::get_stacks_block_height");
-        assert_eq!(new_height, "Current height: 2");
+        assert_eq!(new_height, "Current height: 3");
         let new_height = session.handle_command("::get_burn_block_height");
-        assert_eq!(new_height, "Current height: 1");
+        assert_eq!(new_height, "Current height: 2");
     }
 
     #[test]
     fn set_epoch_command() {
         let mut session = Session::new(SessionSettings::default());
+        let initial_block_height = session.interpreter.get_block_height();
         let initial_epoch = session.handle_command("::get_epoch");
         // initial epoch is 2.05
         assert_eq!(initial_epoch, "Current epoch: 2.05");
@@ -1459,9 +1460,18 @@ mod tests {
         let current_epoch = session.handle_command("::get_epoch");
         assert_eq!(current_epoch, "Current epoch: 2.4");
 
+        // changing epoch in 2.x does not impact the block height
+        assert_eq!(session.interpreter.get_block_height(), initial_block_height);
+
         session.handle_command("::set_epoch 3.0");
         let current_epoch = session.handle_command("::get_epoch");
         assert_eq!(current_epoch, "Current epoch: 3.0");
+
+        // changing epoch in 3.x increments the block height
+        assert_eq!(
+            session.interpreter.get_block_height(),
+            initial_block_height + 1
+        );
     }
 
     #[test]
@@ -1757,30 +1767,6 @@ mod tests {
         };
 
         let result = run_session_snippet(&mut session, "(get-block-info? time u3)");
-        let time_block_2 = match result.expect_optional() {
-            Ok(Some(Value::UInt(time))) => time,
-            _ => panic!("Unexpected result"),
-        };
-
-        assert!(time_block_2 - time_block_1 == 600);
-    }
-
-    #[test]
-    fn block_time_is_realistic_in_epoch_3_0() {
-        let settings = SessionSettings::default();
-        let mut session = Session::new(settings);
-        session.start().expect("session could not start");
-        session.update_epoch(StacksEpochId::Epoch30);
-
-        session.advance_burn_chain_tip(4);
-
-        let result = run_session_snippet(&mut session, "(get-tenure-info? time u2)");
-        let time_block_1 = match result.expect_optional() {
-            Ok(Some(Value::UInt(time))) => time,
-            _ => panic!("Unexpected result"),
-        };
-
-        let result = run_session_snippet(&mut session, "(get-tenure-info? time u3)");
         let time_block_2 = match result.expect_optional() {
             Ok(Some(Value::UInt(time))) => time,
             _ => panic!("Unexpected result"),

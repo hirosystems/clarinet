@@ -1092,7 +1092,8 @@ impl ClarityInterpreter {
     }
 
     pub fn set_current_epoch(&mut self, epoch: StacksEpochId) {
-        self.datastore.set_current_epoch(epoch);
+        self.datastore
+            .set_current_epoch(&mut self.clarity_datastore, epoch);
     }
 
     pub fn advance_burn_chain_tip(&mut self, count: u32) -> u32 {
@@ -1238,6 +1239,24 @@ mod tests {
         assert_eq!(result.result, expected_value);
     }
 
+    #[track_caller]
+    fn run_snippet(
+        interpreter: &mut ClarityInterpreter,
+        snippet: &str,
+        clarity_version: ClarityVersion,
+    ) -> Value {
+        let contract = ClarityContractBuilder::new()
+            .code_source(snippet.to_string())
+            .epoch(interpreter.datastore.get_current_epoch())
+            .clarity_version(clarity_version)
+            .build();
+        let deploy_result = deploy_contract(interpreter, &contract);
+        match deploy_result.unwrap().result {
+            EvaluationResult::Contract(_) => unreachable!(),
+            EvaluationResult::Snippet(res) => res.result,
+        }
+    }
+
     #[test]
     fn test_get_tx_sender() {
         let mut interpreter =
@@ -1277,9 +1296,7 @@ mod tests {
     fn test_advance_stacks_chain_tip_pre_epoch_3() {
         let mut interpreter =
             ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
-        interpreter
-            .datastore
-            .set_current_epoch(StacksEpochId::Epoch2_05);
+        interpreter.set_current_epoch(StacksEpochId::Epoch2_05);
         let count = 5;
         let initial_block_height = interpreter.get_burn_block_height();
         assert_ne!(interpreter.advance_stacks_chain_tip(count), Ok(count));
@@ -1296,14 +1313,13 @@ mod tests {
         };
         let mut interpreter =
             ClarityInterpreter::new(StandardPrincipalData::transient(), wasm_settings);
-        interpreter
-            .datastore
-            .set_current_epoch(StacksEpochId::Epoch30);
+        interpreter.set_current_epoch(StacksEpochId::Epoch30);
+        interpreter.advance_burn_chain_tip(1);
         let count = 5;
-        let initial_block_height = interpreter.get_burn_block_height();
+        let initial_block_height = interpreter.get_block_height();
 
         let result = interpreter.advance_stacks_chain_tip(count);
-        assert_eq!(result, Ok(count));
+        assert_eq!(result, Ok(initial_block_height + count));
 
         assert_eq!(interpreter.get_burn_block_height(), initial_block_height);
         assert_eq!(interpreter.get_block_height(), initial_block_height + count);
@@ -1313,9 +1329,7 @@ mod tests {
     fn test_advance_chain_tip_pre_epoch3() {
         let mut interpreter =
             ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
-        interpreter
-            .datastore
-            .set_current_epoch(StacksEpochId::Epoch2_05);
+        interpreter.set_current_epoch(StacksEpochId::Epoch2_05);
         let count = 5;
         let initial_block_height = interpreter.get_block_height();
         interpreter.advance_burn_chain_tip(count);
@@ -1330,9 +1344,7 @@ mod tests {
     fn test_advance_chain_tip() {
         let mut interpreter =
             ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
-        interpreter
-            .datastore
-            .set_current_epoch(StacksEpochId::Epoch30);
+        interpreter.set_current_epoch(StacksEpochId::Epoch30);
         let count = 5;
         let initial_block_height = interpreter.get_block_height();
         interpreter.advance_burn_chain_tip(count);
@@ -1971,6 +1983,154 @@ mod tests {
             .clarity_version(ClarityVersion::Clarity3)
             .build();
         assert!(interpreter.run(&call_contract, None, false, None).is_ok());
+    }
+
+    #[test]
+    fn burn_block_time_is_realistic_in_epoch_3_0() {
+        let mut interpreter =
+            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+
+        interpreter.set_current_epoch(StacksEpochId::Epoch30);
+        interpreter.advance_burn_chain_tip(3);
+
+        let snippet_1 = run_snippet(
+            &mut interpreter,
+            "(get-tenure-info? time u2)",
+            ClarityVersion::Clarity3,
+        );
+        let time_block_1 = match snippet_1.expect_optional() {
+            Ok(Some(Value::UInt(time))) => time,
+            _ => panic!("Unexpected result"),
+        };
+
+        let snippet_2 = run_snippet(
+            &mut interpreter,
+            "(get-tenure-info? time u3)",
+            ClarityVersion::Clarity3,
+        );
+        let time_block_2 = match snippet_2.expect_optional() {
+            Ok(Some(Value::UInt(time))) => time,
+            _ => panic!("Unexpected result"),
+        };
+        assert_eq!(time_block_2 - time_block_1, 600);
+    }
+
+    #[test]
+    fn first_stacks_block_time_in_a_tenure() {
+        let mut interpreter =
+            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+
+        interpreter.set_current_epoch(StacksEpochId::Epoch30);
+        let _ = interpreter.advance_burn_chain_tip(2);
+
+        let snippet_1 = run_snippet(
+            &mut interpreter,
+            "(get-tenure-info? time (- stacks-block-height u1))",
+            ClarityVersion::Clarity3,
+        );
+        let last_tenure_time = match snippet_1.expect_optional() {
+            Ok(Some(Value::UInt(time))) => time,
+            _ => panic!("Unexpected result"),
+        };
+
+        let snippet_2 = run_snippet(
+            &mut interpreter,
+            "(get-stacks-block-info? time (- stacks-block-height u1))",
+            ClarityVersion::Clarity3,
+        );
+        let last_stacks_block_time = match snippet_2.expect_optional() {
+            Ok(Some(Value::UInt(time))) => time,
+            _ => panic!("Unexpected result"),
+        };
+        assert_eq!((last_stacks_block_time) - (last_tenure_time), 10);
+    }
+
+    #[test]
+    fn stacks_block_time_is_realistic_in_epoch_3_0() {
+        let mut interpreter =
+            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+
+        interpreter.set_current_epoch(StacksEpochId::Epoch30);
+        let _ = interpreter.advance_stacks_chain_tip(3);
+
+        let snippet_1 = run_snippet(
+            &mut interpreter,
+            "(get-stacks-block-info? time u2)",
+            ClarityVersion::Clarity3,
+        );
+        let time_block_1 = match snippet_1.expect_optional() {
+            Ok(Some(Value::UInt(time))) => time,
+            _ => panic!("Unexpected result"),
+        };
+
+        let snippet_2 = run_snippet(
+            &mut interpreter,
+            "(get-stacks-block-info? time u3)",
+            ClarityVersion::Clarity3,
+        );
+        let time_block_2 = match snippet_2.expect_optional() {
+            Ok(Some(Value::UInt(time))) => time,
+            _ => panic!("Unexpected result"),
+        };
+        assert_eq!(time_block_2 - time_block_1, 10);
+    }
+
+    #[test]
+    fn burn_block_time_after_many_stacks_blocks_is_realistic_in_epoch_3_0() {
+        let mut interpreter =
+            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+
+        interpreter.set_current_epoch(StacksEpochId::Epoch30);
+        // by advancing stacks_chain_tip by 101, we are getting a tenure of more than 600 seconds
+        // the next burn block should happen after the last stacks block
+        let stacks_block_height = interpreter.advance_stacks_chain_tip(101).unwrap();
+        assert_eq!(stacks_block_height, 102);
+
+        let snippet_1 = run_snippet(
+            &mut interpreter,
+            "(get-stacks-block-info? time u1)",
+            ClarityVersion::Clarity3,
+        );
+        let stacks_block_time_1 = match snippet_1.expect_optional() {
+            Ok(Some(Value::UInt(time))) => time,
+            _ => panic!("Unexpected result"),
+        };
+
+        let snippet_2 = run_snippet(
+            &mut interpreter,
+            "(get-stacks-block-info? time u101)",
+            ClarityVersion::Clarity3,
+        );
+        let stacks_block_time_2 = match snippet_2.expect_optional() {
+            Ok(Some(Value::UInt(time))) => time,
+            _ => panic!("Unexpected result"),
+        };
+        assert_eq!(stacks_block_time_2 - stacks_block_time_1, 1000);
+
+        let _ = interpreter.advance_burn_chain_tip(1);
+        let _ = interpreter.advance_stacks_chain_tip(1);
+
+        let snippet_3 = run_snippet(
+            &mut interpreter,
+            "(get-tenure-info? time u4)",
+            ClarityVersion::Clarity3,
+        );
+        let tenure_height_1 = match snippet_3.expect_optional() {
+            Ok(Some(Value::UInt(time))) => time,
+            _ => panic!("Unexpected result"),
+        };
+
+        let snippet_4 = run_snippet(
+            &mut interpreter,
+            "(get-tenure-info? time (- stacks-block-height u1))",
+            ClarityVersion::Clarity3,
+        );
+        let tenure_height_2 = match snippet_4.expect_optional() {
+            Ok(Some(Value::UInt(time))) => time,
+            _ => panic!("Unexpected result"),
+        };
+
+        assert_eq!(1030, tenure_height_2 - tenure_height_1);
     }
 
     #[test]

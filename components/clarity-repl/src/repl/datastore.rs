@@ -504,16 +504,25 @@ impl Datastore {
             clarity_datastore
                 .height_at_chain_tip
                 .insert(id, self.stacks_chain_height);
+            clarity_datastore.open_chain_tip = height_to_id(self.stacks_chain_height);
+            clarity_datastore.current_chain_tip = clarity_datastore.open_chain_tip;
         }
 
-        clarity_datastore.open_chain_tip = height_to_id(self.stacks_chain_height);
-        clarity_datastore.current_chain_tip = clarity_datastore.open_chain_tip;
         self.stacks_chain_height
     }
 
-    pub fn set_current_epoch(&mut self, epoch: StacksEpochId) {
+    pub fn set_current_epoch(
+        &mut self,
+        clarity_datastore: &mut ClarityDatastore,
+        epoch: StacksEpochId,
+    ) {
         self.current_epoch = epoch;
         self.current_epoch_start_height = self.stacks_chain_height;
+        if epoch >= StacksEpochId::Epoch30 {
+            // ideally the burn chain tip should be advanced for each new epoch
+            // but this would introduce breaking changes to existing 2.x tests
+            self.advance_burn_chain_tip(clarity_datastore, 1);
+        }
     }
 }
 
@@ -532,11 +541,9 @@ impl HeadersDB for Datastore {
         &self,
         id_bhh: &StacksBlockId,
     ) -> Option<BurnchainHeaderHash> {
-        let hash = self
-            .stacks_blocks
+        self.stacks_blocks
             .get(id_bhh)
-            .map(|block| block.burn_block_header_hash);
-        hash
+            .map(|block| block.burn_block_header_hash)
     }
 
     fn get_consensus_hash_for_block(
@@ -761,8 +768,9 @@ mod tests {
     #[test]
     fn test_set_current_epoch() {
         let mut datastore = Datastore::default();
+        let mut clarity_datastore = ClarityDatastore::new();
         let epoch_id = StacksEpochId::Epoch25;
-        datastore.set_current_epoch(epoch_id);
+        datastore.set_current_epoch(&mut clarity_datastore, epoch_id);
         assert_eq!(datastore.current_epoch, epoch_id);
     }
 
