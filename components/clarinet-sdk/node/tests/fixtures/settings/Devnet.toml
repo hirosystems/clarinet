@@ -33,6 +33,7 @@ balance = 100_000_000_000_000
 [devnet]
 disable_stacks_explorer = false
 disable_stacks_api = false
+disable_postgres = false
 
 # For testing in epoch 2.1 / using Clarity2
 # epoch_2_0 = 100

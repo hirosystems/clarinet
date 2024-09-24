@@ -304,6 +304,7 @@ impl DevnetOrchestrator {
 
         let signers_keys = devnet_config.stacks_signers_keys.clone();
 
+        let disable_postgres = devnet_config.disable_postgres;
         let disable_stacks_api = devnet_config.disable_stacks_api;
         let disable_stacks_explorer = devnet_config.disable_stacks_explorer;
         let disable_bitcoin_explorer = devnet_config.disable_bitcoin_explorer;
@@ -346,30 +347,36 @@ impl DevnetOrchestrator {
             "initializing",
         );
 
-        send_status_update(
-            &event_tx,
-            enable_subnet_node,
-            &self.logger,
-            "stacks-api",
-            Status::Red,
-            "initializing",
-        );
-        send_status_update(
-            &event_tx,
-            enable_subnet_node,
-            &self.logger,
-            "stacks-explorer",
-            Status::Red,
-            "initializing",
-        );
-        send_status_update(
-            &event_tx,
-            enable_subnet_node,
-            &self.logger,
-            "bitcoin-explorer",
-            Status::Red,
-            "initializing",
-        );
+        if !disable_stacks_api {
+            send_status_update(
+                &event_tx,
+                enable_subnet_node,
+                &self.logger,
+                "stacks-api",
+                Status::Red,
+                "initializing",
+            );
+        }
+        if !disable_stacks_explorer {
+            send_status_update(
+                &event_tx,
+                enable_subnet_node,
+                &self.logger,
+                "stacks-explorer",
+                Status::Red,
+                "initializing",
+            );
+        }
+        if !disable_bitcoin_explorer {
+            send_status_update(
+                &event_tx,
+                enable_subnet_node,
+                &self.logger,
+                "bitcoin-explorer",
+                Status::Red,
+                "initializing",
+            );
+        }
 
         if enable_subnet_node {
             send_status_update(
@@ -432,17 +439,8 @@ impl DevnetOrchestrator {
             }
         };
 
-        // Start stacks-api
-        if !disable_stacks_api {
-            // Start postgres
-            send_status_update(
-                &event_tx,
-                enable_subnet_node,
-                &self.logger,
-                "stacks-api",
-                Status::Yellow,
-                "preparing postgres container",
-            );
+        // Start postgres container
+        if !disable_postgres {
             let _ = event_tx.send(DevnetEvent::info("Starting postgres".to_string()));
             match self.prepare_postgres_container(ctx).await {
                 Ok(_) => {}
@@ -460,6 +458,9 @@ impl DevnetOrchestrator {
                     return Err(message);
                 }
             };
+        };
+        // Start stacks-api
+        if !disable_stacks_api {
             send_status_update(
                 &event_tx,
                 enable_subnet_node,

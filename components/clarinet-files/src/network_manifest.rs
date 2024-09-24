@@ -140,6 +140,7 @@ pub struct DevnetConfigFile {
     pub disable_bitcoin_explorer: Option<bool>,
     pub disable_stacks_explorer: Option<bool>,
     pub disable_stacks_api: Option<bool>,
+    pub disable_postgres: Option<bool>,
     pub bind_containers_volumes: Option<bool>,
     pub enable_subnet_node: Option<bool>,
     pub subnet_node_image_url: Option<String>,
@@ -304,6 +305,7 @@ pub struct DevnetConfig {
     pub disable_bitcoin_explorer: bool,
     pub disable_stacks_explorer: bool,
     pub disable_stacks_api: bool,
+    pub disable_postgres: bool,
     pub bind_containers_volumes: bool,
     pub enable_subnet_node: bool,
     pub subnet_node_image_url: String,
@@ -641,6 +643,10 @@ impl NetworkManifest {
                     devnet_config.disable_stacks_api = Some(val);
                 }
 
+                if let Some(val) = devnet_override.disable_postgres {
+                    devnet_config.disable_postgres = Some(val);
+                }
+
                 if let Some(val) = devnet_override.bitcoin_controller_automining_disabled {
                     devnet_config.bitcoin_controller_automining_disabled = Some(val);
                 }
@@ -939,6 +945,7 @@ impl NetworkManifest {
                 pox_stacking_orders: devnet_config.pox_stacking_orders.take().unwrap_or_default(),
                 disable_bitcoin_explorer: devnet_config.disable_bitcoin_explorer.unwrap_or(false),
                 disable_stacks_api: devnet_config.disable_stacks_api.unwrap_or(false),
+                disable_postgres: devnet_config.disable_postgres.unwrap_or(false),
                 disable_stacks_explorer: devnet_config.disable_stacks_explorer.unwrap_or(false),
                 bind_containers_volumes: devnet_config.bind_containers_volumes.unwrap_or(false),
                 enable_subnet_node,
