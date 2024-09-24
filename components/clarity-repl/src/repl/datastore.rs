@@ -512,6 +512,9 @@ impl Datastore {
         clarity_datastore: &mut ClarityDatastore,
         epoch: StacksEpochId,
     ) {
+        if epoch == self.current_epoch {
+            return;
+        }
         self.current_epoch = epoch;
         self.current_epoch_start_height = self.stacks_chain_height;
         if epoch >= StacksEpochId::Epoch30 {
