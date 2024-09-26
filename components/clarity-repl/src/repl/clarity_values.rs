@@ -1,3 +1,5 @@
+use std::fmt::Write;
+
 use clarity::vm::{
     types::{CharType, SequenceData},
     Value,
@@ -24,13 +26,11 @@ pub fn value_to_string(value: &Value) -> String {
     match value {
         Value::Principal(principal_data) => format!("'{}", principal_data),
         Value::Tuple(tup_data) => {
-            let data = tup_data
-                .data_map
-                .iter()
-                .map(|(name, value)| format!("{}: {}", name, value_to_string(value)))
-                .collect::<Vec<_>>()
-                .join(", ");
-            format!("{{ {} }}", data)
+            let mut data = String::new();
+            for (name, value) in &tup_data.data_map {
+                write!(&mut data, "{}: {}, ", name, value_to_string(value)).unwrap();
+            }
+            format!("{{ {} }}", data.trim_end_matches(", "))
         }
         Value::Optional(opt_data) => match &opt_data.data {
             Some(x) => format!("(some {})", value_to_string(x)),
