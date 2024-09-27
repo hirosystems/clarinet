@@ -170,6 +170,7 @@ pub async fn start_chains_coordinator(
 ) -> Result<(), String> {
     let mut should_deploy_protocol = true; // Will change when `stacks-network` components becomes compatible with Testnet / Mainnet setups
     let boot_completed = Arc::new(AtomicBool::new(false));
+    let mut current_burn_height = 0;
 
     let (deployment_commands_tx, deployments_command_rx) = channel();
     let (deployment_events_tx, deployment_events_rx) = channel();
@@ -308,6 +309,7 @@ pub async fn start_chains_coordinator(
                     BitcoinChainEvent::ChainUpdatedWithBlocks(event) => {
                         let tip = event.new_blocks.last().unwrap();
                         let bitcoin_block_height = tip.block_identifier.index;
+                        current_burn_height = bitcoin_block_height;
                         let log = format!("Bitcoin block #{} received", bitcoin_block_height);
                         let comment =
                             format!("mining blocks (chain_tip = #{})", bitcoin_block_height);
@@ -337,6 +339,8 @@ pub async fn start_chains_coordinator(
                     }
                     BitcoinChainEvent::ChainUpdatedWithReorg(events) => {
                         let tip = events.blocks_to_apply.last().unwrap();
+                        let bitcoin_block_height = tip.block_identifier.index;
+                        current_burn_height = bitcoin_block_height;
                         let log = format!(
                             "Bitcoin reorg received (new height: {})",
                             tip.block_identifier.index
@@ -440,7 +444,17 @@ pub async fn start_chains_coordinator(
             }
             ObserverEvent::NotifyBitcoinTransactionProxied => {
                 if !boot_completed.load(Ordering::SeqCst) {
-                    std::thread::sleep(std::time::Duration::from_secs(1));
+                    if config
+                        .devnet_config
+                        .epoch_3_0
+                        .saturating_sub(current_burn_height)
+                        > 20
+                    {
+                        std::thread::sleep(std::time::Duration::from_secs(2));
+                    } else {
+                        // as epoch 3.0 gets closer, bitcoin blocks need to slow down
+                        std::thread::sleep(std::time::Duration::from_secs(5));
+                    }
                     let res = mine_bitcoin_block(
                         &config.services_map_hosts.bitcoin_node_host,
                         config.devnet_config.bitcoin_node_username.as_str(),
