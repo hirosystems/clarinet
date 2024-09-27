@@ -21,6 +21,9 @@ use sha2::{Digest, Sha512_256};
 
 use super::interpreter::BLOCK_LIMIT_MAINNET;
 
+const SECONDS_BETWEEN_BURN_BLOCKS: u64 = 600;
+const SECONDS_BETWEEN_STACKS_BLOCKS: u64 = 10;
+
 fn epoch_to_peer_version(epoch: StacksEpochId) -> u8 {
     use clarity::consts::*;
     match epoch {
@@ -355,7 +358,7 @@ impl Datastore {
             burn_block_header_hash: first_burn_block_header_hash,
             consensus_hash: ConsensusHash([0x00; 20]),
             vrf_seed: VRFSeed([0x00; 32]),
-            stacks_block_time: genesis_time + 10,
+            stacks_block_time: genesis_time + SECONDS_BETWEEN_STACKS_BLOCKS,
         };
 
         let sortition_lookup = HashMap::from([(sortition_id, id)]);
@@ -425,7 +428,7 @@ impl Datastore {
             buffer[0] = 4;
             VRFSeed(buffer)
         };
-        let stacks_block_time: u64 = last_block_time + 10;
+        let stacks_block_time: u64 = last_block_time + SECONDS_BETWEEN_STACKS_BLOCKS;
 
         StacksBlockInfo {
             block_header_hash,
@@ -451,9 +454,11 @@ impl Datastore {
                 .get(&last_stacks_block.burn_block_header_hash)
                 .unwrap();
 
-            let mut next_burn_block_time = last_burn_block.burn_block_time + 600;
+            let mut next_burn_block_time =
+                last_burn_block.burn_block_time + SECONDS_BETWEEN_BURN_BLOCKS;
             if last_stacks_block.stacks_block_time > next_burn_block_time {
-                next_burn_block_time = last_stacks_block.stacks_block_time + 10;
+                next_burn_block_time =
+                    last_stacks_block.stacks_block_time + SECONDS_BETWEEN_STACKS_BLOCKS;
             }
 
             let height = self.burn_chain_height + 1;
