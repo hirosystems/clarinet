@@ -391,8 +391,18 @@ pub async fn start_chains_coordinator(
                     StacksChainEvent::ChainUpdatedWithMicroblocksReorg(_) => {
                         unreachable!() // TODO(lgalabru): good enough for now - code path unreachable in the context of Devnet
                     }
-                    StacksChainEvent::ChainUpdatedWithReorg(_) => {
-                        unreachable!() // TODO(lgalabru): good enough for now - code path unreachable in the context of Devnet
+                    StacksChainEvent::ChainUpdatedWithReorg(data) => {
+                        // reorgs should not happen in devnet
+                        // tests showed that it can happen in epoch 3.0 but should not
+                        // this patch allows to handle it, but further investigation will be done
+                        // with blockchain team in order to avoid this
+                        devnet_event_tx
+                            .send(DevnetEvent::warning("Stacks reorg received".to_string()))
+                            .expect("Unable to send reorg event");
+                        match data.blocks_to_apply.last() {
+                            Some(known_tip) => known_tip.clone(),
+                            None => unreachable!(),
+                        }
                     }
                 };
 
