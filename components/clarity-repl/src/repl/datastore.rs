@@ -501,10 +501,12 @@ impl Datastore {
 
             clarity_datastore
                 .block_id_lookup
-                .insert(id, current_lookup_id);
+                .insert(id, current_lookup_id)
+                .expect("failed to insert block id into lookup table");
             clarity_datastore
                 .height_at_chain_tip
-                .insert(id, self.stacks_chain_height);
+                .insert(id, self.stacks_chain_height)
+                .expect("failed to insert height into chain tip table");
             clarity_datastore.open_chain_tip = height_to_id(self.stacks_chain_height);
             clarity_datastore.current_chain_tip = clarity_datastore.open_chain_tip;
         }
