@@ -1,3 +1,41 @@
+# [2.9.0](https://github.com/hirosystems/clarinet/compare/v2.8.0...v2.9.0) (2024-09-30)
+
+##### New Features
+
+*  Slown down burn blocks when getting close to epoch 3.0 transition (#1569) (8fc863d3)
+*  Customize number of signers in devnet (#1555) (76eba28a)
+
+##### Refactors
+
+*  Consolidate datastore and burn datastore data (#1562) (c56b2d4b)
+*  Remove internal dependency on the repl (#1511) (cd00c892)
+*  Auto extend `stacking_orders` in devnet config by default (#1528) (a3e90023)
+
+##### Chores
+
+*  Add disable_postgres flag and separate from stack_api disabling (#1558) (1bdc2724)
+*  Update clarity and clarity-wasm (#1560) (b57802e9)
+*  Upgrade bitcoin cargo dependencies (#1556) (fb709312)
+*  Upgrade npm dependencies (#1551) (e38d0aef)
+*  Remove unused Clarinet3.toml (148bc5de)
+
+##### Continuous Integration
+
+*  Upgrade actions/upload-artifacts and download-artifacts to v4 (#1554) (146e32ea)
+
+##### Documentation Changes
+
+*  Fix documentation link (#1508) (ce1ffeaa)
+
+##### Bug Fixes
+
+*  Handle reorg in epoch 3.0 (#1568) (be42dd98)
+*  Convert correctly from uSTX to STX when applying a deployment (#1563) (dfe40985)
+
+##### Tests
+
+*  Add block time tests (#1541) (5ecaee9a)
+
 # [2.8.0](https://github.com/hirosystems/clarinet/compare/v2.7.0...v2.8.0) (2024-08-01)
 
 ##### New Features
