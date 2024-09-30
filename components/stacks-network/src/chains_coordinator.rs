@@ -458,9 +458,9 @@ pub async fn start_chains_coordinator(
                         .devnet_config
                         .epoch_3_0
                         .saturating_sub(current_burn_height)
-                        > 20
+                        > 15
                     {
-                        std::thread::sleep(std::time::Duration::from_secs(2));
+                        std::thread::sleep(std::time::Duration::from_secs(1));
                     } else {
                         // as epoch 3.0 gets closer, bitcoin blocks need to slow down
                         std::thread::sleep(std::time::Duration::from_secs(5));
