@@ -60,7 +60,7 @@ describe("the sdk handle all clarity version", () => {
 
     // `tenure-height` was introduced in clarity 3
     let resOk3 = simnet.execute("(print tenure-height)");
-    expect(resOk3.result).toStrictEqual(Cl.uint(1));
+    expect(resOk3.result).toStrictEqual(Cl.uint(2));
 
     // `block-height` was removed in clarity 3
     expect(() => simnet.execute("(print block-height)")).toThrowError(

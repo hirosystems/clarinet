@@ -65,7 +65,7 @@ pub fn main() {
             };
 
             {
-                let mut analysis_db = session.interpreter.datastore.as_analysis_db();
+                let mut analysis_db = session.interpreter.clarity_datastore.as_analysis_db();
                 let cost_track = LimitedCostTracker::new_free();
                 let type_checker = TypeChecker::new(&mut analysis_db, cost_track, true);
                 let settings = Settings::default();
