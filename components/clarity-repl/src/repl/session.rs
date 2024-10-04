@@ -1,5 +1,6 @@
 use super::boot::{STACKS_BOOT_CODE_MAINNET, STACKS_BOOT_CODE_TESTNET};
 use super::diagnostic::output_diagnostic;
+use super::logger_hook::LoggerHook;
 use super::{ClarityCodeSource, ClarityContract, ClarityInterpreter, ContractDeployer};
 use crate::analysis::coverage::TestCoverageReport;
 use crate::repl::clarity_values::value_to_string;
@@ -573,7 +574,7 @@ impl Session {
 
         let result = self.interpreter.run(contract, ast, cost_track, Some(hooks));
 
-        result.map(|result| {
+        result.inspect(|result| {
             if let EvaluationResult::Contract(contract_result) = &result.result {
                 self.contracts
                     .insert(contract_id.clone(), contract_result.contract.clone());
@@ -581,7 +582,6 @@ impl Session {
             if let Some(coverage) = coverage {
                 self.coverage_reports.push(coverage);
             }
-            result
         })
     }
 
@@ -606,6 +606,9 @@ impl Session {
         let contract_id = QualifiedContractIdentifier::parse(&contract_id_str).unwrap();
 
         let mut hooks: Vec<&mut dyn EvalHook> = vec![];
+        let mut logger = LoggerHook::new();
+        hooks.push(&mut logger);
+
         let mut coverage = TestCoverageReport::new(test_name.clone());
         if track_coverage {
             hooks.push(&mut coverage);
@@ -1773,5 +1776,62 @@ mod tests {
         };
 
         assert!(time_block_2 - time_block_1 == 600);
+    }
+}
+#[cfg(test)]
+mod logger_hook_tests {
+
+    use crate::{repl::DEFAULT_EPOCH, test_fixtures::clarity_contract::ClarityContractBuilder};
+
+    use super::*;
+
+    #[test]
+    fn can_retrieve_print_values() {
+        let settings = SessionSettings::default();
+        let mut session = Session::new(settings);
+        session.start().expect("session could not start");
+        session.update_epoch(DEFAULT_EPOCH);
+
+        // session.deploy_contract(contract, eval_hooks, cost_track, test_name, ast)
+        let snippet = [
+            "(define-public (print-and-return (input (response uint uint)))",
+            "  (begin",
+            "    (match input x (print x) y (print y))",
+            "    input",
+            "  )",
+            ")",
+        ]
+        .join("\n");
+
+        let contract = ClarityContractBuilder::new().code_source(snippet).build();
+
+        let _ = session.deploy_contract(&contract, None, false, None, None);
+        let arg = SymbolicExpression::atom_value(Value::okay(Value::UInt(42)).unwrap());
+        let res = session.call_contract_fn(
+            "contract",
+            "print-and-return",
+            &[arg],
+            &session.get_tx_sender(),
+            false,
+            false,
+            false,
+            "test".to_owned(),
+        );
+
+        println!("{:?}", res);
+
+        let arg = SymbolicExpression::atom_value(Value::error(Value::UInt(404)).unwrap());
+        let res = session.call_contract_fn(
+            "contract",
+            "print-and-return",
+            &[arg],
+            &session.get_tx_sender(),
+            false,
+            false,
+            false,
+            "test".to_owned(),
+        );
+
+        println!("{:?}", res);
     }
 }
