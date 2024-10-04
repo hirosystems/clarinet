@@ -832,7 +832,7 @@ impl ClarityInterpreter {
         clarity_version: ClarityVersion,
         track_costs: bool,
         allow_private: bool,
-        eval_hooks: Option<Vec<&mut dyn EvalHook>>,
+        mut eval_hooks: Vec<&mut dyn EvalHook>,
     ) -> Result<ExecutionResult, String> {
         let mut conn = ClarityDatabase::new(
             &mut self.clarity_datastore,
@@ -860,11 +860,11 @@ impl ClarityInterpreter {
         let mut global_context =
             GlobalContext::new(false, CHAIN_ID_TESTNET, conn, cost_tracker, epoch);
 
-        if let Some(mut in_hooks) = eval_hooks {
-            let mut hooks: Vec<&mut dyn EvalHook> = Vec::new();
-            for hook in in_hooks.drain(..) {
-                hooks.push(hook);
-            }
+        let mut hooks: Vec<&mut dyn EvalHook> = Vec::new();
+        for hook in eval_hooks.drain(..) {
+            hooks.push(hook);
+        }
+        if !hooks.is_empty() {
             global_context.eval_hooks = Some(hooks);
         }
 
@@ -1807,7 +1807,7 @@ mod tests {
             ClarityVersion::Clarity2,
             false,
             false,
-            None,
+            vec![],
         );
         assert_execution_result_value(
             result,
@@ -1826,7 +1826,7 @@ mod tests {
             ClarityVersion::Clarity2,
             false,
             false,
-            None,
+            vec![],
         );
         assert_execution_result_value(
             result,
@@ -1879,7 +1879,7 @@ mod tests {
             ClarityVersion::Clarity2,
             false,
             false,
-            None,
+            vec![],
         );
         assert_execution_result_value(
             result,
@@ -1941,7 +1941,7 @@ mod tests {
             ClarityVersion::Clarity3,
             false,
             false,
-            None,
+            vec![],
         );
         assert_execution_result_value(
             result,
@@ -1964,7 +1964,7 @@ mod tests {
             ClarityVersion::Clarity3,
             false,
             false,
-            None,
+            vec![],
         );
         assert_execution_result_value(
             result,
@@ -2153,7 +2153,7 @@ mod tests {
             ClarityVersion::Clarity2,
             false,
             allow_private,
-            None,
+            vec![],
         );
 
         assert!(result.is_ok());
@@ -2184,7 +2184,7 @@ mod tests {
             ClarityVersion::Clarity2,
             false,
             allow_private,
-            None,
+            vec![],
         );
 
         assert!(result.is_ok());
@@ -2215,7 +2215,7 @@ mod tests {
             ClarityVersion::Clarity2,
             false,
             allow_private,
-            None,
+            vec![],
         );
 
         assert!(result.is_err());

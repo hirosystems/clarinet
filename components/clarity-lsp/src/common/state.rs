@@ -654,7 +654,6 @@ pub async fn build_state(
         &mut session,
         &deployment,
         Some(&artifacts.asts),
-        false,
         Some(StacksEpochId::Epoch21),
     );
     for (contract_id, mut result) in contracts.into_iter() {

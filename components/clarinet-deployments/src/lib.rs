@@ -56,7 +56,7 @@ pub fn setup_session_with_deployment(
 ) -> DeploymentGenerationArtifacts {
     let mut session = initiate_session_from_manifest(manifest);
     let UpdateSessionExecutionResult { contracts, .. } =
-        update_session_with_deployment_plan(&mut session, deployment, contracts_asts, false, None);
+        update_session_with_deployment_plan(&mut session, deployment, contracts_asts, None);
 
     let deps = BTreeMap::new();
     let mut diags = HashMap::new();
@@ -122,7 +122,6 @@ pub fn update_session_with_deployment_plan(
     session: &mut Session,
     deployment: &DeploymentSpecification,
     contracts_asts: Option<&BTreeMap<QualifiedContractIdentifier, ContractAST>>,
-    code_coverage_enabled: bool,
     forced_min_epoch: Option<StacksEpochId>,
 ) -> UpdateSessionExecutionResult {
     update_session_with_genesis_accounts(session, deployment);
@@ -160,13 +159,7 @@ pub fn update_session_with_deployment_plan(
                         tx.contract_name.clone(),
                     );
                     let contract_ast = contracts_asts.as_ref().and_then(|m| m.get(&contract_id));
-                    let result = handle_emulated_contract_publish(
-                        session,
-                        tx,
-                        contract_ast,
-                        epoch,
-                        code_coverage_enabled,
-                    );
+                    let result = handle_emulated_contract_publish(session, tx, contract_ast, epoch);
                     contracts.insert(contract_id, result);
                 }
                 TransactionSpecification::EmulatedContractCall(tx) => {
@@ -198,7 +191,6 @@ fn handle_emulated_contract_publish(
     tx: &EmulatedContractPublishSpecification,
     contract_ast: Option<&ContractAST>,
     epoch: StacksEpochId,
-    code_coverage_enabled: bool,
 ) -> Result<ExecutionResult, Vec<Diagnostic>> {
     let default_tx_sender = session.get_tx_sender();
     session.set_tx_sender(&tx.emulated_sender.to_string());
@@ -210,12 +202,8 @@ fn handle_emulated_contract_publish(
         clarity_version: tx.clarity_version,
         epoch,
     };
-    let test_name = if code_coverage_enabled {
-        Some("__analysis__".to_string())
-    } else {
-        None
-    };
-    let result = session.deploy_contract(&contract, None, false, test_name, contract_ast);
+
+    let result = session.deploy_contract(&contract, None, false, contract_ast);
 
     session.set_tx_sender(&default_tx_sender);
     result
@@ -250,7 +238,7 @@ fn handle_emulated_contract_call(
         &tx.emulated_sender.to_string(),
         true,
         false,
-        false,
+        vec![],
         "deployment".to_string(),
     );
     if let Err(errors) = &result {
@@ -930,7 +918,7 @@ mod tests {
             location: FileLocation::from_path_string("/contracts/contract_1.clar").unwrap(),
         };
 
-        handle_emulated_contract_publish(session, &emulated_publish_spec, None, epoch, false)
+        handle_emulated_contract_publish(session, &emulated_publish_spec, None, epoch)
     }
 
     #[test]
