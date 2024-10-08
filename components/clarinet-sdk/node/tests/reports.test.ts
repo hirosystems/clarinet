@@ -37,7 +37,7 @@ describe("simnet can get code coverage", () => {
     expect(reports.coverage.length).toBe(0);
   });
 
-  it.only("reports coverage if enabled", async () => {
+  it("reports coverage if enabled", async () => {
     const simnet = await initSimnet("tests/fixtures/Clarinet.toml", true, {
       trackCoverage: true,
       trackCosts: false,
