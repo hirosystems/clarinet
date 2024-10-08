@@ -1132,6 +1132,14 @@ events_keys = ["*"]
             ));
         }
 
+        stacks_conf.push_str(
+            &r#"
+# Add stacks-api container as an event observer
+[[events_observer]]
+endpoint = "host.docker.internal:3700"
+events_keys = ["*"]
+"#,
+        );
         if devnet_config.enable_subnet_node {
             stacks_conf.push_str(&format!(
                 r#"
