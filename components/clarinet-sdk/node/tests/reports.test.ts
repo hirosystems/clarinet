@@ -45,12 +45,11 @@ describe("simnet can get code coverage", () => {
 
     simnet.callPublicFn("counter", "increment", [], address1);
     simnet.callPublicFn("counter", "increment", [], address1);
-    // simnet.callPrivateFn("counter", "inner-increment", [], address1);
+    simnet.callPrivateFn("counter", "inner-increment", [], address1);
 
     const reports = simnet.collectReport(false, "");
 
     // increment is called twice
-    console.log("reports.coverage", reports.coverage);
     expect(reports.coverage.includes("FNDA:2,increment")).toBe(true);
     // inner-increment is called one time directly and twice by `increment`
     expect(reports.coverage.includes("FNDA:3,inner-increment")).toBe(true);
@@ -86,7 +85,6 @@ describe("simnet can get costs reports", () => {
     expect(parsedReports).toHaveLength(1);
 
     const report = parsedReports[0];
-    console.log("report", report);
     expect(report.contract_id).toBe(`${simnet.deployer}.counter`);
     expect(report.method).toBe("increment");
     expect(report.cost_result.total.write_count).toBe(3);

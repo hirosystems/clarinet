@@ -9,7 +9,7 @@ use clarinet_deployments::{
 };
 use clarinet_files::chainhook_types::StacksNetwork;
 use clarinet_files::{FileAccessor, FileLocation, ProjectManifest, WASMFileSystemAccessor};
-use clarity_repl::analysis::coverage::{CoverageHook, CoverageReports};
+use clarity_repl::analysis::coverage::{build_lcov_content, CoverageHook, CoverageReport};
 use clarity_repl::clarity::analysis::contract_interface_builder::{
     ContractInterface, ContractInterfaceFunction, ContractInterfaceFunctionAccess,
 };
@@ -287,7 +287,7 @@ pub struct SDK {
     options: SDKOptions,
     current_test_name: String,
 
-    coverage_reports: CoverageReports,
+    coverage_reports: Vec<CoverageReport>,
     costs_reports: Vec<CostsReport>,
 }
 
@@ -318,7 +318,7 @@ impl SDK {
             },
             current_test_name: String::new(),
 
-            coverage_reports: CoverageReports::new(),
+            coverage_reports: vec![],
             costs_reports: vec![],
         }
     }
@@ -720,12 +720,6 @@ impl SDK {
         }: &CallFnArgs,
         allow_private: bool,
     ) -> Result<TransactionRes, String> {
-        let contract_id = if contract.starts_with('S') {
-            contract.to_string()
-        } else {
-            format!("{}.{}", self.deployer, contract)
-        };
-
         let test_name = self.current_test_name.clone();
         let SDKOptions {
             track_costs,
@@ -751,7 +745,7 @@ impl SDK {
         let session = self.get_session_mut();
         let execution = session
             .call_contract_fn(
-                &contract_id,
+                contract,
                 method,
                 &parsed_args,
                 sender,
@@ -778,6 +772,11 @@ impl SDK {
 
         if track_costs {
             if let Some(ref cost) = execution.cost {
+                let contract_id = if contract.starts_with('S') {
+                    contract.to_string()
+                } else {
+                    format!("{}.{}", self.deployer, contract)
+                };
                 self.costs_reports.push(CostsReport {
                     test_name,
                     contract_id,
@@ -787,8 +786,8 @@ impl SDK {
                 });
             }
         }
-        if let Some(coverage_hook) = coverage_hook {
-            self.coverage_reports.merge(coverage_hook.reports);
+        if let Some(mut coverage_hook) = coverage_hook {
+            self.coverage_reports.append(&mut coverage_hook.reports);
         }
 
         Ok(execution_result_to_transaction_res(&execution))
@@ -1089,9 +1088,7 @@ impl SDK {
             }
         }
 
-        let coverage = self
-            .coverage_reports
-            .build_lcov_content(&asts, &contract_paths);
+        let coverage = build_lcov_content(&self.coverage_reports, &asts, &contract_paths);
 
         let mut costs_reports = Vec::new();
         costs_reports.append(&mut self.costs_reports);

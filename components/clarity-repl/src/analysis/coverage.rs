@@ -15,11 +15,14 @@ type ExecutableLines = HashMap<u32, Vec<u64>>;
 type ExecutableBranches = HashMap<u64, Vec<(u32, u64)>>;
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
-pub struct CoverageReports(HashMap<String, HashMap<QualifiedContractIdentifier, ExprCoverage>>);
+pub struct CoverageReport {
+    test_name: String,
+    coverage: HashMap<QualifiedContractIdentifier, ExprCoverage>,
+}
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct CoverageHook {
-    pub reports: CoverageReports,
+    pub reports: Vec<CoverageReport>,
     pub current_test_name: Option<String>,
     pub contracts_coverage: HashMap<QualifiedContractIdentifier, ExprCoverage>,
 }
@@ -27,7 +30,7 @@ pub struct CoverageHook {
 impl CoverageHook {
     pub fn new() -> Self {
         Self {
-            reports: CoverageReports::default(),
+            reports: vec![],
             current_test_name: None,
             contracts_coverage: HashMap::new(),
         }
@@ -181,15 +184,10 @@ impl EvalHook for CoverageHook {
     }
 
     fn did_complete(&mut self, _result: Result<&mut clarity::vm::ExecutionResult, String>) {
-        let test_name = self.current_test_name.clone().unwrap_or_default();
-        let coverage = self.reports.0.entry(test_name).or_default();
-
-        for (contract_id, expr_coverage) in self.contracts_coverage.drain() {
-            let contract_coverage = coverage.entry(contract_id).or_default();
-            for (expr_id, count) in expr_coverage {
-                *contract_coverage.entry(expr_id).or_insert(0) += count;
-            }
-        }
+        self.reports.push(CoverageReport {
+            test_name: self.current_test_name.clone().unwrap_or_default(),
+            coverage: std::mem::take(&mut self.contracts_coverage),
+        });
     }
 }
 
@@ -206,166 +204,146 @@ impl EvalHook for CoverageHook {
 // BRH: number branches hit
 // BRDA: branch data: line number, expr_id, branch_nb, hit count
 
-impl CoverageReports {
-    pub fn new() -> Self {
-        Self(HashMap::new())
+pub fn build_lcov_content(
+    reports: &[CoverageReport],
+    asts: &BTreeMap<QualifiedContractIdentifier, ContractAST>,
+    contract_paths: &BTreeMap<String, String>,
+) -> String {
+    let mut file_content = String::new();
+
+    let mut filtered_asts = HashMap::new();
+    for (contract_id, ast) in asts.iter() {
+        let contract_name = contract_id.name.to_string();
+        if contract_paths.contains_key(&contract_name) {
+            filtered_asts.insert(
+                contract_name,
+                (
+                    contract_id,
+                    retrieve_functions(&ast.expressions),
+                    retrieve_executable_lines_and_branches(&ast.expressions),
+                ),
+            );
+        }
     }
 
-    pub fn merge(&mut self, other: Self) {
-        for (test_name, contracts_coverage) in other.0 {
-            let coverage = self.0.entry(test_name).or_default();
-            for (contract_id, expr_coverage) in contracts_coverage {
-                let contract_coverage = coverage.entry(contract_id).or_default();
-                for (expr_id, count) in expr_coverage {
-                    *contract_coverage.entry(expr_id).or_insert(0) += count;
+    // for consistency in the result, we use a btreemap instead of a hashmap
+    let reports_per_tests: BTreeMap<&String, Vec<&CoverageReport>> =
+        reports.iter().fold(BTreeMap::new(), |mut acc, report| {
+            acc.entry(&report.test_name).or_default().push(report);
+            acc
+        });
+
+    for (test_name, test_reports) in reports_per_tests.iter() {
+        for (contract_name, contract_path) in contract_paths.iter() {
+            file_content.push_str(&format!("TN:{}\n", test_name));
+            file_content.push_str(&format!("SF:{}\n", contract_path));
+
+            if let Some((contract_id, functions, executable)) = filtered_asts.get(contract_name) {
+                for (function, line_start, _) in functions.iter() {
+                    file_content.push_str(&format!("FN:{},{}\n", line_start, function));
                 }
-            }
-        }
-    }
+                let (executable_lines, executables_branches) = executable;
 
-    pub fn build_lcov_content(
-        &mut self,
-        asts: &BTreeMap<QualifiedContractIdentifier, ContractAST>,
-        contract_paths: &BTreeMap<String, String>,
-    ) -> String {
-        let mut file_content = String::new();
+                let mut function_hits = BTreeMap::new();
+                let mut line_execution_counts = BTreeMap::new();
 
-        let mut filtered_asts = HashMap::new();
-        for (contract_id, ast) in asts.iter() {
-            let contract_name = contract_id.name.to_string();
-            if contract_paths.contains_key(&contract_name) {
-                filtered_asts.insert(
-                    contract_name,
-                    (
-                        contract_id,
-                        retrieve_functions(&ast.expressions),
-                        retrieve_executable_lines_and_branches(&ast.expressions),
-                    ),
-                );
-            }
-        }
+                let mut branches = HashSet::new();
+                let mut branches_hits = HashSet::new();
+                let mut branch_execution_counts = BTreeMap::new();
 
-        let mut test_names = BTreeSet::new();
-        for test_name in self.0.keys() {
-            test_names.insert(test_name.to_string());
-        }
+                for report in test_reports {
+                    if let Some(coverage) = report.coverage.get(contract_id) {
+                        let mut local_function_hits = BTreeSet::new();
 
-        for test_name in test_names.iter() {
-            for (contract_name, contract_path) in contract_paths.iter() {
-                file_content.push_str(&format!("TN:{}\n", test_name));
-                file_content.push_str(&format!("SF:{}\n", contract_path));
-
-                if let Some((contract_id, functions, executable)) = filtered_asts.get(contract_name)
-                {
-                    for (function, line_start, _) in functions.iter() {
-                        file_content.push_str(&format!("FN:{},{}\n", line_start, function));
-                    }
-                    let (executable_lines, executables_branches) = executable;
-
-                    let mut function_hits = BTreeMap::new();
-                    let mut line_execution_counts = BTreeMap::new();
-
-                    let mut branches = HashSet::new();
-                    let mut branches_hits = HashSet::new();
-                    let mut branch_execution_counts = BTreeMap::new();
-
-                    for (report_test_name, contracts_coverage) in self.0.iter() {
-                        if report_test_name == test_name {
-                            if let Some(coverage) = contracts_coverage.get(contract_id) {
-                                let mut local_function_hits = BTreeSet::new();
-
-                                for (line, expr_ids) in executable_lines.iter() {
-                                    // in case of code branches on the line
-                                    // retrieve the expression with the most hits
-                                    let mut counts = vec![];
-                                    for id in expr_ids {
-                                        if let Some(c) = coverage.get(id) {
-                                            counts.push(*c);
-                                        }
-                                    }
-                                    let count = counts.iter().max().unwrap_or(&0);
-
-                                    let total_count =
-                                        line_execution_counts.entry(line).or_insert(0);
-                                    *total_count += count;
-
-                                    if count == &0 {
-                                        continue;
-                                    }
-
-                                    for (function, line_start, line_end) in functions.iter() {
-                                        if line >= line_start && line <= line_end {
-                                            local_function_hits.insert(function);
-                                            // functions hits must have a matching line hit
-                                            // if we hit a line inside a function, make sure to count one line hit
-                                            if line > line_start {
-                                                let hit_count =
-                                                    line_execution_counts.get(&line_start);
-                                                if hit_count.is_none() || hit_count == Some(&0) {
-                                                    line_execution_counts.insert(line_start, 1);
-                                                }
-                                            }
-                                        }
-                                    }
+                        for (line, expr_ids) in executable_lines.iter() {
+                            // in case of code branches on the line
+                            // retrieve the expression with the most hits
+                            let mut counts = vec![];
+                            for id in expr_ids {
+                                if let Some(c) = coverage.get(id) {
+                                    counts.push(*c);
                                 }
+                            }
+                            let count = counts.iter().max().unwrap_or(&0);
 
-                                for (expr_id, args) in executables_branches.iter() {
-                                    for (i, (line, arg_expr_id)) in args.iter().enumerate() {
-                                        let count = coverage.get(arg_expr_id).unwrap_or(&0);
+                            let total_count = line_execution_counts.entry(line).or_insert(0);
+                            *total_count += count;
 
-                                        branches.insert(arg_expr_id);
-                                        if count > &0 {
-                                            branches_hits.insert(arg_expr_id);
+                            if count == &0 {
+                                continue;
+                            }
+
+                            for (function, line_start, line_end) in functions.iter() {
+                                if line >= line_start && line <= line_end {
+                                    local_function_hits.insert(function);
+                                    // functions hits must have a matching line hit
+                                    // if we hit a line inside a function, make sure to count one line hit
+                                    if line > line_start {
+                                        let hit_count = line_execution_counts.get(&line_start);
+                                        if hit_count.is_none() || hit_count == Some(&0) {
+                                            line_execution_counts.insert(line_start, 1);
                                         }
-
-                                        let total_count = branch_execution_counts
-                                            .entry((line, expr_id, i))
-                                            .or_insert(0);
-                                        *total_count += count;
                                     }
-                                }
-
-                                for function in local_function_hits.into_iter() {
-                                    let hits = function_hits.entry(function).or_insert(0);
-                                    *hits += 1
                                 }
                             }
                         }
-                    }
 
-                    for (function, hits) in function_hits.iter() {
-                        file_content.push_str(&format!("FNDA:{},{}\n", hits, function));
-                    }
-                    file_content.push_str(&format!("FNF:{}\n", functions.len()));
-                    file_content.push_str(&format!("FNH:{}\n", function_hits.len()));
+                        for (expr_id, args) in executables_branches.iter() {
+                            for (i, (line, arg_expr_id)) in args.iter().enumerate() {
+                                let count = coverage.get(arg_expr_id).unwrap_or(&0);
 
-                    for (line, count) in line_execution_counts.iter() {
-                        // the ast can contain elements with a span starting at line 0 that we want to ignore
-                        if line > &&0 {
-                            file_content.push_str(&format!("DA:{},{}\n", line, count));
+                                branches.insert(arg_expr_id);
+                                if count > &0 {
+                                    branches_hits.insert(arg_expr_id);
+                                }
+
+                                let total_count = branch_execution_counts
+                                    .entry((line, expr_id, i))
+                                    .or_insert(0);
+                                *total_count += count;
+                            }
                         }
-                    }
 
-                    file_content.push_str(&format!("BRF:{}\n", branches.len()));
-                    file_content.push_str(&format!("BRH:{}\n", branches_hits.len()));
-
-                    for ((line, block_id, branch_nb), count) in branch_execution_counts.iter() {
-                        // the ast can contain elements with a span starting at line 0 that we want to ignore
-                        if line > &&0 {
-                            file_content.push_str(&format!(
-                                "BRDA:{},{},{},{}\n",
-                                line, block_id, branch_nb, count
-                            ));
+                        for function in local_function_hits.into_iter() {
+                            let hits = function_hits.entry(function).or_insert(0);
+                            *hits += 1
                         }
                     }
                 }
-                file_content.push_str("end_of_record\n");
-            }
-        }
 
-        file_content
+                for (function, hits) in function_hits.iter() {
+                    file_content.push_str(&format!("FNDA:{},{}\n", hits, function));
+                }
+                file_content.push_str(&format!("FNF:{}\n", functions.len()));
+                file_content.push_str(&format!("FNH:{}\n", function_hits.len()));
+
+                for (line, count) in line_execution_counts.iter() {
+                    // the ast can contain elements with a span starting at line 0 that we want to ignore
+                    if line > &&0 {
+                        file_content.push_str(&format!("DA:{},{}\n", line, count));
+                    }
+                }
+
+                file_content.push_str(&format!("BRF:{}\n", branches.len()));
+                file_content.push_str(&format!("BRH:{}\n", branches_hits.len()));
+
+                for ((line, block_id, branch_nb), count) in branch_execution_counts.iter() {
+                    // the ast can contain elements with a span starting at line 0 that we want to ignore
+                    if line > &&0 {
+                        file_content.push_str(&format!(
+                            "BRDA:{},{},{},{}\n",
+                            line, block_id, branch_nb, count
+                        ));
+                    }
+                }
+            }
+            file_content.push_str("end_of_record\n");
+        }
     }
+
+    file_content
 }
+// }
 
 fn try_parse_native_func(
     expr: &[SymbolicExpression],
@@ -379,7 +357,7 @@ fn try_parse_native_func(
 fn report_eval(expr_coverage: &mut ExprCoverage, expr: &SymbolicExpression) {
     if let Some(children) = expr.match_list() {
         if let Some((func, args)) = try_parse_native_func(children) {
-            if [Fold, Map, Filter].contains(&func) {
+            if matches!(func, Fold | Map | Filter) {
                 if let Some(iterator_func) = args.first() {
                     report_eval(expr_coverage, iterator_func);
                 }
