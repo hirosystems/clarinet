@@ -9,11 +9,10 @@ use clarinet_deployments::{
 };
 use clarinet_files::chainhook_types::StacksNetwork;
 use clarinet_files::{FileAccessor, FileLocation, ProjectManifest, WASMFileSystemAccessor};
-use clarity_repl::analysis::coverage::{CoverageReporter, TestCoverageReport};
+use clarity_repl::analysis::coverage::{CoverageHook, CoverageReports};
 use clarity_repl::clarity::analysis::contract_interface_builder::{
     ContractInterface, ContractInterfaceFunction, ContractInterfaceFunctionAccess,
 };
-use clarity_repl::clarity::ast::ContractAST;
 use clarity_repl::clarity::chainstate::StacksAddress;
 use clarity_repl::clarity::vm::types::{
     PrincipalData, QualifiedContractIdentifier, StandardPrincipalData,
@@ -23,7 +22,7 @@ use clarity_repl::clarity::{
     SymbolicExpression,
 };
 use clarity_repl::repl::clarity_values::{uint8_to_string, uint8_to_value};
-use clarity_repl::repl::session::BOOT_CONTRACTS_DATA;
+use clarity_repl::repl::session::{CostsReport, BOOT_CONTRACTS_DATA};
 use clarity_repl::repl::{
     clarity_values, ClarityCodeSource, ClarityContract, ContractDeployer, Session, SessionSettings,
     DEFAULT_CLARITY_VERSION, DEFAULT_EPOCH,
@@ -287,6 +286,9 @@ pub struct SDK {
     file_accessor: Box<dyn FileAccessor>,
     options: SDKOptions,
     current_test_name: String,
+
+    coverage_reports: CoverageReports,
+    costs_reports: Vec<CostsReport>,
 }
 
 #[wasm_bindgen]
@@ -303,16 +305,21 @@ impl SDK {
         Self {
             deployer: String::new(),
             cache: HashMap::new(),
+
             accounts: HashMap::new(),
             contracts_interfaces: HashMap::new(),
             contracts_locations: HashMap::new(),
             session: None,
+
             file_accessor: fs,
             options: SDKOptions {
                 track_coverage,
                 track_costs,
             },
             current_test_name: String::new(),
+
+            coverage_reports: CoverageReports::new(),
+            costs_reports: vec![],
         }
     }
 
@@ -713,6 +720,12 @@ impl SDK {
         }: &CallFnArgs,
         allow_private: bool,
     ) -> Result<TransactionRes, String> {
+        let contract_id = if contract.starts_with('S') {
+            contract.to_string()
+        } else {
+            format!("{}.{}", self.deployer, contract)
+        };
+
         let test_name = self.current_test_name.clone();
         let SDKOptions {
             track_costs,
@@ -720,13 +733,14 @@ impl SDK {
         } = self.options;
 
         let mut hooks: Vec<&mut dyn EvalHook> = Vec::new();
+
         let mut coverage_hook = if track_coverage {
-            Some(TestCoverageReport::new(test_name.clone()))
+            Some(CoverageHook::new())
         } else {
             None
         };
-        if let Some(ref mut hook) = coverage_hook {
-            hooks.push(hook)
+        if let Some(hook) = coverage_hook.as_mut() {
+            hooks.push(hook);
         }
 
         let parsed_args = args
@@ -737,14 +751,13 @@ impl SDK {
         let session = self.get_session_mut();
         let execution = session
             .call_contract_fn(
-                contract,
+                &contract_id,
                 method,
                 &parsed_args,
                 sender,
                 allow_private,
                 track_costs,
                 hooks,
-                test_name,
             )
             .map_err(|diagnostics| {
                 let mut message = format!(
@@ -763,8 +776,19 @@ impl SDK {
                 message
             })?;
 
+        if track_costs {
+            if let Some(ref cost) = execution.cost {
+                self.costs_reports.push(CostsReport {
+                    test_name,
+                    contract_id,
+                    method: method.to_string(),
+                    args: parsed_args.iter().map(|a| a.to_string()).collect(),
+                    cost_result: cost.clone(),
+                });
+            }
+        }
         if let Some(coverage_hook) = coverage_hook {
-            session.coverage_reports.push(coverage_hook)
+            self.coverage_reports.merge(coverage_hook.reports);
         }
 
         Ok(execution_result_to_transaction_res(&execution))
@@ -1044,38 +1068,33 @@ impl SDK {
     ) -> Result<SessionReport, String> {
         let contracts_locations = self.contracts_locations.clone();
         let session = self.get_session_mut();
-        let mut coverage_reporter = CoverageReporter::new();
-        let mut asts: BTreeMap<QualifiedContractIdentifier, ContractAST> = BTreeMap::new();
+
+        let mut asts = BTreeMap::new();
+        let mut contract_paths = BTreeMap::new();
+
         for (contract_id, contract) in session.contracts.iter() {
             asts.insert(contract_id.clone(), contract.ast.clone());
         }
-        coverage_reporter.asts.append(&mut asts);
-
         for (contract_id, contract_location) in contracts_locations.iter() {
-            coverage_reporter
-                .contract_paths
-                .insert(contract_id.name.to_string(), contract_location.to_string());
+            contract_paths.insert(contract_id.name.to_string(), contract_location.to_string());
         }
 
         if include_boot_contracts {
             for (contract_id, (_, ast)) in BOOT_CONTRACTS_DATA.iter() {
-                coverage_reporter
-                    .asts
-                    .insert(contract_id.clone(), ast.clone());
-                coverage_reporter.contract_paths.insert(
+                asts.insert(contract_id.clone(), ast.clone());
+                contract_paths.insert(
                     contract_id.name.to_string(),
                     format!("{boot_contracts_path}/{}.clar", contract_id.name),
                 );
             }
         }
 
-        coverage_reporter
-            .reports
-            .append(&mut session.coverage_reports);
-        let coverage = coverage_reporter.build_lcov_content();
+        let coverage = self
+            .coverage_reports
+            .build_lcov_content(&asts, &contract_paths);
 
         let mut costs_reports = Vec::new();
-        costs_reports.append(&mut session.costs_reports);
+        costs_reports.append(&mut self.costs_reports);
         let costs_reports: Vec<SerializableCostsReport> = costs_reports
             .iter()
             .map(SerializableCostsReport::from_vm_costs_report)

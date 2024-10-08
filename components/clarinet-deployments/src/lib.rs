@@ -239,7 +239,6 @@ fn handle_emulated_contract_call(
         true,
         false,
         vec![],
-        "deployment".to_string(),
     );
     if let Err(errors) = &result {
         println!("error: {:?}", errors.first().unwrap().message);

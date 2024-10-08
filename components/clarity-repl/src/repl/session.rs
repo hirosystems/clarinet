@@ -1,7 +1,6 @@
 use super::boot::{STACKS_BOOT_CODE_MAINNET, STACKS_BOOT_CODE_TESTNET};
 use super::diagnostic::output_diagnostic;
 use super::{ClarityCodeSource, ClarityContract, ClarityInterpreter, ContractDeployer};
-use crate::analysis::coverage::TestCoverageReport;
 use crate::repl::clarity_values::value_to_string;
 use crate::repl::Settings;
 use crate::utils;
@@ -100,8 +99,6 @@ pub struct Session {
     pub contracts: BTreeMap<QualifiedContractIdentifier, ParsedContract>,
     pub interpreter: ClarityInterpreter,
     api_reference: HashMap<String, String>,
-    pub coverage_reports: Vec<TestCoverageReport>,
-    pub costs_reports: Vec<CostsReport>,
     pub show_costs: bool,
     pub executed: Vec<String>,
     keywords_reference: HashMap<String, String>,
@@ -123,8 +120,6 @@ impl Session {
             current_epoch: settings.epoch_id.unwrap_or(StacksEpochId::Epoch2_05),
             contracts: BTreeMap::new(),
             api_reference: build_api_reference(),
-            coverage_reports: vec![],
-            costs_reports: vec![],
             show_costs: false,
             settings,
             executed: Vec::new(),
@@ -578,7 +573,6 @@ impl Session {
         allow_private: bool,
         track_costs: bool,
         eval_hooks: Vec<&mut dyn EvalHook>,
-        test_name: String,
     ) -> Result<ExecutionResult, Vec<Diagnostic>> {
         let initial_tx_sender = self.get_tx_sender();
 
@@ -612,16 +606,6 @@ impl Session {
             }
         };
         self.set_tx_sender(&initial_tx_sender);
-
-        if let Some(ref cost) = execution.cost {
-            self.costs_reports.push(CostsReport {
-                test_name,
-                contract_id: contract_id_str,
-                method: method.to_string(),
-                args: args.iter().map(|a| a.to_string()).collect(),
-                cost_result: cost.clone(),
-            });
-        }
 
         Ok(execution)
     }
@@ -1654,7 +1638,6 @@ mod tests {
             false,
             false,
             vec![],
-            "test".to_string(),
         );
         assert_execution_result_value(
             &result,
@@ -1694,7 +1677,6 @@ mod tests {
             false,
             false,
             vec![],
-            "test".to_owned(),
         );
         assert_execution_result_value(&result, Value::okay(Value::UInt(1)).unwrap());
 
@@ -1706,7 +1688,6 @@ mod tests {
             false,
             false,
             vec![],
-            "test".to_owned(),
         );
         assert_execution_result_value(&result, Value::UInt(1));
     }
