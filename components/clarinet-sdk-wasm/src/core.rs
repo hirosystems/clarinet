@@ -9,7 +9,6 @@ use clarinet_deployments::{
 };
 use clarinet_files::chainhook_types::StacksNetwork;
 use clarinet_files::{FileAccessor, FileLocation, ProjectManifest, WASMFileSystemAccessor};
-use clarity_repl::analysis::coverage::CoverageHook;
 use clarity_repl::clarity::analysis::contract_interface_builder::{
     ContractInterface, ContractInterfaceFunction, ContractInterfaceFunctionAccess,
 };
@@ -18,8 +17,7 @@ use clarity_repl::clarity::vm::types::{
     PrincipalData, QualifiedContractIdentifier, StandardPrincipalData,
 };
 use clarity_repl::clarity::{
-    Address, ClarityVersion, EvalHook, EvaluationResult, ExecutionResult, StacksEpochId,
-    SymbolicExpression,
+    Address, ClarityVersion, EvaluationResult, ExecutionResult, StacksEpochId, SymbolicExpression,
 };
 use clarity_repl::repl::clarity_values::{uint8_to_string, uint8_to_value};
 use clarity_repl::repl::session::{CostsReport, BOOT_CONTRACTS_DATA};
@@ -284,7 +282,6 @@ pub struct SDK {
     file_accessor: Box<dyn FileAccessor>,
     options: SDKOptions,
     current_test_name: String,
-    coverage_hook: Option<CoverageHook>,
     costs_reports: Vec<CostsReport>,
 }
 
@@ -299,12 +296,6 @@ impl SDK {
         let track_coverage = options.as_ref().map_or(false, |o| o.track_coverage);
         let track_costs = options.as_ref().map_or(false, |o| o.track_costs);
 
-        let coverage_hook = if track_coverage {
-            Some(CoverageHook::new())
-        } else {
-            None
-        };
-
         Self {
             deployer: String::new(),
             cache: HashMap::new(),
@@ -318,7 +309,6 @@ impl SDK {
                 track_costs,
             },
             current_test_name: String::new(),
-            coverage_hook,
             costs_reports: vec![],
         }
     }
@@ -453,6 +443,9 @@ impl SDK {
         }
 
         let mut session = initiate_session_from_manifest(&manifest);
+        if self.options.track_coverage {
+            session.enable_coverage();
+        }
         let executed_contracts = update_session_with_deployment_plan(
             &mut session,
             &deployment,
@@ -723,13 +716,6 @@ impl SDK {
         let test_name = self.current_test_name.clone();
         let SDKOptions { track_costs, .. } = self.options;
 
-        let mut hooks: Vec<&mut dyn EvalHook> = Vec::new();
-
-        let mut coverage_hook = self.coverage_hook.take();
-        if let Some(ref mut hook) = coverage_hook {
-            hooks.push(hook);
-        }
-
         let parsed_args = args
             .iter()
             .map(|a| SymbolicExpression::atom_value(uint8_to_value(a)))
@@ -744,7 +730,6 @@ impl SDK {
                 sender,
                 allow_private,
                 track_costs,
-                hooks,
             )
             .map_err(|diagnostics| {
                 let mut message = format!(
@@ -779,8 +764,6 @@ impl SDK {
                 });
             }
         }
-
-        self.coverage_hook = coverage_hook;
 
         Ok(execution_result_to_transaction_res(&execution))
     }
@@ -859,13 +842,6 @@ impl SDK {
         args: &DeployContractArgs,
         advance_chain_tip: bool,
     ) -> Result<TransactionRes, String> {
-        let mut hooks: Vec<&mut dyn EvalHook> = Vec::new();
-
-        let mut coverage_hook = self.coverage_hook.take();
-        if let Some(ref mut hook) = coverage_hook {
-            hooks.push(hook);
-        }
-
         let execution = {
             let session = self.get_session_mut();
             if advance_chain_tip {
@@ -880,7 +856,7 @@ impl SDK {
                 epoch: session.current_epoch,
             };
 
-            match session.deploy_contract(&contract, None, false, None) {
+            match session.deploy_contract(&contract, false, None) {
                 Ok(res) => res,
                 Err(diagnostics) => {
                     let mut message = format!(
@@ -894,8 +870,6 @@ impl SDK {
                 }
             }
         };
-
-        self.coverage_hook = coverage_hook;
 
         if let EvaluationResult::Contract(ref result) = &execution.result {
             let contract_id = result.contract.analysis.contract_identifier.clone();
@@ -998,64 +972,38 @@ impl SDK {
 
     #[wasm_bindgen(js_name=runSnippet)]
     pub fn run_snippet(&mut self, snippet: String) -> String {
-        let mut hooks: Vec<&mut dyn EvalHook> = Vec::new();
-
-        let mut coverage_hook = self.coverage_hook.take();
-        if let Some(ref mut hook) = coverage_hook {
-            hooks.push(hook);
-        }
-
-        let execution = {
-            let session = self.get_session_mut();
-            match session.eval(snippet.clone(), Some(hooks), false) {
-                Ok(res) => match res.result {
-                    EvaluationResult::Snippet(result) => {
-                        clarity_values::to_raw_value(&result.result)
-                    }
-                    EvaluationResult::Contract(_) => unreachable!(
-                        "Contract evaluation result should not be returned from eval_snippet",
-                    ),
-                },
-                Err(diagnostics) => {
-                    let mut message = "error:".to_string();
-                    diagnostics.iter().for_each(|d| {
-                        message = format!("{message}\n{}", d.message);
-                    });
-                    message
-                }
+        let session = self.get_session_mut();
+        match session.eval(snippet.clone(), false) {
+            Ok(res) => match res.result {
+                EvaluationResult::Snippet(result) => clarity_values::to_raw_value(&result.result),
+                EvaluationResult::Contract(_) => unreachable!(
+                    "Contract evaluation result should not be returned from eval_snippet",
+                ),
+            },
+            Err(diagnostics) => {
+                let mut message = "error:".to_string();
+                diagnostics.iter().for_each(|d| {
+                    message = format!("{message}\n{}", d.message);
+                });
+                message
             }
-        };
-
-        self.coverage_hook = coverage_hook;
-        execution
+        }
     }
 
     #[wasm_bindgen(js_name=execute)]
     pub fn execute(&mut self, snippet: String) -> Result<TransactionRes, String> {
-        let mut hooks: Vec<&mut dyn EvalHook> = Vec::new();
-
-        let mut coverage_hook = self.coverage_hook.take();
-        if let Some(ref mut hook) = coverage_hook {
-            hooks.push(hook);
-        }
-
-        let execution = {
-            let session = self.get_session_mut();
-            match session.eval(snippet.clone(), Some(hooks), false) {
-                Ok(res) => Ok(execution_result_to_transaction_res(&res)),
-                Err(diagnostics) => {
-                    let message = diagnostics
-                        .iter()
-                        .map(|d| d.message.to_string())
-                        .collect::<Vec<String>>()
-                        .join("\n");
-                    Err(format!("error: {}", message))
-                }
+        let session = self.get_session_mut();
+        match session.eval(snippet.clone(), false) {
+            Ok(res) => Ok(execution_result_to_transaction_res(&res)),
+            Err(diagnostics) => {
+                let message = diagnostics
+                    .iter()
+                    .map(|d| d.message.to_string())
+                    .collect::<Vec<String>>()
+                    .join("\n");
+                Err(format!("error: {}", message))
             }
-        };
-
-        self.coverage_hook = coverage_hook;
-        execution
+        }
     }
 
     #[wasm_bindgen(js_name=executeCommand)]
@@ -1081,9 +1029,8 @@ impl SDK {
 
     #[wasm_bindgen(js_name=setCurrentTestName)]
     pub fn set_current_test_name(&mut self, test_name: String) {
-        if let Some(coverage_hook) = &mut self.coverage_hook {
-            coverage_hook.set_current_test_name(test_name.clone());
-        }
+        let session = self.get_session_mut();
+        session.set_test_name(test_name.clone());
         self.current_test_name = test_name;
     }
 
@@ -1118,10 +1065,7 @@ impl SDK {
             }
         }
 
-        let coverage = match self.coverage_hook {
-            Some(ref mut hook) => hook.collect_lcov_content(&asts, &contract_paths),
-            None => "".to_string(),
-        };
+        let coverage = session.collect_lcov_content(&asts, &contract_paths);
 
         let mut costs_reports = Vec::new();
         costs_reports.append(&mut self.costs_reports);
