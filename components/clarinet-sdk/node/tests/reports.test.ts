@@ -107,3 +107,31 @@ describe("simnet can report both costs and coverage", () => {
     expect(reports.coverage.length).greaterThan(0);
   });
 });
+
+describe.only("run-snippet and execute also report coverage", () => {
+  it("simnet.execute reports coverage", async () => {
+    const simnet = await initSimnet("tests/fixtures/Clarinet.toml", true, {
+      trackCoverage: true,
+      trackCosts: false,
+    });
+    simnet.execute("(contract-call? .counter increment)");
+    simnet.execute("(contract-call? .counter increment)");
+
+    const reports = simnet.collectReport(false, "");
+    // line 26, within the increment function, is executed twice
+    expect(reports.coverage).toContain("DA:26,2");
+  });
+
+  it("simnet.runSnippet reports coverage", async () => {
+    const simnet = await initSimnet("tests/fixtures/Clarinet.toml", true, {
+      trackCoverage: true,
+      trackCosts: false,
+    });
+    simnet.runSnippet("(contract-call? .counter increment)");
+    simnet.runSnippet("(contract-call? .counter increment)");
+
+    const reports = simnet.collectReport(false, "");
+    // line 26, within the increment function, is executed twice
+    expect(reports.coverage).toContain("DA:26,2");
+  });
+});

@@ -859,6 +859,13 @@ impl SDK {
         args: &DeployContractArgs,
         advance_chain_tip: bool,
     ) -> Result<TransactionRes, String> {
+        let mut hooks: Vec<&mut dyn EvalHook> = Vec::new();
+
+        let mut coverage_hook = self.coverage_hook.take();
+        if let Some(ref mut hook) = coverage_hook {
+            hooks.push(hook);
+        }
+
         let execution = {
             let session = self.get_session_mut();
             if advance_chain_tip {
@@ -887,6 +894,8 @@ impl SDK {
                 }
             }
         };
+
+        self.coverage_hook = coverage_hook;
 
         if let EvaluationResult::Contract(ref result) = &execution.result {
             let contract_id = result.contract.analysis.contract_identifier.clone();
@@ -989,38 +998,64 @@ impl SDK {
 
     #[wasm_bindgen(js_name=runSnippet)]
     pub fn run_snippet(&mut self, snippet: String) -> String {
-        let session = self.get_session_mut();
-        match session.eval(snippet.clone(), None, false) {
-            Ok(res) => match res.result {
-                EvaluationResult::Snippet(result) => clarity_values::to_raw_value(&result.result),
-                EvaluationResult::Contract(_) => unreachable!(
-                    "Contract evaluation result should not be returned from eval_snippet",
-                ),
-            },
-            Err(diagnostics) => {
-                let mut message = "error:".to_string();
-                diagnostics.iter().for_each(|d| {
-                    message = format!("{message}\n{}", d.message);
-                });
-                message
-            }
+        let mut hooks: Vec<&mut dyn EvalHook> = Vec::new();
+
+        let mut coverage_hook = self.coverage_hook.take();
+        if let Some(ref mut hook) = coverage_hook {
+            hooks.push(hook);
         }
+
+        let execution = {
+            let session = self.get_session_mut();
+            match session.eval(snippet.clone(), Some(hooks), false) {
+                Ok(res) => match res.result {
+                    EvaluationResult::Snippet(result) => {
+                        clarity_values::to_raw_value(&result.result)
+                    }
+                    EvaluationResult::Contract(_) => unreachable!(
+                        "Contract evaluation result should not be returned from eval_snippet",
+                    ),
+                },
+                Err(diagnostics) => {
+                    let mut message = "error:".to_string();
+                    diagnostics.iter().for_each(|d| {
+                        message = format!("{message}\n{}", d.message);
+                    });
+                    message
+                }
+            }
+        };
+
+        self.coverage_hook = coverage_hook;
+        execution
     }
 
     #[wasm_bindgen(js_name=execute)]
     pub fn execute(&mut self, snippet: String) -> Result<TransactionRes, String> {
-        let session = self.get_session_mut();
-        match session.eval(snippet.clone(), None, false) {
-            Ok(res) => Ok(execution_result_to_transaction_res(&res)),
-            Err(diagnostics) => {
-                let message = diagnostics
-                    .iter()
-                    .map(|d| d.message.to_string())
-                    .collect::<Vec<String>>()
-                    .join("\n");
-                Err(format!("error: {}", message))
-            }
+        let mut hooks: Vec<&mut dyn EvalHook> = Vec::new();
+
+        let mut coverage_hook = self.coverage_hook.take();
+        if let Some(ref mut hook) = coverage_hook {
+            hooks.push(hook);
         }
+
+        let execution = {
+            let session = self.get_session_mut();
+            match session.eval(snippet.clone(), Some(hooks), false) {
+                Ok(res) => Ok(execution_result_to_transaction_res(&res)),
+                Err(diagnostics) => {
+                    let message = diagnostics
+                        .iter()
+                        .map(|d| d.message.to_string())
+                        .collect::<Vec<String>>()
+                        .join("\n");
+                    Err(format!("error: {}", message))
+                }
+            }
+        };
+
+        self.coverage_hook = coverage_hook;
+        execution
     }
 
     #[wasm_bindgen(js_name=executeCommand)]
