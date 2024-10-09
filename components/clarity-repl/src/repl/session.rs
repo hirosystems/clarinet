@@ -1,7 +1,6 @@
 use super::boot::{STACKS_BOOT_CODE_MAINNET, STACKS_BOOT_CODE_TESTNET};
 use super::diagnostic::output_diagnostic;
 use super::{ClarityCodeSource, ClarityContract, ClarityInterpreter, ContractDeployer};
-use crate::analysis::coverage::TestCoverageReport;
 use crate::repl::clarity_values::value_to_string;
 use crate::repl::Settings;
 use crate::utils;
@@ -100,8 +99,6 @@ pub struct Session {
     pub contracts: BTreeMap<QualifiedContractIdentifier, ParsedContract>,
     pub interpreter: ClarityInterpreter,
     api_reference: HashMap<String, String>,
-    pub coverage_reports: Vec<TestCoverageReport>,
-    pub costs_reports: Vec<CostsReport>,
     pub show_costs: bool,
     pub executed: Vec<String>,
     keywords_reference: HashMap<String, String>,
@@ -123,8 +120,6 @@ impl Session {
             current_epoch: settings.epoch_id.unwrap_or(StacksEpochId::Epoch2_05),
             contracts: BTreeMap::new(),
             api_reference: build_api_reference(),
-            coverage_reports: vec![],
-            costs_reports: vec![],
             show_costs: false,
             settings,
             executed: Vec::new(),
@@ -183,7 +178,7 @@ impl Session {
                 };
 
                 // Result ignored, boot contracts are trusted to be valid
-                let _ = self.deploy_contract(&contract, None, false, None, None);
+                let _ = self.deploy_contract(&contract, None, false, None);
             }
         }
     }
@@ -528,7 +523,6 @@ impl Session {
         contract: &ClarityContract,
         eval_hooks: Option<Vec<&mut dyn EvalHook>>,
         cost_track: bool,
-        test_name: Option<String>,
         ast: Option<&ContractAST>,
     ) -> Result<ExecutionResult, Vec<Diagnostic>> {
         if contract.epoch != self.current_epoch {
@@ -556,32 +550,17 @@ impl Session {
             };
             return Err(vec![diagnostic]);
         }
-        let mut hooks: Vec<&mut dyn EvalHook> = Vec::new();
-        let mut coverage = test_name.map(TestCoverageReport::new);
-        if let Some(coverage) = &mut coverage {
-            hooks.push(coverage);
-        };
-
-        if let Some(mut in_hooks) = eval_hooks {
-            for hook in in_hooks.drain(..) {
-                hooks.push(hook);
-            }
-        }
 
         let contract_id =
             contract.expect_resolved_contract_identifier(Some(&self.interpreter.get_tx_sender()));
 
-        let result = self.interpreter.run(contract, ast, cost_track, Some(hooks));
+        let result = self.interpreter.run(contract, ast, cost_track, eval_hooks);
 
-        result.map(|result| {
+        result.inspect(|result| {
             if let EvaluationResult::Contract(contract_result) = &result.result {
                 self.contracts
                     .insert(contract_id.clone(), contract_result.contract.clone());
             }
-            if let Some(coverage) = coverage {
-                self.coverage_reports.push(coverage);
-            }
-            result
         })
     }
 
@@ -593,36 +572,27 @@ impl Session {
         sender: &str,
         allow_private: bool,
         track_costs: bool,
-        track_coverage: bool,
-        test_name: String,
+        eval_hooks: Vec<&mut dyn EvalHook>,
     ) -> Result<ExecutionResult, Vec<Diagnostic>> {
         let initial_tx_sender = self.get_tx_sender();
+
         // Handle fully qualified contract_id and sugared syntax
         let contract_id_str = if contract.starts_with('S') {
             contract.to_string()
         } else {
             format!("{}.{}", initial_tx_sender, contract)
         };
-        let contract_id = QualifiedContractIdentifier::parse(&contract_id_str).unwrap();
-
-        let mut hooks: Vec<&mut dyn EvalHook> = vec![];
-        let mut coverage = TestCoverageReport::new(test_name.clone());
-        if track_coverage {
-            hooks.push(&mut coverage);
-        }
-
-        let clarity_version = ClarityVersion::default_for_epoch(self.current_epoch);
 
         self.set_tx_sender(sender);
         let execution = match self.interpreter.call_contract_fn(
-            &contract_id,
+            &QualifiedContractIdentifier::parse(&contract_id_str).unwrap(),
             method,
             args,
             self.current_epoch,
-            clarity_version,
+            ClarityVersion::default_for_epoch(self.current_epoch),
             track_costs,
             allow_private,
-            Some(hooks),
+            eval_hooks,
         ) {
             Ok(result) => result,
             Err(e) => {
@@ -636,20 +606,6 @@ impl Session {
             }
         };
         self.set_tx_sender(&initial_tx_sender);
-
-        if track_coverage {
-            self.coverage_reports.push(coverage);
-        }
-
-        if let Some(ref cost) = execution.cost {
-            self.costs_reports.push(CostsReport {
-                test_name,
-                contract_id: contract_id_str,
-                method: method.to_string(),
-                args: args.iter().map(|a| a.to_string()).collect(),
-                cost_result: cost.clone(),
-            });
-        }
 
         Ok(execution)
     }
@@ -1543,7 +1499,7 @@ mod tests {
             epoch: StacksEpochId::Epoch2_05,
         };
 
-        let result = session.deploy_contract(&contract, None, false, None, None);
+        let result = session.deploy_contract(&contract, None, false, None);
         assert!(result.is_err(), "Expected error for clarity mismatch");
     }
 
@@ -1561,7 +1517,7 @@ mod tests {
             .clarity_version(ClarityVersion::Clarity2)
             .build();
 
-        let result = session.deploy_contract(&contract, None, false, None, None);
+        let result = session.deploy_contract(&contract, None, false, None);
         assert!(result.is_err());
         let err = result.unwrap_err();
         assert!(err.len() == 1);
@@ -1601,7 +1557,7 @@ mod tests {
             epoch: StacksEpochId::Epoch25,
         };
 
-        let _ = session.deploy_contract(&contract, None, false, None, None);
+        let _ = session.deploy_contract(&contract, None, false, None);
 
         // assert data-var is set to 0
         assert_eq!(
@@ -1659,7 +1615,7 @@ mod tests {
 
         // deploy default contract
         let contract = ClarityContractBuilder::default().build();
-        let result = session.deploy_contract(&contract, None, false, None, None);
+        let result = session.deploy_contract(&contract, None, false, None);
         assert!(result.is_ok());
     }
 
@@ -1681,8 +1637,7 @@ mod tests {
             BOOT_TESTNET_ADDRESS,
             false,
             false,
-            false,
-            "test".to_string(),
+            vec![],
         );
         assert_execution_result_value(
             &result,
@@ -1710,7 +1665,7 @@ mod tests {
 
         // deploy default contract
         let contract = ClarityContractBuilder::default().build();
-        let _ = session.deploy_contract(&contract, None, false, None, None);
+        let _ = session.deploy_contract(&contract, None, false, None);
 
         dbg!(&contract);
 
@@ -1721,8 +1676,7 @@ mod tests {
             &session.get_tx_sender(),
             false,
             false,
-            false,
-            "test".to_owned(),
+            vec![],
         );
         assert_execution_result_value(&result, Value::okay(Value::UInt(1)).unwrap());
 
@@ -1733,8 +1687,7 @@ mod tests {
             &session.get_tx_sender(),
             false,
             false,
-            false,
-            "test".to_owned(),
+            vec![],
         );
         assert_execution_result_value(&result, Value::UInt(1));
     }

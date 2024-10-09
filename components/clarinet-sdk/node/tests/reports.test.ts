@@ -43,6 +43,7 @@ describe("simnet can get code coverage", () => {
       trackCosts: false,
     });
 
+    simnet.setCurrentTestName("test1");
     simnet.callPublicFn("counter", "increment", [], address1);
     simnet.callPublicFn("counter", "increment", [], address1);
     simnet.callPrivateFn("counter", "inner-increment", [], address1);
@@ -53,7 +54,6 @@ describe("simnet can get code coverage", () => {
     expect(reports.coverage.includes("FNDA:2,increment")).toBe(true);
     // inner-increment is called one time directly and twice by `increment`
     expect(reports.coverage.includes("FNDA:3,inner-increment")).toBe(true);
-
     expect(reports.coverage.startsWith("TN:")).toBe(true);
     expect(reports.coverage.endsWith("end_of_record\n")).toBe(true);
   });
@@ -105,5 +105,33 @@ describe("simnet can report both costs and coverage", () => {
     expect(parsedReports).toHaveLength(1);
 
     expect(reports.coverage.length).greaterThan(0);
+  });
+});
+
+describe("simnet.run-snippet and .execute also report coverage", () => {
+  it("simnet.execute reports coverage", async () => {
+    const simnet = await initSimnet("tests/fixtures/Clarinet.toml", true, {
+      trackCoverage: true,
+      trackCosts: false,
+    });
+    simnet.execute("(contract-call? .counter increment)");
+    simnet.execute("(contract-call? .counter increment)");
+
+    const reports = simnet.collectReport(false, "");
+    // line 26, within the increment function, is executed twice
+    expect(reports.coverage).toContain("DA:26,2");
+  });
+
+  it("simnet.runSnippet reports coverage", async () => {
+    const simnet = await initSimnet("tests/fixtures/Clarinet.toml", true, {
+      trackCoverage: true,
+      trackCosts: false,
+    });
+    simnet.runSnippet("(contract-call? .counter increment)");
+    simnet.runSnippet("(contract-call? .counter increment)");
+
+    const reports = simnet.collectReport(false, "");
+    // line 26, within the increment function, is executed twice
+    expect(reports.coverage).toContain("DA:26,2");
   });
 });

@@ -154,9 +154,8 @@ where
     F: FnOnce(&mut AnalysisDatabase) -> std::result::Result<T, E>,
 {
     conn.begin();
-    let result = f(conn).map_err(|e| {
+    let result = f(conn).inspect_err(|_| {
         conn.roll_back().expect("Failed to roll back");
-        e
     })?;
     conn.commit().expect("Failed to commit");
     Ok(result)

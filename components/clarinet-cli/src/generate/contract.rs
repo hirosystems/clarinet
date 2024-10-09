@@ -31,11 +31,6 @@ impl GetChangesForRmContract {
         f.append_path("tests")?;
         f.append_path(&name)?;
         if !f.exists() {
-            format!(
-                "{} tests/{} doesn't exist. Skipping removal",
-                red!("Warning"),
-                name
-            );
             return Ok(());
         }
         let change = FileDeletion {

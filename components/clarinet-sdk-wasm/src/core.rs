@@ -9,20 +9,20 @@ use clarinet_deployments::{
 };
 use clarinet_files::chainhook_types::StacksNetwork;
 use clarinet_files::{FileAccessor, FileLocation, ProjectManifest, WASMFileSystemAccessor};
-use clarity_repl::analysis::coverage::CoverageReporter;
+use clarity_repl::analysis::coverage::CoverageHook;
 use clarity_repl::clarity::analysis::contract_interface_builder::{
     ContractInterface, ContractInterfaceFunction, ContractInterfaceFunctionAccess,
 };
-use clarity_repl::clarity::ast::ContractAST;
 use clarity_repl::clarity::chainstate::StacksAddress;
 use clarity_repl::clarity::vm::types::{
     PrincipalData, QualifiedContractIdentifier, StandardPrincipalData,
 };
 use clarity_repl::clarity::{
-    Address, ClarityVersion, EvaluationResult, ExecutionResult, StacksEpochId, SymbolicExpression,
+    Address, ClarityVersion, EvalHook, EvaluationResult, ExecutionResult, StacksEpochId,
+    SymbolicExpression,
 };
 use clarity_repl::repl::clarity_values::{uint8_to_string, uint8_to_value};
-use clarity_repl::repl::session::BOOT_CONTRACTS_DATA;
+use clarity_repl::repl::session::{CostsReport, BOOT_CONTRACTS_DATA};
 use clarity_repl::repl::{
     clarity_values, ClarityCodeSource, ClarityContract, ContractDeployer, Session, SessionSettings,
     DEFAULT_CLARITY_VERSION, DEFAULT_EPOCH,
@@ -277,15 +277,15 @@ pub struct SDK {
     #[wasm_bindgen(getter_with_clone)]
     pub deployer: String,
     cache: HashMap<FileLocation, ProjectCache>,
-
     accounts: HashMap<String, String>,
     contracts_locations: HashMap<QualifiedContractIdentifier, FileLocation>,
     contracts_interfaces: HashMap<QualifiedContractIdentifier, ContractInterface>,
     session: Option<Session>,
-
     file_accessor: Box<dyn FileAccessor>,
     options: SDKOptions,
     current_test_name: String,
+    coverage_hook: Option<CoverageHook>,
+    costs_reports: Vec<CostsReport>,
 }
 
 #[wasm_bindgen]
@@ -298,6 +298,12 @@ impl SDK {
 
         let track_coverage = options.as_ref().map_or(false, |o| o.track_coverage);
         let track_costs = options.as_ref().map_or(false, |o| o.track_costs);
+
+        let coverage_hook = if track_coverage {
+            Some(CoverageHook::new())
+        } else {
+            None
+        };
 
         Self {
             deployer: String::new(),
@@ -312,6 +318,8 @@ impl SDK {
                 track_costs,
             },
             current_test_name: String::new(),
+            coverage_hook,
+            costs_reports: vec![],
         }
     }
 
@@ -449,7 +457,6 @@ impl SDK {
             &mut session,
             &deployment,
             Some(&artifacts.asts),
-            false,
             Some(DEFAULT_EPOCH),
         );
 
@@ -714,10 +721,14 @@ impl SDK {
         allow_private: bool,
     ) -> Result<TransactionRes, String> {
         let test_name = self.current_test_name.clone();
-        let SDKOptions {
-            track_costs,
-            track_coverage,
-        } = self.options;
+        let SDKOptions { track_costs, .. } = self.options;
+
+        let mut hooks: Vec<&mut dyn EvalHook> = Vec::new();
+
+        let mut coverage_hook = self.coverage_hook.take();
+        if let Some(ref mut hook) = coverage_hook {
+            hooks.push(hook);
+        }
 
         let parsed_args = args
             .iter()
@@ -733,8 +744,7 @@ impl SDK {
                 sender,
                 allow_private,
                 track_costs,
-                track_coverage,
-                test_name,
+                hooks,
             )
             .map_err(|diagnostics| {
                 let mut message = format!(
@@ -752,6 +762,25 @@ impl SDK {
                 }
                 message
             })?;
+
+        if track_costs {
+            if let Some(ref cost) = execution.cost {
+                let contract_id = if contract.starts_with('S') {
+                    contract.to_string()
+                } else {
+                    format!("{}.{}", self.deployer, contract)
+                };
+                self.costs_reports.push(CostsReport {
+                    test_name,
+                    contract_id,
+                    method: method.to_string(),
+                    args: parsed_args.iter().map(|a| a.to_string()).collect(),
+                    cost_result: cost.clone(),
+                });
+            }
+        }
+
+        self.coverage_hook = coverage_hook;
 
         Ok(execution_result_to_transaction_res(&execution))
     }
@@ -830,6 +859,13 @@ impl SDK {
         args: &DeployContractArgs,
         advance_chain_tip: bool,
     ) -> Result<TransactionRes, String> {
+        let mut hooks: Vec<&mut dyn EvalHook> = Vec::new();
+
+        let mut coverage_hook = self.coverage_hook.take();
+        if let Some(ref mut hook) = coverage_hook {
+            hooks.push(hook);
+        }
+
         let execution = {
             let session = self.get_session_mut();
             if advance_chain_tip {
@@ -844,7 +880,7 @@ impl SDK {
                 epoch: session.current_epoch,
             };
 
-            match session.deploy_contract(&contract, None, false, Some(args.name.clone()), None) {
+            match session.deploy_contract(&contract, None, false, None) {
                 Ok(res) => res,
                 Err(diagnostics) => {
                     let mut message = format!(
@@ -858,6 +894,8 @@ impl SDK {
                 }
             }
         };
+
+        self.coverage_hook = coverage_hook;
 
         if let EvaluationResult::Contract(ref result) = &execution.result {
             let contract_id = result.contract.analysis.contract_identifier.clone();
@@ -960,38 +998,64 @@ impl SDK {
 
     #[wasm_bindgen(js_name=runSnippet)]
     pub fn run_snippet(&mut self, snippet: String) -> String {
-        let session = self.get_session_mut();
-        match session.eval(snippet.clone(), None, false) {
-            Ok(res) => match res.result {
-                EvaluationResult::Snippet(result) => clarity_values::to_raw_value(&result.result),
-                EvaluationResult::Contract(_) => unreachable!(
-                    "Contract evaluation result should not be returned from eval_snippet",
-                ),
-            },
-            Err(diagnostics) => {
-                let mut message = "error:".to_string();
-                diagnostics.iter().for_each(|d| {
-                    message = format!("{message}\n{}", d.message);
-                });
-                message
-            }
+        let mut hooks: Vec<&mut dyn EvalHook> = Vec::new();
+
+        let mut coverage_hook = self.coverage_hook.take();
+        if let Some(ref mut hook) = coverage_hook {
+            hooks.push(hook);
         }
+
+        let execution = {
+            let session = self.get_session_mut();
+            match session.eval(snippet.clone(), Some(hooks), false) {
+                Ok(res) => match res.result {
+                    EvaluationResult::Snippet(result) => {
+                        clarity_values::to_raw_value(&result.result)
+                    }
+                    EvaluationResult::Contract(_) => unreachable!(
+                        "Contract evaluation result should not be returned from eval_snippet",
+                    ),
+                },
+                Err(diagnostics) => {
+                    let mut message = "error:".to_string();
+                    diagnostics.iter().for_each(|d| {
+                        message = format!("{message}\n{}", d.message);
+                    });
+                    message
+                }
+            }
+        };
+
+        self.coverage_hook = coverage_hook;
+        execution
     }
 
     #[wasm_bindgen(js_name=execute)]
     pub fn execute(&mut self, snippet: String) -> Result<TransactionRes, String> {
-        let session = self.get_session_mut();
-        match session.eval(snippet.clone(), None, false) {
-            Ok(res) => Ok(execution_result_to_transaction_res(&res)),
-            Err(diagnostics) => {
-                let message = diagnostics
-                    .iter()
-                    .map(|d| d.message.to_string())
-                    .collect::<Vec<String>>()
-                    .join("\n");
-                Err(format!("error: {}", message))
-            }
+        let mut hooks: Vec<&mut dyn EvalHook> = Vec::new();
+
+        let mut coverage_hook = self.coverage_hook.take();
+        if let Some(ref mut hook) = coverage_hook {
+            hooks.push(hook);
         }
+
+        let execution = {
+            let session = self.get_session_mut();
+            match session.eval(snippet.clone(), Some(hooks), false) {
+                Ok(res) => Ok(execution_result_to_transaction_res(&res)),
+                Err(diagnostics) => {
+                    let message = diagnostics
+                        .iter()
+                        .map(|d| d.message.to_string())
+                        .collect::<Vec<String>>()
+                        .join("\n");
+                    Err(format!("error: {}", message))
+                }
+            }
+        };
+
+        self.coverage_hook = coverage_hook;
+        execution
     }
 
     #[wasm_bindgen(js_name=executeCommand)]
@@ -1017,6 +1081,9 @@ impl SDK {
 
     #[wasm_bindgen(js_name=setCurrentTestName)]
     pub fn set_current_test_name(&mut self, test_name: String) {
+        if let Some(coverage_hook) = &mut self.coverage_hook {
+            coverage_hook.set_current_test_name(test_name.clone());
+        }
         self.current_test_name = test_name;
     }
 
@@ -1030,38 +1097,34 @@ impl SDK {
     ) -> Result<SessionReport, String> {
         let contracts_locations = self.contracts_locations.clone();
         let session = self.get_session_mut();
-        let mut coverage_reporter = CoverageReporter::new();
-        let mut asts: BTreeMap<QualifiedContractIdentifier, ContractAST> = BTreeMap::new();
+
+        let mut asts = BTreeMap::new();
+        let mut contract_paths = BTreeMap::new();
+
         for (contract_id, contract) in session.contracts.iter() {
             asts.insert(contract_id.clone(), contract.ast.clone());
         }
-        coverage_reporter.asts.append(&mut asts);
-
         for (contract_id, contract_location) in contracts_locations.iter() {
-            coverage_reporter
-                .contract_paths
-                .insert(contract_id.name.to_string(), contract_location.to_string());
+            contract_paths.insert(contract_id.name.to_string(), contract_location.to_string());
         }
 
         if include_boot_contracts {
             for (contract_id, (_, ast)) in BOOT_CONTRACTS_DATA.iter() {
-                coverage_reporter
-                    .asts
-                    .insert(contract_id.clone(), ast.clone());
-                coverage_reporter.contract_paths.insert(
+                asts.insert(contract_id.clone(), ast.clone());
+                contract_paths.insert(
                     contract_id.name.to_string(),
                     format!("{boot_contracts_path}/{}.clar", contract_id.name),
                 );
             }
         }
 
-        coverage_reporter
-            .reports
-            .append(&mut session.coverage_reports);
-        let coverage = coverage_reporter.build_lcov_content();
+        let coverage = match self.coverage_hook {
+            Some(ref mut hook) => hook.collect_lcov_content(&asts, &contract_paths),
+            None => "".to_string(),
+        };
 
         let mut costs_reports = Vec::new();
-        costs_reports.append(&mut session.costs_reports);
+        costs_reports.append(&mut self.costs_reports);
         let costs_reports: Vec<SerializableCostsReport> = costs_reports
             .iter()
             .map(SerializableCostsReport::from_vm_costs_report)
