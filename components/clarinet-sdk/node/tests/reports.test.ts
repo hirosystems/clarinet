@@ -108,7 +108,7 @@ describe("simnet can report both costs and coverage", () => {
   });
 });
 
-describe.only("run-snippet and execute also report coverage", () => {
+describe("simnet.run-snippet and .execute also report coverage", () => {
   it("simnet.execute reports coverage", async () => {
     const simnet = await initSimnet("tests/fixtures/Clarinet.toml", true, {
       trackCoverage: true,
