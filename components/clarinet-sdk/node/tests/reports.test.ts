@@ -43,6 +43,7 @@ describe("simnet can get code coverage", () => {
       trackCosts: false,
     });
 
+    simnet.setCurrentTestName("test1");
     simnet.callPublicFn("counter", "increment", [], address1);
     simnet.callPublicFn("counter", "increment", [], address1);
     simnet.callPrivateFn("counter", "inner-increment", [], address1);
@@ -53,7 +54,6 @@ describe("simnet can get code coverage", () => {
     expect(reports.coverage.includes("FNDA:2,increment")).toBe(true);
     // inner-increment is called one time directly and twice by `increment`
     expect(reports.coverage.includes("FNDA:3,inner-increment")).toBe(true);
-
     expect(reports.coverage.startsWith("TN:")).toBe(true);
     expect(reports.coverage.endsWith("end_of_record\n")).toBe(true);
   });

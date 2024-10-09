@@ -1,14 +1,15 @@
 use std::collections::BTreeMap;
 
-use super::coverage::{build_lcov_content, CoverageHook};
+use super::coverage::CoverageHook;
 use crate::repl::session::Session;
 use crate::repl::SessionSettings;
 
-fn get_coverage_report(contract: &str, snippets: Vec<String>, test_name: Option<String>) -> String {
+fn get_coverage_report(contract: &str, snippets: Vec<String>) -> String {
     let mut session = Session::new(SessionSettings::default());
 
     let mut coverage_hook = CoverageHook::new();
-    coverage_hook.current_test_name = Some(test_name.unwrap_or("test_scenario".to_string()));
+    coverage_hook.set_current_test_name("test_scenario".to_string());
+
     let _ = session.eval(contract.into(), Some(vec![&mut coverage_hook]), false);
     for snippet in snippets {
         let _ = session.eval(snippet, Some(vec![&mut coverage_hook]), false);
@@ -20,7 +21,7 @@ fn get_coverage_report(contract: &str, snippets: Vec<String>, test_name: Option<
     let asts = BTreeMap::from([(contract_id.clone(), ast.clone())]);
     let paths = BTreeMap::from([(contract_id.name.to_string(), "/contract-0.clar".into())]);
 
-    build_lcov_content(&coverage_hook.reports, &asts, &paths)
+    coverage_hook.collect_lcov_content(&asts, &paths)
 }
 
 fn get_expected_report(body: String) -> String {
@@ -31,7 +32,7 @@ fn get_expected_report(body: String) -> String {
 fn line_is_executed() {
     let contract = "(define-read-only (add) (+ 1 2))";
     let snippet = "(contract-call? .contract-0 add)";
-    let cov = get_coverage_report(contract, vec![snippet.into()], None);
+    let cov = get_coverage_report(contract, vec![snippet.into()]);
 
     let expect = get_expected_report(
         [
@@ -53,7 +54,7 @@ fn line_is_executed_twice() {
     let contract = "(define-read-only (add) (+ 1 2))";
     // call it twice
     let snippet = "(contract-call? .contract-0 add) (contract-call? .contract-0 add)";
-    let cov = get_coverage_report(contract, vec![snippet.into()], None);
+    let cov = get_coverage_report(contract, vec![snippet.into()]);
 
     let expect = get_expected_report(
         [
@@ -80,7 +81,7 @@ fn line_count_in_iterator() {
     ]
     .join("\n");
     let snippet = "(contract-call? .contract-0 map-add-1)";
-    let cov = get_coverage_report(contract.as_str(), vec![snippet.into()], None);
+    let cov = get_coverage_report(contract.as_str(), vec![snippet.into()]);
 
     let expect = get_expected_report(
         [
@@ -107,7 +108,7 @@ fn function_hit_should_have_line_hit() {
     let contract = ["(define-read-only (t)", "  true", ")"].join("\n");
 
     let snippet = "(contract-call? .contract-0 t)";
-    let cov = get_coverage_report(contract.as_str(), vec![snippet.into()], None);
+    let cov = get_coverage_report(contract.as_str(), vec![snippet.into()]);
 
     let expect = get_expected_report(
         [
@@ -131,7 +132,7 @@ fn multiple_line_execution() {
     .join("\n");
 
     let snippet = "(contract-call? .contract-0 add)";
-    let cov = get_coverage_report(contract.as_str(), vec![snippet.into()], None);
+    let cov = get_coverage_report(contract.as_str(), vec![snippet.into()]);
 
     let expect = get_expected_report(
         [
@@ -165,7 +166,7 @@ fn let_binding() {
     .join("\n");
 
     let snippet = "(contract-call? .contract-0 add-print)";
-    let cov = get_coverage_report(contract.as_str(), vec![snippet.into()], None);
+    let cov = get_coverage_report(contract.as_str(), vec![snippet.into()]);
 
     let expect = get_expected_report(
         [
@@ -207,7 +208,7 @@ fn simple_if_branching() {
 
     // left path
     let snippet = "(contract-call? .contract-0 one-or-two true)";
-    let cov = get_coverage_report(contract.as_str(), vec![snippet.into()], None);
+    let cov = get_coverage_report(contract.as_str(), vec![snippet.into()]);
 
     let expect = get_expected_report(
         [&expect_base[..], &["BRDA:2,8,0,1", "BRDA:2,8,1,0"]]
@@ -218,7 +219,7 @@ fn simple_if_branching() {
 
     // right path
     let snippet = "(contract-call? .contract-0 one-or-two false)";
-    let cov = get_coverage_report(contract.as_str(), vec![snippet.into()], None);
+    let cov = get_coverage_report(contract.as_str(), vec![snippet.into()]);
 
     let expect = get_expected_report(
         [&expect_base[..], &["BRDA:2,8,0,0", "BRDA:2,8,1,1"]]
@@ -237,7 +238,7 @@ fn simple_if_branches_with_exprs() {
     ]
     .join("\n");
     let snippet = "(contract-call? .contract-0 add-or-sub true)";
-    let cov = get_coverage_report(contract.as_str(), vec![snippet.into()], None);
+    let cov = get_coverage_report(contract.as_str(), vec![snippet.into()]);
 
     let expect = get_expected_report(
         [
@@ -274,7 +275,7 @@ fn hit_all_if_branches() {
         "(contract-call? .contract-0 add-or-sub false)".into(),
         "(contract-call? .contract-0 add-or-sub false)".into(),
     ];
-    let cov = get_coverage_report(&contract, snippets, None);
+    let cov = get_coverage_report(&contract, snippets);
 
     let expect = get_expected_report(
         [
@@ -305,7 +306,7 @@ fn simple_asserts_branching() {
 
     // no hit on (err u1)
     let snippets: Vec<String> = vec!["(contract-call? .contract-0 is-one 1)".into()];
-    let cov = get_coverage_report(&contract, snippets, None);
+    let cov = get_coverage_report(&contract, snippets);
 
     let expect = get_expected_report(
         [
@@ -325,7 +326,7 @@ fn simple_asserts_branching() {
 
     // hit on (err u1)
     let snippets: Vec<String> = vec!["(contract-call? .contract-0 is-one 2)".into()];
-    let cov = get_coverage_report(&contract, snippets, None);
+    let cov = get_coverage_report(&contract, snippets);
 
     let expect = get_expected_report(
         [
@@ -357,7 +358,7 @@ fn branch_if_plus_and() {
     .join("\n");
     // calling with `2`, so that evualuation should stop at (> v 2) (which is false)
     let snippet = "(contract-call? .contract-0 unecessary-ifs 2)";
-    let cov = get_coverage_report(contract.as_str(), vec![snippet.into()], None);
+    let cov = get_coverage_report(contract.as_str(), vec![snippet.into()]);
 
     let expect = get_expected_report(
         vec![
@@ -396,7 +397,7 @@ fn branch_if_plus_or() {
     .join("\n");
     // calling with 1, so that evualuation should stop at (is-eq v 1)
     let snippet = "(contract-call? .contract-0 unecessary-ors 1)";
-    let cov = get_coverage_report(contract.as_str(), vec![snippet.into()], None);
+    let cov = get_coverage_report(contract.as_str(), vec![snippet.into()]);
 
     let expect = get_expected_report(
         vec![
@@ -444,7 +445,7 @@ fn match_opt_oneline() {
 
     // left path
     let snippets: Vec<String> = vec!["(contract-call? .contract-0 match-opt (some 1))".into()];
-    let cov = get_coverage_report(&contract, snippets, None);
+    let cov = get_coverage_report(&contract, snippets);
 
     let expect = get_expected_report(
         [&expect_base[..], &["BRDA:2,10,0,1", "BRDA:2,10,1,0"]]
@@ -455,7 +456,7 @@ fn match_opt_oneline() {
 
     // right path
     let snippets: Vec<String> = vec!["(contract-call? .contract-0 match-opt none)".into()];
-    let cov = get_coverage_report(&contract, snippets, None);
+    let cov = get_coverage_report(&contract, snippets);
 
     let expect = get_expected_report(
         [&expect_base[..], &["BRDA:2,10,0,0", "BRDA:2,10,1,1"]]
@@ -489,7 +490,7 @@ fn match_opt_multiline() {
 
     // left path
     let snippets: Vec<String> = vec!["(contract-call? .contract-0 match-opt (some 1))".into()];
-    let cov = get_coverage_report(&contract, snippets, None);
+    let cov = get_coverage_report(&contract, snippets);
 
     let expect = get_expected_report(
         [
@@ -510,7 +511,7 @@ fn match_opt_multiline() {
 
     // right path
     let snippets: Vec<String> = vec!["(contract-call? .contract-0 match-opt none)".into()];
-    let cov = get_coverage_report(&contract, snippets, None);
+    let cov = get_coverage_report(&contract, snippets);
 
     let expect = get_expected_report(
         [
@@ -547,7 +548,7 @@ fn match_res_oneline() {
         "(contract-call? .contract-0 match-res (ok 2))".into(),
         "(contract-call? .contract-0 match-res (err u1))".into(),
     ];
-    let cov = get_coverage_report(&contract, snippets, None);
+    let cov = get_coverage_report(&contract, snippets);
 
     let expect = get_expected_report(
         [
@@ -585,7 +586,7 @@ fn fold_iterator() {
     .join("\n");
 
     let snippets: Vec<String> = vec!["(contract-call? .contract-0 sum)".into()];
-    let cov = get_coverage_report(&contract, snippets, None);
+    let cov = get_coverage_report(&contract, snippets);
 
     let expect = get_expected_report(
         vec![
@@ -624,7 +625,7 @@ fn map_iterator() {
     .join("\n");
 
     let snippets: Vec<String> = vec!["(contract-call? .contract-0 square (list 1 2 3))".into()];
-    let cov = get_coverage_report(&contract, snippets, None);
+    let cov = get_coverage_report(&contract, snippets);
 
     let expect = get_expected_report(
         [
@@ -662,7 +663,7 @@ fn filter_iterator() {
 
     let snippets: Vec<String> =
         vec!["(contract-call? .contract-0 get-positive (list -1 2 3))".into()];
-    let cov = get_coverage_report(&contract, snippets, None);
+    let cov = get_coverage_report(&contract, snippets);
 
     let expect = get_expected_report(
         [
@@ -689,40 +690,42 @@ fn filter_iterator() {
 fn multiple_test_files() {
     let mut session = Session::new(SessionSettings::default());
 
-    let mut reports = vec![];
-
     let contract = "(define-read-only (add) (+ 1 2))";
+
+    // insert 2 contracts
+    // contract-0
+    let _ = session.eval(contract.into(), None, false);
+    // contract-1
     let _ = session.eval(contract.into(), None, false);
 
     let mut coverage_hook = CoverageHook::new();
-    coverage_hook.current_test_name = Some("a_test".to_string());
+
+    // call contract-0 twice in test-1
+    coverage_hook.set_current_test_name("test-1".to_string());
     let snippet = "(contract-call? .contract-0 add)";
     let _ = session.eval(snippet.to_owned(), Some(vec![&mut coverage_hook]), false);
-    reports.append(coverage_hook.reports.as_mut());
-
-    let mut coverage_hook = CoverageHook::new();
-    coverage_hook.current_test_name = Some("a_test".to_string());
     let snippet = "(contract-call? .contract-0 add)";
     let _ = session.eval(snippet.to_owned(), Some(vec![&mut coverage_hook]), false);
-    reports.append(coverage_hook.reports.as_mut());
 
-    let mut coverage_hook = CoverageHook::new();
-    coverage_hook.current_test_name = Some("b_test".to_string());
+    // call contract-0 once and contract-1 once in test-2
+    coverage_hook.set_current_test_name("test-2".to_string());
     let snippet = "(contract-call? .contract-0 add)";
     let _ = session.eval(snippet.to_owned(), Some(vec![&mut coverage_hook]), false);
-    reports.append(coverage_hook.reports.as_mut());
+    let snippet = "(contract-call? .contract-1 add)";
+    let _ = session.eval(snippet.to_owned(), Some(vec![&mut coverage_hook]), false);
 
-    let (contract_id, contract) = session.contracts.pop_first().unwrap();
-    let ast = contract.ast;
+    let mut asts = BTreeMap::new();
+    let mut paths = BTreeMap::new();
+    for (i, (contract_id, contract)) in session.contracts.iter().enumerate() {
+        asts.insert(contract_id.clone(), contract.ast.clone());
+        paths.insert(contract_id.name.to_string(), format!("/contract-{i}.clar"));
+    }
 
-    let asts = BTreeMap::from([(contract_id.clone(), ast.clone())]);
-    let paths = BTreeMap::from([(contract_id.name.to_string(), "/contract-0.clar".into())]);
-
-    let cov = build_lcov_content(&reports, &asts, &paths);
+    let cov = coverage_hook.collect_lcov_content(&asts, &paths);
 
     assert_eq!(
         [
-            "TN:a_test",
+            "TN:test-1",
             "SF:/contract-0.clar",
             "FN:1,add",
             "FNDA:2,add",
@@ -732,7 +735,14 @@ fn multiple_test_files() {
             "BRF:0",
             "BRH:0",
             "end_of_record",
-            "TN:b_test",
+            "SF:/contract-1.clar",
+            "FN:1,add",
+            "FNF:1",
+            "FNH:0",
+            "BRF:0",
+            "BRH:0",
+            "end_of_record",
+            "TN:test-2",
             "SF:/contract-0.clar",
             "FN:1,add",
             "FNDA:1,add",
@@ -742,7 +752,16 @@ fn multiple_test_files() {
             "BRF:0",
             "BRH:0",
             "end_of_record",
-            "",
+            "SF:/contract-1.clar",
+            "FN:1,add",
+            "FNDA:1,add",
+            "FNF:1",
+            "FNH:1",
+            "DA:1,1",
+            "BRF:0",
+            "BRH:0",
+            "end_of_record",
+            ""
         ]
         .join("\n"),
         cov

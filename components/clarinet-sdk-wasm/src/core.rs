@@ -9,7 +9,7 @@ use clarinet_deployments::{
 };
 use clarinet_files::chainhook_types::StacksNetwork;
 use clarinet_files::{FileAccessor, FileLocation, ProjectManifest, WASMFileSystemAccessor};
-use clarity_repl::analysis::coverage::{build_lcov_content, CoverageHook, CoverageReport};
+use clarity_repl::analysis::coverage::CoverageHook;
 use clarity_repl::clarity::analysis::contract_interface_builder::{
     ContractInterface, ContractInterfaceFunction, ContractInterfaceFunctionAccess,
 };
@@ -277,17 +277,14 @@ pub struct SDK {
     #[wasm_bindgen(getter_with_clone)]
     pub deployer: String,
     cache: HashMap<FileLocation, ProjectCache>,
-
     accounts: HashMap<String, String>,
     contracts_locations: HashMap<QualifiedContractIdentifier, FileLocation>,
     contracts_interfaces: HashMap<QualifiedContractIdentifier, ContractInterface>,
     session: Option<Session>,
-
     file_accessor: Box<dyn FileAccessor>,
     options: SDKOptions,
     current_test_name: String,
-
-    coverage_reports: Vec<CoverageReport>,
+    coverage_hook: Option<CoverageHook>,
     costs_reports: Vec<CostsReport>,
 }
 
@@ -302,23 +299,26 @@ impl SDK {
         let track_coverage = options.as_ref().map_or(false, |o| o.track_coverage);
         let track_costs = options.as_ref().map_or(false, |o| o.track_costs);
 
+        let coverage_hook = if track_coverage {
+            Some(CoverageHook::new())
+        } else {
+            None
+        };
+
         Self {
             deployer: String::new(),
             cache: HashMap::new(),
-
             accounts: HashMap::new(),
             contracts_interfaces: HashMap::new(),
             contracts_locations: HashMap::new(),
             session: None,
-
             file_accessor: fs,
             options: SDKOptions {
                 track_coverage,
                 track_costs,
             },
             current_test_name: String::new(),
-
-            coverage_reports: vec![],
+            coverage_hook,
             costs_reports: vec![],
         }
     }
@@ -721,19 +721,12 @@ impl SDK {
         allow_private: bool,
     ) -> Result<TransactionRes, String> {
         let test_name = self.current_test_name.clone();
-        let SDKOptions {
-            track_costs,
-            track_coverage,
-        } = self.options;
+        let SDKOptions { track_costs, .. } = self.options;
 
         let mut hooks: Vec<&mut dyn EvalHook> = Vec::new();
 
-        let mut coverage_hook = if track_coverage {
-            Some(CoverageHook::new())
-        } else {
-            None
-        };
-        if let Some(hook) = coverage_hook.as_mut() {
+        let mut coverage_hook = self.coverage_hook.take();
+        if let Some(ref mut hook) = coverage_hook {
             hooks.push(hook);
         }
 
@@ -786,9 +779,8 @@ impl SDK {
                 });
             }
         }
-        if let Some(mut coverage_hook) = coverage_hook {
-            self.coverage_reports.append(&mut coverage_hook.reports);
-        }
+
+        self.coverage_hook = coverage_hook;
 
         Ok(execution_result_to_transaction_res(&execution))
     }
@@ -1054,6 +1046,9 @@ impl SDK {
 
     #[wasm_bindgen(js_name=setCurrentTestName)]
     pub fn set_current_test_name(&mut self, test_name: String) {
+        if let Some(coverage_hook) = &mut self.coverage_hook {
+            coverage_hook.set_current_test_name(test_name.clone());
+        }
         self.current_test_name = test_name;
     }
 
@@ -1088,7 +1083,10 @@ impl SDK {
             }
         }
 
-        let coverage = build_lcov_content(&self.coverage_reports, &asts, &contract_paths);
+        let coverage = match self.coverage_hook {
+            Some(ref mut hook) => hook.collect_lcov_content(&asts, &contract_paths),
+            None => "".to_string(),
+        };
 
         let mut costs_reports = Vec::new();
         costs_reports.append(&mut self.costs_reports);
