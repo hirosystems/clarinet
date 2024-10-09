@@ -50,7 +50,7 @@ pub fn main() {
             let file = FileLocation::from_path_string(&cmd.file_path).unwrap();
             let snippet = file.read_content_as_utf8().unwrap();
             let mut session = Session::new(SessionSettings::default());
-            let mut contract_analysis = match session.eval(snippet, None, false) {
+            let mut contract_analysis = match session.eval(snippet, false) {
                 Ok(execution) => match execution.result {
                     EvaluationResult::Contract(evaluation) => evaluation.contract.analysis,
                     _ => {
