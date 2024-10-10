@@ -1,18 +1,16 @@
 use std::collections::BTreeMap;
 
-use super::coverage::CoverageHook;
 use crate::repl::session::Session;
 use crate::repl::SessionSettings;
 
 fn get_coverage_report(contract: &str, snippets: Vec<String>) -> String {
     let mut session = Session::new(SessionSettings::default());
+    session.enable_coverage();
+    session.set_test_name("test_scenario".to_string());
 
-    let mut coverage_hook = CoverageHook::new();
-    coverage_hook.set_current_test_name("test_scenario".to_string());
-
-    let _ = session.eval(contract.into(), Some(vec![&mut coverage_hook]), false);
+    let _ = session.eval(contract.into(), false);
     for snippet in snippets {
-        let _ = session.eval(snippet, Some(vec![&mut coverage_hook]), false);
+        let _ = session.eval(snippet, false);
     }
 
     let (contract_id, contract) = session.contracts.pop_first().unwrap();
@@ -21,7 +19,7 @@ fn get_coverage_report(contract: &str, snippets: Vec<String>) -> String {
     let asts = BTreeMap::from([(contract_id.clone(), ast.clone())]);
     let paths = BTreeMap::from([(contract_id.name.to_string(), "/contract-0.clar".into())]);
 
-    coverage_hook.collect_lcov_content(&asts, &paths)
+    session.collect_lcov_content(&asts, &paths)
 }
 
 fn get_expected_report(body: String) -> String {
@@ -689,30 +687,29 @@ fn filter_iterator() {
 #[test]
 fn multiple_test_files() {
     let mut session = Session::new(SessionSettings::default());
+    session.enable_coverage();
 
     let contract = "(define-read-only (add) (+ 1 2))";
 
     // insert 2 contracts
     // contract-0
-    let _ = session.eval(contract.into(), None, false);
+    let _ = session.eval(contract.into(), false);
     // contract-1
-    let _ = session.eval(contract.into(), None, false);
-
-    let mut coverage_hook = CoverageHook::new();
+    let _ = session.eval(contract.into(), false);
 
     // call contract-0 twice in test-1
-    coverage_hook.set_current_test_name("test-1".to_string());
+    session.set_test_name("test-1".to_string());
     let snippet = "(contract-call? .contract-0 add)";
-    let _ = session.eval(snippet.to_owned(), Some(vec![&mut coverage_hook]), false);
+    let _ = session.eval(snippet.to_owned(), false);
     let snippet = "(contract-call? .contract-0 add)";
-    let _ = session.eval(snippet.to_owned(), Some(vec![&mut coverage_hook]), false);
+    let _ = session.eval(snippet.to_owned(), false);
 
     // call contract-0 once and contract-1 once in test-2
-    coverage_hook.set_current_test_name("test-2".to_string());
+    session.set_test_name("test-2".to_string());
     let snippet = "(contract-call? .contract-0 add)";
-    let _ = session.eval(snippet.to_owned(), Some(vec![&mut coverage_hook]), false);
+    let _ = session.eval(snippet.to_owned(), false);
     let snippet = "(contract-call? .contract-1 add)";
-    let _ = session.eval(snippet.to_owned(), Some(vec![&mut coverage_hook]), false);
+    let _ = session.eval(snippet.to_owned(), false);
 
     let mut asts = BTreeMap::new();
     let mut paths = BTreeMap::new();
@@ -721,10 +718,25 @@ fn multiple_test_files() {
         paths.insert(contract_id.name.to_string(), format!("/contract-{i}.clar"));
     }
 
-    let cov = coverage_hook.collect_lcov_content(&asts, &paths);
+    let cov = session.collect_lcov_content(&asts, &paths);
 
     assert_eq!(
         [
+            "TN:",
+            "SF:/contract-0.clar",
+            "FN:1,add",
+            "FNF:1",
+            "FNH:0",
+            "BRF:0",
+            "BRH:0",
+            "end_of_record",
+            "SF:/contract-1.clar",
+            "FN:1,add",
+            "FNF:1",
+            "FNH:0",
+            "BRF:0",
+            "BRH:0",
+            "end_of_record",
             "TN:test-1",
             "SF:/contract-0.clar",
             "FN:1,add",

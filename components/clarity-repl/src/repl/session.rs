@@ -1,6 +1,7 @@
 use super::boot::{STACKS_BOOT_CODE_MAINNET, STACKS_BOOT_CODE_TESTNET};
 use super::diagnostic::output_diagnostic;
 use super::{ClarityCodeSource, ClarityContract, ClarityInterpreter, ContractDeployer};
+use crate::analysis::coverage::CoverageHook;
 use crate::repl::clarity_values::value_to_string;
 use crate::repl::Settings;
 use crate::utils;
@@ -102,6 +103,8 @@ pub struct Session {
     pub show_costs: bool,
     pub executed: Vec<String>,
     keywords_reference: HashMap<String, String>,
+
+    coverage_hook: Option<CoverageHook>,
 }
 
 impl Session {
@@ -124,6 +127,31 @@ impl Session {
             settings,
             executed: Vec::new(),
             keywords_reference: clarity_keywords(),
+
+            coverage_hook: None,
+        }
+    }
+
+    pub fn enable_coverage(&mut self) {
+        self.coverage_hook = Some(CoverageHook::new());
+    }
+
+    pub fn set_test_name(&mut self, name: String) {
+        if let Some(coverage_hook) = &mut self.coverage_hook {
+            coverage_hook.set_current_test_name(name);
+        }
+    }
+
+    pub fn collect_lcov_content(
+        &mut self,
+        asts: &BTreeMap<QualifiedContractIdentifier, ContractAST>,
+        contract_paths: &BTreeMap<String, String>,
+    ) -> String {
+        if let Some(coverage_hook) = &mut self.coverage_hook {
+            println!("Collecting coverage data...");
+            coverage_hook.collect_lcov_content(asts, contract_paths)
+        } else {
+            "".to_string()
         }
     }
 
@@ -178,7 +206,7 @@ impl Session {
                 };
 
                 // Result ignored, boot contracts are trusted to be valid
-                let _ = self.deploy_contract(&contract, None, false, None);
+                let _ = self.deploy_contract(&contract, false, None);
             }
         }
     }
@@ -354,13 +382,12 @@ impl Session {
 
     pub fn formatted_interpretation(
         &mut self,
-        // @TODO: should be &str, it implies 80+ changes in unit tests
         snippet: String,
         name: Option<String>,
         cost_track: bool,
         eval_hooks: Option<Vec<&mut dyn EvalHook>>,
     ) -> Result<(Vec<String>, ExecutionResult), (Vec<String>, Vec<Diagnostic>)> {
-        let result = self.eval(snippet.to_string(), eval_hooks, cost_track);
+        let result = self.eval_with_hooks(snippet.to_string(), eval_hooks, cost_track);
         let mut output = Vec::<String>::new();
         let formatted_lines: Vec<String> = snippet.lines().map(|l| l.to_string()).collect();
         let contract_name = name.unwrap_or("<stdin>".to_string());
@@ -441,7 +468,7 @@ impl Session {
 
         let mut tracer = Tracer::new(snippet.to_string());
 
-        match self.eval(snippet.to_string(), Some(vec![&mut tracer]), false) {
+        match self.eval_with_hooks(snippet.to_string(), Some(vec![&mut tracer]), false) {
             Ok(_) => (),
             Err(diagnostics) => {
                 let lines = snippet.lines();
@@ -515,13 +542,12 @@ impl Session {
         recipient: &str,
     ) -> Result<ExecutionResult, Vec<Diagnostic>> {
         let snippet = format!("(stx-transfer? u{} tx-sender '{})", amount, recipient);
-        self.eval(snippet.clone(), None, false)
+        self.eval(snippet.clone(), false)
     }
 
     pub fn deploy_contract(
         &mut self,
         contract: &ClarityContract,
-        eval_hooks: Option<Vec<&mut dyn EvalHook>>,
         cost_track: bool,
         ast: Option<&ContractAST>,
     ) -> Result<ExecutionResult, Vec<Diagnostic>> {
@@ -536,6 +562,11 @@ impl Session {
                 suggestion: None,
             };
             return Err(vec![diagnostic]);
+        }
+
+        let mut hooks: Vec<&mut dyn EvalHook> = vec![];
+        if let Some(ref mut coverage_hook) = self.coverage_hook {
+            hooks.push(coverage_hook);
         }
 
         if contract.clarity_version > ClarityVersion::default_for_epoch(contract.epoch) {
@@ -554,7 +585,7 @@ impl Session {
         let contract_id =
             contract.expect_resolved_contract_identifier(Some(&self.interpreter.get_tx_sender()));
 
-        let result = self.interpreter.run(contract, ast, cost_track, eval_hooks);
+        let result = self.interpreter.run(contract, ast, cost_track, Some(hooks));
 
         result.inspect(|result| {
             if let EvaluationResult::Contract(contract_result) = &result.result {
@@ -572,7 +603,6 @@ impl Session {
         sender: &str,
         allow_private: bool,
         track_costs: bool,
-        eval_hooks: Vec<&mut dyn EvalHook>,
     ) -> Result<ExecutionResult, Vec<Diagnostic>> {
         let initial_tx_sender = self.get_tx_sender();
 
@@ -584,6 +614,12 @@ impl Session {
         };
 
         self.set_tx_sender(sender);
+
+        let mut hooks: Vec<&mut dyn EvalHook> = vec![];
+        if let Some(ref mut coverage_hook) = self.coverage_hook {
+            hooks.push(coverage_hook);
+        }
+
         let execution = match self.interpreter.call_contract_fn(
             &QualifiedContractIdentifier::parse(&contract_id_str).unwrap(),
             method,
@@ -592,7 +628,7 @@ impl Session {
             ClarityVersion::default_for_epoch(self.current_epoch),
             track_costs,
             allow_private,
-            eval_hooks,
+            hooks,
         ) {
             Ok(result) => result,
             Err(e) => {
@@ -611,6 +647,44 @@ impl Session {
     }
 
     pub fn eval(
+        &mut self,
+        snippet: String,
+        cost_track: bool,
+    ) -> Result<ExecutionResult, Vec<Diagnostic>> {
+        let contract = ClarityContract {
+            code_source: ClarityCodeSource::ContractInMemory(snippet),
+            name: format!("contract-{}", self.contracts.len()),
+            deployer: ContractDeployer::DefaultDeployer,
+            clarity_version: ClarityVersion::default_for_epoch(self.current_epoch),
+            epoch: self.current_epoch,
+        };
+        let contract_identifier =
+            contract.expect_resolved_contract_identifier(Some(&self.interpreter.get_tx_sender()));
+
+        let mut hooks: Vec<&mut dyn EvalHook> = vec![];
+        if let Some(ref mut coverage_hook) = self.coverage_hook {
+            hooks.push(coverage_hook);
+        }
+
+        let result = self
+            .interpreter
+            .run(&contract.clone(), None, cost_track, Some(hooks));
+
+        match result {
+            Ok(result) => {
+                if let EvaluationResult::Contract(contract_result) = &result.result {
+                    self.contracts.insert(
+                        contract_identifier.clone(),
+                        contract_result.contract.clone(),
+                    );
+                };
+                Ok(result)
+            }
+            Err(res) => Err(res),
+        }
+    }
+
+    pub fn eval_with_hooks(
         &mut self,
         snippet: String,
         eval_hooks: Option<Vec<&mut dyn EvalHook>>,
@@ -962,7 +1036,7 @@ impl Session {
             _ => return "Usage: ::encode <expr>".red().to_string(),
         };
 
-        let result = self.eval(snippet.to_string(), None, false);
+        let result = self.eval(snippet.to_string(), false);
         match result {
             Ok(result) => {
                 let mut tx_bytes = vec![];
@@ -1272,7 +1346,7 @@ mod tests {
 
     #[track_caller]
     fn run_session_snippet(session: &mut Session, snippet: &str) -> Value {
-        let execution_res = session.eval(snippet.to_string(), None, false).unwrap();
+        let execution_res = session.eval(snippet.to_string(), false).unwrap();
         let res = match execution_res.result {
             EvaluationResult::Contract(_) => unreachable!(),
             EvaluationResult::Snippet(res) => res,
@@ -1315,7 +1389,7 @@ mod tests {
         let mut session = Session::new(SessionSettings::default());
         session.update_epoch(StacksEpochId::Epoch20);
         let diags = session
-            .eval("(slice? \"blockstack\" u5 u10)".into(), None, false)
+            .eval("(slice? \"blockstack\" u5 u10)".into(), false)
             .unwrap_err();
         assert_eq!(
             diags[0].message,
@@ -1323,7 +1397,7 @@ mod tests {
         );
         session.update_epoch(StacksEpochId::Epoch21);
         let res = session
-            .eval("(slice? \"blockstack\" u5 u10)".into(), None, false)
+            .eval("(slice? \"blockstack\" u5 u10)".into(), false)
             .unwrap();
         let res = match res.result {
             EvaluationResult::Contract(_) => unreachable!(),
@@ -1499,7 +1573,7 @@ mod tests {
             epoch: StacksEpochId::Epoch2_05,
         };
 
-        let result = session.deploy_contract(&contract, None, false, None);
+        let result = session.deploy_contract(&contract, false, None);
         assert!(result.is_err(), "Expected error for clarity mismatch");
     }
 
@@ -1517,7 +1591,7 @@ mod tests {
             .clarity_version(ClarityVersion::Clarity2)
             .build();
 
-        let result = session.deploy_contract(&contract, None, false, None);
+        let result = session.deploy_contract(&contract, false, None);
         assert!(result.is_err());
         let err = result.unwrap_err();
         assert!(err.len() == 1);
@@ -1557,7 +1631,7 @@ mod tests {
             epoch: StacksEpochId::Epoch25,
         };
 
-        let _ = session.deploy_contract(&contract, None, false, None);
+        let _ = session.deploy_contract(&contract, false, None);
 
         // assert data-var is set to 0
         assert_eq!(
@@ -1615,7 +1689,7 @@ mod tests {
 
         // deploy default contract
         let contract = ClarityContractBuilder::default().build();
-        let result = session.deploy_contract(&contract, None, false, None);
+        let result = session.deploy_contract(&contract, false, None);
         assert!(result.is_ok());
     }
 
@@ -1637,7 +1711,6 @@ mod tests {
             BOOT_TESTNET_ADDRESS,
             false,
             false,
-            vec![],
         );
         assert_execution_result_value(
             &result,
@@ -1665,7 +1738,7 @@ mod tests {
 
         // deploy default contract
         let contract = ClarityContractBuilder::default().build();
-        let _ = session.deploy_contract(&contract, None, false, None);
+        let _ = session.deploy_contract(&contract, false, None);
 
         dbg!(&contract);
 
@@ -1676,7 +1749,6 @@ mod tests {
             &session.get_tx_sender(),
             false,
             false,
-            vec![],
         );
         assert_execution_result_value(&result, Value::okay(Value::UInt(1)).unwrap());
 
@@ -1687,7 +1759,6 @@ mod tests {
             &session.get_tx_sender(),
             false,
             false,
-            vec![],
         );
         assert_execution_result_value(&result, Value::UInt(1));
     }
