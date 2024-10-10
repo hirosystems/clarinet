@@ -131,15 +131,14 @@ pub const MAINNET_25_START_HEIGHT: u32 = 147_290;
 // @TODO: set right heights once live on mainnet
 pub const MAINNET_30_START_HEIGHT: u32 = 300_000;
 
-pub const TESTNET_20_START_HEIGHT: u32 = 1;
-pub const TESTNET_2_05_START_HEIGHT: u32 = 20_216;
-pub const TESTNET_21_START_HEIGHT: u32 = 99_113;
-pub const TESTNET_22_START_HEIGHT: u32 = 105_923;
-pub const TESTNET_23_START_HEIGHT: u32 = 106_196;
-pub const TESTNET_24_START_HEIGHT: u32 = 106_979;
-pub const TESTNET_25_START_HEIGHT: u32 = 152_256;
-// @TODO: set right heights once live on testnet
-pub const TESTNET_30_START_HEIGHT: u32 = 300_000;
+pub const TESTNET_20_START_HEIGHT: u32 = 0;
+pub const TESTNET_2_05_START_HEIGHT: u32 = 1;
+pub const TESTNET_21_START_HEIGHT: u32 = 2;
+pub const TESTNET_22_START_HEIGHT: u32 = 3;
+pub const TESTNET_23_START_HEIGHT: u32 = 4;
+pub const TESTNET_24_START_HEIGHT: u32 = 5;
+pub const TESTNET_25_START_HEIGHT: u32 = 6;
+pub const TESTNET_30_START_HEIGHT: u32 = 56_457;
 
 fn epoch_for_height(is_mainnet: bool, height: u32) -> StacksEpochId {
     if is_mainnet {
