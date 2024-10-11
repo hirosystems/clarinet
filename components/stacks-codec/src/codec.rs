@@ -7,7 +7,7 @@ use clarity::address::{
     C32_ADDRESS_VERSION_MAINNET_MULTISIG, C32_ADDRESS_VERSION_MAINNET_SINGLESIG,
     C32_ADDRESS_VERSION_TESTNET_MULTISIG, C32_ADDRESS_VERSION_TESTNET_SINGLESIG,
 };
-use clarity::codec::MAX_MESSAGE_LEN;
+use clarity::codec::{read_next_exact, MAX_MESSAGE_LEN};
 use clarity::codec::{read_next, write_next, Error as CodecError};
 use clarity::types::chainstate::{
     BlockHeaderHash, BurnchainHeaderHash, ConsensusHash, StacksBlockId, StacksWorkScore, TrieHash,
@@ -328,6 +328,37 @@ pub enum TransactionAuthFlags {
 pub struct BitVec<const MAX_SIZE: u16> {
     data: Vec<u8>,
     len: u16,
+}
+
+impl<const MAX_SIZE: u16> StacksMessageCodec for BitVec<MAX_SIZE> {
+    fn consensus_serialize<W: std::io::Write>(&self, fd: &mut W) -> Result<(), CodecError> {
+        write_next(fd, &self.len)?;
+        write_next(fd, &self.data)
+    }
+
+    fn consensus_deserialize<R: std::io::Read>(fd: &mut R) -> Result<Self, CodecError> {
+        let len = read_next(fd)?;
+        if len == 0 {
+            return Err(CodecError::DeserializeError(
+                "BitVec lengths must be positive".to_string(),
+            ));
+        }
+        if len > MAX_SIZE {
+            return Err(CodecError::DeserializeError(format!(
+                "BitVec length exceeded maximum. Max size = {MAX_SIZE}, len = {len}"
+            )));
+        }
+
+        let data = read_next_exact(fd, Self::data_len(len).into())?;
+        Ok(BitVec { data, len })
+    }
+}
+
+impl<const MAX_SIZE: u16> BitVec<MAX_SIZE> {
+    /// Return the number of bytes needed to store `len` bits.
+    fn data_len(len: u16) -> u16 {
+        len / 8 + if len % 8 == 0 { 0 } else { 1 }
+    }
 }
 
 /// Transaction signatures are validated by calculating the public key from the signature, and
@@ -2759,7 +2790,7 @@ pub struct NakamotoBlockHeader {
     /// A Unix time timestamp of when this block was mined, according to the miner.
     /// For the signers to consider a block valid, this timestamp must be:
     ///  * Greater than the timestamp of its parent block
-    ///  * Less than 15 seconds into the future
+    ///  * At most 15 seconds into the future
     pub timestamp: u64,
     /// Recoverable ECDSA signature from the tenure's miner.
     pub miner_signature: MessageSignature,
@@ -2772,6 +2803,40 @@ pub struct NakamotoBlockHeader {
     ///
     /// The maximum number of entries in the bitvec is 4000.
     pub pox_treatment: BitVec<4000>,
+}
+
+impl StacksMessageCodec for NakamotoBlockHeader {
+    fn consensus_serialize<W: std::io::Write>(&self, fd: &mut W) -> Result<(), CodecError> {
+        write_next(fd, &self.version)?;
+        write_next(fd, &self.chain_length)?;
+        write_next(fd, &self.burn_spent)?;
+        write_next(fd, &self.consensus_hash)?;
+        write_next(fd, &self.parent_block_id)?;
+        write_next(fd, &self.tx_merkle_root)?;
+        write_next(fd, &self.state_index_root)?;
+        write_next(fd, &self.timestamp)?;
+        write_next(fd, &self.miner_signature)?;
+        write_next(fd, &self.signer_signature)?;
+        write_next(fd, &self.pox_treatment)?;
+
+        Ok(())
+    }
+
+    fn consensus_deserialize<R: std::io::Read>(fd: &mut R) -> Result<Self, CodecError> {
+        Ok(NakamotoBlockHeader {
+            version: read_next(fd)?,
+            chain_length: read_next(fd)?,
+            burn_spent: read_next(fd)?,
+            consensus_hash: read_next(fd)?,
+            parent_block_id: read_next(fd)?,
+            tx_merkle_root: read_next(fd)?,
+            state_index_root: read_next(fd)?,
+            timestamp: read_next(fd)?,
+            miner_signature: read_next(fd)?,
+            signer_signature: read_next(fd)?,
+            pox_treatment: read_next(fd)?,
+        })
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
