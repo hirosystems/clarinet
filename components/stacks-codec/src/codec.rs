@@ -2840,6 +2840,59 @@ impl StacksMessageCodec for NakamotoBlockHeader {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct NakamotoBlock {
+    pub header: NakamotoBlockHeader,
+    pub txs: Vec<StacksTransaction>,
+}
+
+impl StacksMessageCodec for NakamotoBlock {
+    fn consensus_serialize<W: std::io::Write>(&self, fd: &mut W) -> Result<(), CodecError> {
+        write_next(fd, &self.header)?;
+        write_next(fd, &self.txs)
+    }
+
+    fn consensus_deserialize<R: std::io::Read>(fd: &mut R) -> Result<Self, CodecError> {
+        let (header, txs) = {
+            let mut bound_read = BoundReader::from_reader(fd, u64::from(MAX_MESSAGE_LEN));
+            let header: NakamotoBlockHeader = read_next(&mut bound_read)?;
+            let txs: Vec<_> = read_next(&mut bound_read)?;
+            (header, txs)
+        };
+
+        // // all transactions are unique
+        // if !StacksBlock::validate_transactions_unique(&txs) {
+        //     warn!("Invalid block: Found duplicate transaction";
+        //         "consensus_hash" => %header.consensus_hash,
+        //         "stacks_block_hash" => %header.block_hash(),
+        //         "stacks_block_id" => %header.block_id()
+        //     );
+        //     return Err(CodecError::DeserializeError(
+        //         "Invalid block: found duplicate transaction".to_string(),
+        //     ));
+        // }
+
+        // // header and transactions must be consistent
+        // let txid_vecs = txs.iter().map(|tx| tx.txid().as_bytes().to_vec()).collect();
+
+        // let merkle_tree = MerkleTree::new(&txid_vecs);
+        // let tx_merkle_root: Sha512Trunc256Sum = merkle_tree.root();
+
+        // if tx_merkle_root != header.tx_merkle_root {
+        //     warn!("Invalid block: Tx Merkle root mismatch";
+        //         "consensus_hash" => %header.consensus_hash,
+        //         "stacks_block_hash" => %header.block_hash(),
+        //         "stacks_block_id" => %header.block_id()
+        //     );
+        //     return Err(CodecError::DeserializeError(
+        //         "Invalid block: tx Merkle root mismatch".to_string(),
+        //     ));
+        // }
+
+        Ok(NakamotoBlock { header, txs })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 /// A vote across the signer set for a block
 pub struct NakamotoBlockVote {
     pub signer_signature_hash: Sha512Trunc256Sum,
