@@ -7,7 +7,7 @@ use clarity::address::{
     C32_ADDRESS_VERSION_MAINNET_MULTISIG, C32_ADDRESS_VERSION_MAINNET_SINGLESIG,
     C32_ADDRESS_VERSION_TESTNET_MULTISIG, C32_ADDRESS_VERSION_TESTNET_SINGLESIG,
 };
-use clarity::codec::MAX_MESSAGE_LEN;
+use clarity::codec::{read_next_exact, MAX_MESSAGE_LEN};
 use clarity::codec::{read_next, write_next, Error as CodecError};
 use clarity::types::chainstate::{
     BlockHeaderHash, BurnchainHeaderHash, ConsensusHash, StacksBlockId, StacksWorkScore, TrieHash,
@@ -328,6 +328,37 @@ pub enum TransactionAuthFlags {
 pub struct BitVec<const MAX_SIZE: u16> {
     data: Vec<u8>,
     len: u16,
+}
+
+impl<const MAX_SIZE: u16> StacksMessageCodec for BitVec<MAX_SIZE> {
+    fn consensus_serialize<W: std::io::Write>(&self, fd: &mut W) -> Result<(), CodecError> {
+        write_next(fd, &self.len)?;
+        write_next(fd, &self.data)
+    }
+
+    fn consensus_deserialize<R: std::io::Read>(fd: &mut R) -> Result<Self, CodecError> {
+        let len = read_next(fd)?;
+        if len == 0 {
+            return Err(CodecError::DeserializeError(
+                "BitVec lengths must be positive".to_string(),
+            ));
+        }
+        if len > MAX_SIZE {
+            return Err(CodecError::DeserializeError(format!(
+                "BitVec length exceeded maximum. Max size = {MAX_SIZE}, len = {len}"
+            )));
+        }
+
+        let data = read_next_exact(fd, Self::data_len(len).into())?;
+        Ok(BitVec { data, len })
+    }
+}
+
+impl<const MAX_SIZE: u16> BitVec<MAX_SIZE> {
+    /// Return the number of bytes needed to store `len` bits.
+    fn data_len(len: u16) -> u16 {
+        len / 8 + if len % 8 == 0 { 0 } else { 1 }
+    }
 }
 
 /// Transaction signatures are validated by calculating the public key from the signature, and
@@ -2759,7 +2790,7 @@ pub struct NakamotoBlockHeader {
     /// A Unix time timestamp of when this block was mined, according to the miner.
     /// For the signers to consider a block valid, this timestamp must be:
     ///  * Greater than the timestamp of its parent block
-    ///  * Less than 15 seconds into the future
+    ///  * At most 15 seconds into the future
     pub timestamp: u64,
     /// Recoverable ECDSA signature from the tenure's miner.
     pub miner_signature: MessageSignature,
@@ -2772,6 +2803,93 @@ pub struct NakamotoBlockHeader {
     ///
     /// The maximum number of entries in the bitvec is 4000.
     pub pox_treatment: BitVec<4000>,
+}
+
+impl StacksMessageCodec for NakamotoBlockHeader {
+    fn consensus_serialize<W: std::io::Write>(&self, fd: &mut W) -> Result<(), CodecError> {
+        write_next(fd, &self.version)?;
+        write_next(fd, &self.chain_length)?;
+        write_next(fd, &self.burn_spent)?;
+        write_next(fd, &self.consensus_hash)?;
+        write_next(fd, &self.parent_block_id)?;
+        write_next(fd, &self.tx_merkle_root)?;
+        write_next(fd, &self.state_index_root)?;
+        write_next(fd, &self.timestamp)?;
+        write_next(fd, &self.miner_signature)?;
+        write_next(fd, &self.signer_signature)?;
+        write_next(fd, &self.pox_treatment)?;
+
+        Ok(())
+    }
+
+    fn consensus_deserialize<R: std::io::Read>(fd: &mut R) -> Result<Self, CodecError> {
+        Ok(NakamotoBlockHeader {
+            version: read_next(fd)?,
+            chain_length: read_next(fd)?,
+            burn_spent: read_next(fd)?,
+            consensus_hash: read_next(fd)?,
+            parent_block_id: read_next(fd)?,
+            tx_merkle_root: read_next(fd)?,
+            state_index_root: read_next(fd)?,
+            timestamp: read_next(fd)?,
+            miner_signature: read_next(fd)?,
+            signer_signature: read_next(fd)?,
+            pox_treatment: read_next(fd)?,
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct NakamotoBlock {
+    pub header: NakamotoBlockHeader,
+    pub txs: Vec<StacksTransaction>,
+}
+
+impl StacksMessageCodec for NakamotoBlock {
+    fn consensus_serialize<W: std::io::Write>(&self, fd: &mut W) -> Result<(), CodecError> {
+        write_next(fd, &self.header)?;
+        write_next(fd, &self.txs)
+    }
+
+    fn consensus_deserialize<R: std::io::Read>(fd: &mut R) -> Result<Self, CodecError> {
+        let (header, txs) = {
+            let mut bound_read = BoundReader::from_reader(fd, u64::from(MAX_MESSAGE_LEN));
+            let header: NakamotoBlockHeader = read_next(&mut bound_read)?;
+            let txs: Vec<_> = read_next(&mut bound_read)?;
+            (header, txs)
+        };
+
+        // // all transactions are unique
+        // if !StacksBlock::validate_transactions_unique(&txs) {
+        //     warn!("Invalid block: Found duplicate transaction";
+        //         "consensus_hash" => %header.consensus_hash,
+        //         "stacks_block_hash" => %header.block_hash(),
+        //         "stacks_block_id" => %header.block_id()
+        //     );
+        //     return Err(CodecError::DeserializeError(
+        //         "Invalid block: found duplicate transaction".to_string(),
+        //     ));
+        // }
+
+        // // header and transactions must be consistent
+        // let txid_vecs = txs.iter().map(|tx| tx.txid().as_bytes().to_vec()).collect();
+
+        // let merkle_tree = MerkleTree::new(&txid_vecs);
+        // let tx_merkle_root: Sha512Trunc256Sum = merkle_tree.root();
+
+        // if tx_merkle_root != header.tx_merkle_root {
+        //     warn!("Invalid block: Tx Merkle root mismatch";
+        //         "consensus_hash" => %header.consensus_hash,
+        //         "stacks_block_hash" => %header.block_hash(),
+        //         "stacks_block_id" => %header.block_id()
+        //     );
+        //     return Err(CodecError::DeserializeError(
+        //         "Invalid block: tx Merkle root mismatch".to_string(),
+        //     ));
+        // }
+
+        Ok(NakamotoBlock { header, txs })
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -3749,5 +3867,511 @@ impl StacksMessageCodec for StacksTransaction {
 
     fn consensus_deserialize<R: Read>(fd: &mut R) -> Result<StacksTransaction, CodecError> {
         StacksTransaction::consensus_deserialize_with_len(fd).map(|(result, _)| result)
+    }
+}
+
+define_u8_enum!(
+/// Enum representing the SignerMessage type prefix
+SignerMessageTypePrefix {
+    /// Block Proposal message from miners
+    BlockProposal = 0,
+    /// Block Response message from signers
+    BlockResponse = 1,
+    /// Block Pushed message from miners
+    BlockPushed = 2,
+    /// Mock block proposal message from Epoch 2.5 miners
+    MockProposal = 3,
+    /// Mock block signature message from Epoch 2.5 signers
+    MockSignature = 4,
+    /// Mock block message from Epoch 2.5 miners
+    MockBlock = 5
+});
+
+impl TryFrom<u8> for SignerMessageTypePrefix {
+    type Error = CodecError;
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        Self::from_u8(value).ok_or_else(|| {
+            CodecError::DeserializeError(format!("Unknown signer message type prefix: {value}"))
+        })
+    }
+}
+
+impl From<&SignerMessage> for SignerMessageTypePrefix {
+    fn from(message: &SignerMessage) -> Self {
+        match message {
+            SignerMessage::BlockProposal(_) => SignerMessageTypePrefix::BlockProposal,
+            SignerMessage::BlockResponse(_) => SignerMessageTypePrefix::BlockResponse,
+            SignerMessage::BlockPushed(_) => SignerMessageTypePrefix::BlockPushed,
+            SignerMessage::MockProposal(_) => SignerMessageTypePrefix::MockProposal,
+            SignerMessage::MockSignature(_) => SignerMessageTypePrefix::MockSignature,
+            SignerMessage::MockBlock(_) => SignerMessageTypePrefix::MockBlock,
+        }
+    }
+}
+
+define_u8_enum!(
+/// Enum representing the BlockResponse type prefix
+BlockResponseTypePrefix {
+    /// An accepted block response
+    Accepted = 0,
+    /// A rejected block response
+    Rejected = 1
+});
+
+impl TryFrom<u8> for BlockResponseTypePrefix {
+    type Error = CodecError;
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        Self::from_u8(value).ok_or_else(|| {
+            CodecError::DeserializeError(format!("Unknown block response type prefix: {value}"))
+        })
+    }
+}
+
+impl From<&BlockResponse> for BlockResponseTypePrefix {
+    fn from(block_response: &BlockResponse) -> Self {
+        match block_response {
+            BlockResponse::Accepted(_) => BlockResponseTypePrefix::Accepted,
+            BlockResponse::Rejected(_) => BlockResponseTypePrefix::Rejected,
+        }
+    }
+}
+
+// This enum is used to supply a `reason_code` for validation
+//  rejection responses. This is serialized as an enum with string
+//  type (in jsonschema terminology).
+define_u8_enum![ValidateRejectCode {
+    BadBlockHash = 0,
+    BadTransaction = 1,
+    InvalidBlock = 2,
+    ChainstateError = 3,
+    UnknownParent = 4,
+    NonCanonicalTenure = 5,
+    NoSuchTenure = 6
+}];
+
+impl TryFrom<u8> for ValidateRejectCode {
+    type Error = CodecError;
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        Self::from_u8(value)
+            .ok_or_else(|| CodecError::DeserializeError(format!("Unknown type prefix: {value}")))
+    }
+}
+
+define_u8_enum!(
+/// Enum representing the reject code type prefix
+RejectCodeTypePrefix {
+    /// The block was rejected due to validation issues
+    ValidationFailed = 0,
+    /// The block was rejected due to connectivity issues with the signer
+    ConnectivityIssues = 1,
+    /// The block was rejected in a prior round
+    RejectedInPriorRound = 2,
+    /// The block was rejected due to no sortition view
+    NoSortitionView = 3,
+    /// The block was rejected due to a mismatch with expected sortition view
+    SortitionViewMismatch = 4,
+    /// The block was rejected due to a testing directive
+    TestingDirective = 5
+});
+
+impl TryFrom<u8> for RejectCodeTypePrefix {
+    type Error = CodecError;
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        Self::from_u8(value).ok_or_else(|| {
+            CodecError::DeserializeError(format!("Unknown reject code type prefix: {value}"))
+        })
+    }
+}
+
+impl From<&RejectCode> for RejectCodeTypePrefix {
+    fn from(reject_code: &RejectCode) -> Self {
+        match reject_code {
+            RejectCode::ValidationFailed(_) => RejectCodeTypePrefix::ValidationFailed,
+            RejectCode::ConnectivityIssues => RejectCodeTypePrefix::ConnectivityIssues,
+            RejectCode::RejectedInPriorRound => RejectCodeTypePrefix::RejectedInPriorRound,
+            RejectCode::NoSortitionView => RejectCodeTypePrefix::NoSortitionView,
+            RejectCode::SortitionViewMismatch => RejectCodeTypePrefix::SortitionViewMismatch,
+            RejectCode::TestingDirective => RejectCodeTypePrefix::TestingDirective,
+        }
+    }
+}
+
+/// This enum is used to supply a `reason_code` for block rejections
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum RejectCode {
+    /// RPC endpoint Validation failed
+    ValidationFailed(ValidateRejectCode),
+    /// No Sortition View to verify against
+    NoSortitionView,
+    /// The block was rejected due to connectivity issues with the signer
+    ConnectivityIssues,
+    /// The block was rejected in a prior round
+    RejectedInPriorRound,
+    /// The block was rejected due to a mismatch with expected sortition view
+    SortitionViewMismatch,
+    /// The block was rejected due to a testing directive
+    TestingDirective,
+}
+
+impl StacksMessageCodec for RejectCode {
+    fn consensus_serialize<W: Write>(&self, fd: &mut W) -> Result<(), CodecError> {
+        write_next(fd, &(RejectCodeTypePrefix::from(self) as u8))?;
+        // Do not do a single match here as we may add other variants in the future and don't want to miss adding it
+        match self {
+            RejectCode::ValidationFailed(code) => write_next(fd, &(*code as u8))?,
+            RejectCode::ConnectivityIssues
+            | RejectCode::RejectedInPriorRound
+            | RejectCode::NoSortitionView
+            | RejectCode::SortitionViewMismatch
+            | RejectCode::TestingDirective => {
+                // No additional data to serialize / deserialize
+            }
+        };
+        Ok(())
+    }
+
+    fn consensus_deserialize<R: Read>(fd: &mut R) -> Result<Self, CodecError> {
+        let type_prefix_byte = read_next::<u8, _>(fd)?;
+        let type_prefix = RejectCodeTypePrefix::try_from(type_prefix_byte)?;
+        let code = match type_prefix {
+            RejectCodeTypePrefix::ValidationFailed => RejectCode::ValidationFailed(
+                ValidateRejectCode::try_from(read_next::<u8, _>(fd)?).map_err(|e| {
+                    CodecError::DeserializeError(format!(
+                        "Failed to decode validation reject code: {:?}",
+                        &e
+                    ))
+                })?,
+            ),
+            RejectCodeTypePrefix::ConnectivityIssues => RejectCode::ConnectivityIssues,
+            RejectCodeTypePrefix::RejectedInPriorRound => RejectCode::RejectedInPriorRound,
+            RejectCodeTypePrefix::NoSortitionView => RejectCode::NoSortitionView,
+            RejectCodeTypePrefix::SortitionViewMismatch => RejectCode::SortitionViewMismatch,
+            RejectCodeTypePrefix::TestingDirective => RejectCode::TestingDirective,
+        };
+        Ok(code)
+    }
+}
+
+/// A rejection response from a signer for a proposed block
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct BlockRejection {
+    /// The reason for the rejection
+    pub reason: String,
+    /// The reason code for the rejection
+    pub reason_code: RejectCode,
+    /// The signer signature hash of the block that was rejected
+    pub signer_signature_hash: Sha512Trunc256Sum,
+    /// The signer's signature across the rejection
+    pub signature: MessageSignature,
+    /// The chain id
+    pub chain_id: u32,
+}
+
+impl StacksMessageCodec for BlockRejection {
+    fn consensus_serialize<W: Write>(&self, fd: &mut W) -> Result<(), CodecError> {
+        write_next(fd, &self.reason.as_bytes().to_vec())?;
+        write_next(fd, &self.reason_code)?;
+        write_next(fd, &self.signer_signature_hash)?;
+        write_next(fd, &self.chain_id)?;
+        write_next(fd, &self.signature)?;
+        Ok(())
+    }
+
+    fn consensus_deserialize<R: Read>(fd: &mut R) -> Result<Self, CodecError> {
+        let reason_bytes = read_next::<Vec<u8>, _>(fd)?;
+        let reason = String::from_utf8(reason_bytes).map_err(|e| {
+            CodecError::DeserializeError(format!("Failed to decode reason string: {:?}", &e))
+        })?;
+        let reason_code = read_next::<RejectCode, _>(fd)?;
+        let signer_signature_hash = read_next::<Sha512Trunc256Sum, _>(fd)?;
+        let chain_id = read_next::<u32, _>(fd)?;
+        let signature = read_next::<MessageSignature, _>(fd)?;
+        Ok(Self {
+            reason,
+            reason_code,
+            signer_signature_hash,
+            chain_id,
+            signature,
+        })
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+/// BlockProposal sent to signers
+pub struct BlockProposal {
+    /// The block itself
+    pub block: NakamotoBlock,
+    /// The burn height the block is mined during
+    pub burn_height: u64,
+    /// The reward cycle the block is mined during
+    pub reward_cycle: u64,
+}
+
+impl StacksMessageCodec for BlockProposal {
+    fn consensus_serialize<W: Write>(&self, fd: &mut W) -> Result<(), CodecError> {
+        self.block.consensus_serialize(fd)?;
+        self.burn_height.consensus_serialize(fd)?;
+        self.reward_cycle.consensus_serialize(fd)?;
+        Ok(())
+    }
+
+    fn consensus_deserialize<R: Read>(fd: &mut R) -> Result<Self, CodecError> {
+        let block = NakamotoBlock::consensus_deserialize(fd)?;
+        let burn_height = u64::consensus_deserialize(fd)?;
+        let reward_cycle = u64::consensus_deserialize(fd)?;
+        Ok(BlockProposal {
+            block,
+            burn_height,
+            reward_cycle,
+        })
+    }
+}
+
+/// The response that a signer sends back to observing miners
+/// either accepting or rejecting a Nakamoto block with the corresponding reason
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub enum BlockResponse {
+    /// The Nakamoto block was accepted and therefore signed
+    Accepted((Sha512Trunc256Sum, MessageSignature)),
+    /// The Nakamoto block was rejected and therefore not signed
+    Rejected(BlockRejection),
+}
+
+impl StacksMessageCodec for BlockResponse {
+    fn consensus_serialize<W: Write>(&self, fd: &mut W) -> Result<(), CodecError> {
+        write_next(fd, &(BlockResponseTypePrefix::from(self) as u8))?;
+        match self {
+            BlockResponse::Accepted((hash, sig)) => {
+                write_next(fd, hash)?;
+                write_next(fd, sig)?;
+            }
+            BlockResponse::Rejected(rejection) => {
+                write_next(fd, rejection)?;
+            }
+        };
+        Ok(())
+    }
+
+    fn consensus_deserialize<R: Read>(fd: &mut R) -> Result<Self, CodecError> {
+        let type_prefix_byte = read_next::<u8, _>(fd)?;
+        let type_prefix = BlockResponseTypePrefix::try_from(type_prefix_byte)?;
+        let response = match type_prefix {
+            BlockResponseTypePrefix::Accepted => {
+                let hash = read_next::<Sha512Trunc256Sum, _>(fd)?;
+                let sig = read_next::<MessageSignature, _>(fd)?;
+                BlockResponse::Accepted((hash, sig))
+            }
+            BlockResponseTypePrefix::Rejected => {
+                let rejection = read_next::<BlockRejection, _>(fd)?;
+                BlockResponse::Rejected(rejection)
+            }
+        };
+        Ok(response)
+    }
+}
+
+/// A mock signature for the stacks node to be used for mock signing.
+/// This is only used by Epoch 2.5 signers to simulate the signing of a block for every sortition.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MockSignature {
+    /// The signer's signature across the mock proposal
+    signature: MessageSignature,
+    /// The mock block proposal that was signed across
+    pub mock_proposal: MockProposal,
+}
+
+impl StacksMessageCodec for MockSignature {
+    fn consensus_serialize<W: Write>(&self, fd: &mut W) -> Result<(), CodecError> {
+        write_next(fd, &self.signature)?;
+        self.mock_proposal.consensus_serialize(fd)?;
+        Ok(())
+    }
+
+    fn consensus_deserialize<R: Read>(fd: &mut R) -> Result<Self, CodecError> {
+        let signature = read_next::<MessageSignature, _>(fd)?;
+        let mock_proposal = MockProposal::consensus_deserialize(fd)?;
+        Ok(Self {
+            signature,
+            mock_proposal,
+        })
+    }
+}
+
+/// The signer relevant peer information from the stacks node
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct PeerInfo {
+    /// The burn block height
+    pub burn_block_height: u64,
+    /// The consensus hash of the stacks tip
+    pub stacks_tip_consensus_hash: ConsensusHash,
+    /// The stacks tip
+    pub stacks_tip: BlockHeaderHash,
+    /// The stacks tip height
+    pub stacks_tip_height: u64,
+    /// The pox consensus
+    pub pox_consensus: ConsensusHash,
+    /// The server version
+    pub server_version: String,
+    /// The network id
+    pub network_id: u32,
+}
+
+impl StacksMessageCodec for PeerInfo {
+    fn consensus_serialize<W: Write>(&self, fd: &mut W) -> Result<(), CodecError> {
+        write_next(fd, &self.burn_block_height)?;
+        write_next(fd, self.stacks_tip_consensus_hash.as_bytes())?;
+        write_next(fd, &self.stacks_tip)?;
+        write_next(fd, &self.stacks_tip_height)?;
+        write_next(fd, &(self.server_version.as_bytes().len() as u8))?;
+        fd.write_all(self.server_version.as_bytes())
+            .map_err(CodecError::WriteError)?;
+        write_next(fd, &self.pox_consensus)?;
+        write_next(fd, &self.network_id)?;
+        Ok(())
+    }
+
+    fn consensus_deserialize<R: Read>(fd: &mut R) -> Result<Self, CodecError> {
+        let burn_block_height = read_next::<u64, _>(fd)?;
+        let stacks_tip_consensus_hash = read_next::<ConsensusHash, _>(fd)?;
+        let stacks_tip = read_next::<BlockHeaderHash, _>(fd)?;
+        let stacks_tip_height = read_next::<u64, _>(fd)?;
+        let len_byte: u8 = read_next(fd)?;
+        let mut bytes = vec![0u8; len_byte as usize];
+        fd.read_exact(&mut bytes).map_err(CodecError::ReadError)?;
+        // must encode a valid string
+        let server_version = String::from_utf8(bytes).map_err(|_e| {
+            CodecError::DeserializeError(
+                "Failed to parse server version name: could not contruct from utf8".to_string(),
+            )
+        })?;
+        let pox_consensus = read_next::<ConsensusHash, _>(fd)?;
+        let network_id = read_next(fd)?;
+        Ok(Self {
+            burn_block_height,
+            stacks_tip_consensus_hash,
+            stacks_tip,
+            stacks_tip_height,
+            server_version,
+            pox_consensus,
+            network_id,
+        })
+    }
+}
+
+/// A mock block proposal for Epoch 2.5 mock signing
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MockProposal {
+    /// The view of the stacks node peer information at the time of the mock proposal
+    pub peer_info: PeerInfo,
+    /// The miner's signature across the peer info
+    signature: MessageSignature,
+}
+
+impl StacksMessageCodec for MockProposal {
+    fn consensus_serialize<W: Write>(&self, fd: &mut W) -> Result<(), CodecError> {
+        self.peer_info.consensus_serialize(fd)?;
+        write_next(fd, &self.signature)?;
+        Ok(())
+    }
+
+    fn consensus_deserialize<R: Read>(fd: &mut R) -> Result<Self, CodecError> {
+        let peer_info = PeerInfo::consensus_deserialize(fd)?;
+        let signature = read_next::<MessageSignature, _>(fd)?;
+        Ok(Self {
+            peer_info,
+            signature,
+        })
+    }
+}
+
+/// The mock block data for epoch 2.5 miners to broadcast to simulate block signing
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MockBlock {
+    /// The mock proposal that was signed across
+    pub mock_proposal: MockProposal,
+    /// The mock signatures that the miner received
+    pub mock_signatures: Vec<MockSignature>,
+}
+
+impl StacksMessageCodec for MockBlock {
+    fn consensus_serialize<W: Write>(&self, fd: &mut W) -> Result<(), CodecError> {
+        self.mock_proposal.consensus_serialize(fd)?;
+        write_next(fd, &self.mock_signatures)?;
+        Ok(())
+    }
+
+    fn consensus_deserialize<R: Read>(fd: &mut R) -> Result<Self, CodecError> {
+        let mock_proposal = MockProposal::consensus_deserialize(fd)?;
+        let mock_signatures = read_next::<Vec<MockSignature>, _>(fd)?;
+        Ok(Self {
+            mock_proposal,
+            mock_signatures,
+        })
+    }
+}
+
+/// The messages being sent through the stacker db contracts
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum SignerMessage {
+    /// The block proposal from miners for signers to observe and sign
+    BlockProposal(BlockProposal),
+    /// The block response from signers for miners to observe
+    BlockResponse(BlockResponse),
+    /// A block pushed from miners to the signers set
+    BlockPushed(NakamotoBlock),
+    /// A mock signature from the epoch 2.5 signers
+    MockSignature(MockSignature),
+    /// A mock message from the epoch 2.5 miners
+    MockProposal(MockProposal),
+    /// A mock block from the epoch 2.5 miners
+    MockBlock(MockBlock),
+}
+
+impl StacksMessageCodec for SignerMessage {
+    fn consensus_serialize<W: Write>(&self, fd: &mut W) -> Result<(), CodecError> {
+        SignerMessageTypePrefix::from(self)
+            .to_u8()
+            .consensus_serialize(fd)?;
+        match self {
+            SignerMessage::BlockProposal(block_proposal) => block_proposal.consensus_serialize(fd),
+            SignerMessage::BlockResponse(block_response) => block_response.consensus_serialize(fd),
+            SignerMessage::BlockPushed(block) => block.consensus_serialize(fd),
+            SignerMessage::MockSignature(signature) => signature.consensus_serialize(fd),
+            SignerMessage::MockProposal(message) => message.consensus_serialize(fd),
+            SignerMessage::MockBlock(block) => block.consensus_serialize(fd),
+        }?;
+        Ok(())
+    }
+
+    fn consensus_deserialize<R: Read>(fd: &mut R) -> Result<Self, CodecError> {
+        let type_prefix_byte = u8::consensus_deserialize(fd)?;
+        let type_prefix = SignerMessageTypePrefix::try_from(type_prefix_byte)?;
+        let message = match type_prefix {
+            SignerMessageTypePrefix::BlockProposal => {
+                let block_proposal = StacksMessageCodec::consensus_deserialize(fd)?;
+                SignerMessage::BlockProposal(block_proposal)
+            }
+            SignerMessageTypePrefix::BlockResponse => {
+                let block_response = StacksMessageCodec::consensus_deserialize(fd)?;
+                SignerMessage::BlockResponse(block_response)
+            }
+            SignerMessageTypePrefix::BlockPushed => {
+                let block = StacksMessageCodec::consensus_deserialize(fd)?;
+                SignerMessage::BlockPushed(block)
+            }
+            SignerMessageTypePrefix::MockProposal => {
+                let message = StacksMessageCodec::consensus_deserialize(fd)?;
+                SignerMessage::MockProposal(message)
+            }
+            SignerMessageTypePrefix::MockSignature => {
+                let signature = StacksMessageCodec::consensus_deserialize(fd)?;
+                SignerMessage::MockSignature(signature)
+            }
+            SignerMessageTypePrefix::MockBlock => {
+                let block = StacksMessageCodec::consensus_deserialize(fd)?;
+                SignerMessage::MockBlock(block)
+            }
+        };
+        Ok(message)
     }
 }
