@@ -7,8 +7,8 @@ use clarity::address::{
     C32_ADDRESS_VERSION_MAINNET_MULTISIG, C32_ADDRESS_VERSION_MAINNET_SINGLESIG,
     C32_ADDRESS_VERSION_TESTNET_MULTISIG, C32_ADDRESS_VERSION_TESTNET_SINGLESIG,
 };
-use clarity::codec::{read_next_exact, MAX_MESSAGE_LEN};
 use clarity::codec::{read_next, write_next, Error as CodecError};
+use clarity::codec::{read_next_exact, MAX_MESSAGE_LEN};
 use clarity::types::chainstate::{
     BlockHeaderHash, BurnchainHeaderHash, ConsensusHash, StacksBlockId, StacksWorkScore, TrieHash,
 };
@@ -37,9 +37,6 @@ use std::io::{Read, Write};
 use std::ops::Deref;
 use std::ops::DerefMut;
 use std::str::FromStr;
-use wsts::common::Signature as Secp256k1Signature;
-use wsts::curve::point::{Compressed as Secp256k1Compressed, Point as Secp256k1Point};
-use wsts::curve::scalar::Scalar as Secp256k1Scalar;
 
 pub const MAX_BLOCK_LEN: u32 = 2 * 1024 * 1024;
 pub const MAX_TRANSACTION_LEN: u32 = MAX_BLOCK_LEN;
@@ -1702,50 +1699,6 @@ pub struct TransactionSmartContract {
     pub code_body: StacksString,
 }
 
-/// Schnorr threshold signature using types from `wsts`
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ThresholdSignature(pub wsts::common::Signature);
-
-impl StacksMessageCodec for ThresholdSignature {
-    fn consensus_serialize<W: Write>(&self, fd: &mut W) -> Result<(), CodecError> {
-        let compressed = self.0.R.compress();
-        let bytes = compressed.as_bytes();
-        fd.write_all(bytes).map_err(CodecError::WriteError)?;
-        write_next(fd, &self.0.z.to_bytes())?;
-        Ok(())
-    }
-
-    fn consensus_deserialize<R: Read>(fd: &mut R) -> Result<Self, CodecError> {
-        // Read curve point
-        let mut buf = [0u8; 33];
-        fd.read_exact(&mut buf).map_err(CodecError::ReadError)?;
-        let r = Secp256k1Point::try_from(&Secp256k1Compressed::from(buf))
-            .map_err(|_| CodecError::DeserializeError("Failed to read curve point".into()))?;
-
-        // Read scalar
-        let mut buf = [0u8; 32];
-        fd.read_exact(&mut buf).map_err(CodecError::ReadError)?;
-        let z = Secp256k1Scalar::from(buf);
-
-        Ok(Self(Secp256k1Signature { R: r, z }))
-    }
-}
-
-impl ThresholdSignature {
-    pub fn verify(&self, public_key: &Secp256k1Point, msg: &[u8]) -> bool {
-        self.0.verify(public_key, msg)
-    }
-
-    /// Create an empty/null signature. This is not valid data, but it is used
-    ///  as a placeholder in the header during mining.
-    pub fn empty() -> Self {
-        Self(Secp256k1Signature {
-            R: Secp256k1Point::G(),
-            z: Secp256k1Scalar::new(),
-        })
-    }
-}
-
 /// Cause of change in mining tenure
 /// Depending on cause, tenure can be ended or extended
 #[repr(u8)]
@@ -1881,10 +1834,25 @@ impl TransactionPayload {
         match self {
             TransactionPayload::TokenTransfer(..) => "TokenTransfer",
             TransactionPayload::ContractCall(..) => "ContractCall",
-            TransactionPayload::SmartContract(..) => "SmartContract",
+            TransactionPayload::SmartContract(_, version_opt) => {
+                if version_opt.is_some() {
+                    "SmartContract(Versioned)"
+                } else {
+                    "SmartContract"
+                }
+            }
             TransactionPayload::PoisonMicroblock(..) => "PoisonMicroblock",
-            TransactionPayload::Coinbase(..) => "Coinbase",
-            TransactionPayload::TenureChange(..) => "TenureChange",
+            TransactionPayload::Coinbase(_, _, vrf_opt) => {
+                if vrf_opt.is_some() {
+                    "Coinbase(Nakamoto)"
+                } else {
+                    "Coinbase"
+                }
+            }
+            TransactionPayload::TenureChange(payload) => match payload.cause {
+                TenureChangeCause::BlockFound => "TenureChange(BlockFound)",
+                TenureChangeCause::Extended => "TenureChange(Extension)",
+            },
         }
     }
 }
@@ -2492,6 +2460,26 @@ impl StacksTransaction {
         };
 
         Ok((tx, fd.num_read()))
+    }
+
+    /// Try to convert to a coinbase payload
+    pub fn try_as_coinbase(
+        &self,
+    ) -> Option<(&CoinbasePayload, Option<&PrincipalData>, Option<&VRFProof>)> {
+        match &self.payload {
+            TransactionPayload::Coinbase(payload, recipient_opt, vrf_proof_opt) => {
+                Some((payload, recipient_opt.as_ref(), vrf_proof_opt.as_ref()))
+            }
+            _ => None,
+        }
+    }
+
+    /// Try to convert to a tenure change payload
+    pub fn try_as_tenure_change(&self) -> Option<&TenureChangePayload> {
+        match &self.payload {
+            TransactionPayload::TenureChange(tc_payload) => Some(tc_payload),
+            _ => None,
+        }
     }
 }
 
