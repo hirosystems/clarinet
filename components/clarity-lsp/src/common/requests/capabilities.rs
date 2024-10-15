@@ -6,7 +6,7 @@ use lsp_types::{
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", default)]
 pub struct InitializationOptions {
     completion: bool,
     pub completion_smart_parenthesis_wrap: bool,
