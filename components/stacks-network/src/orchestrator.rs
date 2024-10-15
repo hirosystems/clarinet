@@ -855,6 +855,7 @@ rpcport={bitcoin_node_rpc_port}
 
         let mut binds = vec![format!("{}/conf:/etc/bitcoin", devnet_config.working_dir)];
 
+        binds.push("/var/run/docker.sock:/var/run/docker.sock".to_string());
         if devnet_config.bind_containers_volumes {
             binds.push(format!(
                 "{}/data/{}/bitcoin:/root/.bitcoin",
@@ -1263,6 +1264,7 @@ start_height = {epoch_3_0}
             devnet_config.working_dir
         )];
 
+        binds.push("/var/run/docker.sock:/var/run/docker.sock".to_string());
         if devnet_config.bind_containers_volumes {
             binds.push(format!(
                 "{}/data/{}/stacks:/devnet/",
@@ -1421,6 +1423,7 @@ db_path = "stacks-signer-{signer_id}.sqlite"
             devnet_config.working_dir
         )];
 
+        binds.push("/var/run/docker.sock:/var/run/docker.sock".to_string());
         if devnet_config.bind_containers_volumes {
             binds.push(format!(
                 "{}/data/{}/stacks:/devnet/",
@@ -1676,6 +1679,7 @@ events_keys = ["*"]
             devnet_config.working_dir
         )];
 
+        binds.push("/var/run/docker.sock:/var/run/docker.sock".to_string());
         if devnet_config.bind_containers_volumes {
             binds.push(format!(
                 "{}/data/{}/subnet:/devnet/",
