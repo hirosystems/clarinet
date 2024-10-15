@@ -372,7 +372,7 @@ pub fn process_mutating_request(
         LspRequest::Initialize(params) => {
             let initialization_options = params
                 .initialization_options
-                .and_then(|o| serde_json::from_str(o.as_str()?).ok())
+                .and_then(|o| serde_json::from_value(o).ok())
                 .unwrap_or(InitializationOptions::default());
 
             match editor_state.try_write(|es| es.settings = initialization_options.clone()) {
