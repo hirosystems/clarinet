@@ -1296,7 +1296,10 @@ start_height = {epoch_3_0}
                 binds: Some(binds),
                 network_mode: Some(self.network_name.clone()),
                 port_bindings: Some(port_bindings),
-                extra_hosts: Some(vec!["host.docker.internal:host-gateway".into()]),
+                extra_hosts: Some(vec![
+                    "backend:host.docker.internal".into(),
+                    "host.docker.internal:host-gateway".into(),
+                ]),
                 ..Default::default()
             }),
             ..Default::default()
