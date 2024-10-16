@@ -1298,7 +1298,7 @@ start_height = {epoch_3_0}
                 port_bindings: Some(port_bindings),
                 extra_hosts: Some(vec![
                     "backend:host.docker.internal".into(),
-                    "host.docker.internal:host-gateway".into(),
+                    // "host.docker.internal:host-gateway".into(),
                 ]),
                 ..Default::default()
             }),
