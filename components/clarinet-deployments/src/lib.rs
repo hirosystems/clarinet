@@ -203,7 +203,7 @@ fn handle_emulated_contract_publish(
         epoch,
     };
 
-    let result = session.deploy_contract(&contract, None, false, contract_ast);
+    let result = session.deploy_contract(&contract, false, contract_ast);
 
     session.set_tx_sender(&default_tx_sender);
     result
@@ -211,7 +211,7 @@ fn handle_emulated_contract_publish(
 
 /// Used to evalutate function arguments passed in deployment plans
 fn eval_clarity_string(session: &mut Session, snippet: &str) -> SymbolicExpression {
-    let eval_result = session.eval(snippet.to_string(), None, false);
+    let eval_result = session.eval(snippet.to_string(), false);
     let value = match eval_result.unwrap().result {
         EvaluationResult::Contract(_) => unreachable!(),
         EvaluationResult::Snippet(snippet_result) => snippet_result.result,
@@ -238,7 +238,6 @@ fn handle_emulated_contract_call(
         &tx.emulated_sender.to_string(),
         true,
         false,
-        vec![],
     );
     if let Err(errors) = &result {
         println!("error: {:?}", errors.first().unwrap().message);
