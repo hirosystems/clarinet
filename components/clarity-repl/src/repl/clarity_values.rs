@@ -1,10 +1,13 @@
 use std::fmt::Write;
 
-use clarity::vm::{
-    types::{CharType, SequenceData},
-    Value,
-};
 use clarity::{codec::StacksMessageCodec, util::hash};
+use clarity::{
+    util::hash::hex_bytes,
+    vm::{
+        types::{CharType, SequenceData},
+        Value,
+    },
+};
 
 pub fn to_raw_value(value: &Value) -> String {
     let hex = value

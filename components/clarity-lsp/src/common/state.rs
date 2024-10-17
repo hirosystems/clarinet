@@ -19,6 +19,7 @@ use lsp_types::{
     CompletionItem, DocumentSymbol, Hover, Location, MessageType, Position, Range, SignatureHelp,
     Url,
 };
+use serde::Serialize;
 use std::borrow::BorrowMut;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::vec;
@@ -413,6 +414,16 @@ impl EditorState {
             line: position.line + 1,
             character: position.character + 1,
         };
+
+        let metadata = self.contracts_lookup.get(contract_location)?;
+        let protocol = self.protocols.get(&metadata.manifest_location)?;
+        let contract_state = protocol.contracts.get(contract_location)?;
+        let analysis = contract_state.analysis.as_ref()?;
+        let interface = analysis.contract_interface.as_ref()?;
+        let f = interface.functions.first()?;
+        // f.serialize();
+        // f.outputs.type_f
+
         let documentation =
             get_expression_documentation(&position, contract.expressions.as_ref()?)?;
 
