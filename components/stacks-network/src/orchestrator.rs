@@ -855,7 +855,7 @@ rpcport={bitcoin_node_rpc_port}
 
         let mut binds = vec![format!("{}/conf:/etc/bitcoin", devnet_config.working_dir)];
 
-        // binds.push("/var/run/docker.sock:/var/run/docker.sock".to_string());
+        binds.push("/var/run/docker.sock:/var/run/docker.sock".to_string());
         if devnet_config.bind_containers_volumes {
             binds.push(format!(
                 "{}/data/{}/bitcoin:/root/.bitcoin",
@@ -1264,7 +1264,7 @@ start_height = {epoch_3_0}
             devnet_config.working_dir
         )];
 
-        // binds.push("/var/run/docker.sock:/var/run/docker.sock".to_string());
+        binds.push("/var/run/docker.sock:/var/run/docker.sock".to_string());
         if devnet_config.bind_containers_volumes {
             binds.push(format!(
                 "{}/data/{}/stacks:/devnet/",
@@ -1297,8 +1297,8 @@ start_height = {epoch_3_0}
                 network_mode: Some(self.network_name.clone()),
                 port_bindings: Some(port_bindings),
                 extra_hosts: Some(vec![
-                    "host.docker.internal:backend".into(),
-                    // "host.docker.internal:host-gateway".into(),
+                    // "host.docker.internal:backend".into(),
+                    "host.docker.internal:host-gateway".into(),
                 ]),
                 ..Default::default()
             }),
@@ -1426,7 +1426,7 @@ db_path = "stacks-signer-{signer_id}.sqlite"
             devnet_config.working_dir
         )];
 
-        // binds.push("/var/run/docker.sock:/var/run/docker.sock".to_string());
+        binds.push("/var/run/docker.sock:/var/run/docker.sock".to_string());
         if devnet_config.bind_containers_volumes {
             binds.push(format!(
                 "{}/data/{}/stacks:/devnet/",
@@ -1682,7 +1682,7 @@ events_keys = ["*"]
             devnet_config.working_dir
         )];
 
-        // binds.push("/var/run/docker.sock:/var/run/docker.sock".to_string());
+        binds.push("/var/run/docker.sock:/var/run/docker.sock".to_string());
         if devnet_config.bind_containers_volumes {
             binds.push(format!(
                 "{}/data/{}/subnet:/devnet/",
