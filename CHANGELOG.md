@@ -1,3 +1,17 @@
+# [2.10.0](https://github.com/hirosystems/clarinet/compare/v2.9.0...v2.10.0) (2024-11-17)
+
+##### New Features
+
+*  Update testnet epochs heights (#1582) (90cb0158)
+
+##### Bug Fixes
+
+*  LSP initialization options (#1584) (9948b1c6)
+
+##### Refactors
+
+*  Better eval hooks handling in contract calls (#1575) (6f178d8c)
+
 # [2.9.0](https://github.com/hirosystems/clarinet/compare/v2.8.0...v2.9.0) (2024-09-30)
 
 ##### New Features
