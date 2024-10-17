@@ -9,4 +9,3 @@ description = "Stack wire format implementation"
 clarity = { workspace = true, features = ["canonical", "developer-mode", "log"] }
 
 serde = { version = "1", features = ["derive"] }
-wsts = { version = "9.0.0", default-features = false }
