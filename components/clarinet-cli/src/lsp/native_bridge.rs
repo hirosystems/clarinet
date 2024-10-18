@@ -101,14 +101,14 @@ impl LspNativeBridge {
 impl LanguageServer for LspNativeBridge {
     async fn initialize(&self, params: InitializeParams) -> Result<InitializeResult> {
         let _ = match self.request_tx.lock() {
-            Ok(tx) => tx.send(LspRequest::Initialize(params)),
+            Ok(tx) => tx.send(LspRequest::Initialize(Box::new(params))),
             Err(_) => return Err(Error::new(ErrorCode::InternalError)),
         };
 
         let response_rx = self.response_rx.lock().expect("failed to lock response_rx");
         let response = &response_rx.recv().expect("failed to get value from recv");
         if let LspResponse::Request(LspRequestResponse::Initialize(initialize)) = response {
-            return Ok(initialize.to_owned());
+            return Ok(*initialize.to_owned());
         }
         Err(Error::new(ErrorCode::InternalError))
     }

@@ -198,6 +198,7 @@ pub fn encode_contract_publish(
     )
 }
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug)]
 pub enum TransactionStatus {
     Queued,
@@ -221,6 +222,7 @@ pub enum TransactionCheck {
     BtcTransfer,
 }
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug)]
 pub enum DeploymentEvent {
     TransactionUpdate(TransactionTracker),
