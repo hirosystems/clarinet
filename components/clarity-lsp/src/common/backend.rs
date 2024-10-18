@@ -258,7 +258,7 @@ pub enum LspRequest {
     Definition(GotoDefinitionParams),
     Hover(HoverParams),
     DocumentSymbol(DocumentSymbolParams),
-    Initialize(InitializeParams),
+    Initialize(Box<InitializeParams>),
 }
 
 #[derive(Debug, PartialEq, Deserialize, Serialize)]
@@ -268,7 +268,7 @@ pub enum LspRequestResponse {
     Definition(Option<Location>),
     DocumentSymbol(Vec<DocumentSymbol>),
     Hover(Option<Hover>),
-    Initialize(InitializeResult),
+    Initialize(Box<InitializeResult>),
 }
 
 pub fn process_request(
@@ -376,10 +376,10 @@ pub fn process_mutating_request(
                 .unwrap_or(InitializationOptions::default());
 
             match editor_state.try_write(|es| es.settings = initialization_options.clone()) {
-                Ok(_) => Ok(LspRequestResponse::Initialize(InitializeResult {
+                Ok(_) => Ok(LspRequestResponse::Initialize(Box::new(InitializeResult {
                     server_info: None,
                     capabilities: get_capabilities(&initialization_options),
-                })),
+                }))),
                 Err(err) => Err(err),
             }
         }
