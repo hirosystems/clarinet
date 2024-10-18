@@ -772,7 +772,7 @@ dependencies = [
 
 [[package]]
 name = "clarinet-cli"
-version = "2.9.0"
+version = "2.10.0"
 dependencies = [
  "ansi_term",
  "atty",
@@ -805,7 +805,7 @@ dependencies = [
 
 [[package]]
 name = "clarinet-deployments"
-version = "2.9.0"
+version = "2.10.0"
 dependencies = [
  "base58 0.2.0",
  "base64 0.21.7",
@@ -830,7 +830,7 @@ dependencies = [
 
 [[package]]
 name = "clarinet-files"
-version = "2.9.0"
+version = "2.10.0"
 dependencies = [
  "bip39",
  "bitcoin",
@@ -854,7 +854,7 @@ dependencies = [
 
 [[package]]
 name = "clarinet-sdk-wasm"
-version = "2.9.0"
+version = "2.10.0"
 dependencies = [
  "clarinet-deployments",
  "clarinet-files",
@@ -883,7 +883,7 @@ dependencies = [
 [[package]]
 name = "clarity"
 version = "2.3.0"
-source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-develop#8ad0d2a2ecc767c4d1adb8d163bfdd59b4ccc523"
+source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-develop#dfdf66ac5816d3cabc116f13d5c73914dc5fd374"
 dependencies = [
  "getrandom 0.2.8",
  "hashbrown 0.14.3",
@@ -906,7 +906,7 @@ dependencies = [
 
 [[package]]
 name = "clarity-events"
-version = "2.9.0"
+version = "2.10.0"
 dependencies = [
  "clap",
  "clarinet-files",
@@ -918,7 +918,7 @@ dependencies = [
 
 [[package]]
 name = "clarity-lsp"
-version = "2.9.0"
+version = "2.10.0"
 dependencies = [
  "clarinet-deployments",
  "clarinet-files",
@@ -938,7 +938,7 @@ dependencies = [
 
 [[package]]
 name = "clarity-repl"
-version = "2.9.0"
+version = "2.10.0"
 dependencies = [
  "ansi_term",
  "atty",
@@ -4818,7 +4818,7 @@ dependencies = [
 
 [[package]]
 name = "stacks-codec"
-version = "2.9.0"
+version = "2.10.0"
 dependencies = [
  "clarity",
  "serde",
@@ -4859,7 +4859,7 @@ dependencies = [
 
 [[package]]
 name = "stacks-devnet-js"
-version = "2.9.0"
+version = "2.10.0"
 dependencies = [
  "clarinet-deployments",
  "clarinet-files",
@@ -4873,7 +4873,7 @@ dependencies = [
 
 [[package]]
 name = "stacks-network"
-version = "2.9.0"
+version = "2.10.0"
 dependencies = [
  "ansi_term",
  "atty",
@@ -4909,7 +4909,7 @@ dependencies = [
 
 [[package]]
 name = "stacks-rpc-client"
-version = "2.9.0"
+version = "2.10.0"
 dependencies = [
  "clarity",
  "hmac 0.12.1",
