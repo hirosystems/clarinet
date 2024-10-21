@@ -408,13 +408,23 @@ impl EditorState {
         contract_location: &FileLocation,
         position: &lsp_types::Position,
     ) -> Option<Hover> {
-        let contract = self.active_contracts.get(contract_location)?;
+        println!("getting hover data");
+        let contract_data = self.active_contracts.get(contract_location)?;
         let position = Position {
             line: position.line + 1,
             character: position.character + 1,
         };
-        let documentation =
-            get_expression_documentation(&position, contract.expressions.as_ref()?)?;
+
+        let contract_metadata = self.contracts_lookup.get(contract_location)?;
+        let protocol = self.protocols.get(&contract_metadata.manifest_location)?;
+        let contract = protocol.contracts.get(contract_location)?;
+
+        println!("getting documentation");
+        let documentation = get_expression_documentation(
+            &position,
+            contract_data.expressions.as_ref()?,
+            &contract.analysis.clone()?,
+        )?;
 
         Some(Hover {
             contents: lsp_types::HoverContents::Markup(lsp_types::MarkupContent {
