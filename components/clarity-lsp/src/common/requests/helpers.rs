@@ -47,6 +47,22 @@ pub fn get_expression_name_at_position(
     None
 }
 
+pub fn get_expression_at_position(
+    position: &Position,
+    expressions: &Vec<SymbolicExpression>,
+) -> Option<SymbolicExpression> {
+    for expr in expressions {
+        if is_position_within_span(position, &expr.span, 0) {
+            if expr.match_atom().is_some() {
+                return Some(expr.clone());
+            } else if let Some(expressions) = expr.match_list() {
+                return get_expression_at_position(position, &expressions.to_vec());
+            }
+        }
+    }
+    None
+}
+
 pub fn get_function_at_position(
     position: &Position,
     expressions: &Vec<SymbolicExpression>,
