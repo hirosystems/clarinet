@@ -30,7 +30,7 @@ serde_json = "1.0.114"
 
 [features]
 default = ["cli"]
-cli = ["bitcoin", "clarity-repl/cli"]
+cli = ["bitcoin", "clarity-repl/sdk"]
 wasm = [
   "js-sys",
   "serde-wasm-bindgen",
