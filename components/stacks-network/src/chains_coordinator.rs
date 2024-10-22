@@ -16,7 +16,6 @@ use chainhook_sdk::types::BitcoinBlockSignaling;
 use chainhook_sdk::types::BitcoinChainEvent;
 use chainhook_sdk::types::StacksChainEvent;
 use chainhook_sdk::types::StacksNodeConfig;
-use chainhook_sdk::types::{BitcoinNetwork, StacksNetwork};
 use chainhook_sdk::utils::Context;
 use clarinet_deployments::onchain::TransactionStatus;
 use clarinet_deployments::onchain::{
@@ -24,6 +23,7 @@ use clarinet_deployments::onchain::{
 };
 use clarinet_deployments::types::DeploymentSpecification;
 use clarinet_files::PoxStackingOrder;
+use clarinet_files::StacksNetwork;
 use clarinet_files::DEFAULT_FIRST_BURN_HEADER_HEIGHT;
 use clarinet_files::{self, AccountConfig, DevnetConfig, NetworkManifest, ProjectManifest};
 use clarity::address::AddressHashMode;
@@ -134,8 +134,8 @@ impl DevnetEventObserverConfig {
             }),
 
             display_stacks_ingestion_logs: true,
-            bitcoin_network: BitcoinNetwork::Regtest,
-            stacks_network: StacksNetwork::Devnet,
+            bitcoin_network: chainhook_types::BitcoinNetwork::Regtest,
+            stacks_network: chainhook_types::StacksNetwork::Devnet,
             prometheus_monitoring_port: None,
         };
 

@@ -7,7 +7,7 @@ use clarinet_deployments::{
     generate_default_deployment, initiate_session_from_manifest,
     update_session_with_deployment_plan,
 };
-use clarinet_files::chainhook_types::StacksNetwork;
+use clarinet_files::StacksNetwork;
 use clarinet_files::{FileAccessor, FileLocation, ProjectManifest, WASMFileSystemAccessor};
 use clarity_repl::analysis::coverage::CoverageHook;
 use clarity_repl::clarity::analysis::contract_interface_builder::{

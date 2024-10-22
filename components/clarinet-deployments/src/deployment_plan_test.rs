@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use clarinet_files::{chainhook_types::StacksNetwork, FileLocation};
+use clarinet_files::{FileLocation, StacksNetwork};
 use clarity_repl::clarity::{
     vm::types::QualifiedContractIdentifier, ClarityName, ClarityVersion, ContractName,
 };

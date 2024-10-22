@@ -21,7 +21,7 @@ use self::types::{
     DeploymentSpecification, EmulatedContractPublishSpecification, GenesisSpecification,
     TransactionPlanSpecification, TransactionsBatchSpecification, WalletSpecification,
 };
-use clarinet_files::chainhook_types::StacksNetwork;
+use clarinet_files::StacksNetwork;
 use clarinet_files::{FileAccessor, FileLocation};
 use clarinet_files::{NetworkManifest, ProjectManifest};
 use clarity_repl::analysis::ast_dependency_detector::{ASTDependencyDetector, DependencySet};
@@ -422,7 +422,7 @@ pub async fn generate_default_deployment(
                     contract_epochs.insert(contract_id.clone(), epoch);
 
                     // Build the struct representing the requirement in the deployment
-                    if network.is_simnet() {
+                    if matches!(network, StacksNetwork::Simnet) {
                         let data = EmulatedContractPublishSpecification {
                             contract_name: contract_id.name.clone(),
                             emulated_sender: contract_id.issuer.clone(),
@@ -431,7 +431,7 @@ pub async fn generate_default_deployment(
                             clarity_version,
                         };
                         emulated_contracts_publish.insert(contract_id.clone(), data);
-                    } else if network.either_devnet_or_testnet() {
+                    } else if matches!(network, StacksNetwork::Devnet | StacksNetwork::Testnet) {
                         let mut remap_principals = BTreeMap::new();
                         remap_principals
                             .insert(contract_id.issuer.clone(), default_deployer_address.clone());
@@ -534,7 +534,7 @@ pub async fn generate_default_deployment(
         }
 
         // Avoid listing requirements as deployment transactions to the deployment specification on Mainnet
-        if !network.is_mainnet() {
+        if !matches!(network, StacksNetwork::Mainnet) {
             let mut ordered_contracts_ids = match ASTDependencyDetector::order_contracts(
                 &requirements_deps,
                 &contract_epochs,
@@ -546,7 +546,7 @@ pub async fn generate_default_deployment(
             // Filter out boot contracts from requirement dependencies
             ordered_contracts_ids.retain(|contract_id| !boot_contracts_ids.contains(contract_id));
 
-            if network.is_simnet() {
+            if matches!(network, StacksNetwork::Simnet) {
                 for contract_id in ordered_contracts_ids.iter() {
                     let data = emulated_contracts_publish
                         .remove(contract_id)
@@ -558,7 +558,7 @@ pub async fn generate_default_deployment(
                         &contract_epochs[contract_id].into(),
                     );
                 }
-            } else if network.either_devnet_or_testnet() {
+            } else if matches!(network, StacksNetwork::Devnet | StacksNetwork::Testnet) {
                 for contract_id in ordered_contracts_ids.iter() {
                     let data = requirements_publish
                         .remove(contract_id)
@@ -674,7 +674,7 @@ pub async fn generate_default_deployment(
             },
         );
 
-        let contract_spec = if network.is_simnet() {
+        let contract_spec = if matches!(network, StacksNetwork::Simnet) {
             TransactionSpecification::EmulatedContractPublish(
                 EmulatedContractPublishSpecification {
                     contract_name,
@@ -788,7 +788,7 @@ pub async fn generate_default_deployment(
     }
 
     let mut wallets = vec![];
-    if network.is_simnet() {
+    if matches!(network, StacksNetwork::Simnet) {
         for (name, account) in network_manifest.accounts.into_iter() {
             let address = match PrincipalData::parse_standard_principal(&account.stx_address) {
                 Ok(res) => res,
@@ -819,7 +819,7 @@ pub async fn generate_default_deployment(
         stacks_node,
         bitcoin_node,
         network: network.clone(),
-        genesis: if network.is_simnet() {
+        genesis: if matches!(network, StacksNetwork::Simnet) {
             Some(GenesisSpecification {
                 wallets,
                 contracts: manifest.project.boot_contracts.clone(),

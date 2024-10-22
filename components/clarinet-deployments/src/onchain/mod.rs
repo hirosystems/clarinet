@@ -1,5 +1,5 @@
 use bitcoincore_rpc::{Auth, Client};
-use clarinet_files::chainhook_types::StacksNetwork;
+use clarinet_files::StacksNetwork;
 use clarinet_files::{AccountConfig, NetworkManifest};
 use clarinet_utils::get_bip39_seed_from_mnemonic;
 use clarity_repl::clarity::chainstate::StacksAddress;
@@ -334,8 +334,12 @@ pub fn apply_on_chain_deployment(
     override_bitcoin_rpc_url: Option<String>,
     override_stacks_rpc_url: Option<String>,
 ) {
-    let network = deployment.network.get_networks();
-    let delay_between_checks: u64 = if network.1.is_devnet() { 1 } else { 10 };
+    let networks = deployment.network.get_networks();
+    let delay_between_checks: u64 = if matches!(networks.1, StacksNetwork::Devnet) {
+        1
+    } else {
+        10
+    };
     // Load deployers, deployment_fee_rate
     // Check fee, balances and deployers
 
@@ -569,7 +573,10 @@ pub fn apply_on_chain_deployment(
                             .expect("Unable to retrieve account"),
                     };
                     let account = stx_accounts_lookup.get(&issuer_address).unwrap();
-                    let source = if deployment.network.either_devnet_or_testnet() {
+                    let source = if matches!(
+                        deployment.network,
+                        StacksNetwork::Devnet | StacksNetwork::Testnet
+                    ) {
                         // Remapping - This is happening
                         let mut source = tx.source.clone();
                         for (old_contract_id, new_contract_id) in contracts_ids_to_remap.iter() {
@@ -635,7 +642,7 @@ pub fn apply_on_chain_deployment(
                     }
                 }
                 TransactionSpecification::RequirementPublish(tx) => {
-                    if deployment.network.is_mainnet() {
+                    if matches!(deployment.network, StacksNetwork::Mainnet) {
                         panic!("Deployment specification malformed - requirements publish not supported on mainnet");
                     }
                     let old_contract_id = tx.contract_id.to_string();
@@ -647,7 +654,7 @@ pub fn apply_on_chain_deployment(
                     contracts_ids_to_remap.insert((old_contract_id, new_contract_id));
 
                     // Testnet handling: don't re-deploy previously deployed contracts
-                    if deployment.network.is_testnet() {
+                    if matches!(deployment.network, StacksNetwork::Testnet) {
                         let res = stacks_rpc.get_contract_source(
                             &tx.remap_sender.to_address(),
                             &tx.contract_id.name.to_string(),
@@ -949,7 +956,10 @@ pub fn get_initial_transactions_trackers(
                     status: TransactionStatus::Queued,
                 },
                 TransactionSpecification::RequirementPublish(tx) => {
-                    if !deployment.network.either_devnet_or_testnet() {
+                    if !matches!(
+                        deployment.network,
+                        StacksNetwork::Devnet | StacksNetwork::Testnet
+                    ) {
                         panic!("Deployment specification malformed - requirements publish not supported on mainnet");
                     }
                     TransactionTracker {
