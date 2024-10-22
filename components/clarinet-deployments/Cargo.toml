@@ -30,7 +30,7 @@ clarity = { workspace = true }
 
 [features]
 default = ["cli"]
-cli = ["clarity-repl/cli", "clarinet-files/cli", "stacks-codec", "onchain"]
+cli = ["clarity-repl/sdk", "clarinet-files/cli", "stacks-codec", "onchain"]
 wasm = ["clarity-repl/wasm", "clarinet-files/wasm"]
 onchain = [
     "stacks-rpc-client",
