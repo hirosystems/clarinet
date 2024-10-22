@@ -7,13 +7,13 @@ use clarity::address::{
     C32_ADDRESS_VERSION_MAINNET_MULTISIG, C32_ADDRESS_VERSION_MAINNET_SINGLESIG,
     C32_ADDRESS_VERSION_TESTNET_MULTISIG, C32_ADDRESS_VERSION_TESTNET_SINGLESIG,
 };
-use clarity::codec::MAX_MESSAGE_LEN;
 use clarity::codec::{read_next, write_next, Error as CodecError};
+use clarity::codec::{read_next_exact, MAX_MESSAGE_LEN};
 use clarity::types::chainstate::{
     BlockHeaderHash, BurnchainHeaderHash, ConsensusHash, StacksBlockId, StacksWorkScore, TrieHash,
 };
 use clarity::types::chainstate::{StacksAddress, StacksPublicKey};
-use clarity::types::PrivateKey;
+use clarity::types::{PrivateKey, StacksEpochId};
 use clarity::util::hash::{Hash160, Sha512Trunc256Sum};
 use clarity::util::retry::BoundReader;
 use clarity::util::secp256k1::{
@@ -37,12 +37,54 @@ use std::io::{Read, Write};
 use std::ops::Deref;
 use std::ops::DerefMut;
 use std::str::FromStr;
-use wsts::common::Signature as Secp256k1Signature;
-use wsts::curve::point::{Compressed as Secp256k1Compressed, Point as Secp256k1Point};
-use wsts::curve::scalar::Scalar as Secp256k1Scalar;
 
 pub const MAX_BLOCK_LEN: u32 = 2 * 1024 * 1024;
 pub const MAX_TRANSACTION_LEN: u32 = MAX_BLOCK_LEN;
+
+/// Define a "u8" enum
+///  gives you a try_from(u8) -> Option<Self> function
+#[macro_export]
+macro_rules! define_u8_enum {
+    ($(#[$outer:meta])*
+     $Name:ident {
+         $(
+             $(#[$inner:meta])*
+             $Variant:ident = $Val:literal),+
+     }) =>
+    {
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
+        #[repr(u8)]
+        $(#[$outer])*
+        pub enum $Name {
+            $(  $(#[$inner])*
+                $Variant = $Val),*,
+        }
+        impl $Name {
+            /// All members of the enum
+            pub const ALL: &'static [$Name] = &[$($Name::$Variant),*];
+
+            /// Return the u8 representation of the variant
+            pub fn to_u8(&self) -> u8 {
+                match self {
+                    $(
+                        $Name::$Variant => $Val,
+                    )*
+                }
+            }
+
+            /// Returns Some and the variant if `v` is a u8 corresponding to a variant in this enum.
+            /// Returns None otherwise
+            pub fn from_u8(v: u8) -> Option<Self> {
+                match v {
+                    $(
+                        v if v == $Name::$Variant as u8 => Some($Name::$Variant),
+                    )*
+                    _ => None
+                }
+            }
+        }
+    }
+}
 
 #[macro_export]
 macro_rules! impl_byte_array_message_codec {
@@ -270,6 +312,52 @@ pub enum TransactionAuthFlags {
     AuthSponsored = 0x05,
 }
 
+#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+/// This data structure represents a list of booleans
+/// as a bitvector.
+///
+/// The generic argument `MAX_SIZE` specifies the maximum number of
+/// elements that the bit vector can hold. It is not the _actual_ size
+/// of the bitvec: if there are only 8 entries, the bitvector will
+/// just have a single byte, even if the MAX_SIZE is u16::MAX. This
+/// type parameter ensures that constructors and deserialization routines
+/// error if input data is too long.
+pub struct BitVec<const MAX_SIZE: u16> {
+    data: Vec<u8>,
+    len: u16,
+}
+
+impl<const MAX_SIZE: u16> StacksMessageCodec for BitVec<MAX_SIZE> {
+    fn consensus_serialize<W: std::io::Write>(&self, fd: &mut W) -> Result<(), CodecError> {
+        write_next(fd, &self.len)?;
+        write_next(fd, &self.data)
+    }
+
+    fn consensus_deserialize<R: std::io::Read>(fd: &mut R) -> Result<Self, CodecError> {
+        let len = read_next(fd)?;
+        if len == 0 {
+            return Err(CodecError::DeserializeError(
+                "BitVec lengths must be positive".to_string(),
+            ));
+        }
+        if len > MAX_SIZE {
+            return Err(CodecError::DeserializeError(format!(
+                "BitVec length exceeded maximum. Max size = {MAX_SIZE}, len = {len}"
+            )));
+        }
+
+        let data = read_next_exact(fd, Self::data_len(len).into())?;
+        Ok(BitVec { data, len })
+    }
+}
+
+impl<const MAX_SIZE: u16> BitVec<MAX_SIZE> {
+    /// Return the number of bytes needed to store `len` bits.
+    fn data_len(len: u16) -> u16 {
+        len / 8 + if len % 8 == 0 { 0 } else { 1 }
+    }
+}
+
 /// Transaction signatures are validated by calculating the public key from the signature, and
 /// verifying that all public keys hash to the signing account's hash.  To do so, we must preserve
 /// enough information in the auth structure to recover each public key's bytes.
@@ -370,6 +458,13 @@ pub enum MultisigHashMode {
     P2WSH = 0x03,
 }
 
+#[repr(u8)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum OrderIndependentMultisigHashMode {
+    P2SH = 0x05,
+    P2WSH = 0x07,
+}
+
 impl SinglesigHashMode {
     pub fn to_address_hash_mode(&self) -> AddressHashMode {
         match *self {
@@ -415,6 +510,35 @@ impl MultisigHashMode {
         match n {
             x if x == MultisigHashMode::P2SH as u8 => Some(MultisigHashMode::P2SH),
             x if x == MultisigHashMode::P2WSH as u8 => Some(MultisigHashMode::P2WSH),
+            _ => None,
+        }
+    }
+}
+
+impl OrderIndependentMultisigHashMode {
+    pub fn to_address_hash_mode(&self) -> AddressHashMode {
+        match *self {
+            OrderIndependentMultisigHashMode::P2SH => AddressHashMode::SerializeP2SH,
+            OrderIndependentMultisigHashMode::P2WSH => AddressHashMode::SerializeP2WSH,
+        }
+    }
+
+    pub fn from_address_hash_mode(hm: AddressHashMode) -> Option<OrderIndependentMultisigHashMode> {
+        match hm {
+            AddressHashMode::SerializeP2SH => Some(OrderIndependentMultisigHashMode::P2SH),
+            AddressHashMode::SerializeP2WSH => Some(OrderIndependentMultisigHashMode::P2WSH),
+            _ => None,
+        }
+    }
+
+    pub fn from_u8(n: u8) -> Option<OrderIndependentMultisigHashMode> {
+        match n {
+            x if x == OrderIndependentMultisigHashMode::P2SH as u8 => {
+                Some(OrderIndependentMultisigHashMode::P2SH)
+            }
+            x if x == OrderIndependentMultisigHashMode::P2WSH as u8 => {
+                Some(OrderIndependentMultisigHashMode::P2WSH)
+            }
             _ => None,
         }
     }
@@ -639,13 +763,136 @@ impl SinglesigSpendingCondition {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct OrderIndependentMultisigSpendingCondition {
+    pub hash_mode: OrderIndependentMultisigHashMode,
+    pub signer: Hash160,
+    pub nonce: u64,  // nth authorization from this account
+    pub tx_fee: u64, // microSTX/compute rate offered by this account
+    pub fields: Vec<TransactionAuthField>,
+    pub signatures_required: u16,
+}
+
+impl OrderIndependentMultisigSpendingCondition {
+    pub fn push_signature(
+        &mut self,
+        key_encoding: TransactionPublicKeyEncoding,
+        signature: MessageSignature,
+    ) {
+        self.fields
+            .push(TransactionAuthField::Signature(key_encoding, signature));
+    }
+
+    pub fn push_public_key(&mut self, public_key: StacksPublicKey) {
+        self.fields
+            .push(TransactionAuthField::PublicKey(public_key));
+    }
+
+    pub fn pop_auth_field(&mut self) -> Option<TransactionAuthField> {
+        self.fields.pop()
+    }
+
+    pub fn address_mainnet(&self) -> StacksAddress {
+        StacksAddress {
+            version: C32_ADDRESS_VERSION_MAINNET_MULTISIG,
+            bytes: self.signer,
+        }
+    }
+
+    pub fn address_testnet(&self) -> StacksAddress {
+        StacksAddress {
+            version: C32_ADDRESS_VERSION_TESTNET_MULTISIG,
+            bytes: self.signer,
+        }
+    }
+
+    /// Authenticate a spending condition against an initial sighash.
+    /// In doing so, recover all public keys and verify that they hash to the signer
+    /// via the given hash mode.
+    pub fn verify(
+        &self,
+        initial_sighash: &Txid,
+        cond_code: &TransactionAuthFlags,
+    ) -> Result<Txid, CodecError> {
+        let mut pubkeys = vec![];
+        let mut num_sigs: u16 = 0;
+        let mut have_uncompressed = false;
+        for field in self.fields.iter() {
+            let pubkey = match field {
+                TransactionAuthField::PublicKey(ref pubkey) => {
+                    if !pubkey.compressed() {
+                        have_uncompressed = true;
+                    }
+                    *pubkey
+                }
+                TransactionAuthField::Signature(ref pubkey_encoding, ref sigbuf) => {
+                    if *pubkey_encoding == TransactionPublicKeyEncoding::Uncompressed {
+                        have_uncompressed = true;
+                    }
+
+                    let (pubkey, _next_sighash) = TransactionSpendingCondition::next_verification(
+                        initial_sighash,
+                        cond_code,
+                        self.tx_fee,
+                        self.nonce,
+                        pubkey_encoding,
+                        sigbuf,
+                    )?;
+                    num_sigs = num_sigs
+                        .checked_add(1)
+                        .ok_or(CodecError::SigningError("Too many signatures".to_string()))?;
+                    pubkey
+                }
+            };
+            pubkeys.push(pubkey);
+        }
+
+        if num_sigs < self.signatures_required {
+            return Err(CodecError::SigningError(format!(
+                "Not enough signatures. Got {num_sigs}, expected at least {req}",
+                req = self.signatures_required
+            )));
+        }
+
+        if have_uncompressed && self.hash_mode == OrderIndependentMultisigHashMode::P2WSH {
+            return Err(CodecError::SigningError(
+                "Uncompressed keys are not allowed in this hash mode".to_string(),
+            ));
+        }
+
+        let addr_bytes = match StacksAddress::from_public_keys(
+            0,
+            &self.hash_mode.to_address_hash_mode(),
+            self.signatures_required as usize,
+            &pubkeys,
+        ) {
+            Some(a) => a.bytes,
+            None => {
+                return Err(CodecError::SigningError(
+                    "Failed to generate address from public keys".to_string(),
+                ));
+            }
+        };
+
+        if addr_bytes != self.signer {
+            return Err(CodecError::SigningError(format!(
+                "Signer hash does not equal hash of public key(s): {} != {}",
+                addr_bytes, self.signer
+            )));
+        }
+
+        Ok(*initial_sighash)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum TransactionSpendingCondition {
     Singlesig(SinglesigSpendingCondition),
     Multisig(MultisigSpendingCondition),
+    OrderIndependentMultisig(OrderIndependentMultisigSpendingCondition),
 }
 
 impl TransactionSpendingCondition {
-    pub fn new_singlesig_p2pkh(pubkey: Secp256k1PublicKey) -> Option<TransactionSpendingCondition> {
+    pub fn new_singlesig_p2pkh(pubkey: StacksPublicKey) -> Option<TransactionSpendingCondition> {
         let key_encoding = if pubkey.compressed() {
             TransactionPublicKeyEncoding::Compressed
         } else {
@@ -666,9 +913,7 @@ impl TransactionSpendingCondition {
         ))
     }
 
-    pub fn new_singlesig_p2wpkh(
-        pubkey: Secp256k1PublicKey,
-    ) -> Option<TransactionSpendingCondition> {
+    pub fn new_singlesig_p2wpkh(pubkey: StacksPublicKey) -> Option<TransactionSpendingCondition> {
         let signer_addr = StacksAddress::from_public_keys(
             0,
             &AddressHashMode::SerializeP2WPKH,
@@ -690,12 +935,12 @@ impl TransactionSpendingCondition {
 
     pub fn new_multisig_p2sh(
         num_sigs: u16,
-        pubkeys: Vec<Secp256k1PublicKey>,
+        pubkeys: Vec<StacksPublicKey>,
     ) -> Option<TransactionSpendingCondition> {
         let signer_addr = StacksAddress::from_public_keys(
             0,
             &AddressHashMode::SerializeP2SH,
-            num_sigs as usize,
+            usize::from(num_sigs),
             &pubkeys,
         )?;
 
@@ -711,14 +956,60 @@ impl TransactionSpendingCondition {
         ))
     }
 
-    pub fn new_multisig_p2wsh(
+    pub fn new_multisig_order_independent_p2sh(
         num_sigs: u16,
-        pubkeys: Vec<Secp256k1PublicKey>,
+        pubkeys: Vec<StacksPublicKey>,
+    ) -> Option<TransactionSpendingCondition> {
+        let signer_addr = StacksAddress::from_public_keys(
+            0,
+            &AddressHashMode::SerializeP2SH,
+            usize::from(num_sigs),
+            &pubkeys,
+        )?;
+
+        Some(TransactionSpendingCondition::OrderIndependentMultisig(
+            OrderIndependentMultisigSpendingCondition {
+                signer: signer_addr.bytes,
+                nonce: 0,
+                tx_fee: 0,
+                hash_mode: OrderIndependentMultisigHashMode::P2SH,
+                fields: vec![],
+                signatures_required: num_sigs,
+            },
+        ))
+    }
+
+    pub fn new_multisig_order_independent_p2wsh(
+        num_sigs: u16,
+        pubkeys: Vec<StacksPublicKey>,
     ) -> Option<TransactionSpendingCondition> {
         let signer_addr = StacksAddress::from_public_keys(
             0,
             &AddressHashMode::SerializeP2WSH,
-            num_sigs as usize,
+            usize::from(num_sigs),
+            &pubkeys,
+        )?;
+
+        Some(TransactionSpendingCondition::OrderIndependentMultisig(
+            OrderIndependentMultisigSpendingCondition {
+                signer: signer_addr.bytes,
+                nonce: 0,
+                tx_fee: 0,
+                hash_mode: OrderIndependentMultisigHashMode::P2WSH,
+                fields: vec![],
+                signatures_required: num_sigs,
+            },
+        ))
+    }
+
+    pub fn new_multisig_p2wsh(
+        num_sigs: u16,
+        pubkeys: Vec<StacksPublicKey>,
+    ) -> Option<TransactionSpendingCondition> {
+        let signer_addr = StacksAddress::from_public_keys(
+            0,
+            &AddressHashMode::SerializeP2WSH,
+            usize::from(num_sigs),
             &pubkeys,
         )?;
 
@@ -768,6 +1059,17 @@ impl TransactionSpendingCondition {
                 }
                 num_sigs
             }
+            TransactionSpendingCondition::OrderIndependentMultisig(ref data) => {
+                let mut num_sigs: u16 = 0;
+                for field in data.fields.iter() {
+                    if field.is_signature() {
+                        num_sigs = num_sigs
+                            .checked_add(1)
+                            .expect("Unreasonable amount of signatures"); // something is seriously wrong if this fails
+                    }
+                }
+                num_sigs
+            }
         }
     }
 
@@ -777,6 +1079,9 @@ impl TransactionSpendingCondition {
             TransactionSpendingCondition::Multisig(ref multisig_data) => {
                 multisig_data.signatures_required
             }
+            TransactionSpendingCondition::OrderIndependentMultisig(ref multisig_data) => {
+                multisig_data.signatures_required
+            }
         }
     }
 
@@ -784,6 +1089,7 @@ impl TransactionSpendingCondition {
         match *self {
             TransactionSpendingCondition::Singlesig(ref data) => data.nonce,
             TransactionSpendingCondition::Multisig(ref data) => data.nonce,
+            TransactionSpendingCondition::OrderIndependentMultisig(ref data) => data.nonce,
         }
     }
 
@@ -791,6 +1097,7 @@ impl TransactionSpendingCondition {
         match *self {
             TransactionSpendingCondition::Singlesig(ref data) => data.tx_fee,
             TransactionSpendingCondition::Multisig(ref data) => data.tx_fee,
+            TransactionSpendingCondition::OrderIndependentMultisig(ref data) => data.tx_fee,
         }
     }
 
@@ -800,6 +1107,9 @@ impl TransactionSpendingCondition {
                 singlesig_data.nonce = n;
             }
             TransactionSpendingCondition::Multisig(ref mut multisig_data) => {
+                multisig_data.nonce = n;
+            }
+            TransactionSpendingCondition::OrderIndependentMultisig(ref mut multisig_data) => {
                 multisig_data.nonce = n;
             }
         }
@@ -813,6 +1123,9 @@ impl TransactionSpendingCondition {
             TransactionSpendingCondition::Multisig(ref mut multisig_data) => {
                 multisig_data.tx_fee = tx_fee;
             }
+            TransactionSpendingCondition::OrderIndependentMultisig(ref mut multisig_data) => {
+                multisig_data.tx_fee = tx_fee;
+            }
         }
     }
 
@@ -820,6 +1133,9 @@ impl TransactionSpendingCondition {
         match *self {
             TransactionSpendingCondition::Singlesig(ref singlesig_data) => singlesig_data.tx_fee,
             TransactionSpendingCondition::Multisig(ref multisig_data) => multisig_data.tx_fee,
+            TransactionSpendingCondition::OrderIndependentMultisig(ref multisig_data) => {
+                multisig_data.tx_fee
+            }
         }
     }
 
@@ -828,6 +1144,9 @@ impl TransactionSpendingCondition {
         match *self {
             TransactionSpendingCondition::Singlesig(ref data) => data.address_mainnet(),
             TransactionSpendingCondition::Multisig(ref data) => data.address_mainnet(),
+            TransactionSpendingCondition::OrderIndependentMultisig(ref data) => {
+                data.address_mainnet()
+            }
         }
     }
 
@@ -836,6 +1155,18 @@ impl TransactionSpendingCondition {
         match *self {
             TransactionSpendingCondition::Singlesig(ref data) => data.address_testnet(),
             TransactionSpendingCondition::Multisig(ref data) => data.address_testnet(),
+            TransactionSpendingCondition::OrderIndependentMultisig(ref data) => {
+                data.address_testnet()
+            }
+        }
+    }
+
+    /// Get the address for an account, given the network flag
+    pub fn get_address(&self, mainnet: bool) -> StacksAddress {
+        if mainnet {
+            self.address_mainnet()
+        } else {
+            self.address_testnet()
         }
     }
 
@@ -848,6 +1179,11 @@ impl TransactionSpendingCondition {
                 singlesig_data.signature = MessageSignature::empty();
             }
             TransactionSpendingCondition::Multisig(ref mut multisig_data) => {
+                multisig_data.tx_fee = 0;
+                multisig_data.nonce = 0;
+                multisig_data.fields.clear();
+            }
+            TransactionSpendingCondition::OrderIndependentMultisig(ref mut multisig_data) => {
                 multisig_data.tx_fee = 0;
                 multisig_data.nonce = 0;
                 multisig_data.fields.clear();
@@ -882,7 +1218,7 @@ impl TransactionSpendingCondition {
 
     pub fn make_sighash_postsign(
         cur_sighash: &Txid,
-        pubkey: &Secp256k1PublicKey,
+        pubkey: &StacksPublicKey,
         sig: &MessageSignature,
     ) -> Txid {
         // new hash combines the previous hash and all the new data this signature will add.  This
@@ -949,7 +1285,7 @@ impl TransactionSpendingCondition {
         nonce: u64,
         key_encoding: &TransactionPublicKeyEncoding,
         sig: &MessageSignature,
-    ) -> Result<(Secp256k1PublicKey, Txid), CodecError> {
+    ) -> Result<(StacksPublicKey, Txid), CodecError> {
         let sighash_presign = TransactionSpendingCondition::make_sighash_presign(
             cur_sighash,
             cond_code,
@@ -958,7 +1294,7 @@ impl TransactionSpendingCondition {
         );
 
         // verify the current signature
-        let mut pubk = Secp256k1PublicKey::recover_to_pubkey(sighash_presign.as_bytes(), sig)
+        let mut pubk = StacksPublicKey::recover_to_pubkey(sighash_presign.as_bytes(), sig)
             .map_err(|ve| CodecError::SigningError(ve.to_string()))?;
 
         match key_encoding {
@@ -985,6 +1321,9 @@ impl TransactionSpendingCondition {
             TransactionSpendingCondition::Multisig(ref data) => {
                 data.verify(initial_sighash, cond_code)
             }
+            TransactionSpendingCondition::OrderIndependentMultisig(ref data) => {
+                data.verify(initial_sighash, cond_code)
+            }
         }
     }
 }
@@ -998,29 +1337,49 @@ pub enum TransactionAuth {
 
 impl TransactionAuth {
     pub fn from_p2pkh(privk: &Secp256k1PrivateKey) -> Option<TransactionAuth> {
-        TransactionSpendingCondition::new_singlesig_p2pkh(Secp256k1PublicKey::from_private(privk))
+        TransactionSpendingCondition::new_singlesig_p2pkh(StacksPublicKey::from_private(privk))
             .map(TransactionAuth::Standard)
     }
 
     pub fn from_p2sh(privks: &[Secp256k1PrivateKey], num_sigs: u16) -> Option<TransactionAuth> {
         let mut pubks = vec![];
         for privk in privks.iter() {
-            pubks.push(Secp256k1PublicKey::from_private(privk));
+            pubks.push(StacksPublicKey::from_private(privk));
         }
 
         TransactionSpendingCondition::new_multisig_p2sh(num_sigs, pubks)
             .map(TransactionAuth::Standard)
     }
 
+    pub fn from_order_independent_p2sh(
+        privks: &[Secp256k1PrivateKey],
+        num_sigs: u16,
+    ) -> Option<TransactionAuth> {
+        let pubks = privks.iter().map(StacksPublicKey::from_private).collect();
+
+        TransactionSpendingCondition::new_multisig_order_independent_p2sh(num_sigs, pubks)
+            .map(TransactionAuth::Standard)
+    }
+
+    pub fn from_order_independent_p2wsh(
+        privks: &[Secp256k1PrivateKey],
+        num_sigs: u16,
+    ) -> Option<TransactionAuth> {
+        let pubks = privks.iter().map(StacksPublicKey::from_private).collect();
+
+        TransactionSpendingCondition::new_multisig_order_independent_p2wsh(num_sigs, pubks)
+            .map(TransactionAuth::Standard)
+    }
+
     pub fn from_p2wpkh(privk: &Secp256k1PrivateKey) -> Option<TransactionAuth> {
-        TransactionSpendingCondition::new_singlesig_p2wpkh(Secp256k1PublicKey::from_private(privk))
+        TransactionSpendingCondition::new_singlesig_p2wpkh(StacksPublicKey::from_private(privk))
             .map(TransactionAuth::Standard)
     }
 
     pub fn from_p2wsh(privks: &[Secp256k1PrivateKey], num_sigs: u16) -> Option<TransactionAuth> {
         let mut pubks = vec![];
         for privk in privks.iter() {
-            pubks.push(Secp256k1PublicKey::from_private(privk));
+            pubks.push(StacksPublicKey::from_private(privk));
         }
 
         TransactionSpendingCondition::new_multisig_p2wsh(num_sigs, pubks)
@@ -1169,6 +1528,34 @@ impl TransactionAuth {
             }
         }
     }
+
+    /// Checks if this TransactionAuth is supported in the passed epoch
+    /// OrderIndependent multisig is not supported before epoch 3.0
+    pub fn is_supported_in_epoch(&self, epoch_id: StacksEpochId) -> bool {
+        match &self {
+            TransactionAuth::Sponsored(ref origin, ref sponsor) => {
+                let origin_supported = match origin {
+                    TransactionSpendingCondition::OrderIndependentMultisig(..) => {
+                        epoch_id >= StacksEpochId::Epoch30
+                    }
+                    _ => true,
+                };
+                let sponsor_supported = match sponsor {
+                    TransactionSpendingCondition::OrderIndependentMultisig(..) => {
+                        epoch_id >= StacksEpochId::Epoch30
+                    }
+                    _ => true,
+                };
+                origin_supported && sponsor_supported
+            }
+            TransactionAuth::Standard(ref origin) => match origin {
+                TransactionSpendingCondition::OrderIndependentMultisig(..) => {
+                    epoch_id >= StacksEpochId::Epoch30
+                }
+                _ => true,
+            },
+        }
+    }
 }
 
 /// A transaction that calls into a smart contract
@@ -1312,35 +1699,6 @@ pub struct TransactionSmartContract {
     pub code_body: StacksString,
 }
 
-/// Schnorr threshold signature using types from `wsts`
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ThresholdSignature(pub wsts::common::Signature);
-
-impl StacksMessageCodec for ThresholdSignature {
-    fn consensus_serialize<W: Write>(&self, fd: &mut W) -> Result<(), CodecError> {
-        let compressed = self.0.R.compress();
-        let bytes = compressed.as_bytes();
-        fd.write_all(bytes).map_err(CodecError::WriteError)?;
-        write_next(fd, &self.0.z.to_bytes())?;
-        Ok(())
-    }
-
-    fn consensus_deserialize<R: Read>(fd: &mut R) -> Result<Self, CodecError> {
-        // Read curve point
-        let mut buf = [0u8; 33];
-        fd.read_exact(&mut buf).map_err(CodecError::ReadError)?;
-        let r = Secp256k1Point::try_from(&Secp256k1Compressed::from(buf))
-            .map_err(|_| CodecError::DeserializeError("Failed to read curve point".into()))?;
-
-        // Read scalar
-        let mut buf = [0u8; 32];
-        fd.read_exact(&mut buf).map_err(CodecError::ReadError)?;
-        let z = Secp256k1Scalar::from(buf);
-
-        Ok(Self(Secp256k1Signature { R: r, z }))
-    }
-}
-
 /// Cause of change in mining tenure
 /// Depending on cause, tenure can be ended or extended
 #[repr(u8)]
@@ -1402,6 +1760,25 @@ pub struct TenureChangePayload {
     pub pubkey_hash: Hash160,
 }
 
+impl TenureChangePayload {
+    pub fn extend(
+        &self,
+        burn_view_consensus_hash: ConsensusHash,
+        last_tenure_block_id: StacksBlockId,
+        num_blocks_so_far: u32,
+    ) -> Self {
+        TenureChangePayload {
+            tenure_consensus_hash: self.tenure_consensus_hash,
+            prev_tenure_consensus_hash: self.tenure_consensus_hash,
+            burn_view_consensus_hash,
+            previous_tenure_end: last_tenure_block_id,
+            previous_tenure_blocks: num_blocks_so_far,
+            cause: TenureChangeCause::Extended,
+            pubkey_hash: self.pubkey_hash,
+        }
+    }
+}
+
 impl StacksMessageCodec for TenureChangePayload {
     fn consensus_serialize<W: Write>(&self, fd: &mut W) -> Result<(), CodecError> {
         write_next(fd, &self.tenure_consensus_hash)?;
@@ -1457,17 +1834,30 @@ impl TransactionPayload {
         match self {
             TransactionPayload::TokenTransfer(..) => "TokenTransfer",
             TransactionPayload::ContractCall(..) => "ContractCall",
-            TransactionPayload::SmartContract(..) => "SmartContract",
+            TransactionPayload::SmartContract(_, version_opt) => {
+                if version_opt.is_some() {
+                    "SmartContract(Versioned)"
+                } else {
+                    "SmartContract"
+                }
+            }
             TransactionPayload::PoisonMicroblock(..) => "PoisonMicroblock",
-            TransactionPayload::Coinbase(..) => "Coinbase",
-            TransactionPayload::TenureChange(..) => "TenureChange",
+            TransactionPayload::Coinbase(_, _, vrf_opt) => {
+                if vrf_opt.is_some() {
+                    "Coinbase(Nakamoto)"
+                } else {
+                    "Coinbase"
+                }
+            }
+            TransactionPayload::TenureChange(payload) => match payload.cause {
+                TenureChangeCause::BlockFound => "TenureChange(BlockFound)",
+                TenureChangeCause::Extended => "TenureChange(Extension)",
+            },
         }
     }
 }
 
-#[repr(u8)]
-#[derive(Debug, Clone, PartialEq, Copy, Serialize, Deserialize)]
-pub enum TransactionPayloadID {
+define_u8_enum!(TransactionPayloadID {
     TokenTransfer = 0,
     SmartContract = 1,
     ContractCall = 2,
@@ -1478,8 +1868,8 @@ pub enum TransactionPayloadID {
     VersionedSmartContract = 6,
     TenureChange = 7,
     // has a VRF proof, and may have an alt principal
-    NakamotoCoinbase = 8,
-}
+    NakamotoCoinbase = 8
+});
 
 /// Encoding of an asset type identifier
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -1665,7 +2055,11 @@ impl StacksTransaction {
         auth: TransactionAuth,
         payload: TransactionPayload,
     ) -> StacksTransaction {
-        let anchor_mode = TransactionAnchorMode::Any;
+        let anchor_mode = match payload {
+            TransactionPayload::Coinbase(..) => TransactionAnchorMode::OnChainOnly,
+            TransactionPayload::PoisonMicroblock(_, _) => TransactionAnchorMode::OnChainOnly,
+            _ => TransactionAnchorMode::Any,
+        };
 
         StacksTransaction {
             version,
@@ -1776,6 +2170,10 @@ impl StacksTransaction {
             privk,
         )?;
         match condition {
+            TransactionSpendingCondition::Singlesig(ref mut cond) => {
+                cond.set_signature(next_sig);
+                Ok(next_sighash)
+            }
             TransactionSpendingCondition::Multisig(ref mut cond) => {
                 cond.push_signature(
                     if privk.compress_public() {
@@ -1787,9 +2185,16 @@ impl StacksTransaction {
                 );
                 Ok(next_sighash)
             }
-            TransactionSpendingCondition::Singlesig(ref mut cond) => {
-                cond.set_signature(next_sig);
-                Ok(next_sighash)
+            TransactionSpendingCondition::OrderIndependentMultisig(ref mut cond) => {
+                cond.push_signature(
+                    if privk.compress_public() {
+                        TransactionPublicKeyEncoding::Compressed
+                    } else {
+                        TransactionPublicKeyEncoding::Uncompressed
+                    },
+                    next_sig,
+                );
+                Ok(*cur_sighash)
             }
         }
     }
@@ -1800,6 +2205,9 @@ impl StacksTransaction {
     ) -> Option<TransactionAuthField> {
         match condition {
             TransactionSpendingCondition::Multisig(ref mut cond) => cond.pop_auth_field(),
+            TransactionSpendingCondition::OrderIndependentMultisig(ref mut cond) => {
+                cond.pop_auth_field()
+            }
             TransactionSpendingCondition::Singlesig(ref mut cond) => cond.pop_signature(),
         }
     }
@@ -1807,12 +2215,15 @@ impl StacksTransaction {
     /// Append a public key to a multisig condition
     fn append_pubkey(
         condition: &mut TransactionSpendingCondition,
-        pubkey: &Secp256k1PublicKey,
+        pubkey: &StacksPublicKey,
     ) -> Result<(), CodecError> {
         match condition {
             TransactionSpendingCondition::Multisig(ref mut cond) => {
-                #[allow(clippy::clone_on_copy)]
-                cond.push_public_key(pubkey.clone());
+                cond.push_public_key(*pubkey);
+                Ok(())
+            }
+            TransactionSpendingCondition::OrderIndependentMultisig(ref mut cond) => {
+                cond.push_public_key(*pubkey);
                 Ok(())
             }
             _ => Err(CodecError::SigningError(
@@ -1829,15 +2240,8 @@ impl StacksTransaction {
         privk: &Secp256k1PrivateKey,
     ) -> Result<Txid, CodecError> {
         let next_sighash = match self.auth {
-            TransactionAuth::Standard(ref mut origin_condition) => {
-                StacksTransaction::sign_and_append(
-                    origin_condition,
-                    cur_sighash,
-                    &TransactionAuthFlags::AuthStandard,
-                    privk,
-                )?
-            }
-            TransactionAuth::Sponsored(ref mut origin_condition, _) => {
+            TransactionAuth::Standard(ref mut origin_condition)
+            | TransactionAuth::Sponsored(ref mut origin_condition, _) => {
                 StacksTransaction::sign_and_append(
                     origin_condition,
                     cur_sighash,
@@ -1850,7 +2254,7 @@ impl StacksTransaction {
     }
 
     /// Append the next public key to the origin account authorization.
-    pub fn append_next_origin(&mut self, pubk: &Secp256k1PublicKey) -> Result<(), CodecError> {
+    pub fn append_next_origin(&mut self, pubk: &StacksPublicKey) -> Result<(), CodecError> {
         match self.auth {
             TransactionAuth::Standard(ref mut origin_condition) => {
                 StacksTransaction::append_pubkey(origin_condition, pubk)
@@ -1888,7 +2292,7 @@ impl StacksTransaction {
     }
 
     /// Append the next public key to the sponsor account authorization.
-    pub fn append_next_sponsor(&mut self, pubk: &Secp256k1PublicKey) -> Result<(), CodecError> {
+    pub fn append_next_sponsor(&mut self, pubk: &StacksPublicKey) -> Result<(), CodecError> {
         match self.auth {
             TransactionAuth::Standard(_) => Err(CodecError::SigningError(
                 "Cannot appned a public key to the sponsor of a standard auth condition"
@@ -1969,7 +2373,7 @@ impl StacksTransaction {
         let mut tx_bytes = vec![];
         self.consensus_serialize(&mut tx_bytes)
             .expect("BUG: Failed to serialize a transaction object");
-        tx_bytes.len() as u64
+        u64::try_from(tx_bytes.len()).expect("tx len exceeds 2^64 bytes")
     }
 
     pub fn consensus_deserialize_with_len<R: Read>(
@@ -2012,6 +2416,25 @@ impl StacksTransaction {
         // if the payload is a proof of a poisoned microblock stream, or is a coinbase, then this _must_ be anchored.
         // Otherwise, if the offending leader is the next leader, they can just orphan their proof
         // of malfeasance.
+        match payload {
+            TransactionPayload::PoisonMicroblock(_, _) => {
+                if anchor_mode != TransactionAnchorMode::OnChainOnly {
+                    return Err(CodecError::DeserializeError(
+                        "Failed to parse transaction: invalid anchor mode for PoisonMicroblock"
+                            .to_string(),
+                    ));
+                }
+            }
+            TransactionPayload::Coinbase(..) => {
+                if anchor_mode != TransactionAnchorMode::OnChainOnly {
+                    return Err(CodecError::DeserializeError(
+                        "Failed to parse transaction: invalid anchor mode for Coinbase".to_string(),
+                    ));
+                }
+            }
+            _ => {}
+        }
+
         let post_condition_mode = match post_condition_mode_u8 {
             x if x == TransactionPostConditionMode::Allow as u8 => {
                 TransactionPostConditionMode::Allow
@@ -2026,19 +2449,37 @@ impl StacksTransaction {
                 )));
             }
         };
+        let tx = StacksTransaction {
+            version,
+            chain_id,
+            auth,
+            anchor_mode,
+            post_condition_mode,
+            post_conditions,
+            payload,
+        };
 
-        Ok((
-            StacksTransaction {
-                version,
-                chain_id,
-                auth,
-                anchor_mode,
-                post_condition_mode,
-                post_conditions,
-                payload,
-            },
-            fd.num_read(),
-        ))
+        Ok((tx, fd.num_read()))
+    }
+
+    /// Try to convert to a coinbase payload
+    pub fn try_as_coinbase(
+        &self,
+    ) -> Option<(&CoinbasePayload, Option<&PrincipalData>, Option<&VRFProof>)> {
+        match &self.payload {
+            TransactionPayload::Coinbase(payload, recipient_opt, vrf_proof_opt) => {
+                Some((payload, recipient_opt.as_ref(), vrf_proof_opt.as_ref()))
+            }
+            _ => None,
+        }
+    }
+
+    /// Try to convert to a tenure change payload
+    pub fn try_as_tenure_change(&self) -> Option<&TenureChangePayload> {
+        match &self.payload {
+            TransactionPayload::TenureChange(tc_payload) => Some(tc_payload),
+            _ => None,
+        }
     }
 }
 
@@ -2251,7 +2692,7 @@ pub struct StacksMicroblock {
 pub struct StacksBlockHeader {
     pub version: u8,
     pub total_work: StacksWorkScore, // NOTE: this is the work done on the chain tip this block builds on (i.e. take this from the parent)
-    pub proof: String,
+    pub proof: VRFProof,
     pub parent_block: BlockHeaderHash, // NOTE: even though this is also present in the burn chain, we need this here for super-light clients that don't even have burn chain headers
     pub parent_microblock: BlockHeaderHash,
     pub parent_microblock_sequence: u16,
@@ -2314,21 +2755,203 @@ impl StacksMicroblockHeader {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct NakamotoBlockHeader {
+    pub version: u8,
+    /// The total number of StacksBlock and NakamotoBlocks preceding
+    /// this block in this block's history.
+    pub chain_length: u64,
+    /// Total amount of BTC spent producing the sortition that
+    /// selected this block's miner.
+    pub burn_spent: u64,
+    /// The consensus hash of the burnchain block that selected this tenure.  The consensus hash
+    /// uniquely identifies this tenure, including across all Bitcoin forks.
+    pub consensus_hash: ConsensusHash,
+    /// The index block hash of the immediate parent of this block.
+    /// This is the hash of the parent block's hash and consensus hash.
+    pub parent_block_id: StacksBlockId,
+    /// The root of a SHA512/256 merkle tree over all this block's
+    /// contained transactions
+    pub tx_merkle_root: Sha512Trunc256Sum,
+    /// The MARF trie root hash after this block has been processed
+    pub state_index_root: TrieHash,
+    /// A Unix time timestamp of when this block was mined, according to the miner.
+    /// For the signers to consider a block valid, this timestamp must be:
+    ///  * Greater than the timestamp of its parent block
+    ///  * At most 15 seconds into the future
+    pub timestamp: u64,
+    /// Recoverable ECDSA signature from the tenure's miner.
+    pub miner_signature: MessageSignature,
+    /// The set of recoverable ECDSA signatures over
+    /// the block header from the signer set active during the tenure.
+    /// (ordered by reward set order)
+    pub signer_signature: Vec<MessageSignature>,
+    /// A bitvec which conveys whether reward addresses should be punished (by burning their PoX rewards)
+    ///  or not in this block.
+    ///
+    /// The maximum number of entries in the bitvec is 4000.
+    pub pox_treatment: BitVec<4000>,
+}
+
+impl StacksMessageCodec for NakamotoBlockHeader {
+    fn consensus_serialize<W: std::io::Write>(&self, fd: &mut W) -> Result<(), CodecError> {
+        write_next(fd, &self.version)?;
+        write_next(fd, &self.chain_length)?;
+        write_next(fd, &self.burn_spent)?;
+        write_next(fd, &self.consensus_hash)?;
+        write_next(fd, &self.parent_block_id)?;
+        write_next(fd, &self.tx_merkle_root)?;
+        write_next(fd, &self.state_index_root)?;
+        write_next(fd, &self.timestamp)?;
+        write_next(fd, &self.miner_signature)?;
+        write_next(fd, &self.signer_signature)?;
+        write_next(fd, &self.pox_treatment)?;
+
+        Ok(())
+    }
+
+    fn consensus_deserialize<R: std::io::Read>(fd: &mut R) -> Result<Self, CodecError> {
+        Ok(NakamotoBlockHeader {
+            version: read_next(fd)?,
+            chain_length: read_next(fd)?,
+            burn_spent: read_next(fd)?,
+            consensus_hash: read_next(fd)?,
+            parent_block_id: read_next(fd)?,
+            tx_merkle_root: read_next(fd)?,
+            state_index_root: read_next(fd)?,
+            timestamp: read_next(fd)?,
+            miner_signature: read_next(fd)?,
+            signer_signature: read_next(fd)?,
+            pox_treatment: read_next(fd)?,
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct NakamotoBlock {
+    pub header: NakamotoBlockHeader,
+    pub txs: Vec<StacksTransaction>,
+}
+
+impl StacksMessageCodec for NakamotoBlock {
+    fn consensus_serialize<W: std::io::Write>(&self, fd: &mut W) -> Result<(), CodecError> {
+        write_next(fd, &self.header)?;
+        write_next(fd, &self.txs)
+    }
+
+    fn consensus_deserialize<R: std::io::Read>(fd: &mut R) -> Result<Self, CodecError> {
+        let (header, txs) = {
+            let mut bound_read = BoundReader::from_reader(fd, u64::from(MAX_MESSAGE_LEN));
+            let header: NakamotoBlockHeader = read_next(&mut bound_read)?;
+            let txs: Vec<_> = read_next(&mut bound_read)?;
+            (header, txs)
+        };
+
+        // // all transactions are unique
+        // if !StacksBlock::validate_transactions_unique(&txs) {
+        //     warn!("Invalid block: Found duplicate transaction";
+        //         "consensus_hash" => %header.consensus_hash,
+        //         "stacks_block_hash" => %header.block_hash(),
+        //         "stacks_block_id" => %header.block_id()
+        //     );
+        //     return Err(CodecError::DeserializeError(
+        //         "Invalid block: found duplicate transaction".to_string(),
+        //     ));
+        // }
+
+        // // header and transactions must be consistent
+        // let txid_vecs = txs.iter().map(|tx| tx.txid().as_bytes().to_vec()).collect();
+
+        // let merkle_tree = MerkleTree::new(&txid_vecs);
+        // let tx_merkle_root: Sha512Trunc256Sum = merkle_tree.root();
+
+        // if tx_merkle_root != header.tx_merkle_root {
+        //     warn!("Invalid block: Tx Merkle root mismatch";
+        //         "consensus_hash" => %header.consensus_hash,
+        //         "stacks_block_hash" => %header.block_hash(),
+        //         "stacks_block_id" => %header.block_id()
+        //     );
+        //     return Err(CodecError::DeserializeError(
+        //         "Invalid block: tx Merkle root mismatch".to_string(),
+        //     ));
+        // }
+
+        Ok(NakamotoBlock { header, txs })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+/// A vote across the signer set for a block
+pub struct NakamotoBlockVote {
+    pub signer_signature_hash: Sha512Trunc256Sum,
+    pub rejected: bool,
+}
+
+impl StacksMessageCodec for NakamotoBlockVote {
+    fn consensus_serialize<W: std::io::Write>(&self, fd: &mut W) -> Result<(), CodecError> {
+        write_next(fd, &self.signer_signature_hash)?;
+        if self.rejected {
+            write_next(fd, &1u8)?;
+        }
+        Ok(())
+    }
+
+    fn consensus_deserialize<R: std::io::Read>(fd: &mut R) -> Result<Self, CodecError> {
+        let signer_signature_hash = read_next(fd)?;
+        let rejected_byte: Option<u8> = read_next(fd).ok();
+        let rejected = rejected_byte.is_some();
+        Ok(Self {
+            signer_signature_hash,
+            rejected,
+        })
+    }
+}
+
 // values a miner uses to produce the next block
 pub const MINER_BLOCK_CONSENSUS_HASH: ConsensusHash = ConsensusHash([1u8; 20]);
 pub const MINER_BLOCK_HEADER_HASH: BlockHeaderHash = BlockHeaderHash([1u8; 32]);
 
 #[derive(Debug, Clone, PartialEq)]
+pub enum StacksBlockHeaderTypes {
+    Epoch2(StacksBlockHeader),
+    Nakamoto(NakamotoBlockHeader),
+}
+
+impl From<StacksBlockHeader> for StacksBlockHeaderTypes {
+    fn from(value: StacksBlockHeader) -> Self {
+        Self::Epoch2(value)
+    }
+}
+
+impl From<NakamotoBlockHeader> for StacksBlockHeaderTypes {
+    fn from(value: NakamotoBlockHeader) -> Self {
+        Self::Nakamoto(value)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct StacksHeaderInfo {
-    pub anchored_header: StacksBlockHeader,
+    /// Stacks block header
+    pub anchored_header: StacksBlockHeaderTypes,
+    /// Last microblock header (Stacks 2.x only; this is None in Stacks 3.x)
     pub microblock_tail: Option<StacksMicroblockHeader>,
+    /// Height of this Stacks block
     pub stacks_block_height: u64,
+    /// MARF root hash of the headers DB (not consensus critical)
     pub index_root: TrieHash,
+    /// consensus hash of the burnchain block in which this miner was selected to produce this block
     pub consensus_hash: ConsensusHash,
+    /// Hash of the burnchain block in which this miner was selected to produce this block
     pub burn_header_hash: BurnchainHeaderHash,
+    /// Height of the burnchain block
     pub burn_header_height: u32,
+    /// Timestamp of the burnchain block
     pub burn_header_timestamp: u64,
+    /// Size of the block corresponding to `anchored_header` in bytes
     pub anchored_block_size: u64,
+    /// The burnchain tip that is passed to Clarity while processing this block.
+    /// This should always be `Some()` for Nakamoto blocks and `None` for 2.x blocks
+    pub burn_view: Option<ConsensusHash>,
 }
 
 /// A record of a coin reward for a miner.  There will be at most two of these for a miner: one for
@@ -2507,18 +3130,18 @@ fn clarity_version_consensus_deserialize<R: Read>(
 
 impl StacksMessageCodec for TransactionPayload {
     fn consensus_serialize<W: Write>(&self, fd: &mut W) -> Result<(), CodecError> {
-        match *self {
-            TransactionPayload::TokenTransfer(ref address, ref amount, ref memo) => {
+        match self {
+            TransactionPayload::TokenTransfer(address, amount, memo) => {
                 write_next(fd, &(TransactionPayloadID::TokenTransfer as u8))?;
                 write_next(fd, address)?;
                 write_next(fd, amount)?;
                 write_next(fd, memo)?;
             }
-            TransactionPayload::ContractCall(ref cc) => {
+            TransactionPayload::ContractCall(cc) => {
                 write_next(fd, &(TransactionPayloadID::ContractCall as u8))?;
                 cc.consensus_serialize(fd)?;
             }
-            TransactionPayload::SmartContract(ref sc, ref version_opt) => {
+            TransactionPayload::SmartContract(sc, version_opt) => {
                 if let Some(version) = version_opt {
                     // caller requests a specific Clarity version
                     write_next(fd, &(TransactionPayloadID::VersionedSmartContract as u8))?;
@@ -2530,45 +3153,105 @@ impl StacksMessageCodec for TransactionPayload {
                     sc.consensus_serialize(fd)?;
                 }
             }
-            _ => {
-                unreachable!()
+            TransactionPayload::PoisonMicroblock(h1, h2) => {
+                write_next(fd, &(TransactionPayloadID::PoisonMicroblock as u8))?;
+                h1.consensus_serialize(fd)?;
+                h2.consensus_serialize(fd)?;
+            }
+            TransactionPayload::Coinbase(buf, recipient_opt, vrf_opt) => {
+                match (recipient_opt, vrf_opt) {
+                    (None, None) => {
+                        // stacks 2.05 and earlier only use this path
+                        write_next(fd, &(TransactionPayloadID::Coinbase as u8))?;
+                        write_next(fd, buf)?;
+                    }
+                    (Some(recipient), None) => {
+                        write_next(fd, &(TransactionPayloadID::CoinbaseToAltRecipient as u8))?;
+                        write_next(fd, buf)?;
+                        write_next(fd, &Value::Principal(recipient.clone()))?;
+                    }
+                    (None, Some(vrf_proof)) => {
+                        // nakamoto coinbase
+                        // encode principal as (optional principal)
+                        write_next(fd, &(TransactionPayloadID::NakamotoCoinbase as u8))?;
+                        write_next(fd, buf)?;
+                        write_next(fd, &Value::none())?;
+                        write_next(fd, vrf_proof)?;
+                    }
+                    (Some(recipient), Some(vrf_proof)) => {
+                        write_next(fd, &(TransactionPayloadID::NakamotoCoinbase as u8))?;
+                        write_next(fd, buf)?;
+                        write_next(
+                            fd,
+                            &Value::some(Value::Principal(recipient.clone())).expect(
+                                "FATAL: failed to encode recipient principal as `optional`",
+                            ),
+                        )?;
+                        write_next(fd, vrf_proof)?;
+                    }
+                }
+            }
+            TransactionPayload::TenureChange(tc) => {
+                write_next(fd, &(TransactionPayloadID::TenureChange as u8))?;
+                tc.consensus_serialize(fd)?;
             }
         }
         Ok(())
     }
 
     fn consensus_deserialize<R: Read>(fd: &mut R) -> Result<TransactionPayload, CodecError> {
-        let type_id: u8 = read_next(fd)?;
+        let type_id_u8 = read_next(fd)?;
+        let type_id = TransactionPayloadID::from_u8(type_id_u8).ok_or_else(|| {
+            CodecError::DeserializeError(format!(
+                "Failed to parse transaction -- unknown payload ID {type_id_u8}"
+            ))
+        })?;
         let payload = match type_id {
-            x if x == TransactionPayloadID::TokenTransfer as u8 => {
+            TransactionPayloadID::TokenTransfer => {
                 let principal = read_next(fd)?;
                 let amount = read_next(fd)?;
                 let memo = read_next(fd)?;
                 TransactionPayload::TokenTransfer(principal, amount, memo)
             }
-            x if x == TransactionPayloadID::ContractCall as u8 => {
+            TransactionPayloadID::ContractCall => {
                 let payload: TransactionContractCall = read_next(fd)?;
                 TransactionPayload::ContractCall(payload)
             }
-            x if x == TransactionPayloadID::SmartContract as u8 => {
+            TransactionPayloadID::SmartContract => {
                 let payload: TransactionSmartContract = read_next(fd)?;
                 TransactionPayload::SmartContract(payload, None)
             }
-            x if x == TransactionPayloadID::VersionedSmartContract as u8 => {
+            TransactionPayloadID::VersionedSmartContract => {
                 let version = clarity_version_consensus_deserialize(fd)?;
                 let payload: TransactionSmartContract = read_next(fd)?;
                 TransactionPayload::SmartContract(payload, Some(version))
             }
-            x if x == TransactionPayloadID::PoisonMicroblock as u8 => {
-                let micrblock1: StacksMicroblockHeader = read_next(fd)?;
-                let micrblock2: StacksMicroblockHeader = read_next(fd)?;
-                TransactionPayload::PoisonMicroblock(micrblock1, micrblock2)
+            TransactionPayloadID::PoisonMicroblock => {
+                let h1: StacksMicroblockHeader = read_next(fd)?;
+                let h2: StacksMicroblockHeader = read_next(fd)?;
+
+                // must differ in some field
+                if h1 == h2 {
+                    return Err(CodecError::DeserializeError(
+                        "Failed to parse transaction -- microblock headers match".to_string(),
+                    ));
+                }
+
+                // must have the same sequence number or same block parent
+                if h1.sequence != h2.sequence && h1.prev_block != h2.prev_block {
+                    return Err(CodecError::DeserializeError(
+                        "Failed to parse transaction -- microblock headers do not identify a fork"
+                            .to_string(),
+                    ));
+                }
+
+                TransactionPayload::PoisonMicroblock(h1, h2)
             }
-            x if x == TransactionPayloadID::Coinbase as u8 => {
+            TransactionPayloadID::Coinbase => {
                 let payload: CoinbasePayload = read_next(fd)?;
                 TransactionPayload::Coinbase(payload, None, None)
             }
-            x if x == TransactionPayloadID::CoinbaseToAltRecipient as u8 => {
+            TransactionPayloadID::CoinbaseToAltRecipient => {
                 let payload: CoinbasePayload = read_next(fd)?;
                 let principal_value: Value = read_next(fd)?;
                 let recipient = match principal_value {
@@ -2580,7 +3263,8 @@ impl StacksMessageCodec for TransactionPayload {
 
                 TransactionPayload::Coinbase(payload, Some(recipient), None)
             }
-            x if x == TransactionPayloadID::NakamotoCoinbase as u8 => {
+            // TODO: gate this!
+            TransactionPayloadID::NakamotoCoinbase => {
                 let payload: CoinbasePayload = read_next(fd)?;
                 let principal_value_opt: Value = read_next(fd)?;
                 let recipient_opt = if let Value::Optional(optional_data) = principal_value_opt {
@@ -2599,15 +3283,9 @@ impl StacksMessageCodec for TransactionPayload {
                 let vrf_proof: VRFProof = read_next(fd)?;
                 TransactionPayload::Coinbase(payload, recipient_opt, Some(vrf_proof))
             }
-            x if x == TransactionPayloadID::TenureChange as u8 => {
+            TransactionPayloadID::TenureChange => {
                 let payload: TenureChangePayload = read_next(fd)?;
                 TransactionPayload::TenureChange(payload)
-            }
-            _ => {
-                return Err(CodecError::DeserializeError(format!(
-                    "Failed to parse transaction -- unknown payload ID {}",
-                    type_id
-                )));
             }
         };
 
@@ -2821,6 +3499,9 @@ impl StacksMessageCodec for TransactionSpendingCondition {
             TransactionSpendingCondition::Multisig(ref data) => {
                 data.consensus_serialize(fd)?;
             }
+            TransactionSpendingCondition::OrderIndependentMultisig(ref data) => {
+                data.consensus_serialize(fd)?;
+            }
         }
         Ok(())
     }
@@ -2839,6 +3520,10 @@ impl StacksMessageCodec for TransactionSpendingCondition {
             } else if MultisigHashMode::from_u8(hash_mode_u8).is_some() {
                 let cond = MultisigSpendingCondition::consensus_deserialize(&mut rrd)?;
                 TransactionSpendingCondition::Multisig(cond)
+            } else if OrderIndependentMultisigHashMode::from_u8(hash_mode_u8).is_some() {
+                let cond =
+                    OrderIndependentMultisigSpendingCondition::consensus_deserialize(&mut rrd)?;
+                TransactionSpendingCondition::OrderIndependentMultisig(cond)
             } else {
                 return Err(CodecError::DeserializeError(format!(
                     "Failed to parse spending condition: invalid hash mode {}",
@@ -2987,6 +3672,88 @@ impl StacksMessageCodec for MultisigSpendingCondition {
     }
 }
 
+impl StacksMessageCodec for OrderIndependentMultisigSpendingCondition {
+    fn consensus_serialize<W: Write>(&self, fd: &mut W) -> Result<(), CodecError> {
+        write_next(fd, &(self.hash_mode.clone() as u8))?;
+        write_next(fd, &self.signer)?;
+        write_next(fd, &self.nonce)?;
+        write_next(fd, &self.tx_fee)?;
+        write_next(fd, &self.fields)?;
+        write_next(fd, &self.signatures_required)?;
+        Ok(())
+    }
+
+    fn consensus_deserialize<R: Read>(
+        fd: &mut R,
+    ) -> Result<OrderIndependentMultisigSpendingCondition, CodecError> {
+        let hash_mode_u8: u8 = read_next(fd)?;
+        let hash_mode = OrderIndependentMultisigHashMode::from_u8(hash_mode_u8).ok_or(
+            CodecError::DeserializeError(format!(
+                "Failed to parse multisig spending condition: unknown hash mode {}",
+                hash_mode_u8
+            )),
+        )?;
+
+        let signer: Hash160 = read_next(fd)?;
+        let nonce: u64 = read_next(fd)?;
+        let tx_fee: u64 = read_next(fd)?;
+        let fields: Vec<TransactionAuthField> = {
+            let mut bound_read = BoundReader::from_reader(fd, MAX_MESSAGE_LEN as u64);
+            read_next(&mut bound_read)
+        }?;
+
+        let signatures_required: u16 = read_next(fd)?;
+
+        // read and decode _exactly_ num_signatures signature buffers
+        let mut num_sigs_given: u16 = 0;
+        let mut have_uncompressed = false;
+        for f in fields.iter() {
+            match *f {
+                TransactionAuthField::Signature(ref key_encoding, _) => {
+                    num_sigs_given =
+                        num_sigs_given
+                            .checked_add(1)
+                            .ok_or(CodecError::DeserializeError(
+                                "Failed to parse order independent multisig spending condition: too many signatures"
+                                    .to_string(),
+                            ))?;
+                    if *key_encoding == TransactionPublicKeyEncoding::Uncompressed {
+                        have_uncompressed = true;
+                    }
+                }
+                TransactionAuthField::PublicKey(ref pubk) => {
+                    if !pubk.compressed() {
+                        have_uncompressed = true;
+                    }
+                }
+            };
+        }
+
+        // must be given the right number of signatures
+        if num_sigs_given < signatures_required {
+            let msg = format!(
+                "Failed to deserialize order independent multisig spending condition: got {num_sigs_given} sigs, expected at least {signatures_required}"
+            );
+            return Err(CodecError::DeserializeError(msg));
+        }
+
+        // must all be compressed if we're using P2WSH
+        if have_uncompressed && hash_mode == OrderIndependentMultisigHashMode::P2WSH {
+            let msg = "Failed to deserialize order independent multisig spending condition: expected compressed keys only".to_string();
+            return Err(CodecError::DeserializeError(msg));
+        }
+
+        Ok(OrderIndependentMultisigSpendingCondition {
+            signer,
+            nonce,
+            tx_fee,
+            hash_mode,
+            fields,
+            signatures_required,
+        })
+    }
+}
+
 /// A container for public keys (compressed secp256k1 public keys)
 pub struct StacksPublicKeyBuffer(pub [u8; 33]);
 impl_array_newtype!(StacksPublicKeyBuffer, u8, 33);
@@ -3088,5 +3855,511 @@ impl StacksMessageCodec for StacksTransaction {
 
     fn consensus_deserialize<R: Read>(fd: &mut R) -> Result<StacksTransaction, CodecError> {
         StacksTransaction::consensus_deserialize_with_len(fd).map(|(result, _)| result)
+    }
+}
+
+define_u8_enum!(
+/// Enum representing the SignerMessage type prefix
+SignerMessageTypePrefix {
+    /// Block Proposal message from miners
+    BlockProposal = 0,
+    /// Block Response message from signers
+    BlockResponse = 1,
+    /// Block Pushed message from miners
+    BlockPushed = 2,
+    /// Mock block proposal message from Epoch 2.5 miners
+    MockProposal = 3,
+    /// Mock block signature message from Epoch 2.5 signers
+    MockSignature = 4,
+    /// Mock block message from Epoch 2.5 miners
+    MockBlock = 5
+});
+
+impl TryFrom<u8> for SignerMessageTypePrefix {
+    type Error = CodecError;
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        Self::from_u8(value).ok_or_else(|| {
+            CodecError::DeserializeError(format!("Unknown signer message type prefix: {value}"))
+        })
+    }
+}
+
+impl From<&SignerMessage> for SignerMessageTypePrefix {
+    fn from(message: &SignerMessage) -> Self {
+        match message {
+            SignerMessage::BlockProposal(_) => SignerMessageTypePrefix::BlockProposal,
+            SignerMessage::BlockResponse(_) => SignerMessageTypePrefix::BlockResponse,
+            SignerMessage::BlockPushed(_) => SignerMessageTypePrefix::BlockPushed,
+            SignerMessage::MockProposal(_) => SignerMessageTypePrefix::MockProposal,
+            SignerMessage::MockSignature(_) => SignerMessageTypePrefix::MockSignature,
+            SignerMessage::MockBlock(_) => SignerMessageTypePrefix::MockBlock,
+        }
+    }
+}
+
+define_u8_enum!(
+/// Enum representing the BlockResponse type prefix
+BlockResponseTypePrefix {
+    /// An accepted block response
+    Accepted = 0,
+    /// A rejected block response
+    Rejected = 1
+});
+
+impl TryFrom<u8> for BlockResponseTypePrefix {
+    type Error = CodecError;
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        Self::from_u8(value).ok_or_else(|| {
+            CodecError::DeserializeError(format!("Unknown block response type prefix: {value}"))
+        })
+    }
+}
+
+impl From<&BlockResponse> for BlockResponseTypePrefix {
+    fn from(block_response: &BlockResponse) -> Self {
+        match block_response {
+            BlockResponse::Accepted(_) => BlockResponseTypePrefix::Accepted,
+            BlockResponse::Rejected(_) => BlockResponseTypePrefix::Rejected,
+        }
+    }
+}
+
+// This enum is used to supply a `reason_code` for validation
+//  rejection responses. This is serialized as an enum with string
+//  type (in jsonschema terminology).
+define_u8_enum![ValidateRejectCode {
+    BadBlockHash = 0,
+    BadTransaction = 1,
+    InvalidBlock = 2,
+    ChainstateError = 3,
+    UnknownParent = 4,
+    NonCanonicalTenure = 5,
+    NoSuchTenure = 6
+}];
+
+impl TryFrom<u8> for ValidateRejectCode {
+    type Error = CodecError;
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        Self::from_u8(value)
+            .ok_or_else(|| CodecError::DeserializeError(format!("Unknown type prefix: {value}")))
+    }
+}
+
+define_u8_enum!(
+/// Enum representing the reject code type prefix
+RejectCodeTypePrefix {
+    /// The block was rejected due to validation issues
+    ValidationFailed = 0,
+    /// The block was rejected due to connectivity issues with the signer
+    ConnectivityIssues = 1,
+    /// The block was rejected in a prior round
+    RejectedInPriorRound = 2,
+    /// The block was rejected due to no sortition view
+    NoSortitionView = 3,
+    /// The block was rejected due to a mismatch with expected sortition view
+    SortitionViewMismatch = 4,
+    /// The block was rejected due to a testing directive
+    TestingDirective = 5
+});
+
+impl TryFrom<u8> for RejectCodeTypePrefix {
+    type Error = CodecError;
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        Self::from_u8(value).ok_or_else(|| {
+            CodecError::DeserializeError(format!("Unknown reject code type prefix: {value}"))
+        })
+    }
+}
+
+impl From<&RejectCode> for RejectCodeTypePrefix {
+    fn from(reject_code: &RejectCode) -> Self {
+        match reject_code {
+            RejectCode::ValidationFailed(_) => RejectCodeTypePrefix::ValidationFailed,
+            RejectCode::ConnectivityIssues => RejectCodeTypePrefix::ConnectivityIssues,
+            RejectCode::RejectedInPriorRound => RejectCodeTypePrefix::RejectedInPriorRound,
+            RejectCode::NoSortitionView => RejectCodeTypePrefix::NoSortitionView,
+            RejectCode::SortitionViewMismatch => RejectCodeTypePrefix::SortitionViewMismatch,
+            RejectCode::TestingDirective => RejectCodeTypePrefix::TestingDirective,
+        }
+    }
+}
+
+/// This enum is used to supply a `reason_code` for block rejections
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum RejectCode {
+    /// RPC endpoint Validation failed
+    ValidationFailed(ValidateRejectCode),
+    /// No Sortition View to verify against
+    NoSortitionView,
+    /// The block was rejected due to connectivity issues with the signer
+    ConnectivityIssues,
+    /// The block was rejected in a prior round
+    RejectedInPriorRound,
+    /// The block was rejected due to a mismatch with expected sortition view
+    SortitionViewMismatch,
+    /// The block was rejected due to a testing directive
+    TestingDirective,
+}
+
+impl StacksMessageCodec for RejectCode {
+    fn consensus_serialize<W: Write>(&self, fd: &mut W) -> Result<(), CodecError> {
+        write_next(fd, &(RejectCodeTypePrefix::from(self) as u8))?;
+        // Do not do a single match here as we may add other variants in the future and don't want to miss adding it
+        match self {
+            RejectCode::ValidationFailed(code) => write_next(fd, &(*code as u8))?,
+            RejectCode::ConnectivityIssues
+            | RejectCode::RejectedInPriorRound
+            | RejectCode::NoSortitionView
+            | RejectCode::SortitionViewMismatch
+            | RejectCode::TestingDirective => {
+                // No additional data to serialize / deserialize
+            }
+        };
+        Ok(())
+    }
+
+    fn consensus_deserialize<R: Read>(fd: &mut R) -> Result<Self, CodecError> {
+        let type_prefix_byte = read_next::<u8, _>(fd)?;
+        let type_prefix = RejectCodeTypePrefix::try_from(type_prefix_byte)?;
+        let code = match type_prefix {
+            RejectCodeTypePrefix::ValidationFailed => RejectCode::ValidationFailed(
+                ValidateRejectCode::try_from(read_next::<u8, _>(fd)?).map_err(|e| {
+                    CodecError::DeserializeError(format!(
+                        "Failed to decode validation reject code: {:?}",
+                        &e
+                    ))
+                })?,
+            ),
+            RejectCodeTypePrefix::ConnectivityIssues => RejectCode::ConnectivityIssues,
+            RejectCodeTypePrefix::RejectedInPriorRound => RejectCode::RejectedInPriorRound,
+            RejectCodeTypePrefix::NoSortitionView => RejectCode::NoSortitionView,
+            RejectCodeTypePrefix::SortitionViewMismatch => RejectCode::SortitionViewMismatch,
+            RejectCodeTypePrefix::TestingDirective => RejectCode::TestingDirective,
+        };
+        Ok(code)
+    }
+}
+
+/// A rejection response from a signer for a proposed block
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct BlockRejection {
+    /// The reason for the rejection
+    pub reason: String,
+    /// The reason code for the rejection
+    pub reason_code: RejectCode,
+    /// The signer signature hash of the block that was rejected
+    pub signer_signature_hash: Sha512Trunc256Sum,
+    /// The signer's signature across the rejection
+    pub signature: MessageSignature,
+    /// The chain id
+    pub chain_id: u32,
+}
+
+impl StacksMessageCodec for BlockRejection {
+    fn consensus_serialize<W: Write>(&self, fd: &mut W) -> Result<(), CodecError> {
+        write_next(fd, &self.reason.as_bytes().to_vec())?;
+        write_next(fd, &self.reason_code)?;
+        write_next(fd, &self.signer_signature_hash)?;
+        write_next(fd, &self.chain_id)?;
+        write_next(fd, &self.signature)?;
+        Ok(())
+    }
+
+    fn consensus_deserialize<R: Read>(fd: &mut R) -> Result<Self, CodecError> {
+        let reason_bytes = read_next::<Vec<u8>, _>(fd)?;
+        let reason = String::from_utf8(reason_bytes).map_err(|e| {
+            CodecError::DeserializeError(format!("Failed to decode reason string: {:?}", &e))
+        })?;
+        let reason_code = read_next::<RejectCode, _>(fd)?;
+        let signer_signature_hash = read_next::<Sha512Trunc256Sum, _>(fd)?;
+        let chain_id = read_next::<u32, _>(fd)?;
+        let signature = read_next::<MessageSignature, _>(fd)?;
+        Ok(Self {
+            reason,
+            reason_code,
+            signer_signature_hash,
+            chain_id,
+            signature,
+        })
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+/// BlockProposal sent to signers
+pub struct BlockProposal {
+    /// The block itself
+    pub block: NakamotoBlock,
+    /// The burn height the block is mined during
+    pub burn_height: u64,
+    /// The reward cycle the block is mined during
+    pub reward_cycle: u64,
+}
+
+impl StacksMessageCodec for BlockProposal {
+    fn consensus_serialize<W: Write>(&self, fd: &mut W) -> Result<(), CodecError> {
+        self.block.consensus_serialize(fd)?;
+        self.burn_height.consensus_serialize(fd)?;
+        self.reward_cycle.consensus_serialize(fd)?;
+        Ok(())
+    }
+
+    fn consensus_deserialize<R: Read>(fd: &mut R) -> Result<Self, CodecError> {
+        let block = NakamotoBlock::consensus_deserialize(fd)?;
+        let burn_height = u64::consensus_deserialize(fd)?;
+        let reward_cycle = u64::consensus_deserialize(fd)?;
+        Ok(BlockProposal {
+            block,
+            burn_height,
+            reward_cycle,
+        })
+    }
+}
+
+/// The response that a signer sends back to observing miners
+/// either accepting or rejecting a Nakamoto block with the corresponding reason
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub enum BlockResponse {
+    /// The Nakamoto block was accepted and therefore signed
+    Accepted((Sha512Trunc256Sum, MessageSignature)),
+    /// The Nakamoto block was rejected and therefore not signed
+    Rejected(BlockRejection),
+}
+
+impl StacksMessageCodec for BlockResponse {
+    fn consensus_serialize<W: Write>(&self, fd: &mut W) -> Result<(), CodecError> {
+        write_next(fd, &(BlockResponseTypePrefix::from(self) as u8))?;
+        match self {
+            BlockResponse::Accepted((hash, sig)) => {
+                write_next(fd, hash)?;
+                write_next(fd, sig)?;
+            }
+            BlockResponse::Rejected(rejection) => {
+                write_next(fd, rejection)?;
+            }
+        };
+        Ok(())
+    }
+
+    fn consensus_deserialize<R: Read>(fd: &mut R) -> Result<Self, CodecError> {
+        let type_prefix_byte = read_next::<u8, _>(fd)?;
+        let type_prefix = BlockResponseTypePrefix::try_from(type_prefix_byte)?;
+        let response = match type_prefix {
+            BlockResponseTypePrefix::Accepted => {
+                let hash = read_next::<Sha512Trunc256Sum, _>(fd)?;
+                let sig = read_next::<MessageSignature, _>(fd)?;
+                BlockResponse::Accepted((hash, sig))
+            }
+            BlockResponseTypePrefix::Rejected => {
+                let rejection = read_next::<BlockRejection, _>(fd)?;
+                BlockResponse::Rejected(rejection)
+            }
+        };
+        Ok(response)
+    }
+}
+
+/// A mock signature for the stacks node to be used for mock signing.
+/// This is only used by Epoch 2.5 signers to simulate the signing of a block for every sortition.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MockSignature {
+    /// The signer's signature across the mock proposal
+    signature: MessageSignature,
+    /// The mock block proposal that was signed across
+    pub mock_proposal: MockProposal,
+}
+
+impl StacksMessageCodec for MockSignature {
+    fn consensus_serialize<W: Write>(&self, fd: &mut W) -> Result<(), CodecError> {
+        write_next(fd, &self.signature)?;
+        self.mock_proposal.consensus_serialize(fd)?;
+        Ok(())
+    }
+
+    fn consensus_deserialize<R: Read>(fd: &mut R) -> Result<Self, CodecError> {
+        let signature = read_next::<MessageSignature, _>(fd)?;
+        let mock_proposal = MockProposal::consensus_deserialize(fd)?;
+        Ok(Self {
+            signature,
+            mock_proposal,
+        })
+    }
+}
+
+/// The signer relevant peer information from the stacks node
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct PeerInfo {
+    /// The burn block height
+    pub burn_block_height: u64,
+    /// The consensus hash of the stacks tip
+    pub stacks_tip_consensus_hash: ConsensusHash,
+    /// The stacks tip
+    pub stacks_tip: BlockHeaderHash,
+    /// The stacks tip height
+    pub stacks_tip_height: u64,
+    /// The pox consensus
+    pub pox_consensus: ConsensusHash,
+    /// The server version
+    pub server_version: String,
+    /// The network id
+    pub network_id: u32,
+}
+
+impl StacksMessageCodec for PeerInfo {
+    fn consensus_serialize<W: Write>(&self, fd: &mut W) -> Result<(), CodecError> {
+        write_next(fd, &self.burn_block_height)?;
+        write_next(fd, self.stacks_tip_consensus_hash.as_bytes())?;
+        write_next(fd, &self.stacks_tip)?;
+        write_next(fd, &self.stacks_tip_height)?;
+        write_next(fd, &(self.server_version.as_bytes().len() as u8))?;
+        fd.write_all(self.server_version.as_bytes())
+            .map_err(CodecError::WriteError)?;
+        write_next(fd, &self.pox_consensus)?;
+        write_next(fd, &self.network_id)?;
+        Ok(())
+    }
+
+    fn consensus_deserialize<R: Read>(fd: &mut R) -> Result<Self, CodecError> {
+        let burn_block_height = read_next::<u64, _>(fd)?;
+        let stacks_tip_consensus_hash = read_next::<ConsensusHash, _>(fd)?;
+        let stacks_tip = read_next::<BlockHeaderHash, _>(fd)?;
+        let stacks_tip_height = read_next::<u64, _>(fd)?;
+        let len_byte: u8 = read_next(fd)?;
+        let mut bytes = vec![0u8; len_byte as usize];
+        fd.read_exact(&mut bytes).map_err(CodecError::ReadError)?;
+        // must encode a valid string
+        let server_version = String::from_utf8(bytes).map_err(|_e| {
+            CodecError::DeserializeError(
+                "Failed to parse server version name: could not contruct from utf8".to_string(),
+            )
+        })?;
+        let pox_consensus = read_next::<ConsensusHash, _>(fd)?;
+        let network_id = read_next(fd)?;
+        Ok(Self {
+            burn_block_height,
+            stacks_tip_consensus_hash,
+            stacks_tip,
+            stacks_tip_height,
+            server_version,
+            pox_consensus,
+            network_id,
+        })
+    }
+}
+
+/// A mock block proposal for Epoch 2.5 mock signing
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MockProposal {
+    /// The view of the stacks node peer information at the time of the mock proposal
+    pub peer_info: PeerInfo,
+    /// The miner's signature across the peer info
+    signature: MessageSignature,
+}
+
+impl StacksMessageCodec for MockProposal {
+    fn consensus_serialize<W: Write>(&self, fd: &mut W) -> Result<(), CodecError> {
+        self.peer_info.consensus_serialize(fd)?;
+        write_next(fd, &self.signature)?;
+        Ok(())
+    }
+
+    fn consensus_deserialize<R: Read>(fd: &mut R) -> Result<Self, CodecError> {
+        let peer_info = PeerInfo::consensus_deserialize(fd)?;
+        let signature = read_next::<MessageSignature, _>(fd)?;
+        Ok(Self {
+            peer_info,
+            signature,
+        })
+    }
+}
+
+/// The mock block data for epoch 2.5 miners to broadcast to simulate block signing
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MockBlock {
+    /// The mock proposal that was signed across
+    pub mock_proposal: MockProposal,
+    /// The mock signatures that the miner received
+    pub mock_signatures: Vec<MockSignature>,
+}
+
+impl StacksMessageCodec for MockBlock {
+    fn consensus_serialize<W: Write>(&self, fd: &mut W) -> Result<(), CodecError> {
+        self.mock_proposal.consensus_serialize(fd)?;
+        write_next(fd, &self.mock_signatures)?;
+        Ok(())
+    }
+
+    fn consensus_deserialize<R: Read>(fd: &mut R) -> Result<Self, CodecError> {
+        let mock_proposal = MockProposal::consensus_deserialize(fd)?;
+        let mock_signatures = read_next::<Vec<MockSignature>, _>(fd)?;
+        Ok(Self {
+            mock_proposal,
+            mock_signatures,
+        })
+    }
+}
+
+/// The messages being sent through the stacker db contracts
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum SignerMessage {
+    /// The block proposal from miners for signers to observe and sign
+    BlockProposal(BlockProposal),
+    /// The block response from signers for miners to observe
+    BlockResponse(BlockResponse),
+    /// A block pushed from miners to the signers set
+    BlockPushed(NakamotoBlock),
+    /// A mock signature from the epoch 2.5 signers
+    MockSignature(MockSignature),
+    /// A mock message from the epoch 2.5 miners
+    MockProposal(MockProposal),
+    /// A mock block from the epoch 2.5 miners
+    MockBlock(MockBlock),
+}
+
+impl StacksMessageCodec for SignerMessage {
+    fn consensus_serialize<W: Write>(&self, fd: &mut W) -> Result<(), CodecError> {
+        SignerMessageTypePrefix::from(self)
+            .to_u8()
+            .consensus_serialize(fd)?;
+        match self {
+            SignerMessage::BlockProposal(block_proposal) => block_proposal.consensus_serialize(fd),
+            SignerMessage::BlockResponse(block_response) => block_response.consensus_serialize(fd),
+            SignerMessage::BlockPushed(block) => block.consensus_serialize(fd),
+            SignerMessage::MockSignature(signature) => signature.consensus_serialize(fd),
+            SignerMessage::MockProposal(message) => message.consensus_serialize(fd),
+            SignerMessage::MockBlock(block) => block.consensus_serialize(fd),
+        }?;
+        Ok(())
+    }
+
+    fn consensus_deserialize<R: Read>(fd: &mut R) -> Result<Self, CodecError> {
+        let type_prefix_byte = u8::consensus_deserialize(fd)?;
+        let type_prefix = SignerMessageTypePrefix::try_from(type_prefix_byte)?;
+        let message = match type_prefix {
+            SignerMessageTypePrefix::BlockProposal => {
+                let block_proposal = StacksMessageCodec::consensus_deserialize(fd)?;
+                SignerMessage::BlockProposal(block_proposal)
+            }
+            SignerMessageTypePrefix::BlockResponse => {
+                let block_response = StacksMessageCodec::consensus_deserialize(fd)?;
+                SignerMessage::BlockResponse(block_response)
+            }
+            SignerMessageTypePrefix::BlockPushed => {
+                let block = StacksMessageCodec::consensus_deserialize(fd)?;
+                SignerMessage::BlockPushed(block)
+            }
+            SignerMessageTypePrefix::MockProposal => {
+                let message = StacksMessageCodec::consensus_deserialize(fd)?;
+                SignerMessage::MockProposal(message)
+            }
+            SignerMessageTypePrefix::MockSignature => {
+                let signature = StacksMessageCodec::consensus_deserialize(fd)?;
+                SignerMessage::MockSignature(signature)
+            }
+            SignerMessageTypePrefix::MockBlock => {
+                let block = StacksMessageCodec::consensus_deserialize(fd)?;
+                SignerMessage::MockBlock(block)
+            }
+        };
+        Ok(message)
     }
 }

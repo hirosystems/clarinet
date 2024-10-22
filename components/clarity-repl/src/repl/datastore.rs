@@ -80,6 +80,7 @@ pub struct Datastore {
     stacks_chain_height: u32,
     stacks_blocks: HashMap<StacksBlockId, StacksBlockInfo>,
     sortition_lookup: HashMap<SortitionId, StacksBlockId>,
+    tenure_blocks_height: HashMap<u32, u32>,
     consensus_hash_lookup: HashMap<ConsensusHash, SortitionId>,
     current_epoch: StacksEpochId,
     current_epoch_start_height: u32,
@@ -363,6 +364,7 @@ impl Datastore {
 
         let sortition_lookup = HashMap::from([(sortition_id, id)]);
         let consensus_hash_lookup = HashMap::from([(genesis_block.consensus_hash, sortition_id)]);
+        let tenure_blocks_height = HashMap::from([(0, 0)]);
         let burn_blocks = HashMap::from([(first_burn_block_header_hash, genesis_burn_block)]);
         let stacks_blocks = HashMap::from([(id, genesis_block)]);
 
@@ -374,6 +376,7 @@ impl Datastore {
             stacks_blocks,
             sortition_lookup,
             consensus_hash_lookup,
+            tenure_blocks_height,
             current_epoch: StacksEpochId::Epoch2_05,
             current_epoch_start_height: 0,
             constants,
@@ -471,6 +474,9 @@ impl Datastore {
             self.burn_blocks.insert(hash, burn_block_info);
             self.burn_chain_height = height;
             self.advance_stacks_chain_tip(clarity_datastore, 1);
+
+            self.tenure_blocks_height
+                .insert(self.burn_chain_height, self.stacks_chain_height);
         }
 
         self.burn_chain_height
@@ -588,6 +594,14 @@ impl HeadersDB for Datastore {
         self.get_burn_header_hash_for_block(id_bhh)
             .and_then(|hash| self.burn_blocks.get(&hash))
             .map(|b| b.burn_block_height)
+    }
+
+    fn get_stacks_height_for_tenure_height(
+        &self,
+        _id_bhh: &StacksBlockId,
+        tenure_height: u32,
+    ) -> Option<u32> {
+        self.tenure_blocks_height.get(&tenure_height).copied()
     }
 
     fn get_miner_address(
