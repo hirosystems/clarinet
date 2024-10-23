@@ -2,7 +2,6 @@ use std::collections::BTreeMap;
 
 use super::{FileAccessor, FileLocation};
 use bip39::{Language, Mnemonic};
-use chainhook_types::{BitcoinNetwork, StacksNetwork};
 use clarinet_utils::get_bip39_seed_from_mnemonic;
 use clarity::address::AddressHashMode;
 use clarity::types::chainstate::{StacksAddress, StacksPrivateKey};
@@ -67,6 +66,35 @@ lazy_static! {
         )
         .unwrap(),
     ];
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum StacksNetwork {
+    Simnet,
+    Devnet,
+    Testnet,
+    Mainnet,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BitcoinNetwork {
+    Regtest,
+    Testnet,
+    Signet,
+    Mainnet,
+}
+
+impl StacksNetwork {
+    pub fn get_networks(&self) -> (BitcoinNetwork, StacksNetwork) {
+        match &self {
+            StacksNetwork::Simnet => (BitcoinNetwork::Regtest, StacksNetwork::Simnet),
+            StacksNetwork::Devnet => (BitcoinNetwork::Testnet, StacksNetwork::Devnet),
+            StacksNetwork::Testnet => (BitcoinNetwork::Testnet, StacksNetwork::Testnet),
+            StacksNetwork::Mainnet => (BitcoinNetwork::Mainnet, StacksNetwork::Mainnet),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -444,7 +472,7 @@ impl NetworkManifest {
         };
 
         let mut accounts = BTreeMap::new();
-        let is_mainnet = networks.1.is_mainnet();
+        let is_mainnet = matches!(networks.1, StacksNetwork::Mainnet);
 
         if let Some(Value::Table(entries)) = &network_manifest_file.accounts {
             for (account_name, account_settings) in entries.iter() {
@@ -499,7 +527,7 @@ impl NetworkManifest {
             }
         };
 
-        let devnet = if networks.1.is_devnet() {
+        let devnet = if matches!(networks.1, StacksNetwork::Devnet) {
             let mut devnet_config = network_manifest_file.devnet.take().unwrap_or_default();
 
             if let Some(ref devnet_override) = devnet_override {
@@ -1057,7 +1085,7 @@ pub fn compute_addresses(
 
     let public_key = PublicKey::from_secret_key(&secret_key);
     let pub_key = Secp256k1PublicKey::from_slice(&public_key.serialize_compressed()).unwrap();
-    let version = if networks.1.is_mainnet() {
+    let version = if matches!(networks.1, StacksNetwork::Mainnet) {
         clarity::address::C32_ADDRESS_VERSION_MAINNET_SINGLESIG
     } else {
         clarity::address::C32_ADDRESS_VERSION_TESTNET_SINGLESIG

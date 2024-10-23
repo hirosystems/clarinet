@@ -68,17 +68,6 @@ path = "src/bin.rs"
 
 [features]
 default = ["cli", "dap"]
-cli = [
-    "pico-args",
-    "rustyline",
-    "clarity/canonical",
-    "clarity/developer-mode",
-    "clarity/devtools",
-    "clarity/log",
-    "hiro_system_kit/tokio_helpers",
-    "clar2wasm",
-    "pox-locking/default"
-]
 sdk = [
     "clarity/canonical",
     "clarity/developer-mode",
@@ -86,6 +75,12 @@ sdk = [
     "clarity/log",
     "hiro_system_kit/tokio_helpers",
     "pox-locking/default"
+]
+cli = [
+    "sdk",
+    "pico-args",
+    "rustyline",
+    "clar2wasm",
 ]
 dap = [
     "tokio",

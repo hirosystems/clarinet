@@ -8,13 +8,13 @@ use clarinet_deployments::{get_default_deployment_path, load_deployment};
 use clarinet_files::bip39::{Language, Mnemonic};
 use clarinet_files::{
     compute_addresses, AccountConfig, DevnetConfigFile, FileLocation, PoxStackingOrder,
-    ProjectManifest, DEFAULT_DERIVATION_PATH,
+    ProjectManifest, StacksNetwork, DEFAULT_DERIVATION_PATH,
 };
 use hiro_system_kit::{o, slog, slog_async, slog_term, Drain};
 use neon::context::Context as NeonContext;
 use stacks_network::chainhook_sdk::types::{
     BitcoinChainEvent, BitcoinChainUpdatedWithBlocksData, StacksChainEvent,
-    StacksChainUpdatedWithBlocksData, StacksNetwork,
+    StacksChainUpdatedWithBlocksData,
 };
 use stacks_network::chains_coordinator::BitcoinMiningCommand;
 use stacks_network::{self, Context, DevnetEvent, DevnetOrchestrator, LogLevel};

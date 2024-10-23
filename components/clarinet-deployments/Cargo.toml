@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 colored = "2.1.0"
 serde = "1"
-serde_json = "1"
+serde_json = "1.0.123"
 serde_derive = "1"
 serde_yaml = "0.8.23"
 
@@ -30,7 +30,7 @@ clarity = { workspace = true }
 
 [features]
 default = ["cli"]
-cli = ["clarity-repl/cli", "clarinet-files/cli", "stacks-codec", "onchain"]
+cli = ["clarity-repl/sdk", "clarinet-files/cli", "stacks-codec", "onchain"]
 wasm = ["clarity-repl/wasm", "clarinet-files/wasm"]
 onchain = [
     "stacks-rpc-client",

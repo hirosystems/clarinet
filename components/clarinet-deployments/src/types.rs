@@ -1,4 +1,4 @@
-use clarinet_files::chainhook_types::StacksNetwork;
+use clarinet_files::StacksNetwork;
 use clarinet_files::{FileAccessor, FileLocation};
 use clarity_repl::clarity::util::hash::{hex_bytes, to_hex};
 use clarity_repl::clarity::vm::analysis::ContractAnalysis;
@@ -1103,7 +1103,7 @@ impl DeploymentSpecification {
                                     TransactionSpecification::ContractCall(ContractCallSpecification::from_specifications(spec)?)
                                 }
                                 TransactionSpecificationFile::RequirementPublish(spec) => {
-                                    if network.is_mainnet() {
+                                    if matches!(network, StacksNetwork::Mainnet) {
                                         return Err(format!("{} only supports transactions of type 'contract-call' and 'contract-publish", specs.network.to_lowercase()))
                                     }
                                     let spec = RequirementPublishSpecification::from_specifications(spec, project_root_location)?;

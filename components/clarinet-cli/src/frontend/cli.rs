@@ -22,7 +22,7 @@ use clarinet_deployments::types::{DeploymentGenerationArtifacts, DeploymentSpeci
 use clarinet_deployments::{
     get_default_deployment_path, load_deployment, setup_session_with_deployment,
 };
-use clarinet_files::chainhook_types::StacksNetwork;
+use clarinet_files::StacksNetwork;
 use clarinet_files::{
     get_manifest_location, FileLocation, NetworkManifest, ProjectManifest, ProjectManifestFile,
     RequirementConfig,
@@ -624,7 +624,9 @@ pub fn main() {
                         }
                     };
 
-                if !cmd.manual_cost && network.either_testnet_or_mainnet() {
+                if !cmd.manual_cost
+                    && matches!(network, StacksNetwork::Testnet | StacksNetwork::Mainnet)
+                {
                     let priority = match (cmd.low_cost, cmd.medium_cost, cmd.high_cost) {
                         (_, _, true) => 2,
                         (_, true, _) => 1,

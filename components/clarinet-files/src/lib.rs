@@ -9,14 +9,13 @@ pub extern crate url;
 mod network_manifest;
 mod project_manifest;
 
+pub use network_manifest::{BitcoinNetwork, StacksNetwork};
+
 #[cfg(feature = "wasm")]
 mod wasm_fs_accessor;
 #[cfg(feature = "wasm")]
 pub use wasm_fs_accessor::WASMFileSystemAccessor;
 
-pub use chainhook_types;
-
-use chainhook_types::StacksNetwork;
 pub use network_manifest::{
     compute_addresses, AccountConfig, DevnetConfig, DevnetConfigFile, NetworkManifest,
     NetworkManifestFile, PoxStackingOrder, DEFAULT_BITCOIN_EXPLORER_IMAGE,
