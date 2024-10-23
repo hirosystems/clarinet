@@ -458,12 +458,12 @@ pub async fn start_chains_coordinator(
                         .devnet_config
                         .epoch_3_0
                         .saturating_sub(current_burn_height)
-                        > 15
+                        > 5
                     {
                         std::thread::sleep(std::time::Duration::from_secs(1));
                     } else {
                         // as epoch 3.0 gets closer, bitcoin blocks need to slow down
-                        std::thread::sleep(std::time::Duration::from_secs(5));
+                        std::thread::sleep(std::time::Duration::from_secs(4));
                     }
                     let res = mine_bitcoin_block(
                         &config.services_map_hosts.bitcoin_node_host,

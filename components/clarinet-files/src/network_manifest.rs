@@ -15,8 +15,8 @@ use toml::value::Value;
 
 pub const DEFAULT_DERIVATION_PATH: &str = "m/44'/5757'/0'/0/0";
 
-pub const DEFAULT_STACKS_NODE_IMAGE: &str = "quay.io/hirosystems/stacks-node:devnet-2.5";
-pub const DEFAULT_STACKS_SIGNER_IMAGE: &str = "quay.io/hirosystems/stacks-signer:devnet-2.5";
+pub const DEFAULT_STACKS_NODE_IMAGE: &str = "quay.io/hirosystems/stacks-node:devnet-3.0";
+pub const DEFAULT_STACKS_SIGNER_IMAGE: &str = "quay.io/hirosystems/stacks-signer:devnet-3.0";
 pub const DEFAULT_STACKS_API_IMAGE: &str = "hirosystems/stacks-blockchain-api:master";
 
 pub const DEFAULT_BITCOIN_NODE_IMAGE: &str = "quay.io/hirosystems/bitcoind:26.0";
@@ -45,8 +45,7 @@ pub const DEFAULT_EPOCH_2_2: u64 = 102;
 pub const DEFAULT_EPOCH_2_3: u64 = 103;
 pub const DEFAULT_EPOCH_2_4: u64 = 104;
 pub const DEFAULT_EPOCH_2_5: u64 = 108;
-// Mainnet run on  Epoch 2.5, which shoud remain the default for devnet
-pub const DEFAULT_EPOCH_3_0: u64 = 1000001;
+pub const DEFAULT_EPOCH_3_0: u64 = 144;
 
 // Currently, the pox-4 contract has these values hardcoded:
 // https://github.com/stacks-network/stacks-core/blob/e09ab931e2f15ff70f3bb5c2f4d7afb[…]42bd7bec6/stackslib/src/chainstate/stacks/boot/pox-testnet.clar
@@ -56,16 +55,10 @@ pub const DEFAULT_POX_REWARD_LENGTH: u64 = 10;
 pub const DEFAULT_FIRST_BURN_HEADER_HEIGHT: u64 = 100;
 
 lazy_static! {
-    pub static ref DEFAULT_PRIVATE_KEYS: [StacksPrivateKey; 2] = [
-        StacksPrivateKey::from_hex(
-            "7287ba251d44a4d3fd9276c88ce34c5c52a038955511cccaf77e61068649c17801",
-        )
-        .unwrap(),
-        StacksPrivateKey::from_hex(
-            "530d9f61984c888536871c6573073bdfc0058896dc1adfe9a6a10dfacadc209101",
-        )
-        .unwrap(),
-    ];
+    pub static ref DEFAULT_PRIVATE_KEYS: [StacksPrivateKey; 1] = [StacksPrivateKey::from_hex(
+        "7287ba251d44a4d3fd9276c88ce34c5c52a038955511cccaf77e61068649c17801",
+    )
+    .unwrap()];
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -127,7 +120,6 @@ pub struct DevnetConfigFile {
     pub stacks_node_events_observers: Option<Vec<String>>,
     pub stacks_node_wait_time_for_microblocks: Option<u32>,
     pub stacks_node_first_attempt_time_ms: Option<u32>,
-    pub stacks_node_subsequent_attempt_time_ms: Option<u32>,
     pub stacks_node_env_vars: Option<Vec<String>>,
     pub stacks_node_next_initiative_delay: Option<u16>,
     pub stacks_signers_keys: Option<Vec<String>>,
@@ -288,7 +280,6 @@ pub struct DevnetConfig {
     pub stacks_node_rpc_port: u16,
     pub stacks_node_wait_time_for_microblocks: u32,
     pub stacks_node_first_attempt_time_ms: u32,
-    pub stacks_node_subsequent_attempt_time_ms: u32,
     pub stacks_node_events_observers: Vec<String>,
     pub stacks_node_env_vars: Vec<String>,
     pub stacks_node_next_initiative_delay: u16,
@@ -893,9 +884,6 @@ impl NetworkManifest {
                 stacks_node_first_attempt_time_ms: devnet_config
                     .stacks_node_first_attempt_time_ms
                     .unwrap_or(500),
-                stacks_node_subsequent_attempt_time_ms: devnet_config
-                    .stacks_node_subsequent_attempt_time_ms
-                    .unwrap_or(1_000),
                 stacks_node_next_initiative_delay: devnet_config
                     .stacks_node_next_initiative_delay
                     .unwrap_or(4000),

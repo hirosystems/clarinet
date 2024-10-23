@@ -1059,16 +1059,10 @@ disable_inbound_handshakes = true
 disable_inbound_walks = true
 public_ip_address = "1.1.1.1:1234"
 auth_token = "12345"
-# block_proposal_token has been replaced by auth_token
-# we keep it for backward compatibility
-block_proposal_token = "12345"
 
 [miner]
-min_tx_fee = 1
 first_attempt_time_ms = {first_attempt_time_ms}
-second_attempt_time_ms = {subsequent_attempt_time_ms}
 block_reward_recipient = "{miner_coinbase_recipient}"
-wait_for_block_download = false
 microblock_attempt_time_ms = 10
 pre_nakamoto_mock_signing = {pre_nakamoto_mock_signing}
 mining_key = "19ec1c3e31d139c989a23a27eac60d1abfad5277d3ae9604242514c738258efa01"
@@ -1078,7 +1072,6 @@ mining_key = "19ec1c3e31d139c989a23a27eac60d1abfad5277d3ae9604242514c738258efa01
             miner_secret_key_hex = devnet_config.miner_secret_key_hex,
             next_initiative_delay = devnet_config.stacks_node_next_initiative_delay,
             first_attempt_time_ms = devnet_config.stacks_node_first_attempt_time_ms,
-            subsequent_attempt_time_ms = devnet_config.stacks_node_subsequent_attempt_time_ms,
             miner_coinbase_recipient = devnet_config.miner_coinbase_recipient,
             pre_nakamoto_mock_signing = devnet_config.pre_nakamoto_mock_signing,
         );
@@ -1576,10 +1569,7 @@ wait_time_for_microblocks = {wait_time_for_microblocks}
 wait_before_first_anchored_block = 0
 
 [miner]
-min_tx_fee = 1
 first_attempt_time_ms = {first_attempt_time_ms}
-subsequent_attempt_time_ms = {subsequent_attempt_time_ms}
-wait_for_block_download = false
 self_signing_seed = 1
 # microblock_attempt_time_ms = 15_000
 
@@ -1609,7 +1599,6 @@ observer_port = {subnet_events_ingestion_port}
             subnet_contract_id = devnet_config.remapped_subnet_contract_id,
             wait_time_for_microblocks = devnet_config.stacks_node_wait_time_for_microblocks,
             first_attempt_time_ms = devnet_config.stacks_node_first_attempt_time_ms,
-            subsequent_attempt_time_ms = devnet_config.stacks_node_subsequent_attempt_time_ms,
         );
 
         for events_observer in devnet_config.subnet_node_events_observers.iter() {
