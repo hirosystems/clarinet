@@ -69,6 +69,7 @@ lazy_static! {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum StacksNetwork {
     Simnet,
     Devnet,
@@ -76,6 +77,8 @@ pub enum StacksNetwork {
     Mainnet,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum BitcoinNetwork {
     Regtest,
     Testnet,
