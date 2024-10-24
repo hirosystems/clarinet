@@ -24,8 +24,8 @@ pub use settings::{Settings, SettingsFile};
 use clarity::types::StacksEpochId;
 use clarity::vm::ClarityVersion;
 
-pub const DEFAULT_CLARITY_VERSION: ClarityVersion = ClarityVersion::Clarity2;
-pub const DEFAULT_EPOCH: StacksEpochId = StacksEpochId::Epoch25;
+pub const DEFAULT_CLARITY_VERSION: ClarityVersion = ClarityVersion::Clarity3;
+pub const DEFAULT_EPOCH: StacksEpochId = StacksEpochId::Epoch30;
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct ClarityContract {
