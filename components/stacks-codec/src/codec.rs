@@ -4042,6 +4042,37 @@ impl StacksMessageCodec for RejectCode {
 
 /// A rejection response from a signer for a proposed block
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct BlockAccepted {
+    /// The signer signature hash of the block that was accepted
+    pub signer_signature_hash: Sha512Trunc256Sum,
+    /// The signer's signature across the acceptance
+    pub signature: MessageSignature,
+    /// Signer message metadata
+    pub metadata: SignerMessageMetadata,
+}
+
+impl StacksMessageCodec for BlockAccepted {
+    fn consensus_serialize<W: Write>(&self, fd: &mut W) -> Result<(), CodecError> {
+        write_next(fd, &self.signer_signature_hash)?;
+        write_next(fd, &self.signature)?;
+        write_next(fd, &self.metadata)?;
+        Ok(())
+    }
+
+    fn consensus_deserialize<R: Read>(fd: &mut R) -> Result<Self, CodecError> {
+        let signer_signature_hash = read_next::<Sha512Trunc256Sum, _>(fd)?;
+        let signature = read_next::<MessageSignature, _>(fd)?;
+        let metadata = read_next::<SignerMessageMetadata, _>(fd)?;
+        Ok(Self {
+            signer_signature_hash,
+            signature,
+            metadata,
+        })
+    }
+}
+
+/// A rejection response from a signer for a proposed block
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct BlockRejection {
     /// The reason for the rejection
     pub reason: String,
@@ -4053,6 +4084,8 @@ pub struct BlockRejection {
     pub signature: MessageSignature,
     /// The chain id
     pub chain_id: u32,
+    /// Signer message metadata
+    pub metadata: SignerMessageMetadata,
 }
 
 impl StacksMessageCodec for BlockRejection {
@@ -4062,6 +4095,7 @@ impl StacksMessageCodec for BlockRejection {
         write_next(fd, &self.signer_signature_hash)?;
         write_next(fd, &self.chain_id)?;
         write_next(fd, &self.signature)?;
+        write_next(fd, &self.metadata)?;
         Ok(())
     }
 
@@ -4074,12 +4108,14 @@ impl StacksMessageCodec for BlockRejection {
         let signer_signature_hash = read_next::<Sha512Trunc256Sum, _>(fd)?;
         let chain_id = read_next::<u32, _>(fd)?;
         let signature = read_next::<MessageSignature, _>(fd)?;
+        let metadata = read_next::<SignerMessageMetadata, _>(fd)?;
         Ok(Self {
             reason,
             reason_code,
             signer_signature_hash,
             chain_id,
             signature,
+            metadata,
         })
     }
 }
@@ -4120,7 +4156,7 @@ impl StacksMessageCodec for BlockProposal {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum BlockResponse {
     /// The Nakamoto block was accepted and therefore signed
-    Accepted((Sha512Trunc256Sum, MessageSignature)),
+    Accepted(BlockAccepted),
     /// The Nakamoto block was rejected and therefore not signed
     Rejected(BlockRejection),
 }
@@ -4129,9 +4165,8 @@ impl StacksMessageCodec for BlockResponse {
     fn consensus_serialize<W: Write>(&self, fd: &mut W) -> Result<(), CodecError> {
         write_next(fd, &(BlockResponseTypePrefix::from(self) as u8))?;
         match self {
-            BlockResponse::Accepted((hash, sig)) => {
-                write_next(fd, hash)?;
-                write_next(fd, sig)?;
+            BlockResponse::Accepted(accepted) => {
+                write_next(fd, accepted)?;
             }
             BlockResponse::Rejected(rejection) => {
                 write_next(fd, rejection)?;
@@ -4145,9 +4180,8 @@ impl StacksMessageCodec for BlockResponse {
         let type_prefix = BlockResponseTypePrefix::try_from(type_prefix_byte)?;
         let response = match type_prefix {
             BlockResponseTypePrefix::Accepted => {
-                let hash = read_next::<Sha512Trunc256Sum, _>(fd)?;
-                let sig = read_next::<MessageSignature, _>(fd)?;
-                BlockResponse::Accepted((hash, sig))
+                let accepted = read_next::<BlockAccepted, _>(fd)?;
+                BlockResponse::Accepted(accepted)
             }
             BlockResponseTypePrefix::Rejected => {
                 let rejection = read_next::<BlockRejection, _>(fd)?;
@@ -4155,6 +4189,49 @@ impl StacksMessageCodec for BlockResponse {
             }
         };
         Ok(response)
+    }
+}
+
+/// Metadata for signer messages
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct SignerMessageMetadata {
+    /// The signer's server version
+    pub server_version: String,
+}
+
+/// To ensure backwards compatibility, when deserializing,
+/// if no bytes are found, return empty metadata
+impl StacksMessageCodec for SignerMessageMetadata {
+    fn consensus_serialize<W: Write>(&self, fd: &mut W) -> Result<(), CodecError> {
+        write_next(fd, &self.server_version.as_bytes().to_vec())?;
+        Ok(())
+    }
+
+    fn consensus_deserialize<R: Read>(fd: &mut R) -> Result<Self, CodecError> {
+        match read_next::<Vec<u8>, _>(fd) {
+            Ok(server_version) => {
+                let server_version = String::from_utf8(server_version).map_err(|e| {
+                    CodecError::DeserializeError(format!(
+                        "Failed to decode server version: {:?}",
+                        &e
+                    ))
+                })?;
+                Ok(Self { server_version })
+            }
+            Err(_) => {
+                // For backwards compatibility, return empty metadata
+                Ok(Self::empty())
+            }
+        }
+    }
+}
+
+impl SignerMessageMetadata {
+    /// Empty metadata
+    pub fn empty() -> Self {
+        Self {
+            server_version: String::new(),
+        }
     }
 }
 
@@ -4166,21 +4243,26 @@ pub struct MockSignature {
     signature: MessageSignature,
     /// The mock block proposal that was signed across
     pub mock_proposal: MockProposal,
+    /// The signature metadata
+    pub metadata: SignerMessageMetadata,
 }
 
 impl StacksMessageCodec for MockSignature {
     fn consensus_serialize<W: Write>(&self, fd: &mut W) -> Result<(), CodecError> {
         write_next(fd, &self.signature)?;
         self.mock_proposal.consensus_serialize(fd)?;
+        self.metadata.consensus_serialize(fd)?;
         Ok(())
     }
 
     fn consensus_deserialize<R: Read>(fd: &mut R) -> Result<Self, CodecError> {
         let signature = read_next::<MessageSignature, _>(fd)?;
         let mock_proposal = MockProposal::consensus_deserialize(fd)?;
+        let metadata = SignerMessageMetadata::consensus_deserialize(fd)?;
         Ok(Self {
             signature,
             mock_proposal,
+            metadata,
         })
     }
 }
