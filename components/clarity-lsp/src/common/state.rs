@@ -3,29 +3,29 @@ use clarinet_deployments::{
     generate_default_deployment, initiate_session_from_manifest,
     update_session_with_deployment_plan, UpdateSessionExecutionResult,
 };
-use clarinet_files::ProjectManifest;
+use clarinet_files::{NetworkManifest, ProjectManifest};
 use clarinet_files::StacksNetwork;
 use clarinet_files::{FileAccessor, FileLocation};
 use clarity_repl::analysis::ast_dependency_detector::DependencySet;
 use clarity_repl::clarity::analysis::ContractAnalysis;
-use clarity_repl::clarity::ast::{build_ast_with_rules, ASTRules};
+use clarity_repl::clarity::ast::{build_ast_with_diagnostics, build_ast_with_rules, ASTRules};
 use clarity_repl::clarity::diagnostic::{Diagnostic as ClarityDiagnostic, Level as ClarityLevel};
+use clarity_repl::clarity::vm::types::signatures::MethodSignature;
 use clarity_repl::clarity::vm::ast::ContractAST;
-use clarity_repl::clarity::vm::types::{QualifiedContractIdentifier, StandardPrincipalData};
+use clarity_repl::clarity::vm::types::{QualifiedContractIdentifier, StandardPrincipalData, PrincipalData};
 use clarity_repl::clarity::vm::EvaluationResult;
 use clarity_repl::clarity::{ClarityName, ClarityVersion, StacksEpochId, SymbolicExpression};
 use clarity_repl::repl::{ContractDeployer, DEFAULT_CLARITY_VERSION};
 use lsp_types::{
-    CompletionItem, DocumentSymbol, Hover, Location, MessageType, Position, Range, SignatureHelp,
-    Url,
+    CompletionContext, CompletionItem, DocumentSymbol, Hover, Location, MessageType, Position, Range, SignatureHelp, Url
 };
-use std::borrow::BorrowMut;
+use std::borrow::{BorrowMut, Cow};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::vec;
 
 use super::requests::capabilities::InitializationOptions;
 use super::requests::completion::{
-    build_completion_item_list, get_contract_calls, ContractDefinedData,
+    build_completion_item_list, build_trait_completion_data, get_contract_calls, ContractDefinedData
 };
 use super::requests::definitions::{
     get_definitions, get_public_function_definitions, DefinitionLocation,
@@ -53,15 +53,16 @@ impl ActiveContractData {
         issuer: Option<StandardPrincipalData>,
         source: &str,
     ) -> Self {
-        match build_ast_with_rules(
-            &QualifiedContractIdentifier::transient(),
-            source,
-            &mut (),
-            clarity_version,
-            epoch,
-            ASTRules::PrecheckSize,
-        ) {
-            Ok(ast) => ActiveContractData {
+        let (ast, diagnostics, success) = build_ast_with_diagnostics(
+            &QualifiedContractIdentifier::transient(), 
+            source, 
+            &mut (), 
+            clarity_version, 
+            epoch
+        );
+
+        if success {
+            ActiveContractData {
                 clarity_version,
                 epoch,
                 issuer: issuer.clone(),
@@ -69,16 +70,25 @@ impl ActiveContractData {
                 definitions: Some(get_definitions(&ast.expressions, issuer)),
                 diagnostic: None,
                 source: source.to_string(),
-            },
-            Err(err) => ActiveContractData {
+            }
+        } else {
+            ActiveContractData {
                 clarity_version,
                 epoch,
-                issuer,
-                expressions: None,
-                definitions: None,
-                diagnostic: Some(err.diagnostic),
+                issuer: issuer.clone(),
+                expressions: if !ast.expressions.is_empty() {
+                    Some(ast.expressions.clone())
+                } else {
+                    None
+                },
+                definitions: if !ast.expressions.is_empty() {
+                    Some(get_definitions(&ast.expressions, issuer))
+                } else {
+                    None
+                },
+                diagnostic: Some(diagnostics.first().unwrap().clone()),
                 source: source.to_string(),
-            },
+            }
         }
     }
 
@@ -121,6 +131,29 @@ impl ActiveContractData {
     pub fn update_issuer(&mut self, issuer: Option<StandardPrincipalData>) {
         self.issuer = issuer;
         self.update_definitions();
+    }
+
+    // maybe better than persisting state of Vec<PreSymbolicExpr> to get placeholder values.
+    pub fn get_token_at_postion(&self, pos: &Position,) -> Option<String> {
+        let lines = self.source.lines().collect::<Vec<_>>();
+
+        if pos.line < lines.len() as u32 {
+            let line = lines[pos.line as usize];
+
+            if pos.character as usize <= line.len() {
+                let trimmed = &line[..pos.character as usize];
+            
+                let words: Vec<&str> = trimmed.split_whitespace().collect();
+                return words.last().map(|s| s.to_string())
+            }
+        }
+
+        None
+    }
+
+    pub fn get_last_line(&self) -> u32 {
+        let lines = self.source.lines().collect::<Vec<_>>();
+        (lines.len()+1) as u32
     }
 }
 
@@ -296,22 +329,98 @@ impl EditorState {
         &self,
         contract_location: &FileLocation,
         position: &Position,
+        context: &Option<CompletionContext>,
     ) -> Vec<lsp_types::CompletionItem> {
         let active_contract = match self.active_contracts.get(contract_location) {
             Some(contract) => contract,
             None => return vec![],
         };
 
-        let contract_calls = self
+        let (state, contract_calls) = self
             .contracts_lookup
             .get(contract_location)
             .and_then(|d| self.protocols.get(&d.manifest_location))
-            .map(|p| p.get_contract_calls_for_contract(contract_location))
-            .unwrap_or_default();
+            .map(|p| (Cow::Borrowed(p), p.get_contract_calls_for_contract(contract_location)))
+            .unwrap_or((Cow::Owned(ProtocolState::new()), vec![]));
 
-        let expressions = active_contract.expressions.as_ref();
+        let expressions = active_contract
+            .expressions
+            .as_ref()
+            .map(Cow::Borrowed)
+            .unwrap_or(Cow::Owned(vec![]));
+
         let active_contract_defined_data =
-            ContractDefinedData::new(expressions.unwrap_or(&vec![]), position);
+        ContractDefinedData::new(
+            &expressions[..], 
+            *position, 
+            active_contract.epoch, 
+            active_contract.clarity_version
+        );
+
+        let issuer = 'it: {
+            let Some((network_manifest, deployer)) = self.contracts_lookup
+                .get(contract_location)
+                .and_then(|d| ProjectManifest::from_location(&d.manifest_location).ok())
+                .and_then(|manifest|
+                    NetworkManifest::from_project_manifest_location(
+                        &manifest.location, 
+                        &StacksNetwork::Simnet.get_networks(), 
+                        Some(&manifest.project.cache_location), 
+                        Option::None
+                    )
+                    .ok()
+                    .and_then(|network_manifest| 
+                        manifest
+                        .contracts_settings
+                        .get(contract_location)
+                        .map(|metadata| (network_manifest, metadata.deployer.clone()))
+                    )
+                ) else {
+                    break 'it None
+                };          
+
+            let issuer = match &deployer {
+                ContractDeployer::DefaultDeployer => {
+                    let default_deployer = match network_manifest.accounts.get("deployer") {
+                        Some(deployer) => deployer,
+                        None => break 'it None,
+                    };
+                    
+                    match PrincipalData::parse_standard_principal(&default_deployer.stx_address) {
+                            Ok(res) => res,
+                            Err(_) => break 'it None,
+                        }
+                },
+
+                ContractDeployer::LabeledDeployer(deployer) => {
+                    let deployer = match network_manifest.accounts.get(deployer) {
+                        Some(deployer) => deployer,
+                        None => break 'it None,
+                    };
+                    match PrincipalData::parse_standard_principal(&deployer.stx_address) {
+                        Ok(res) => res,
+                        Err(_) => break 'it None,
+                    }
+                },
+
+                _ => {break 'it None},
+            };
+
+            if let Some(trait_completion_data) = build_trait_completion_data(
+                &issuer, 
+                contract_location, 
+                &active_contract_defined_data, 
+                &state, 
+                active_contract, 
+                position, 
+                context
+            ) {
+                return trait_completion_data
+            }
+
+            Some(issuer)
+        };
+
         let should_wrap = match self.settings.completion_smart_parenthesis_wrap {
             true => check_if_should_wrap(&active_contract.source, position),
             false => true,
@@ -319,12 +428,15 @@ impl EditorState {
 
         build_completion_item_list(
             &active_contract.clarity_version,
-            expressions.unwrap_or(&vec![]),
+            &expressions,
+            contract_location,
             &Position {
                 line: position.line + 1,
                 character: position.character + 1,
             },
+            issuer,
             &active_contract_defined_data,
+            &state,
             contract_calls,
             should_wrap,
             self.settings.completion_include_native_placeholders,
@@ -616,6 +728,31 @@ impl ProtocolState {
         }
         contract_calls
     }
+
+    pub fn get_trait_definitions(
+        &self, 
+        contract_uri: &FileLocation
+    ) -> BTreeMap<(QualifiedContractIdentifier, ClarityName), BTreeMap<ClarityName, MethodSignature>> {
+        let mut traits = BTreeMap::new();
+        for (url, contract_state) in self.contracts.iter() {
+            if !contract_uri.eq(url) {
+                if let Some(analysis) = &contract_state.analysis {
+                    for (name, signature) in analysis.defined_traits.iter() {
+                        traits.insert((contract_state.contract_id.clone(), name.to_owned()), signature.to_owned());
+                    }
+                }
+            }
+        }
+        traits
+    }
+
+    pub fn get_contract_identifiers(&self) -> Vec<QualifiedContractIdentifier> {
+        let mut contract_ids = Vec::new();
+        for (_, state) in self.contracts.iter() {
+            contract_ids.push(state.contract_id.clone());
+        }
+        contract_ids
+    } 
 }
 
 pub async fn build_state(

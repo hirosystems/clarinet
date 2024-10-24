@@ -286,7 +286,7 @@ pub fn process_request(
             };
 
             let completion_items = match editor_state
-                .try_read(|es| es.get_completion_items_for_contract(&contract_location, &position))
+                .try_read(|es| es.get_completion_items_for_contract(&contract_location, &position, &params.context))
             {
                 Ok(result) => result,
                 Err(_) => return Ok(LspRequestResponse::CompletionItems(vec![])),

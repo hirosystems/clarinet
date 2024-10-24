@@ -7,9 +7,9 @@ pub use clarity::vm::analysis::types::ContractAnalysis;
 use clarity::vm::analysis::{CheckErrors, CheckResult};
 use clarity::vm::ast::ContractAST;
 use clarity::vm::representations::{SymbolicExpression, TraitDefinition};
-use clarity::vm::types::signatures::CallableSubtype;
+use clarity::vm::types::signatures::{CallableSubtype, MethodSignature};
 use clarity::vm::types::{
-    FunctionSignature, PrincipalData, QualifiedContractIdentifier, SequenceSubtype,
+    PrincipalData, QualifiedContractIdentifier, SequenceSubtype,
     TraitIdentifier, TypeSignature, Value,
 };
 use clarity::vm::{ClarityName, ClarityVersion, SymbolicExpressionType};
@@ -31,7 +31,7 @@ pub struct ASTDependencyDetector<'a> {
         BTreeMap<(&'a QualifiedContractIdentifier, &'a ClarityName), Vec<TypeSignature>>,
     defined_traits: BTreeMap<
         (&'a QualifiedContractIdentifier, &'a ClarityName),
-        BTreeMap<ClarityName, FunctionSignature>,
+        BTreeMap<ClarityName, MethodSignature>,
     >,
     defined_contract_constants: BTreeMap<
         (&'a QualifiedContractIdentifier, &'a ClarityName),
@@ -383,7 +383,7 @@ impl<'a> ASTDependencyDetector<'a> {
         &mut self,
         contract_identifier: &'a QualifiedContractIdentifier,
         name: &'a ClarityName,
-        trait_definition: BTreeMap<ClarityName, FunctionSignature>,
+        trait_definition: BTreeMap<ClarityName, MethodSignature>,
     ) {
         if let Some(pending) = self.pending_trait_checks.remove(&TraitIdentifier {
             name: name.clone(),
@@ -441,7 +441,7 @@ impl<'a> ASTDependencyDetector<'a> {
 
     fn check_trait_dependencies(
         &self,
-        trait_definition: &BTreeMap<ClarityName, FunctionSignature>,
+        trait_definition: &BTreeMap<ClarityName, MethodSignature>,
         function_name: &ClarityName,
         args: &'a [SymbolicExpression],
     ) -> BTreeSet<QualifiedContractIdentifier> {

@@ -43,7 +43,10 @@ pub fn get_capabilities(initialization_options: &InitializationOptions) -> Serve
             },
         )),
         completion_provider: match initialization_options.completion {
-            true => Some(CompletionOptions::default()),
+            true => Some(CompletionOptions {
+                trigger_characters: Some(vec!["'".to_string(),".".to_string(), "<".to_string()]),
+                ..Default::default()
+            }),
             false => None,
         },
         hover_provider: match initialization_options.hover {
