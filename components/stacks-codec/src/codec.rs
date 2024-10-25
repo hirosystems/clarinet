@@ -4386,12 +4386,12 @@ impl MockProposal {
             TupleData::from_data(vec![
                 (
                     "stacks-tip-consensus-hash".into(),
-                    Value::buff_from(self.peer_info.stacks_tip_consensus_hash.as_bytes().into())
+                    Value::buff_from((*self.peer_info.stacks_tip_consensus_hash.as_bytes()).into())
                         .unwrap(),
                 ),
                 (
                     "stacks-tip".into(),
-                    Value::buff_from(self.peer_info.stacks_tip.as_bytes().into()).unwrap(),
+                    Value::buff_from((*self.peer_info.stacks_tip.as_bytes()).into()).unwrap(),
                 ),
                 (
                     "stacks-tip-height".into(),
@@ -4404,7 +4404,7 @@ impl MockProposal {
                 ),
                 (
                     "pox-consensus".into(),
-                    Value::buff_from(self.peer_info.pox_consensus.as_bytes().into()).unwrap(),
+                    Value::buff_from((*self.peer_info.pox_consensus.as_bytes()).into()).unwrap(),
                 ),
             ])
             .expect("Error creating signature hash"),
@@ -4420,11 +4420,11 @@ impl MockProposal {
             TupleData::from_data(vec![
                 (
                     "miner-signature-hash".into(),
-                    Value::buff_from(self.miner_signature_hash().as_bytes().into()).unwrap(),
+                    Value::buff_from((*self.miner_signature_hash().as_bytes()).into()).unwrap(),
                 ),
                 (
                     "miner-signature".into(),
-                    Value::buff_from(self.signature.as_bytes().into()).unwrap(),
+                    Value::buff_from((*self.signature.as_bytes()).into()).unwrap(),
                 ),
             ])
             .expect("Error creating signature hash"),
