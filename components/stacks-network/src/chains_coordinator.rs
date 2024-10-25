@@ -458,7 +458,7 @@ pub async fn start_chains_coordinator(
                         .devnet_config
                         .epoch_3_0
                         .saturating_sub(current_burn_height)
-                        > 15
+                        > 6
                     {
                         std::thread::sleep(std::time::Duration::from_secs(1));
                     } else {

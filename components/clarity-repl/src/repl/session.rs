@@ -1342,7 +1342,10 @@ mod tests {
     use clarity::vm::types::TupleData;
 
     use super::*;
-    use crate::{repl::settings::Account, test_fixtures::clarity_contract::ClarityContractBuilder};
+    use crate::{
+        repl::{settings::Account, DEFAULT_EPOCH},
+        test_fixtures::clarity_contract::ClarityContractBuilder,
+    };
 
     #[track_caller]
     fn run_session_snippet(session: &mut Session, snippet: &str) -> Value {
@@ -1685,7 +1688,7 @@ mod tests {
         let settings = SessionSettings::default();
         let mut session = Session::new(settings);
         session.start().expect("session could not start");
-        session.update_epoch(StacksEpochId::Epoch25);
+        session.update_epoch(DEFAULT_EPOCH);
 
         // deploy default contract
         let contract = ClarityContractBuilder::default().build();
@@ -1734,7 +1737,7 @@ mod tests {
         let settings = SessionSettings::default();
         let mut session = Session::new(settings);
         session.start().expect("session could not start");
-        session.update_epoch(StacksEpochId::Epoch25);
+        session.update_epoch(DEFAULT_EPOCH);
 
         // deploy default contract
         let contract = ClarityContractBuilder::default().build();

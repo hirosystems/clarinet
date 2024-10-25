@@ -77,9 +77,9 @@ describe("basic simnet interactions", () => {
 
     // @ts-ignore
     // "0" is an invalid epoch
-    // it logs that 0 is invalid and defaults to 2.5
+    // it logs that 0 is invalid and defaults to 3.0
     simnet.setEpoch("0");
-    expect(simnet.currentEpoch).toBe("2.5");
+    expect(simnet.currentEpoch).toBe("3.0");
   });
 
   it("can get default clarity version for current epoch", () => {
@@ -322,6 +322,7 @@ describe("simnet can get contracts info and deploy contracts", () => {
   });
 
   it("can deploy contracts as snippets", () => {
+    simnet.setEpoch("3.0");
     const res = simnet.deployContract("temp", "(+ 24 18)", null, deployerAddr);
     expect(res.result).toStrictEqual(Cl.int(42));
 
@@ -330,6 +331,7 @@ describe("simnet can get contracts info and deploy contracts", () => {
   });
 
   it("can deploy contracts", () => {
+    simnet.setEpoch("3.0");
     const source = "(define-public (add (a uint) (b uint)) (ok (+ a b)))\n";
     const deployRes = simnet.deployContract("op", source, null, deployerAddr);
     expect(deployRes.result).toStrictEqual(Cl.bool(true));
