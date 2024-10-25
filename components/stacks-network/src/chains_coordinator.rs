@@ -463,7 +463,7 @@ pub async fn start_chains_coordinator(
                         std::thread::sleep(std::time::Duration::from_secs(1));
                     } else {
                         // as epoch 3.0 gets closer, bitcoin blocks need to slow down
-                        std::thread::sleep(std::time::Duration::from_secs(3));
+                        std::thread::sleep(std::time::Duration::from_secs(5));
                     }
                     let res = mine_bitcoin_block(
                         &config.services_map_hosts.bitcoin_node_host,
