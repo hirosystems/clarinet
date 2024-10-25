@@ -4334,7 +4334,7 @@ pub struct MockProposal {
     /// The view of the stacks node peer information at the time of the mock proposal
     pub peer_info: PeerInfo,
     /// The miner's signature across the peer info
-    signature: MessageSignature,
+    pub signature: MessageSignature,
 }
 
 impl StacksMessageCodec for MockProposal {
