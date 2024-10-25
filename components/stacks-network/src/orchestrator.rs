@@ -1425,7 +1425,7 @@ db_path = "stacks-signer-{signer_id}.sqlite"
 
         let config = Config {
             labels: Some(labels),
-            image: Some(devnet_config.stacks_signers_image_url.clone()),
+            image: Some(devnet_config.stacks_signer_image_url.clone()),
             // domainname: Some(self.network_name.to_string()),
             tty: None,
             exposed_ports: None,
@@ -1468,7 +1468,7 @@ db_path = "stacks-signer-{signer_id}.sqlite"
         let _info = docker
             .create_image(
                 Some(CreateImageOptions {
-                    from_image: devnet_config.stacks_signers_image_url.clone(),
+                    from_image: devnet_config.stacks_signer_image_url.clone(),
                     platform: devnet_config.docker_platform.clone(),
                     ..Default::default()
                 }),
