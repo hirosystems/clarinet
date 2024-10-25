@@ -4222,7 +4222,7 @@ impl SignerMessageMetadata {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MockSignature {
     /// The signer's signature across the mock proposal
-    signature: MessageSignature,
+    pub signature: MessageSignature,
     /// The mock block proposal that was signed across
     pub mock_proposal: MockProposal,
     /// The signature metadata
