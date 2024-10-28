@@ -1,3 +1,15 @@
+# [2.11.0](https://github.com/hirosystems/clarinet/compare/v2.10.0...v2.11.0) (2024-11-28)
+
+##### New Features
+
+*  Nakamoto settings as the defaults (#1590) (e7c6f1de)
+*  Session.eval_with_hooks (#1580) (acf290ed)
+
+##### Bug Fixes
+
+*  Update SignerMessage codec (#1591) (9e090c58)
+
+
 # [2.10.0](https://github.com/hirosystems/clarinet/compare/v2.9.0...v2.10.0) (2024-11-17)
 
 ##### New Features
