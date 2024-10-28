@@ -840,10 +840,18 @@ impl NetworkManifest {
                 ));
             }
 
+            let mut stacking_orders = vec![];
+            let mut add_default_stacking_order = true;
             // for stacking orders, we validate that wallet names match one of the provided accounts
-            if let Some(ref val) = devnet_config.pox_stacking_orders {
+            if let Some(mut val) = devnet_config.pox_stacking_orders {
                 for (i, stacking_order) in val.iter().enumerate() {
                     let wallet_name = &stacking_order.wallet;
+
+                    // if the project already set a stacking order for the deployer, do not override it
+                    if wallet_name == "deployer" {
+                        add_default_stacking_order = false;
+                    }
+
                     let wallet_is_in_accounts = accounts
                         .iter()
                         .any(|(account_name, _)| wallet_name == account_name);
@@ -852,8 +860,27 @@ impl NetworkManifest {
                     };
                 }
 
-                devnet_config.pox_stacking_orders = Some(val.clone());
+                stacking_orders.append(&mut val);
             }
+
+            // to ensure that the network stacks enough STXs to reach epoch 3.0
+            // add a default stacking order for deployer wallet in cycle 1
+            if add_default_stacking_order {
+                if let Some((_, account_config)) = accounts
+                    .iter()
+                    .find(|(account_name, _)| *account_name == "deployer")
+                {
+                    stacking_orders.push(PoxStackingOrder {
+                        auto_extend: Some(true),
+                        duration: 10,
+                        start_at_cycle: 1,
+                        wallet: "deployer".into(),
+                        slots: 6,
+                        btc_address: account_config.btc_address.clone(),
+                    })
+                }
+            }
+
             let config = DevnetConfig {
                 name: devnet_config.name.take().unwrap_or("devnet".into()),
                 network_id: devnet_config.network_id,
@@ -958,7 +985,7 @@ impl NetworkManifest {
                     .bitcoin_explorer_image_url
                     .take()
                     .unwrap_or(DEFAULT_BITCOIN_EXPLORER_IMAGE.to_string()),
-                pox_stacking_orders: devnet_config.pox_stacking_orders.take().unwrap_or_default(),
+                pox_stacking_orders: stacking_orders,
                 disable_bitcoin_explorer: devnet_config.disable_bitcoin_explorer.unwrap_or(false),
                 disable_stacks_api: devnet_config.disable_stacks_api.unwrap_or(false),
                 disable_postgres: devnet_config.disable_postgres.unwrap_or(false),
