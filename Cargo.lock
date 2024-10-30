@@ -688,7 +688,7 @@ dependencies = [
 
 [[package]]
 name = "clarinet-cli"
-version = "2.11.1"
+version = "2.11.2"
 dependencies = [
  "ansi_term",
  "atty",
@@ -721,7 +721,7 @@ dependencies = [
 
 [[package]]
 name = "clarinet-deployments"
-version = "2.11.1"
+version = "2.11.2"
 dependencies = [
  "base58 0.2.0",
  "base64 0.21.7",
@@ -746,7 +746,7 @@ dependencies = [
 
 [[package]]
 name = "clarinet-files"
-version = "2.11.1"
+version = "2.11.2"
 dependencies = [
  "bip39",
  "bitcoin",
@@ -769,7 +769,7 @@ dependencies = [
 
 [[package]]
 name = "clarinet-sdk-wasm"
-version = "2.11.1"
+version = "2.11.2"
 dependencies = [
  "clarinet-deployments",
  "clarinet-files",
@@ -821,7 +821,7 @@ dependencies = [
 
 [[package]]
 name = "clarity-events"
-version = "2.11.1"
+version = "2.11.2"
 dependencies = [
  "clap",
  "clarinet-files",
@@ -833,7 +833,7 @@ dependencies = [
 
 [[package]]
 name = "clarity-lsp"
-version = "2.11.1"
+version = "2.11.2"
 dependencies = [
  "clarinet-deployments",
  "clarinet-files",
@@ -853,7 +853,7 @@ dependencies = [
 
 [[package]]
 name = "clarity-repl"
-version = "2.11.1"
+version = "2.11.2"
 dependencies = [
  "ansi_term",
  "atty",
@@ -4555,7 +4555,7 @@ dependencies = [
 
 [[package]]
 name = "stacks-codec"
-version = "2.11.1"
+version = "2.11.2"
 dependencies = [
  "clarity",
  "serde",
@@ -4594,7 +4594,7 @@ dependencies = [
 
 [[package]]
 name = "stacks-devnet-js"
-version = "2.11.1"
+version = "2.11.2"
 dependencies = [
  "clarinet-deployments",
  "clarinet-files",
@@ -4608,7 +4608,7 @@ dependencies = [
 
 [[package]]
 name = "stacks-network"
-version = "2.11.1"
+version = "2.11.2"
 dependencies = [
  "ansi_term",
  "atty",
@@ -4645,7 +4645,7 @@ dependencies = [
 
 [[package]]
 name = "stacks-rpc-client"
-version = "2.11.1"
+version = "2.11.2"
 dependencies = [
  "clarity",
  "hmac 0.12.1",
