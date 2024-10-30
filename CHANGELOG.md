@@ -1,3 +1,9 @@
+# [2.11.2](https://github.com/hirosystems/clarinet/compare/v2.11.2...v2.11.2) (2024-11-30)
+
+##### Bug Fixes
+
+*  Default devnet stacker (#1602) (af78d2d6)
+
 # [2.11.1](https://github.com/hirosystems/clarinet/compare/v2.11.0...v2.11.1) (2024-11-29)
 
 ##### Refactors
