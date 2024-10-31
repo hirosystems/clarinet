@@ -239,7 +239,10 @@ pub async fn process_notification(
             match editor_state.try_write(|es| {
                 es.update_active_contract(&contract_location, &contract_source, false)
             })? {
-                Ok(_result) => Ok(LspNotificationResponse::default()),
+                Ok(_result) => Ok(
+                   
+                   
+                    LspNotificationResponse::default()),
                 Err(err) => Ok(LspNotificationResponse::error(&err)),
             }
         }

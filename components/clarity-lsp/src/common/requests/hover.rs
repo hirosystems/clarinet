@@ -134,6 +134,7 @@ pub fn get_expression_documentation(
         return Some(definition);
     }
 
+    // let and match bindings
     let expr = get_expression_at_position(position, expressions)?;
     if let Some(expr_type) = analysis.type_map.clone()?.get_type(&expr) {
         return Some(format!(
@@ -141,6 +142,9 @@ pub fn get_expression_documentation(
             ClarinetTypeSignature(expr_type.clone())
         ));
     }
+
+    // contract-call?
+    // tuple get
 
     None
 }
