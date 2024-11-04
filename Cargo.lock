@@ -825,6 +825,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "clarity-format"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "clarinet-files",
+ "clarity-repl",
+ "serde",
+ "serde_derive",
+ "serde_json",
+]
+
+[[package]]
 name = "clarity-lsp"
 version = "2.13.0"
 dependencies = [
