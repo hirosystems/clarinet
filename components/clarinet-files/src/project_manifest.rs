@@ -27,13 +27,6 @@ pub struct ClarityContractMetadata {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct ProjectManifestFile {
-    project: ProjectConfigFile,
-    contracts: Option<TomlValue>,
-    repl: Option<repl::SettingsFile>,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
 pub struct ProjectConfigFile {
     name: String,
     authors: Option<Vec<String>>,
@@ -46,6 +39,13 @@ pub struct ProjectConfigFile {
     // backwards compatibility.
     analysis: Option<Vec<clarity_repl::analysis::Pass>>,
     cache_dir: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ProjectManifestFile {
+    project: ProjectConfigFile,
+    contracts: Option<TomlValue>,
+    repl: Option<repl::SettingsFile>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]

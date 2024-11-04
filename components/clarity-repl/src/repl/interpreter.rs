@@ -1199,6 +1199,7 @@ impl ClarityInterpreter {
 mod tests {
     use super::*;
     use crate::analysis::Settings as AnalysisSettings;
+    use crate::repl::settings::NetworkSimulationSettings;
     use crate::{
         repl::session::BOOT_CONTRACTS_DATA, test_fixtures::clarity_contract::ClarityContractBuilder,
     };
@@ -1308,6 +1309,7 @@ mod tests {
     fn test_advance_stacks_chain_tip() {
         let wasm_settings = Settings {
             analysis: AnalysisSettings::default(),
+            network_simulation: NetworkSimulationSettings::default(),
             clarity_wasm_mode: true,
             show_timings: false,
         };

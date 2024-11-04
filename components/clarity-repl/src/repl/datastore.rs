@@ -48,6 +48,17 @@ pub struct ClarityDatastore {
     metadata: HashMap<(String, String), String>,
     block_id_lookup: HashMap<StacksBlockId, StacksBlockId>,
     height_at_chain_tip: HashMap<StacksBlockId, u32>,
+    remote_chaintip_cache: HashMap<u32, String>,
+}
+
+#[derive(Deserialize)]
+struct ClarityDataResponse {
+    pub data: String,
+}
+
+#[derive(Deserialize)]
+struct BlockInfoResponse {
+    pub index_block_hash: String,
 }
 
 #[derive(Clone, Debug)]
@@ -122,6 +133,7 @@ impl ClarityDatastore {
             metadata: HashMap::new(),
             block_id_lookup: HashMap::from([(id, id)]),
             height_at_chain_tip: HashMap::from([(id, 0)]),
+            remote_chaintip_cache: HashMap::new(),
         }
     }
 
@@ -208,6 +220,111 @@ impl ClarityDatastore {
     pub fn make_contract_hash_key(contract: &QualifiedContractIdentifier) -> String {
         format!("clarity-contract::{}", contract)
     }
+
+    #[cfg(any(feature = "cli", feature = "sdk"))]
+    fn get_remote_chaintip(&mut self, height: u32) -> String {
+        if let Some(cached) = self.remote_chaintip_cache.get(&height) {
+            println!("using cached chaintip for height: {}", height);
+            return cached.to_string();
+        }
+        println!("fetching remote chaintip for height: {}", height);
+
+        let url = format!("http://localhost:3999/extended/v2/blocks/{}", height);
+
+        let response = reqwest::blocking::get(url).unwrap_or_else(|e| {
+            panic!(
+                "unable to fetch remote chaintip for height: {}\nError: {}",
+                height, e
+            )
+        });
+
+        let data = response.json::<BlockInfoResponse>().unwrap_or_else(|e| {
+            panic!("unable to parse json, error: {}", e);
+        });
+
+        let block_hash = data.index_block_hash.replacen("0x", "", 1);
+        self.remote_chaintip_cache
+            .insert(height, block_hash.clone());
+
+        block_hash
+    }
+
+    #[cfg(any(feature = "cli", feature = "sdk"))]
+    fn fetch_remote_data(&mut self, path: &str) -> Result<Option<String>> {
+        let url = format!("http://localhost:3999/v2{}", path);
+
+        let response = reqwest::blocking::get(url)
+            .unwrap_or_else(|e| panic!("unable to fetch value for: {}\nError: {}", path, e));
+
+        if response.status() == reqwest::StatusCode::NOT_FOUND {
+            if response.text().unwrap_or_default() == "Chain tip not found" {
+                println!("An invalid chaintip was specified do");
+            }
+            return Ok(None);
+        }
+
+        if response.status() != reqwest::StatusCode::OK {
+            println!(
+                "Failed to fetch data. Status: {}\nError: {}",
+                response.status(),
+                response.text().unwrap_or_default()
+            );
+            return Ok(None);
+        }
+
+        let data = response.json::<ClarityDataResponse>().unwrap_or_else(|e| {
+            panic!("unable to parse json, error: {}", e);
+        });
+
+        let value = if data.data.starts_with("0x") {
+            data.data[2..].to_string()
+        } else {
+            data.data
+        };
+
+        Ok(Some(value))
+    }
+
+    #[cfg(not(any(feature = "cli", feature = "sdk")))]
+    fn fetch_remote_data(&mut self, path: &str) {
+        // use wasm_bindgen::prelude::*;
+        // use web_sys::XmlHttpRequest;
+        let url = format!("http://localhost:3999/v2{}", path);
+        let xhr = XmlHttpRequest::new()?;
+        xhr.open("GET", url)?;
+        xhr.send()?;
+
+        if xhr.status() == 200 {
+            Ok(xhr.response_text()?.unwrap_or_default())
+        } else {
+            Err(JsValue::from_str(&format!(
+                "Failed to fetch data. Status: {}",
+                xhr.status()
+            )))
+        }
+    }
+
+    fn fetch_clarity_marf_value(&mut self, key: &str, block_height: u32) -> Result<Option<String>> {
+        let remote_chaintip = self.get_remote_chaintip(block_height);
+        let path = format!(
+            "/clarity_marf_value/{}?tip={}&proof=false",
+            key, remote_chaintip
+        );
+        dbg!(&path);
+        self.fetch_remote_data(&path)
+    }
+
+    fn fetch_clarity_metadata(
+        &mut self,
+        contract: &QualifiedContractIdentifier,
+        key: &str,
+    ) -> Result<Option<String>> {
+        let addr = contract.issuer.to_string();
+        let contract = contract.name.to_string();
+
+        let url = format!("/clarity_metadata/{}/{}/{}", addr, contract, key);
+        self.fetch_remote_data(&url)
+    }
 }
 
 impl ClarityBackingStore for ClarityDatastore {
@@ -220,13 +337,26 @@ impl ClarityBackingStore for ClarityDatastore {
 
     /// fetch K-V out of the committed datastore
     fn get_data(&mut self, key: &str) -> Result<Option<String>> {
+        println!("get_data({})", key);
+        let current_block_height = self.get_current_block_height();
+
         let lookup_id = self
             .block_id_lookup
             .get(&self.current_chain_tip)
             .expect("Could not find current chain tip in block_id_lookup map");
 
         if let Some(map) = self.store.get(lookup_id) {
-            Ok(map.get(key).cloned())
+            let value = map.get(key);
+            if value.is_some() {
+                return Ok(value.cloned());
+            }
+            println!("fetching MARF from network");
+            let data = self.fetch_clarity_marf_value(key, current_block_height);
+            if let Ok(Some(value)) = &data {
+                println!("network marf value: {}", value);
+                self.put(key, value);
+            }
+            data
         } else {
             panic!("Block does not exist for current chain tip");
         }
@@ -307,11 +437,18 @@ impl ClarityBackingStore for ClarityDatastore {
         contract: &QualifiedContractIdentifier,
         key: &str,
     ) -> Result<Option<String>> {
-        let key = &(contract.to_string(), key.to_string());
+        println!("get_metadata({}, {})", contract, key);
 
-        match self.metadata.get(key) {
+        match self.metadata.get(&(contract.to_string(), key.to_string())) {
             Some(result) => Ok(Some(result.to_string())),
-            None => Ok(None),
+            None => {
+                println!("fetching METADATA from network");
+                let data = self.fetch_clarity_metadata(contract, key);
+                if let Ok(Some(value)) = &data {
+                    let _ = self.insert_metadata(contract, key, value);
+                }
+                data
+            }
         }
     }
 
