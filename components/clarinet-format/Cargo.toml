@@ -1,0 +1,12 @@
+[package]
+name = "clarinet-format"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+clarinet-files = { path = "../clarinet-files", default-features = false, optional = true }
+clarity-repl = { path = "../clarity-repl", default-features = false }
+
+[lib]
+name = "clarinet_format"
+path = "src/lib.rs"

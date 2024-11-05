@@ -692,6 +692,7 @@ dependencies = [
  "clap_complete",
  "clarinet-deployments",
  "clarinet-files",
+ "clarinet-format",
  "clarity-lsp",
  "clarity-repl",
  "colored",
@@ -761,6 +762,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "clarinet-format"
+version = "0.1.0"
+dependencies = [
+ "clarinet-files",
+ "clarity-repl",
+]
+
+[[package]]
 name = "clarinet-sdk-wasm"
 version = "2.13.0"
 dependencies = [
@@ -815,18 +824,6 @@ dependencies = [
 [[package]]
 name = "clarity-events"
 version = "2.13.0"
-dependencies = [
- "clap",
- "clarinet-files",
- "clarity-repl",
- "serde",
- "serde_derive",
- "serde_json",
-]
-
-[[package]]
-name = "clarity-format"
-version = "0.1.0"
 dependencies = [
  "clap",
  "clarinet-files",

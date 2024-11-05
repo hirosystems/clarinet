@@ -28,6 +28,7 @@ use clarinet_files::{
     get_manifest_location, FileLocation, NetworkManifest, ProjectManifest, ProjectManifestFile,
     RequirementConfig,
 };
+use clarinet_format::formatter::{ClarityFormatter, Settings};
 use clarity_repl::analysis::call_checker::ContractAnalysis;
 use clarity_repl::clarity::vm::analysis::AnalysisDatabase;
 use clarity_repl::clarity::vm::costs::LimitedCostTracker;
@@ -94,9 +95,24 @@ enum Command {
     /// Get Clarity autocompletion and inline errors from your code editor (VSCode, vim, emacs, etc)
     #[clap(name = "lsp", bin_name = "lsp")]
     LSP,
+    /// Format clarity code files
+    #[clap(name = "format", aliases = &["fmt"], bin_name = "format")]
+    Format(Format),
     /// Step by step debugging and breakpoints from your code editor (VSCode, vim, emacs, etc)
     #[clap(name = "dap", bin_name = "dap")]
     DAP,
+}
+
+#[derive(Parser, PartialEq, Clone, Debug)]
+struct Format {
+    /// Path to clarity files
+    #[clap(long = "path", short = 'p')]
+    pub code_path: Option<String>,
+    /// If specified, format only this file
+    #[clap(long = "file", short = 'f')]
+    pub file: Option<String>,
+    #[clap(long = "dry-run")]
+    pub dry_run: bool,
 }
 
 #[derive(Subcommand, PartialEq, Clone, Debug)]
@@ -1199,6 +1215,44 @@ pub fn main() {
                 process::exit(1);
             }
         },
+        Command::Format(cmd) => {
+            // look for files at the default code path (./contracts/) if cmd.code_path is not specified OR if cmd.file is not specified
+            // Default to "./contracts/" if no path is specified
+            let path = cmd.code_path.unwrap_or_else(|| "./contracts/".to_string());
+
+            // Collect file paths and load source code
+            let files: Vec<String> = match cmd.file {
+                Some(file_name) => vec![format!("{}/{}", path, file_name)],
+                None => match fs::read_dir(&path) {
+                    Ok(entries) => entries
+                        .filter_map(Result::ok)
+                        .filter(|entry| entry.path().is_file())
+                        .map(|entry| entry.path().to_string_lossy().into_owned())
+                        .collect(),
+                    Err(message) => {
+                        eprintln!("{}", format_err!(message));
+                        std::process::exit(1)
+                    }
+                },
+            };
+            // Map each file to its source code
+            let sources: Vec<(String, String)> = files
+                .into_iter()
+                .map(|file_path| {
+                    let source = fs::read_to_string(&file_path)
+                        .unwrap_or_else(|_| "// Failed to read file".to_string());
+                    (file_path, source)
+                })
+                .collect();
+
+            let settings = Settings::default();
+            let mut formatter = ClarityFormatter::new(settings);
+
+            for (file_path, source) in &sources {
+                println!("here: {}", source);
+                formatter.format(file_path, source);
+            }
+        }
         Command::Devnet(subcommand) => match subcommand {
             Devnet::Package(cmd) => {
                 let manifest = load_manifest_or_exit(cmd.manifest_path, false);
@@ -1270,6 +1324,14 @@ fn load_manifest_or_warn(path: Option<String>) -> Option<ProjectManifest> {
     } else {
         None
     }
+}
+
+fn load_clarity_code(
+    code_path: &Option<String>,
+    file: &Option<String>,
+    dry_run: bool,
+) -> (Option<String>) {
+    Some("".to_string())
 }
 
 fn load_deployment_and_artifacts_or_exit(
