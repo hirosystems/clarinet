@@ -1,12 +1,18 @@
 (define-data-var counter uint u1)
 (define-constant FORBIDDEN (err u1))
 
+(define-constant val {
+  status: { code: 200, msg: "ok" },
+  res: (ok (list (some u1)))
+})
+
 (define-read-only (get-counter)
   (ok (var-get counter))
 )
 
 (define-public (add (n uint))
   (begin
+    (print val)
     (asserts! (> n u1) FORBIDDEN)
     (var-set counter (+ (var-get counter) n))
     (ok (var-get counter))

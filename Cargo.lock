@@ -839,6 +839,7 @@ dependencies = [
  "clarinet-files",
  "clarity-repl",
  "console_error_panic_hook",
+ "hashbrown 0.14.3",
  "js-sys",
  "lazy_static",
  "lsp-types",

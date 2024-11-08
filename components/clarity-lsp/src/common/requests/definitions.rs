@@ -471,10 +471,13 @@ impl<'a> ASTVisitor<'a> for Definitions {
         bindings: &HashMap<&'a ClarityName, &'a SymbolicExpression>,
         body: &'a [SymbolicExpression],
     ) -> bool {
-        let local_scope = || -> Option<HashMap<ClarityName, Range>> {
-            let mut result = HashMap::new();
+        let mut result = HashMap::new();
 
-            let binding_exprs = expr.match_list()?.get(1)?.match_list()?;
+        if let Some(binding_exprs) = expr
+            .match_list()
+            .and_then(|list| list.get(1))
+            .and_then(|bindings| bindings.match_list())
+        {
             for binding in binding_exprs {
                 if let Some(name) = binding
                     .match_list()
@@ -484,10 +487,10 @@ impl<'a> ASTVisitor<'a> for Definitions {
                     result.insert(name.to_owned(), span_to_range(&binding.span));
                 }
             }
-            Some(result)
-        };
-        if let Some(local_scope) = local_scope() {
-            self.local.insert(expr.id, local_scope);
+        }
+
+        if !result.is_empty() {
+            self.local.insert(expr.id, result);
         }
 
         for binding in bindings.values() {
