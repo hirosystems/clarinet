@@ -42,7 +42,7 @@ use clarity_repl::{analysis, repl, Terminal};
 use stacks_network::{self, DevnetOrchestrator};
 use std::collections::HashMap;
 use std::fs::{self, File};
-use std::io::prelude::*;
+use std::io::{self, prelude::*};
 use std::{env, process};
 use toml;
 
@@ -1216,41 +1216,15 @@ pub fn main() {
             }
         },
         Command::Format(cmd) => {
-            // look for files at the default code path (./contracts/) if cmd.code_path is not specified OR if cmd.file is not specified
-            // Default to "./contracts/" if no path is specified
-            let path = cmd.code_path.unwrap_or_else(|| "./contracts/".to_string());
-
-            // Collect file paths and load source code
-            let files: Vec<String> = match cmd.file {
-                Some(file_name) => vec![format!("{}/{}", path, file_name)],
-                None => match fs::read_dir(&path) {
-                    Ok(entries) => entries
-                        .filter_map(Result::ok)
-                        .filter(|entry| entry.path().is_file())
-                        .map(|entry| entry.path().to_string_lossy().into_owned())
-                        .collect(),
-                    Err(message) => {
-                        eprintln!("{}", format_err!(message));
-                        std::process::exit(1)
-                    }
-                },
-            };
-            // Map each file to its source code
-            let sources: Vec<(String, String)> = files
-                .into_iter()
-                .map(|file_path| {
-                    let source = fs::read_to_string(&file_path)
-                        .unwrap_or_else(|_| "// Failed to read file".to_string());
-                    (file_path, source)
-                })
-                .collect();
-
+            let sources = get_source_with_path(cmd.code_path, cmd.file);
             let settings = Settings::default();
             let mut formatter = ClarityFormatter::new(settings);
 
             for (file_path, source) in &sources {
-                println!("here: {}", source);
-                formatter.format(file_path, source);
+                let output = formatter.format(source);
+                if !cmd.dry_run {
+                    let _ = overwrite_formatted(file_path, output);
+                }
             }
         }
         Command::Devnet(subcommand) => match subcommand {
@@ -1264,6 +1238,47 @@ pub fn main() {
             Devnet::DevnetStart(cmd) => devnet_start(cmd, clarinetrc),
         },
     };
+}
+
+fn overwrite_formatted(file_path: &String, output: String) -> io::Result<()> {
+    // Open the file in write mode, overwriting existing content
+    let mut file = fs::File::create(file_path)?;
+
+    file.write_all(output.as_bytes())?;
+
+    // flush the contents to ensure it's written immediately
+    file.flush()
+}
+
+fn get_source_with_path(code_path: Option<String>, file: Option<String>) -> Vec<(String, String)> {
+    // look for files at the default code path (./contracts/) if
+    // cmd.code_path is not specified OR if cmd.file is not specified
+    let path = code_path.unwrap_or_else(|| "./contracts/".to_string());
+
+    // Collect file paths and load source code
+    let files: Vec<String> = match file {
+        Some(file_name) => vec![format!("{}/{}", path, file_name)],
+        None => match fs::read_dir(&path) {
+            Ok(entries) => entries
+                .filter_map(Result::ok)
+                .filter(|entry| entry.path().is_file())
+                .map(|entry| entry.path().to_string_lossy().into_owned())
+                .collect(),
+            Err(message) => {
+                eprintln!("{}", format_err!(message));
+                std::process::exit(1)
+            }
+        },
+    };
+    // Map each file to its source code
+    files
+        .into_iter()
+        .map(|file_path| {
+            let source = fs::read_to_string(&file_path)
+                .unwrap_or_else(|_| "// Failed to read file".to_string());
+            (file_path, source)
+        })
+        .collect()
 }
 
 fn get_manifest_location_or_exit(path: Option<String>) -> FileLocation {
