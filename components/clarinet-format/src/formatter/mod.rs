@@ -1,14 +1,15 @@
 use clarity_repl::clarity::ast::build_ast_with_rules;
+use clarity_repl::clarity::vm::functions::{define::DefineFunctions, NativeFunctions};
 use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
 use clarity_repl::clarity::ClarityVersion;
 use clarity_repl::clarity::StacksEpochId;
-mod formatters;
-use self::formatters::format;
-//
+use clarity_repl::clarity::SymbolicExpression;
+
 pub enum Indentation {
     Space(u8),
     Tab,
 }
+
 pub struct Settings {
     pub indentation: Indentation,
     pub max_line_length: u8,
@@ -21,14 +22,15 @@ impl Settings {
         }
     }
 }
+//
 pub struct ClarityFormatter {
     settings: Settings,
 }
 impl ClarityFormatter {
     pub fn new(settings: Settings) -> Self {
-        Self { settings: settings }
+        Self { settings }
     }
-    pub fn format(&mut self, file_path: &str, source: &str) -> String {
+    pub fn format(&mut self, source: &str) -> String {
         let ast = build_ast_with_rules(
             &QualifiedContractIdentifier::transient(),
             source,
@@ -38,11 +40,18 @@ impl ClarityFormatter {
             clarity_repl::clarity::ast::ASTRules::Typical,
         )
         .unwrap();
-        let output = format(&ast.expressions, "");
+        let output = format_source_exprs(&self.settings, &ast.expressions, "");
         println!("output: {}", output);
-        // @todo mut output and reinject comments based on start and end expr_ids
         output
     }
+}
+
+pub fn format_source_exprs(
+    settings: &Settings,
+    expressions: &[SymbolicExpression],
+    acc: &str,
+) -> String {
+    "here".to_string()
 }
 #[cfg(test)]
 mod tests_formatter {
