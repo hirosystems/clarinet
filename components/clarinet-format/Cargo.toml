@@ -10,3 +10,4 @@ clarity-repl = { path = "../clarity-repl", default-features = false }
 [lib]
 name = "clarinet_format"
 path = "src/lib.rs"
+crate-type = ["lib"]
