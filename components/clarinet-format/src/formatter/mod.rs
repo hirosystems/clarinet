@@ -46,12 +46,124 @@ impl ClarityFormatter {
     }
 }
 
+// * functions
+
+// Top level define-<function> should have a line break above and after (except on first line)
+// options always on new lines
+// Functions Always on multiple lines, even if short
+// *begin* never on one line
+// *let* never on one line
+
+// * match *
+// One line if less than max length (unless the original source has line breaks?)
+// Multiple lines if more than max length (should the first arg be on the first line if it fits?)
 pub fn format_source_exprs(
     settings: &Settings,
     expressions: &[SymbolicExpression],
     acc: &str,
 ) -> String {
-    "here".to_string()
+    if let Some((expr, remaining)) = expressions.split_first() {
+        if let Some(list) = expr.match_list() {
+            let atom = list.split_first().and_then(|(f, _)| f.match_atom());
+            use NativeFunctions::*;
+            let formatted = if let Some(
+                DefineFunctions::PublicFunction
+                | DefineFunctions::ReadOnlyFunction
+                | DefineFunctions::PrivateFunction,
+            ) = atom.and_then(|a| DefineFunctions::lookup_by_name(a))
+            {
+                format_function(settings, list)
+            } else if let Some(Begin) = atom.and_then(|a| NativeFunctions::lookup_by_name(a)) {
+                format_begin(settings, list)
+            } else if let Some(Let) = atom.and_then(|a| NativeFunctions::lookup_by_name(a)) {
+                format_let(settings, list)
+            } else if let Some(TupleCons) = atom.and_then(|a| NativeFunctions::lookup_by_name(a)) {
+                format_tuple(settings, list)
+            } else {
+                format!("({})", format_source_exprs(settings, list, acc))
+            };
+            return format!(
+                "{formatted} {}",
+                format_source_exprs(settings, remaining, acc)
+            )
+            .trim()
+            .to_owned();
+        }
+        return format!("{} {}", expr, format_source_exprs(settings, remaining, acc))
+            .trim()
+            .to_owned();
+    };
+    acc.to_owned()
+}
+
+fn format_begin(settings: &Settings, exprs: &[SymbolicExpression]) -> String {
+    let mut begin_acc = "(begin\n".to_string();
+    for arg in exprs.get(1..).unwrap_or_default() {
+        if let Some(list) = arg.match_list() {
+            begin_acc.push_str(&format!(
+                "\n  ({})",
+                format_source_exprs(settings, list, "")
+            ))
+        }
+    }
+    begin_acc.push_str("\n)\n");
+    begin_acc.to_owned()
+}
+
+fn format_let(settings: &Settings, exprs: &[SymbolicExpression]) -> String {
+    let mut begin_acc = "(let (\n".to_string();
+    for arg in exprs.get(1..).unwrap_or_default() {
+        if let Some(list) = arg.match_list() {
+            begin_acc.push_str(&format!(
+                "\n  ({})",
+                format_source_exprs(settings, list, "")
+            ))
+        }
+    }
+    begin_acc.push_str("\n)  \n");
+    begin_acc.to_owned()
+}
+
+fn format_tuple(settings: &Settings, exprs: &[SymbolicExpression]) -> String {
+    let mut tuple_acc = "{ ".to_string();
+    for (i, expr) in exprs[1..].iter().enumerate() {
+        let (key, value) = expr
+            .match_list()
+            .and_then(|list| list.split_first())
+            .unwrap();
+        if i < exprs.len() - 2 {
+            tuple_acc.push_str(&format!(
+                "{key}: {}, ",
+                format_source_exprs(settings, value, "")
+            ));
+        } else {
+            tuple_acc.push_str(&format!(
+                "{key}: {}",
+                format_source_exprs(settings, value, "")
+            ));
+        }
+    }
+    tuple_acc.push_str(" }");
+    tuple_acc.to_string()
+}
+
+fn format_function(settings: &Settings, exprs: &[SymbolicExpression]) -> String {
+    let func_type = exprs.first().unwrap();
+    let name_and_args = exprs.get(1).and_then(|f| f.match_list()).unwrap();
+    let mut func_acc = format!(
+        "({func_type} ({})",
+        format_source_exprs(settings, name_and_args, "")
+    );
+    for arg in exprs.get(2..).unwrap_or_default() {
+        if let Some(list) = arg.match_list() {
+            func_acc.push_str(&format!(
+                "\n  ({})",
+                format_source_exprs(settings, list, "")
+            ))
+        }
+    }
+    func_acc.push_str("\n)");
+    func_acc.to_owned()
 }
 #[cfg(test)]
 mod tests_formatter {
@@ -88,5 +200,21 @@ mod tests_formatter {
             result,
             "(define-private (my-func)\n  (ok { n1: 1, n2: 2, n3: 3 })\n)"
         );
+    }
+
+    #[test]
+    fn test_function_args_multiline() {
+        let src = "(define-public (my-func (amount uint) (sender principal)) (ok true))";
+        let result = format_with_default(&String::from(src));
+        assert_eq!(
+            result,
+            "(define-public (my-func\n    (amount uint)\n    (sender principal)\n  )\n  (ok true)\n)"
+        );
+    }
+    #[test]
+    fn test_begin_never_one_line() {
+        let src = "(begin (ok true))";
+        let result = format_with_default(&String::from(src));
+        assert_eq!(result, "(begin\n  (ok true)\n)");
     }
 }
