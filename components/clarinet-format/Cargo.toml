@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 clarinet-files = { path = "../clarinet-files", default-features = false, optional = true }
-clarity-repl = { path = "../clarity-repl", default-features = false }
+clarity-repl = { path = "../clarity-repl" }
 
 [lib]
 name = "clarinet_format"
