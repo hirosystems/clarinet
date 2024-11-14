@@ -2,10 +2,10 @@ use clarinet_files::{
     DEFAULT_BITCOIN_EXPLORER_IMAGE, DEFAULT_BITCOIN_NODE_IMAGE, DEFAULT_DERIVATION_PATH,
     DEFAULT_EPOCH_2_0, DEFAULT_EPOCH_2_05, DEFAULT_EPOCH_2_1, DEFAULT_EPOCH_2_2, DEFAULT_EPOCH_2_3,
     DEFAULT_EPOCH_2_4, DEFAULT_EPOCH_2_5, DEFAULT_EPOCH_3_0, DEFAULT_FAUCET_MNEMONIC,
-    DEFAULT_POSTGRES_IMAGE, DEFAULT_STACKS_API_IMAGE, DEFAULT_STACKS_EXPLORER_IMAGE,
-    DEFAULT_STACKS_MINER_MNEMONIC, DEFAULT_STACKS_NODE_IMAGE, DEFAULT_STACKS_SIGNER_IMAGE,
-    DEFAULT_SUBNET_API_IMAGE, DEFAULT_SUBNET_CONTRACT_ID, DEFAULT_SUBNET_MNEMONIC,
-    DEFAULT_SUBNET_NODE_IMAGE,
+    DEFAULT_POSTGRES_IMAGE, DEFAULT_STACKER_MNEMONIC, DEFAULT_STACKS_API_IMAGE,
+    DEFAULT_STACKS_EXPLORER_IMAGE, DEFAULT_STACKS_MINER_MNEMONIC, DEFAULT_STACKS_NODE_IMAGE,
+    DEFAULT_STACKS_SIGNER_IMAGE, DEFAULT_SUBNET_API_IMAGE, DEFAULT_SUBNET_CONTRACT_ID,
+    DEFAULT_SUBNET_MNEMONIC, DEFAULT_SUBNET_NODE_IMAGE,
 };
 
 use super::changes::{Changes, DirectoryCreation, FileCreation};
@@ -308,6 +308,8 @@ disable_stacks_api = false
 # miner_derivation_path = "{default_derivation_path}"
 # faucet_mnemonic = "{default_stacks_faucet_mnemonic}"
 # faucet_derivation_path = "{default_derivation_path}"
+# stacker_mnemonic = "{default_stacks_stacker_mnemonic}"
+# stacker_derivation_path = "{default_derivation_path}"
 # orchestrator_port = 20445
 # bitcoin_node_p2p_port = 18444
 # bitcoin_node_rpc_port = 18443
@@ -392,6 +394,7 @@ btc_address = "mvZtbibDAAA3WLpY7zXXFqRa3T4XSknBX7"
             default_subnet_api_image = DEFAULT_SUBNET_API_IMAGE,
             default_stacks_miner_mnemonic = DEFAULT_STACKS_MINER_MNEMONIC,
             default_stacks_faucet_mnemonic = DEFAULT_FAUCET_MNEMONIC,
+            default_stacks_stacker_mnemonic = DEFAULT_STACKER_MNEMONIC,
         );
         let name = "settings/Devnet.toml".into();
         self.changes

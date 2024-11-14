@@ -29,6 +29,7 @@ pub const DEFAULT_SUBNET_CONTRACT_ID: &str =
     "ST173JK7NZBA4BS05ZRATQH1K89YJMTGEH1Z5J52E.subnet-v3-0-1";
 pub const DEFAULT_STACKS_MINER_MNEMONIC: &str = "fragile loan twenty basic net assault jazz absorb diet talk art shock innocent float punch travel gadget embrace caught blossom hockey surround initial reduce";
 pub const DEFAULT_FAUCET_MNEMONIC: &str = "shadow private easily thought say logic fault paddle word top book during ignore notable orange flight clock image wealth health outside kitten belt reform";
+pub const DEFAULT_STACKER_MNEMONIC: &str = "empty lens any direct brother then drop fury rule pole win claim scissors list rescue horn rent inform relief jump sword weekend half legend";
 pub const DEFAULT_SUBNET_MNEMONIC: &str = "twice kind fence tip hidden tilt action fragile skin nothing glory cousin green tomorrow spring wrist shed math olympic multiply hip blue scout claw";
 #[cfg(unix)]
 pub const DEFAULT_DOCKER_SOCKET: &str = "unix:///var/run/docker.sock";
@@ -139,6 +140,8 @@ pub struct DevnetConfigFile {
     pub miner_wallet_name: Option<String>,
     pub faucet_mnemonic: Option<String>,
     pub faucet_derivation_path: Option<String>,
+    pub stacker_mnemonic: Option<String>,
+    pub stacker_derivation_path: Option<String>,
     pub bitcoin_controller_block_time: Option<u32>,
     pub bitcoin_controller_automining_disabled: Option<bool>,
     pub pre_nakamoto_mock_signing: Option<bool>,
@@ -305,6 +308,8 @@ pub struct DevnetConfig {
     pub faucet_btc_address: String,
     pub faucet_mnemonic: String,
     pub faucet_derivation_path: String,
+    pub stacker_mnemonic: String,
+    pub stacker_derivation_path: String,
     pub pre_nakamoto_mock_signing: bool,
     pub working_dir: String,
     pub postgres_port: u16,
@@ -840,10 +845,42 @@ impl NetworkManifest {
                 ));
             }
 
+            let stacker_mnemonic = devnet_config
+                .stacker_mnemonic
+                .take()
+                .unwrap_or(DEFAULT_STACKER_MNEMONIC.to_string());
+            let stacker_derivation_path = devnet_config
+                .stacker_derivation_path
+                .take()
+                .unwrap_or(DEFAULT_DERIVATION_PATH.to_string());
+            let (stx_address, btc_address, _) =
+                compute_addresses(&stacker_mnemonic, &stacker_derivation_path, networks);
+
+            accounts.insert(
+                "stacker".to_string(),
+                AccountConfig {
+                    label: "stacker".to_string(),
+                    mnemonic: stacker_mnemonic.clone(),
+                    derivation: stacker_derivation_path.clone(),
+                    balance: 100_000_000_000_000,
+                    stx_address,
+                    btc_address,
+                    is_mainnet: false,
+                },
+            );
+
+            let mut stacking_orders = vec![];
+            let mut add_default_stacking_order = true;
             // for stacking orders, we validate that wallet names match one of the provided accounts
-            if let Some(ref val) = devnet_config.pox_stacking_orders {
+            if let Some(mut val) = devnet_config.pox_stacking_orders {
                 for (i, stacking_order) in val.iter().enumerate() {
                     let wallet_name = &stacking_order.wallet;
+
+                    // if the project already set a stacking order for the stacker, do not override it
+                    if wallet_name == "stacker" {
+                        add_default_stacking_order = false;
+                    }
+
                     let wallet_is_in_accounts = accounts
                         .iter()
                         .any(|(account_name, _)| wallet_name == account_name);
@@ -852,8 +889,27 @@ impl NetworkManifest {
                     };
                 }
 
-                devnet_config.pox_stacking_orders = Some(val.clone());
+                stacking_orders.append(&mut val);
             }
+
+            // to ensure that the network stacks enough STXs to reach epoch 3.0
+            // add a default stacking order for deployer wallet in cycle 1
+            if add_default_stacking_order {
+                if let Some((_, account_config)) = accounts
+                    .iter()
+                    .find(|(account_name, _)| *account_name == "stacker")
+                {
+                    stacking_orders.push(PoxStackingOrder {
+                        auto_extend: Some(true),
+                        duration: 10,
+                        start_at_cycle: 1,
+                        wallet: "stacker".into(),
+                        slots: 10,
+                        btc_address: account_config.btc_address.clone(),
+                    })
+                }
+            }
+
             let config = DevnetConfig {
                 name: devnet_config.name.take().unwrap_or("devnet".into()),
                 network_id: devnet_config.network_id,
@@ -908,6 +964,8 @@ impl NetworkManifest {
                 faucet_mnemonic,
                 faucet_secret_key_hex,
                 faucet_derivation_path,
+                stacker_mnemonic,
+                stacker_derivation_path,
                 working_dir: devnet_config
                     .working_dir
                     .take()
@@ -958,7 +1016,7 @@ impl NetworkManifest {
                     .bitcoin_explorer_image_url
                     .take()
                     .unwrap_or(DEFAULT_BITCOIN_EXPLORER_IMAGE.to_string()),
-                pox_stacking_orders: devnet_config.pox_stacking_orders.take().unwrap_or_default(),
+                pox_stacking_orders: stacking_orders,
                 disable_bitcoin_explorer: devnet_config.disable_bitcoin_explorer.unwrap_or(false),
                 disable_stacks_api: devnet_config.disable_stacks_api.unwrap_or(false),
                 disable_postgres: devnet_config.disable_postgres.unwrap_or(false),

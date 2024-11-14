@@ -53,6 +53,7 @@ export function initVFS(client: LanguageClient) {
         }
       }),
     );
+    var a = 1;
     return Object.fromEntries(files.filter(([, content]) => content !== null));
   });
 
