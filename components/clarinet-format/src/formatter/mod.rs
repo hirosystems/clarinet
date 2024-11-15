@@ -1,21 +1,29 @@
-use clarity_repl::clarity::ast::build_ast_with_rules;
-use clarity_repl::clarity::vm::functions::{define::DefineFunctions, NativeFunctions};
-use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
-use clarity_repl::clarity::ClarityVersion;
-use clarity_repl::clarity::StacksEpochId;
-use clarity_repl::clarity::SymbolicExpression;
+use clarity::types::StacksEpochId;
+use clarity::vm::ast::{build_ast_with_rules, ASTRules};
+use clarity::vm::functions::{define::DefineFunctions, NativeFunctions};
+use clarity::vm::types::QualifiedContractIdentifier;
+use clarity::vm::{ClarityVersion, SymbolicExpression};
 
 pub enum Indentation {
-    Space(u8),
+    Space(usize),
     Tab,
 }
 
 pub struct Settings {
     pub indentation: Indentation,
-    pub max_line_length: u8,
+    pub max_line_length: usize,
 }
+
 impl Settings {
-    pub fn default() -> Settings {
+    pub fn new(indentation: Indentation, max_line_length: usize) -> Self {
+        Settings {
+            indentation,
+            max_line_length,
+        }
+    }
+}
+impl Default for Settings {
+    fn default() -> Settings {
         Settings {
             indentation: Indentation::Space(2),
             max_line_length: 80,
@@ -37,7 +45,7 @@ impl ClarityFormatter {
             &mut (),
             ClarityVersion::Clarity3,
             StacksEpochId::Epoch30,
-            clarity_repl::clarity::ast::ASTRules::Typical,
+            ASTRules::Typical,
         )
         .unwrap();
         let output = format_source_exprs(&self.settings, &ast.expressions, "");
@@ -96,12 +104,21 @@ pub fn format_source_exprs(
     acc.to_owned()
 }
 
+fn indentation_to_string(indentation: &Indentation) -> String {
+    match indentation {
+        Indentation::Space(i) => " ".repeat(*i),
+        Indentation::Tab => "\t".to_string(),
+    }
+}
+
 fn format_begin(settings: &Settings, exprs: &[SymbolicExpression]) -> String {
-    let mut begin_acc = "(begin\n".to_string();
+    let mut begin_acc = "(begin".to_string();
+    let indentation = indentation_to_string(&settings.indentation);
     for arg in exprs.get(1..).unwrap_or_default() {
         if let Some(list) = arg.match_list() {
             begin_acc.push_str(&format!(
-                "\n  ({})",
+                "\n{}({})",
+                indentation,
                 format_source_exprs(settings, list, "")
             ))
         }
@@ -111,11 +128,13 @@ fn format_begin(settings: &Settings, exprs: &[SymbolicExpression]) -> String {
 }
 
 fn format_let(settings: &Settings, exprs: &[SymbolicExpression]) -> String {
-    let mut begin_acc = "(let (\n".to_string();
+    let mut begin_acc = "(let (".to_string();
+    let indentation = indentation_to_string(&settings.indentation);
     for arg in exprs.get(1..).unwrap_or_default() {
         if let Some(list) = arg.match_list() {
             begin_acc.push_str(&format!(
-                "\n  ({})",
+                "\n{}({})",
+                indentation,
                 format_source_exprs(settings, list, "")
             ))
         }
@@ -149,6 +168,7 @@ fn format_tuple(settings: &Settings, exprs: &[SymbolicExpression]) -> String {
 
 fn format_function(settings: &Settings, exprs: &[SymbolicExpression]) -> String {
     let func_type = exprs.first().unwrap();
+    let indentation = indentation_to_string(&settings.indentation);
     let name_and_args = exprs.get(1).and_then(|f| f.match_list()).unwrap();
     let mut func_acc = format!(
         "({func_type} ({})",
@@ -157,7 +177,8 @@ fn format_function(settings: &Settings, exprs: &[SymbolicExpression]) -> String 
     for arg in exprs.get(2..).unwrap_or_default() {
         if let Some(list) = arg.match_list() {
             func_acc.push_str(&format!(
-                "\n  ({})",
+                "\n{}({})",
+                indentation,
                 format_source_exprs(settings, list, "")
             ))
         }
@@ -168,8 +189,13 @@ fn format_function(settings: &Settings, exprs: &[SymbolicExpression]) -> String 
 #[cfg(test)]
 mod tests_formatter {
     use super::{ClarityFormatter, Settings};
+    use crate::formatter::Indentation;
     fn format_with_default(source: &str) -> String {
         let mut formatter = ClarityFormatter::new(Settings::default());
+        formatter.format(source)
+    }
+    fn format_with(source: &str, settings: Settings) -> String {
+        let mut formatter = ClarityFormatter::new(settings);
         formatter.format(source)
     }
     #[test]
@@ -216,5 +242,12 @@ mod tests_formatter {
         let src = "(begin (ok true))";
         let result = format_with_default(&String::from(src));
         assert_eq!(result, "(begin\n  (ok true)\n)");
+    }
+
+    #[test]
+    fn test_custom_tab_setting() {
+        let src = "(begin (ok true))";
+        let result = format_with(&String::from(src), Settings::new(Indentation::Space(4), 80));
+        assert_eq!(result, "(begin\n    (ok true)\n)");
     }
 }
