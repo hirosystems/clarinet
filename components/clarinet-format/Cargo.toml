@@ -4,8 +4,23 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-clarinet-files = { path = "../clarinet-files", default-features = false, optional = true }
-clarity-repl = { path = "../clarity-repl" }
+# clarity-repl = { path = "../clarity-repl" }
+clarity = { workspace = true}
+
+[features]
+default = ["cli"]
+cli = [
+    "clarity/canonical",
+    "clarity/developer-mode",
+    "clarity/devtools",
+    "clarity/log",
+]
+wasm = [
+    "clarity/wasm",
+    "clarity/developer-mode",
+    "clarity/devtools",
+]
+
 
 [lib]
 name = "clarinet_format"
