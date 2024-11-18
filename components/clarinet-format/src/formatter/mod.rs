@@ -48,9 +48,7 @@ impl ClarityFormatter {
             ASTRules::Typical,
         )
         .unwrap();
-        let output = format_source_exprs(&self.settings, &ast.expressions, "");
-        println!("output: {}", output);
-        output
+        format_source_exprs(&self.settings, &ast.expressions, "")
     }
 }
 
