@@ -1205,6 +1205,8 @@ pub fn main() {
                 let output = formatter.format(source);
                 if !cmd.dry_run {
                     let _ = overwrite_formatted(file_path, output);
+                } else {
+                    println!("{}", output);
                 }
             }
         }
@@ -1222,13 +1224,10 @@ pub fn main() {
 }
 
 fn overwrite_formatted(file_path: &String, output: String) -> io::Result<()> {
-    // Open the file in write mode, overwriting existing content
     let mut file = fs::File::create(file_path)?;
 
     file.write_all(output.as_bytes())?;
-
-    // flush the contents to ensure it's written immediately
-    file.flush()
+    Ok(())
 }
 
 fn get_source_with_path(code_path: Option<String>, file: Option<String>) -> Vec<(String, String)> {
@@ -1238,7 +1237,7 @@ fn get_source_with_path(code_path: Option<String>, file: Option<String>) -> Vec<
 
     // Collect file paths and load source code
     let files: Vec<String> = match file {
-        Some(file_name) => vec![format!("{}/{}", path, file_name)],
+        Some(file_name) => vec![format!("{}", file_name)],
         None => match fs::read_dir(&path) {
             Ok(entries) => entries
                 .filter_map(Result::ok)
@@ -1317,14 +1316,6 @@ fn load_manifest_or_warn(path: Option<String>) -> Option<ProjectManifest> {
     } else {
         None
     }
-}
-
-fn load_clarity_code(
-    code_path: &Option<String>,
-    file: &Option<String>,
-    dry_run: bool,
-) -> (Option<String>) {
-    Some("".to_string())
 }
 
 fn load_deployment_and_artifacts_or_exit(
