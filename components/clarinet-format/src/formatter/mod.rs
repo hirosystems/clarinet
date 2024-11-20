@@ -86,10 +86,10 @@ pub fn format_source_exprs(
             } else if let Some(TupleCons) = atom.and_then(|a| NativeFunctions::lookup_by_name(a)) {
                 format_tuple(settings, list)
             } else {
-                format!("({})", format_source_exprs(settings, list, acc))
+                format!("({})\n", format_source_exprs(settings, list, acc))
             };
             return format!(
-                "{formatted} {}",
+                "{formatted}{}",
                 format_source_exprs(settings, remaining, acc)
             )
             .trim()
@@ -168,10 +168,25 @@ fn format_function(settings: &Settings, exprs: &[SymbolicExpression]) -> String 
     let func_type = exprs.first().unwrap();
     let indentation = indentation_to_string(&settings.indentation);
     let name_and_args = exprs.get(1).and_then(|f| f.match_list()).unwrap();
-    let mut func_acc = format!(
-        "({func_type} ({})",
-        format_source_exprs(settings, name_and_args, "")
-    );
+
+    let mut func_acc = format!("({func_type} (");
+
+    if let Some((name, args)) = name_and_args.split_first() {
+        func_acc.push_str(&format!("{}", name));
+        if args.is_empty() {
+            func_acc.push(')');
+        } else {
+            for arg in args {
+                func_acc.push_str(&format!(
+                    "\n{}{}{}",
+                    indentation,
+                    indentation,
+                    format_source_exprs(settings, &[arg.clone()], "")
+                ));
+            }
+            func_acc.push_str(&format!("\n{})", indentation));
+        }
+    }
     for arg in exprs.get(2..).unwrap_or_default() {
         if let Some(list) = arg.match_list() {
             func_acc.push_str(&format!(
@@ -188,6 +203,8 @@ fn format_function(settings: &Settings, exprs: &[SymbolicExpression]) -> String 
 mod tests_formatter {
     use super::{ClarityFormatter, Settings};
     use crate::formatter::Indentation;
+    use std::fs;
+    use std::path::Path;
     fn format_with_default(source: &str) -> String {
         let mut formatter = ClarityFormatter::new(Settings::default());
         formatter.format(source)
@@ -207,11 +224,6 @@ mod tests_formatter {
         assert_eq!(result, "(ok true)\n(ok true)");
     }
     #[test]
-    fn test_function_formatter() {
-        let result = format_with_default(&String::from("(define-private (my-func) (ok true))"));
-        assert_eq!(result, "(define-private (my-func)\n  (ok true)\n)");
-    }
-    #[test]
     fn test_tuple_formatter() {
         let result = format_with_default(&String::from("{n1:1,n2:2,n3:3}"));
         assert_eq!(result, "{ n1: 1, n2: 2, n3: 3 }");
@@ -224,6 +236,12 @@ mod tests_formatter {
             result,
             "(define-private (my-func)\n  (ok { n1: 1, n2: 2, n3: 3 })\n)"
         );
+    }
+
+    #[test]
+    fn test_function_formatter() {
+        let result = format_with_default(&String::from("(define-private (my-func) (ok true))"));
+        assert_eq!(result, "(define-private (my-func)\n  (ok true)\n)");
     }
 
     #[test]
@@ -248,4 +266,30 @@ mod tests_formatter {
         let result = format_with(&String::from(src), Settings::new(Indentation::Space(4), 80));
         assert_eq!(result, "(begin\n    (ok true)\n)");
     }
+
+    // #[test]
+    // fn test_irl_contracts() {
+    //     let golden_dir = "./tests/golden";
+    //     let intended_dir = "./tests/golden-intended";
+
+    //     // Iterate over files in the golden directory
+    //     for entry in fs::read_dir(golden_dir).expect("Failed to read golden directory") {
+    //         let entry = entry.expect("Failed to read directory entry");
+    //         let path = entry.path();
+
+    //         if path.is_file() {
+    //             let src = fs::read_to_string(&path).expect("Failed to read source file");
+
+    //             let file_name = path.file_name().expect("Failed to get file name");
+    //             let intended_path = Path::new(intended_dir).join(file_name);
+
+    //             let intended =
+    //                 fs::read_to_string(&intended_path).expect("Failed to read intended file");
+
+    //             // Apply formatting and compare
+    //             let result = format_with_default(&src);
+    //             assert_eq!(result, intended, "Mismatch for file: {:?}", file_name);
+    //         }
+    //     }
+    // }
 }
