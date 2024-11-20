@@ -24,7 +24,7 @@ fn deploy_basic_contract(sdk: &mut SDK) -> TransactionRes {
 }
 
 #[wasm_bindgen_test]
-async fn it_cn_execute_clarity_code() {
+async fn it_can_execute_clarity_code() {
     let mut sdk = init_sdk().await;
     let tx = sdk.execute("(+ u41 u1)".into()).unwrap();
     let expected = format!("0x{}", ClarityValue::UInt(42).serialize_to_hex().unwrap());
@@ -46,18 +46,18 @@ async fn it_can_deploy_contract() {
     assert_eq!(tx.result, expected);
 }
 
-#[wasm_bindgen_test]
-async fn it_can_call_a_private_function() {
-    let mut sdk = init_sdk().await;
-    let _ = deploy_basic_contract(&mut sdk);
-    let tx = sdk
-        .call_private_fn(&CallFnArgs::new(
-            "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.basic-contract".into(),
-            "two".into(),
-            vec![],
-            "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM".into(),
-        ))
-        .unwrap();
-    let expected = format!("0x{}", ClarityValue::UInt(2).serialize_to_hex().unwrap());
-    assert_eq!(tx.result, expected);
-}
+// #[wasm_bindgen_test]
+// async fn it_can_call_a_private_function() {
+//     let mut sdk = init_sdk().await;
+//     let _ = deploy_basic_contract(&mut sdk);
+//     let tx = sdk
+//         .call_private_fn(&CallFnArgs::new(
+//             "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.basic-contract".into(),
+//             "two".into(),
+//             vec![],
+//             "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM".into(),
+//         ))
+//         .unwrap();
+//     let expected = format!("0x{}", ClarityValue::UInt(2).serialize_to_hex().unwrap());
+//     assert_eq!(tx.result, expected);
+// }

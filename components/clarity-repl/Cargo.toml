@@ -37,6 +37,11 @@ clarity = { workspace = true }
 clar2wasm = { git = "https://github.com/stacks-network/clarity-wasm.git", branch = "main", optional = true }
 pox-locking = { git = "https://github.com/stacks-network/stacks-core.git", branch="feat/clarity-wasm-develop", optional = true, default-features = false }
 prettytable-rs = { version = "0.10.0" }
+ehttp = "0.5.0"
+
+# wasm
+wasm-bindgen = { workspace = true, optional = true }
+web-sys = { workspace = true, optional = true, features = ["XmlHttpRequest"]}
 
 # DAP Debugger
 tokio = { version = "1.35.1", features = ["full"], optional = true }
@@ -52,10 +57,11 @@ memchr = { version = "2.4.1", optional = true }
 pico-args = { version = "0.5.0", optional = true }
 rustyline = { version = "14.0.0", optional = true }
 hiro_system_kit = { version = "0.1.0", package = "hiro-system-kit", path = "../hiro-system-kit", default-features = false }
-reqwest = { workspace = true }
+reqwest = { workspace = true, features = ["blocking"] }
 
 [dev-dependencies]
 test-case = "*"
+wasm-bindgen-test = "0.3.0"
 
 [lib]
 name = "clarity_repl"
@@ -73,7 +79,7 @@ sdk = [
     "clarity/devtools",
     "clarity/log",
     "hiro_system_kit/tokio_helpers",
-    "pox-locking/default"
+    "pox-locking/default",
 ]
 cli = [
     "sdk",
@@ -95,5 +101,7 @@ wasm = [
     "clarity/wasm",
     "clarity/developer-mode",
     "clarity/devtools",
-    "pox-locking/wasm"
+    "pox-locking/wasm",
+    "wasm-bindgen",
+    "web-sys",
 ]

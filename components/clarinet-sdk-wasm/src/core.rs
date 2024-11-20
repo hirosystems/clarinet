@@ -167,7 +167,6 @@ pub struct DeployContractArgs {
     options: ContractOptions,
     sender: String,
 }
-
 #[wasm_bindgen]
 impl DeployContractArgs {
     #[wasm_bindgen(constructor)]
@@ -336,6 +335,12 @@ impl SDK {
         EpochString {
             obj: DEFAULT_EPOCH.to_string().into(),
         }
+    }
+
+    pub fn xhr_req(&self) -> Result<web_sys::XmlHttpRequest, JsValue> {
+        let xhr = web_sys::XmlHttpRequest::new();
+        log!("{:?}", xhr);
+        xhr
     }
 
     #[wasm_bindgen(js_name=getDefaultClarityVersionForCurrentEpoch)]

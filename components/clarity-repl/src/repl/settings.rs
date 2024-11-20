@@ -1,7 +1,6 @@
 use std::convert::TryInto;
 
 use crate::analysis;
-use clarity::address::b58::from;
 use clarity::types::chainstate::StacksAddress;
 use clarity::types::StacksEpochId;
 use clarity::vm::types::{PrincipalData, QualifiedContractIdentifier, StandardPrincipalData};
