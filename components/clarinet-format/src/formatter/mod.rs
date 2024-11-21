@@ -87,17 +87,23 @@ pub fn format_source_exprs(
             } else if let Some(TupleCons) = atom.and_then(|a| NativeFunctions::lookup_by_name(a)) {
                 format_tuple(settings, list)
             } else {
-                format!("({})\n", format_source_exprs(settings, list, acc))
+                format!("({})", format_source_exprs(settings, list, acc))
             };
-            let pre_comments = format_comments(&expr.pre_comments, settings.max_line_length);
-            let post_comments = format_comments(&expr.post_comments, settings.max_line_length);
+            let pre_comments = format_comments(&expr.pre_comments);
+            let post_comments = format_comments(&expr.post_comments);
+
             let end_line_comment = if let Some(comment) = &expr.end_line_comment {
-                format!(" ;; {}", comment)
+                format!(" ;; {}\n", comment)
             } else {
                 String::new()
             };
+            let post_comment_prefix = if end_line_comment.is_empty() {
+                "\n"
+            } else {
+                ""
+            };
             return format!(
-                "{pre_comments}{formatted}{end_line_comment}{post_comments}{}",
+                "{pre_comments}{formatted}{end_line_comment}{post_comment_prefix}{post_comments}{}",
                 format_source_exprs(settings, remaining, acc)
             )
             .trim()
@@ -110,43 +116,19 @@ pub fn format_source_exprs(
     acc.to_owned()
 }
 
-fn format_comments(
-    comments: &[(String, clarity::vm::representations::Span)],
-    max_line_length: usize,
-) -> String {
+fn format_comments(comments: &[(String, clarity::vm::representations::Span)]) -> String {
     if !comments.is_empty() {
-        let joined = comments
+        comments
             .iter()
             .map(|(comment, span)| {
-                let mut formatted = String::new();
-                let mut current_line = String::new();
-                let indent = " ".repeat(span.start_column as usize - 1);
-                let max_content_length = max_line_length - span.start_column as usize - 3;
-
-                for word in comment.split_whitespace() {
-                    if current_line.len() + word.len() + 1 > max_content_length {
-                        // push the current line and start a new one
-                        formatted.push_str(&format!("{};; {}\n", indent, current_line.trim_end()));
-                        current_line.clear();
-                    }
-                    // add a space if the current line isn't empty
-                    if !current_line.is_empty() {
-                        current_line.push(' ');
-                    }
-                    current_line.push_str(word);
-                }
-
-                // push the rest if it exists
-                if !current_line.is_empty() {
-                    formatted.push_str(&format!("{};; {}", indent, current_line.trim_end()));
-                }
-
-                formatted
+                format!(
+                    "{};; {}\n",
+                    " ".repeat(span.start_column as usize - 1),
+                    comment
+                )
             })
             .collect::<Vec<_>>()
-            .join("\n");
-
-        format!("{joined}\n")
+            .join("\n")
     } else {
         "".to_string()
     }
@@ -304,19 +286,24 @@ mod tests_formatter {
         );
     }
     #[test]
-    fn test_comments_included() {
-        let src = ";; this is a comment\n(ok true)";
+    fn test_pre_postcomments_included() {
+        let src = ";; this is a pre comment\n(ok true)";
+
+        let result = format_with_default(&String::from(src));
+        assert_eq!(src, result);
+
+        let src = "(ok true)\n;; this is a post comment";
 
         let result = format_with_default(&String::from(src));
         assert_eq!(src, result);
     }
-    // #[test]
-    // fn test_end_of_line_comments_included() {
-    //     let src = "(ok true) ;; this is a comment";
+    #[test]
+    fn test_end_of_line_comments_included() {
+        let src = "(ok true) ;; this is a comment";
 
-    //     let result = format_with_default(&String::from(src));
-    //     assert_eq!(src, result);
-    // }
+        let result = format_with_default(&String::from(src));
+        assert_eq!(src, result);
+    }
     // #[test]
     // fn test_end_of_line_comments_max_line_length() {
     //     let src = "(ok true) ;; this is a comment";
@@ -325,13 +312,6 @@ mod tests_formatter {
     //     let expected = ";; this is a comment\n(ok true)";
     //     assert_eq!(result, expected);
     // }
-    #[test]
-    fn test_comments_only() {
-        let src = ";; this is a comment\n(ok true)";
-
-        let result = format_with_default(&String::from(src));
-        assert_eq!(src, result);
-    }
     #[test]
     fn test_begin_never_one_line() {
         let src = "(begin (ok true))";
@@ -346,13 +326,6 @@ mod tests_formatter {
         assert_eq!(result, "(begin\n    (ok true)\n)");
     }
 
-    #[test]
-    fn test_max_line_length() {
-        let src = ";; a comment with line length 32\n(ok true)";
-        let result = format_with(&String::from(src), Settings::new(Indentation::Space(2), 32));
-        let expected = ";; a comment with line length\n;; 32\n(ok true)";
-        assert_eq!(result, expected);
-    }
     // #[test]
     // fn test_irl_contracts() {
     //     let golden_dir = "./tests/golden";
