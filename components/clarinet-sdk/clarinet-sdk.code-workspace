@@ -4,10 +4,9 @@
     "rust-analyzer.check.overrideCommand": [
       "cargo",
       "clippy",
-      "--no-default-features",
       "--package=clarinet-sdk-wasm",
-      "--features=wasm",
       "--target=wasm32-unknown-unknown",
+      "--tests",
       "--message-format=json",
     ],
     "rust-analyzer.cargo.allTargets": false,
@@ -16,10 +15,9 @@
     "rust-analyzer.cargo.buildScripts.overrideCommand": [
       "cargo",
       "build",
-      "--no-default-features",
       "--package=clarinet-sdk-wasm",
-      "--features=wasm",
       "--target=wasm32-unknown-unknown",
+      "--tests",
       "--message-format=json",
     ],
   },
