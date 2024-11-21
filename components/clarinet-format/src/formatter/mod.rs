@@ -88,8 +88,18 @@ pub fn format_source_exprs(
             } else {
                 format!("({})\n", format_source_exprs(settings, list, acc))
             };
+            let pre_comments = format_comments(&expr.pre_comments, settings.max_line_length);
+            let post_comments = format_comments(&expr.post_comments, settings.max_line_length);
+            let end_line_comment = if let Some(comment) = &expr.end_line_comment {
+                print!("here");
+                format!(" ;; {}", comment)
+            } else {
+                print!("there");
+                String::new()
+            };
+            print!("{}", formatted);
             return format!(
-                "{formatted}{}",
+                "{pre_comments}{formatted}{end_line_comment}{post_comments}{}",
                 format_source_exprs(settings, remaining, acc)
             )
             .trim()
@@ -100,6 +110,48 @@ pub fn format_source_exprs(
             .to_owned();
     };
     acc.to_owned()
+}
+
+fn format_comments(
+    comments: &[(String, clarity::vm::representations::Span)],
+    max_line_length: usize,
+) -> String {
+    if !comments.is_empty() {
+        let joined = comments
+            .iter()
+            .map(|(comment, span)| {
+                let mut formatted = String::new();
+                let mut current_line = String::new();
+                let indent = " ".repeat(span.start_column as usize - 1);
+                let max_content_length = max_line_length - span.start_column as usize - 3;
+
+                for word in comment.split_whitespace() {
+                    if current_line.len() + word.len() + 1 > max_content_length {
+                        // push the current line and start a new one
+                        formatted.push_str(&format!("{};; {}\n", indent, current_line.trim_end()));
+                        current_line.clear();
+                    }
+                    // add a space if the current line isn't empty
+                    if !current_line.is_empty() {
+                        current_line.push(' ');
+                    }
+                    current_line.push_str(word);
+                }
+
+                // push the rest if it exists
+                if !current_line.is_empty() {
+                    formatted.push_str(&format!("{};; {}", indent, current_line.trim_end()));
+                }
+
+                formatted
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        format!("{joined}\n")
+    } else {
+        "".to_string()
+    }
 }
 
 fn indentation_to_string(indentation: &Indentation) -> String {
@@ -254,6 +306,35 @@ mod tests_formatter {
         );
     }
     #[test]
+    fn test_comments_included() {
+        let src = ";; this is a comment\n(ok true)";
+
+        let result = format_with_default(&String::from(src));
+        assert_eq!(src, result);
+    }
+    // #[test]
+    // fn test_end_of_line_comments_included() {
+    //     let src = "(ok true) ;; this is a comment";
+
+    //     let result = format_with_default(&String::from(src));
+    //     assert_eq!(src, result);
+    // }
+    // #[test]
+    // fn test_end_of_line_comments_max_line_length() {
+    //     let src = "(ok true) ;; this is a comment";
+
+    //     let result = format_with(&String::from(src), Settings::new(Indentation::Space(2), 9));
+    //     let expected = ";; this is a comment\n(ok true)";
+    //     assert_eq!(result, expected);
+    // }
+    #[test]
+    fn test_comments_only() {
+        let src = ";; this is a comment\n(ok true)";
+
+        let result = format_with_default(&String::from(src));
+        assert_eq!(src, result);
+    }
+    #[test]
     fn test_begin_never_one_line() {
         let src = "(begin (ok true))";
         let result = format_with_default(&String::from(src));
@@ -267,6 +348,13 @@ mod tests_formatter {
         assert_eq!(result, "(begin\n    (ok true)\n)");
     }
 
+    #[test]
+    fn test_max_line_length() {
+        let src = ";; a comment with line length 32\n(ok true)";
+        let result = format_with(&String::from(src), Settings::new(Indentation::Space(2), 32));
+        let expected = ";; a comment with line length\n;; 32\n(ok true)";
+        assert_eq!(result, expected);
+    }
     // #[test]
     // fn test_irl_contracts() {
     //     let golden_dir = "./tests/golden";
