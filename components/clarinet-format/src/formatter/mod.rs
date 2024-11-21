@@ -75,7 +75,8 @@ pub fn format_source_exprs(
             let formatted = if let Some(
                 DefineFunctions::PublicFunction
                 | DefineFunctions::ReadOnlyFunction
-                | DefineFunctions::PrivateFunction,
+                | DefineFunctions::PrivateFunction
+                | DefineFunctions::Map,
             ) = atom.and_then(|a| DefineFunctions::lookup_by_name(a))
             {
                 format_function(settings, list)
@@ -91,13 +92,10 @@ pub fn format_source_exprs(
             let pre_comments = format_comments(&expr.pre_comments, settings.max_line_length);
             let post_comments = format_comments(&expr.post_comments, settings.max_line_length);
             let end_line_comment = if let Some(comment) = &expr.end_line_comment {
-                print!("here");
                 format!(" ;; {}", comment)
             } else {
-                print!("there");
                 String::new()
             };
-            print!("{}", formatted);
             return format!(
                 "{pre_comments}{formatted}{end_line_comment}{post_comments}{}",
                 format_source_exprs(settings, remaining, acc)

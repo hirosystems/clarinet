@@ -97,20 +97,25 @@ enum Command {
     LSP,
     /// Format clarity code files
     #[clap(name = "format", aliases = &["fmt"], bin_name = "format")]
-    Format(Format),
+    Formatter(Formatter),
     /// Step by step debugging and breakpoints from your code editor (VSCode, vim, emacs, etc)
     #[clap(name = "dap", bin_name = "dap")]
     DAP,
 }
 
 #[derive(Parser, PartialEq, Clone, Debug)]
-struct Format {
-    /// Path to clarity files
+struct Formatter {
+    /// Path to clarity files (defaults to ./contracts)
     #[clap(long = "path", short = 'p')]
     pub code_path: Option<String>,
     /// If specified, format only this file
     #[clap(long = "file", short = 'f')]
     pub file: Option<String>,
+    #[clap(long = "max-line-length", short = 'l')]
+    pub max_line_length: Option<usize>,
+    #[clap(long = "tabs", short = 't')]
+    /// indentation size, e.g. 2
+    pub indentation: Option<usize>,
     #[clap(long = "dry-run")]
     pub dry_run: bool,
 }
@@ -1215,9 +1220,17 @@ pub fn main() {
                 process::exit(1);
             }
         },
-        Command::Format(cmd) => {
+        Command::Formatter(cmd) => {
             let sources = get_source_with_path(cmd.code_path, cmd.file);
-            let settings = Settings::default();
+            let mut settings = Settings::default();
+
+            if let Some(max_line_length) = cmd.max_line_length {
+                settings.max_line_length = max_line_length;
+            }
+
+            if let Some(indentation) = cmd.indentation {
+                settings.indentation = clarinet_format::formatter::Indentation::Space(indentation);
+            }
             let mut formatter = ClarityFormatter::new(settings);
 
             for (file_path, source) in &sources {
