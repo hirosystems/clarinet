@@ -10,5 +10,17 @@
       "--target=wasm32-unknown-unknown",
       "--message-format=json",
     ],
+    "rust-analyzer.cargo.allTargets": false,
+    "rust-analyzer.cargo.target": "wasm32-unknown-unknown",
+    "rust-analyzer.check.workspace": false,
+    "rust-analyzer.cargo.buildScripts.overrideCommand": [
+      "cargo",
+      "build",
+      "--no-default-features",
+      "--package=clarinet-sdk-wasm",
+      "--features=wasm",
+      "--target=wasm32-unknown-unknown",
+      "--message-format=json",
+    ],
   },
 }

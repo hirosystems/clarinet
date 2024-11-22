@@ -4,7 +4,6 @@
   "description": "Workspace hosting the Clarinet SDK for Node.js and Browser",
   "author": "hirosystems",
   "license": "GPL-3.0",
-  "type": "module",
   "workspaces": [
     "components/clarinet-sdk-wasm/pkg-node",
     "components/clarinet-sdk-wasm/pkg-browser",
