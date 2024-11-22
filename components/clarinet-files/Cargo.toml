@@ -25,7 +25,7 @@ clarity-repl = { path = "../clarity-repl", default-features = false, optional = 
 js-sys = { version = "0.3", optional = true }
 serde-wasm-bindgen = { version = "0.6.4", optional = true }
 wasm-bindgen = { workspace = true, optional = true }
-wasm-bindgen-futures = { version = "0.4.41", optional = true }
+wasm-bindgen-futures = { version = "0.4", optional = true }
 serde_json = "1.0.114"
 
 [features]
