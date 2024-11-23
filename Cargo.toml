@@ -27,8 +27,8 @@ reqwest = { version = "0.12", default-features = false, features = [
     "json",
     "rustls-tls",
 ] }
-web-sys = { version = "0.3" }
 wasm-bindgen = { version = "0.2" }
+web-sys = { version = "0.3" }
 
 [patch.crates-io]
 chainhook-sdk = { git = "https://github.com/hirosystems/chainhook.git" }

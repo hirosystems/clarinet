@@ -54,6 +54,14 @@ extern "C" {
     pub type IContractInterfaces;
 }
 
+impl EpochString {
+    pub fn new(obj: &str) -> Self {
+        Self {
+            obj: JsValue::from_str(obj),
+        }
+    }
+}
+
 macro_rules! log {
     ( $( $t:tt )* ) => {
         web_sys::console::log_1(&format!( $( $t )* ).into());
