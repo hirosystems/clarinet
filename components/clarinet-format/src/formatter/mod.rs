@@ -1,6 +1,7 @@
 use clarity::types::StacksEpochId;
 use clarity::vm::ast::{build_ast_with_rules, ASTRules};
 use clarity::vm::functions::{define::DefineFunctions, NativeFunctions};
+use clarity::vm::representations::{PreSymbolicExpression, PreSymbolicExpressionType};
 use clarity::vm::types::QualifiedContractIdentifier;
 use clarity::vm::{ClarityVersion, SymbolicExpression};
 
@@ -39,111 +40,169 @@ impl ClarityFormatter {
         Self { settings }
     }
     pub fn format(&mut self, source: &str) -> String {
-        let ast = build_ast_with_rules(
-            &QualifiedContractIdentifier::transient(),
-            source,
-            &mut (),
-            ClarityVersion::Clarity3,
-            StacksEpochId::Epoch30,
-            ASTRules::Typical,
-        )
-        .unwrap();
-        format_source_exprs(&self.settings, &ast.expressions, "")
+        let pse = clarity::vm::ast::parser::v2::parse(source).unwrap();
+        format_source_exprs(&self.settings, &pse, "")
     }
 }
 
-// * functions
-
-// Top level define-<function> should have a line break above and after (except on first line)
-// options always on new lines
-// Functions Always on multiple lines, even if short
-// *begin* never on one line
-// *let* never on one line
-
-// * match *
-// One line if less than max length (unless the original source has line breaks?)
-// Multiple lines if more than max length (should the first arg be on the first line if it fits?)
 pub fn format_source_exprs(
     settings: &Settings,
-    expressions: &[SymbolicExpression],
+    expressions: &[PreSymbolicExpression],
     acc: &str,
 ) -> String {
     if let Some((expr, remaining)) = expressions.split_first() {
         if let Some(list) = expr.match_list() {
-            let atom = list.split_first().and_then(|(f, _)| f.match_atom());
-            use NativeFunctions::*;
-            let formatted = if let Some(
-                DefineFunctions::PublicFunction
-                | DefineFunctions::ReadOnlyFunction
-                | DefineFunctions::PrivateFunction
-                | DefineFunctions::Map,
-            ) = atom.and_then(|a| DefineFunctions::lookup_by_name(a))
-            {
-                format_function(settings, list)
-            } else if let Some(Begin) = atom.and_then(|a| NativeFunctions::lookup_by_name(a)) {
-                format_begin(settings, list)
-            } else if let Some(Let) = atom.and_then(|a| NativeFunctions::lookup_by_name(a)) {
-                format_let(settings, list)
-            } else if let Some(TupleCons) = atom.and_then(|a| NativeFunctions::lookup_by_name(a)) {
-                format_tuple(settings, list)
-            } else {
-                format!("({})", format_source_exprs(settings, list, acc))
-            };
-            let pre_comments = format_comments(&expr.pre_comments);
-            let post_comments = format_comments(&expr.post_comments);
+            // println!("{:?}", list);
+            if let Some(atom_name) = list.split_first().and_then(|(f, _)| f.match_atom()) {
+                let formatted = if let Some(native) = NativeFunctions::lookup_by_name(atom_name) {
+                    match native {
+                        NativeFunctions::Let => format_let(settings, list),
+                        NativeFunctions::Begin => format_begin(settings, list),
+                        NativeFunctions::Match => format_match(settings, list),
+                        NativeFunctions::TupleCons => format_tuple(settings, list),
+                        NativeFunctions::ListCons => format_list(settings, list),
+                        _ => format!("({})", format_source_exprs(settings, list, acc)),
+                    }
+                } else if let Some(define) = DefineFunctions::lookup_by_name(atom_name) {
+                    match define {
+                        DefineFunctions::PublicFunction
+                        | DefineFunctions::ReadOnlyFunction
+                        | DefineFunctions::PrivateFunction => format_function(settings, list),
+                        DefineFunctions::Constant => format_constant(settings, list),
+                        DefineFunctions::UseTrait => format_use_trait(settings, list),
+                        DefineFunctions::Trait => format_trait(settings, list),
+                        DefineFunctions::Map => format_map(settings, list),
+                        DefineFunctions::ImplTrait => format_impl_trait(settings, list),
+                        // DefineFunctions::PersistedVariable
+                        // DefineFunctions::FungibleToken
+                        // DefineFunctions::NonFungibleToken
+                        _ => format!("({})", format_source_exprs(settings, list, acc)),
+                    }
+                } else {
+                    format!("({})", format_source_exprs(settings, list, acc))
+                };
 
-            let end_line_comment = if let Some(comment) = &expr.end_line_comment {
-                format!(" ;; {}\n", comment)
-            } else {
-                String::new()
-            };
-            let post_comment_prefix = if end_line_comment.is_empty() {
-                "\n"
-            } else {
-                ""
-            };
-            return format!(
-                "{pre_comments}{formatted}{end_line_comment}{post_comment_prefix}{post_comments}{}",
-                format_source_exprs(settings, remaining, acc)
-            )
-            .trim()
-            .to_owned();
+                return format!(
+                    "{formatted}{}",
+                    format_source_exprs(settings, remaining, acc)
+                )
+                .trim()
+                .to_owned();
+            }
         }
-        return format!("{} {}", expr, format_source_exprs(settings, remaining, acc))
-            .trim()
-            .to_owned();
+        return format!(
+            "{} {}",
+            display_pse(expr),
+            format_source_exprs(settings, remaining, acc)
+        )
+        .trim()
+        .to_owned();
     };
     acc.to_owned()
 }
 
-fn format_comments(comments: &[(String, clarity::vm::representations::Span)]) -> String {
-    if !comments.is_empty() {
-        comments
-            .iter()
-            .map(|(comment, span)| {
-                format!(
-                    "{};; {}\n",
-                    " ".repeat(span.start_column as usize - 1),
-                    comment
-                )
-            })
-            .collect::<Vec<_>>()
-            .join("\n")
+fn format_use_trait(_settings: &Settings, _exprs: &[PreSymbolicExpression]) -> String {
+    "".to_string()
+}
+fn format_impl_trait(_settings: &Settings, _exprs: &[PreSymbolicExpression]) -> String {
+    "".to_string()
+}
+fn format_trait(_settings: &Settings, _exprs: &[PreSymbolicExpression]) -> String {
+    "".to_string()
+}
+
+fn name_and_args(
+    exprs: &[PreSymbolicExpression],
+) -> Option<(&PreSymbolicExpression, &[PreSymbolicExpression])> {
+    if exprs.len() >= 2 {
+        Some((&exprs[1], &exprs[2..]))
     } else {
-        "".to_string()
+        None // Return None if there aren't enough items
     }
 }
 
-fn indentation_to_string(indentation: &Indentation) -> String {
-    match indentation {
-        Indentation::Space(i) => " ".repeat(*i),
-        Indentation::Tab => "\t".to_string(),
+// fn format_constant(settings: &Settings, exprs: &[PreSymbolicExpression]) -> String {
+//     let indentation = indentation_to_string(&settings.indentation);
+//     let mut acc = "(define-constant ".to_string();
+
+//     if let Some((name, args)) = exprs
+//         .get(1)
+//         .and_then(|f| f.match_list())
+//         .and_then(|list| list.split_first())
+//     {
+//         acc.push_str(&display_pse(name));
+
+//         for arg in args {
+//             if let Some(list) = arg.match_list() {
+//                 acc.push_str(&format!(
+//                     "\n{}({})",
+//                     indentation,
+//                     format_source_exprs(settings, list, "")
+//                 ));
+//             }
+//         }
+//         acc.push_str("\n)\n");
+//         acc.to_owned()
+//     } else {
+//         panic!("Expected a valid constant definition")
+//     }
+// }
+
+fn format_constant(settings: &Settings, exprs: &[PreSymbolicExpression]) -> String {
+    let indentation = indentation_to_string(&settings.indentation);
+    let mut acc = "(define-constant ".to_string();
+
+    if let Some((name, args)) = name_and_args(exprs) {
+        acc.push_str(&format!("{} ", display_pse(name)));
+
+        // Access the value from args
+        if let Some(value) = args.first() {
+            if let Some(list) = value.match_list() {
+                acc.push_str(&format!(
+                    "\n{}({})",
+                    indentation,
+                    format_source_exprs(settings, list, "")
+                ));
+            } else {
+                // Handle non-list values (e.g., literals or simple expressions)
+                acc.push_str(&display_pse(value));
+            }
+        }
+
+        acc.push_str("\n)\n");
+        acc.to_owned()
+    } else {
+        panic!("Expected a valid constant definition with (name value)")
     }
 }
+fn format_map(settings: &Settings, exprs: &[PreSymbolicExpression]) -> String {
+    let indentation = indentation_to_string(&settings.indentation);
+    let mut acc = "(define-map (".to_string();
+    let name_and_args = exprs.get(1).and_then(|f| f.match_list()).unwrap();
 
-fn format_begin(settings: &Settings, exprs: &[SymbolicExpression]) -> String {
+    if let Some((name, args)) = name_and_args.split_first() {
+        acc.push_str(&format!("{}", display_pse(name)));
+
+        for arg in args {
+            if let Some(list) = arg.match_list() {
+                acc.push_str(&format!(
+                    "\n{}{}",
+                    indentation,
+                    format_source_exprs(settings, list, "")
+                ))
+            }
+        }
+        acc.push_str("\n)\n");
+        acc.to_owned()
+    } else {
+        String::new() // this is likely an error or unreachable
+    }
+}
+// *begin* never on one line
+fn format_begin(settings: &Settings, exprs: &[PreSymbolicExpression]) -> String {
     let mut begin_acc = "(begin".to_string();
     let indentation = indentation_to_string(&settings.indentation);
+
     for arg in exprs.get(1..).unwrap_or_default() {
         if let Some(list) = arg.match_list() {
             begin_acc.push_str(&format!(
@@ -157,7 +216,8 @@ fn format_begin(settings: &Settings, exprs: &[SymbolicExpression]) -> String {
     begin_acc.to_owned()
 }
 
-fn format_let(settings: &Settings, exprs: &[SymbolicExpression]) -> String {
+// *let* never on one line
+fn format_let(settings: &Settings, exprs: &[PreSymbolicExpression]) -> String {
     let mut begin_acc = "(let (".to_string();
     let indentation = indentation_to_string(&settings.indentation);
     for arg in exprs.get(1..).unwrap_or_default() {
@@ -173,21 +233,63 @@ fn format_let(settings: &Settings, exprs: &[SymbolicExpression]) -> String {
     begin_acc.to_owned()
 }
 
-fn format_tuple(settings: &Settings, exprs: &[SymbolicExpression]) -> String {
+// * match *
+// One line if less than max length (unless the original source has line breaks?)
+// Multiple lines if more than max length (should the first arg be on the first line if it fits?)
+fn format_match(settings: &Settings, exprs: &[PreSymbolicExpression]) -> String {
+    println!("{:?}", exprs);
+    let mut acc = "(match ".to_string();
+    let indentation = indentation_to_string(&settings.indentation);
+
+    if let Some((name, args)) = name_and_args(exprs) {
+        acc.push_str(&display_pse(name));
+        for arg in args.get(1..).unwrap_or_default() {
+            if let Some(list) = arg.match_list() {
+                acc.push_str(&format!(
+                    "\n{}({})",
+                    indentation,
+                    format_source_exprs(settings, list, "")
+                ))
+            }
+        }
+        acc.push_str("\n)");
+        acc.to_owned()
+    } else {
+        "".to_string()
+    }
+}
+
+fn format_list(settings: &Settings, exprs: &[PreSymbolicExpression]) -> String {
+    println!("here");
+    let mut acc = "(".to_string();
+    for (i, expr) in exprs[1..].iter().enumerate() {
+        let value = format_source_exprs(settings, &[expr.clone()], "");
+        if i < exprs.len() - 2 {
+            acc.push_str(&format!("{value} "));
+        } else {
+            acc.push_str(&value.to_string());
+        }
+    }
+    acc.push(')');
+    acc.to_string()
+}
+
+fn format_tuple(settings: &Settings, exprs: &[PreSymbolicExpression]) -> String {
     let mut tuple_acc = "{ ".to_string();
     for (i, expr) in exprs[1..].iter().enumerate() {
         let (key, value) = expr
             .match_list()
             .and_then(|list| list.split_first())
             .unwrap();
+        let fkey = display_pse(key);
         if i < exprs.len() - 2 {
             tuple_acc.push_str(&format!(
-                "{key}: {}, ",
+                "{fkey}: {}, ",
                 format_source_exprs(settings, value, "")
             ));
         } else {
             tuple_acc.push_str(&format!(
-                "{key}: {}",
+                "{fkey}: {}",
                 format_source_exprs(settings, value, "")
             ));
         }
@@ -196,40 +298,101 @@ fn format_tuple(settings: &Settings, exprs: &[SymbolicExpression]) -> String {
     tuple_acc.to_string()
 }
 
-fn format_function(settings: &Settings, exprs: &[SymbolicExpression]) -> String {
-    let func_type = exprs.first().unwrap();
-    let indentation = indentation_to_string(&settings.indentation);
-    let name_and_args = exprs.get(1).and_then(|f| f.match_list()).unwrap();
-
-    let mut func_acc = format!("({func_type} (");
-
-    if let Some((name, args)) = name_and_args.split_first() {
-        func_acc.push_str(&format!("{}", name));
-        if args.is_empty() {
-            func_acc.push(')');
-        } else {
-            for arg in args {
-                func_acc.push_str(&format!(
-                    "\n{}{}{}",
-                    indentation,
-                    indentation,
-                    format_source_exprs(settings, &[arg.clone()], "")
-                ));
-            }
-            func_acc.push_str(&format!("\n{})", indentation));
+// This should panic on most things besides atoms and values. Added this to help
+// debugging in the meantime
+fn display_pse(pse: &PreSymbolicExpression) -> String {
+    match pse.pre_expr {
+        PreSymbolicExpressionType::Atom(ref value) => {
+            println!("atom: {}", value.as_str());
+            value.as_str().trim().to_string()
+        }
+        PreSymbolicExpressionType::AtomValue(ref value) => {
+            println!("atomvalue: {}", value);
+            value.to_string()
+        }
+        PreSymbolicExpressionType::List(ref items) => {
+            println!("list: {:?}", items);
+            items.iter().map(display_pse).collect::<Vec<_>>().join(" ")
+        }
+        PreSymbolicExpressionType::Tuple(ref items) => {
+            println!("tuple: {:?}", items);
+            items.iter().map(display_pse).collect::<Vec<_>>().join(", ")
+        }
+        PreSymbolicExpressionType::SugaredContractIdentifier(ref name) => name.to_string(),
+        PreSymbolicExpressionType::SugaredFieldIdentifier(ref contract, ref field) => {
+            format!("{}.{}", contract, field)
+        }
+        PreSymbolicExpressionType::FieldIdentifier(ref trait_id) => {
+            println!("field id: {}", trait_id);
+            trait_id.to_string()
+        }
+        PreSymbolicExpressionType::TraitReference(ref name) => name.to_string(),
+        PreSymbolicExpressionType::Comment(ref text) => {
+            // println!("comment: {}", text);
+            format!(";; {}\n", text.trim())
+        }
+        PreSymbolicExpressionType::Placeholder(ref _placeholder) => {
+            "".to_string() // Placeholder is for if parsing fails
         }
     }
-    for arg in exprs.get(2..).unwrap_or_default() {
-        if let Some(list) = arg.match_list() {
-            func_acc.push_str(&format!(
+}
+
+// * functions
+
+// Top level define-<function> should have a line break above and after (except on first line)
+// options always on new lines
+// Functions Always on multiple lines, even if short
+fn format_function(settings: &Settings, exprs: &[PreSymbolicExpression]) -> String {
+    let func_type = display_pse(exprs.first().unwrap());
+    let indentation = indentation_to_string(&settings.indentation);
+
+    let mut acc = format!("({func_type} (");
+
+    // function name and arguments
+    if let Some(def) = exprs.get(1).and_then(|f| f.match_list()) {
+        if let Some((name, args)) = def.split_first() {
+            acc.push_str(&display_pse(name));
+            for arg in args.iter() {
+                if let Some(list) = arg.match_list() {
+                    acc.push_str(&format!(
+                        "\n{}{}({})",
+                        indentation,
+                        indentation,
+                        format_source_exprs(settings, list, "")
+                    ))
+                } else {
+                    acc.push_str(&display_pse(arg))
+                }
+            }
+            if args.is_empty() {
+                acc.push(')')
+            } else {
+                acc.push_str(&format!("\n{})", indentation))
+            }
+        } else {
+            panic!("can't have a nameless function")
+        }
+    }
+
+    // function body expressions
+    for expr in exprs.get(2..).unwrap_or_default() {
+        if let Some(list) = expr.match_list() {
+            acc.push_str(&format!(
                 "\n{}({})",
                 indentation,
                 format_source_exprs(settings, list, "")
             ))
         }
     }
-    func_acc.push_str("\n)");
-    func_acc.to_owned()
+    acc.push_str("\n)\n\n");
+    acc.to_owned()
+}
+
+fn indentation_to_string(indentation: &Indentation) -> String {
+    match indentation {
+        Indentation::Space(i) => " ".repeat(*i),
+        Indentation::Tab => "\t".to_string(),
+    }
 }
 #[cfg(test)]
 mod tests_formatter {
@@ -277,6 +440,21 @@ mod tests_formatter {
     }
 
     #[test]
+    fn test_multi_function() {
+        let src = "(define-public (my-func) (ok true))\n(define-public (my-func2) (ok true))";
+        let result = format_with_default(&String::from(src));
+        let expected = r#"(define-public (my-func)
+  (ok true)
+)
+
+(define-public (my-func2)
+  (ok true)
+)
+
+"#;
+        assert_eq!(expected, result);
+    }
+    #[test]
     fn test_function_args_multiline() {
         let src = "(define-public (my-func (amount uint) (sender principal)) (ok true))";
         let result = format_with_default(&String::from(src));
@@ -303,6 +481,23 @@ mod tests_formatter {
 
         let result = format_with_default(&String::from(src));
         assert_eq!(src, result);
+    }
+
+    #[test]
+    fn test_map() {
+        let src = "(define-map something { name: (buff 48), namespace: (buff 20) } uint\n)";
+        let result = format_with_default(&String::from(src));
+        assert_eq!(result, "(define-map something\n  uint\n  uint)");
+        //         let src2 = "(define-map something { name: (buff 48), namespace: (buff 20) } uint\n)";
+        //         let result2 = format_with_default(&String::from(src2));
+        //         let expected2 = r#"(define-map something
+        //   {
+        //     name: (buff 48),
+        //     namespace: (buff 20)
+        //   }
+        //   uint
+        // )"#;
+        //         assert_eq!(result2, expected2);
     }
     // #[test]
     // fn test_end_of_line_comments_max_line_length() {
