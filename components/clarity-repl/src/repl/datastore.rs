@@ -1,6 +1,4 @@
 use std::collections::HashMap;
-use std::sync::mpsc::channel;
-use std::thread;
 
 use clarity::types::chainstate::{
     BlockHeaderHash, BurnchainHeaderHash, ConsensusHash, SortitionId, StacksAddress, StacksBlockId,
@@ -16,8 +14,13 @@ use clarity::vm::types::{QualifiedContractIdentifier, TupleData};
 use clarity::vm::StacksEpoch;
 use pox_locking::handle_contract_call_special_cases;
 use sha2::{Digest, Sha512_256};
+#[cfg(target_arch = "wasm32")]
+use wasm_bindgen::JsValue;
+#[cfg(target_arch = "wasm32")]
+use web_sys::js_sys::{Function as JsFunction, JsString, Uint8Array};
 
 use super::interpreter::BLOCK_LIMIT_MAINNET;
+use super::settings::RemoteDataSettings;
 
 const SECONDS_BETWEEN_BURN_BLOCKS: u64 = 600;
 const SECONDS_BETWEEN_STACKS_BLOCKS: u64 = 10;
@@ -45,7 +48,12 @@ pub struct ClarityDatastore {
     metadata: HashMap<(String, String), String>,
     block_id_lookup: HashMap<StacksBlockId, StacksBlockId>,
     height_at_chain_tip: HashMap<StacksBlockId, u32>,
+
+    remote_data_settings: RemoteDataSettings,
     remote_chaintip_cache: HashMap<u32, String>,
+
+    #[cfg(target_arch = "wasm32")]
+    http_client: Option<JsFunction>,
 }
 
 #[derive(Deserialize)]
@@ -116,12 +124,12 @@ fn height_to_burn_block_header_hash(height: u32) -> BurnchainHeaderHash {
 
 impl Default for ClarityDatastore {
     fn default() -> Self {
-        Self::new()
+        Self::new(RemoteDataSettings::default())
     }
 }
 
 impl ClarityDatastore {
-    pub fn new() -> Self {
+    pub fn new(remote_data_settings: RemoteDataSettings) -> Self {
         let id = height_to_id(0);
         Self {
             open_chain_tip: id,
@@ -130,12 +138,17 @@ impl ClarityDatastore {
             metadata: HashMap::new(),
             block_id_lookup: HashMap::from([(id, id)]),
             height_at_chain_tip: HashMap::from([(id, 0)]),
+
+            remote_data_settings,
             remote_chaintip_cache: HashMap::new(),
+            #[cfg(target_arch = "wasm32")]
+            http_client: None,
         }
     }
 
-    pub fn open(_path_str: &str, _miner_tip: Option<&StacksBlockId>) -> Result<ClarityDatastore> {
-        Ok(ClarityDatastore::new())
+    #[cfg(target_arch = "wasm32")]
+    pub fn set_http_client(&mut self, http_client: web_sys::js_sys::Function) {
+        self.http_client = Some(http_client);
     }
 
     pub fn as_analysis_db(&mut self) -> AnalysisDatabase<'_> {
@@ -218,7 +231,40 @@ impl ClarityDatastore {
         format!("clarity-contract::{}", contract)
     }
 
-    #[cfg(not(target_family = "wasm"))]
+    #[cfg(not(target_arch = "wasm32"))]
+    fn fetch_data<T: serde::de::DeserializeOwned>(&self, path: &str) -> Result<T> {
+        let url = format!("{}{}", self.remote_data_settings.api_url, path);
+        let response =
+            reqwest::blocking::get(url).unwrap_or_else(|e| panic!("unable to fetch data: {}", e));
+
+        let data = response.json::<T>().unwrap_or_else(|e| {
+            panic!("unable to parse json, error: {}", e);
+        });
+
+        Ok(data)
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    fn fetch_data<T: serde::de::DeserializeOwned>(&self, path: &str) -> Result<T> {
+        let url = JsString::from(format!("{}{}", self.remote_data_settings.api_url, path));
+
+        match self.http_client {
+            Some(ref client) => {
+                let response = client.call2(&JsValue::NULL, &JsString::from("GET"), &url);
+                if let Ok(response) = response {
+                    let bytes = Uint8Array::from(response).to_vec();
+                    let raw_result = std::str::from_utf8(bytes.as_slice()).unwrap();
+                    let data =
+                        serde_json::from_str::<T>(raw_result).expect("Failed to parse response");
+                    Ok(data)
+                } else {
+                    panic!("unable to fetch data: {:?}", response);
+                }
+            }
+            None => panic!("http client not set"),
+        }
+    }
+
     fn get_remote_chaintip(&mut self, height: u32) -> String {
         if let Some(cached) = self.remote_chaintip_cache.get(&height) {
             println!("using cached chaintip for height: {}", height);
@@ -226,28 +272,13 @@ impl ClarityDatastore {
         }
         println!("fetching remote chaintip for height: {}", height);
 
-        let url = format!("http://localhost:3999/extended/v2/blocks/{}", height);
-        let request = ehttp::Request::get(&url);
-        let (tx, rx) = channel();
-        ehttp::fetch(request, move |result: ehttp::Result<ehttp::Response>| {
-            println!("----------------");
-            if let Ok(res) = result {
-                let _ = tx.send(res.status);
-            }
-        });
-        let status = rx.recv().expect("Failed to receive status");
-        println!("Status code: {:?}", status);
+        let url = format!("/extended/v2/blocks/{}", height);
 
-        let response = reqwest::blocking::get(url).unwrap_or_else(|e| {
-            panic!(
-                "unable to fetch remote chaintip for height: {}\nError: {}",
-                height, e
-            )
-        });
-
-        let data = response.json::<BlockInfoResponse>().unwrap_or_else(|e| {
-            panic!("unable to parse json, error: {}", e);
-        });
+        let data = self
+            .fetch_data::<BlockInfoResponse>(&url)
+            .unwrap_or_else(|e| {
+                panic!("unable to parse json, error: {}", e);
+            });
 
         let block_hash = data.index_block_hash.replacen("0x", "", 1);
         self.remote_chaintip_cache
@@ -256,100 +287,12 @@ impl ClarityDatastore {
         block_hash
     }
 
-    #[cfg(target_family = "wasm")]
-    fn get_remote_chaintip(&mut self, height: u32) -> String {
-        if let Some(cached) = self.remote_chaintip_cache.get(&height) {
-            println!("using cached chaintip for height: {}", height);
-            return cached.to_string();
-        }
-
-        println!("fetching remote chaintip for height: {}", height);
-
-        let url = format!("http://localhost:3999/extended/v2/blocks/{}", height);
-
-        match web_sys::XmlHttpRequest::new() {
-            Ok(xhr) => {
-                let _ = xhr.open("GET", &url);
-                let _ = xhr.send();
-
-                match xhr.response_text() {
-                    Ok(Some(response)) => {
-                        let data = serde_json::from_str::<BlockInfoResponse>(&response)
-                            .expect("Failed to parse response");
-
-                        let block_hash = data.index_block_hash.replacen("0x", "", 1);
-                        self.remote_chaintip_cache
-                            .insert(height, block_hash.clone());
-
-                        block_hash
-                    }
-                    _ => {
-                        panic!("Failed to fetch remote chaintip for height: {}", height);
-                    }
-                }
-            }
-            Err(e) => {
-                panic!(
-                    "Failed to create XmlHttpRequest: {}",
-                    e.as_string().unwrap()
-                );
-            }
-        }
-    }
-
-    #[cfg(not(target_family = "wasm"))]
     fn fetch_remote_data(&mut self, path: &str) -> Result<Option<String>> {
-        let url = format!("http://localhost:3999/v2{}", path);
-
-        let request = ehttp::Request::get(&url);
-        // let (sender, receiver) = channel();
-        // ehttp::fetch(request, move |result: ehttp::Result<ehttp::Response>| {
-        //     println!("----------------");
-        //     match result {
-        //         Ok(res) => {
-        //             let data = res.text().clone();
-        //             println!("Response: {:?}", res);
-        //             let _ = sender.send(data);
-        //         }
-        //         Err(e) => {
-        //             panic!("Failed to fetch data: {}", e);
-        //         }
-        //     }
-        // });
-        let request = ehttp::Request::get(&url);
-        let (tx, rx) = channel();
-        ehttp::fetch(request, move |result: ehttp::Result<ehttp::Response>| {
-            if let Ok(res) = result {
-                let _ = tx.send(res);
-            }
-        });
-        let response = rx.recv().unwrap();
-        let data = serde_json::from_str::<ClarityDataResponse>(response.text().unwrap()).unwrap();
-        println!("----------------");
-        println!("request response: {:#?}", data.data);
-
-        // let response = reqwest::blocking::get(url)
-        //     .unwrap_or_else(|e| panic!("unable to fetch value for: {}\nError: {}", path, e));
-
-        // if response.status() == reqwest::StatusCode::NOT_FOUND {
-        //     if response.text().unwrap_or_default() == "Chain tip not found" {
-        //         println!("An invalid chaintip was specified do");
-        //     }
-        //     return Ok(None);
-        // }
-
-        // if response.status() != reqwest::StatusCode::OK {
-        //     println!(
-        //         "Failed to fetch data. Status: {}\nError: {}",
-        //         response.status(),
-        //         response.text().unwrap_or_default()
-        //     );
-        //     return Ok(None);
-        // }
-
-        // let data = response.json::<ClarityDataResponse>().unwrap_or_else(|e| {
-        //     panic!("unable to parse json, error: {}", e);
-        // });
+        let data = self
+            .fetch_data::<ClarityDataResponse>(path)
+            .unwrap_or_else(|e| {
+                panic!("unable to parse json, error: {}", e);
+            });
 
         let value = if data.data.starts_with("0x") {
             data.data[2..].to_string()
@@ -360,49 +303,13 @@ impl ClarityDatastore {
         Ok(Some(value))
     }
 
-    #[cfg(target_family = "wasm")]
-    fn fetch_remote_data(&mut self, path: &str) -> Result<Option<String>> {
-        let url = format!("http://localhost:3999/v2{}", path);
-        match web_sys::XmlHttpRequest::new() {
-            Ok(xhr) => {
-                let _ = xhr.open("GET", &url);
-                let _ = xhr.send();
-
-                match xhr.response_text() {
-                    Ok(Some(response)) => {
-                        let data = serde_json::from_str::<ClarityDataResponse>(&response)
-                            .expect("Failed to parse response");
-
-                        let value = if data.data.starts_with("0x") {
-                            data.data[2..].to_string()
-                        } else {
-                            data.data
-                        };
-                        Ok(Some(value))
-                    }
-                    _ => {
-                        panic!("Failed to fetch data");
-                    }
-                }
-            }
-            Err(e) => {
-                dbg!(&e);
-                match e.as_string() {
-                    Some(s) => {
-                        panic!("Failed to create XmlHttpRequest: {}", s);
-                    }
-                    None => {
-                        panic!("Failed to create XmlHttpRequest");
-                    }
-                }
-            }
-        }
-    }
-
-    fn fetch_clarity_marf_value(&mut self, key: &str, block_height: u32) -> Result<Option<String>> {
+    fn fetch_clarity_marf_value(&mut self, key: &str) -> Result<Option<String>> {
+        let block_height = self.get_current_block_height();
         let remote_chaintip = self.get_remote_chaintip(block_height);
-        let path = format!("/clarity/marf/{}?tip={}&proof=false", key, remote_chaintip);
-        dbg!(&path);
+        let path = format!(
+            "/v2/clarity/marf/{}?tip={}&proof=false",
+            key, remote_chaintip
+        );
         self.fetch_remote_data(&path)
     }
 
@@ -413,17 +320,23 @@ impl ClarityDatastore {
     ) -> Result<Option<String>> {
         let addr = contract.issuer.to_string();
         let contract = contract.name.to_string();
-
-        println!(
+        let block_height = self.get_current_block_height();
+        let remote_chaintip = self.get_remote_chaintip(block_height);
+        uprint!(
             "fetching METADATA from network, {}/{}/{}",
-            addr, contract, key
+            addr,
+            contract,
+            key
         );
 
-        let url = format!("/clarity/metadata/{}/{}/{}", addr, contract, key);
+        let url = format!(
+            "/v2/clarity/metadata/{}/{}/{}?tip={}",
+            addr, contract, key, remote_chaintip
+        );
         let data = self.fetch_remote_data(&url);
 
         if let Ok(Some(value)) = &data {
-            println!("network metadata value: {}", value);
+            uprint!("network metadata value: {}", value);
         }
 
         data
@@ -440,8 +353,7 @@ impl ClarityBackingStore for ClarityDatastore {
 
     /// fetch K-V out of the committed datastore
     fn get_data(&mut self, key: &str) -> Result<Option<String>> {
-        println!("get_data({})", key);
-        let current_block_height = self.get_current_block_height();
+        uprint!("get_data({})", key);
 
         let lookup_id = self
             .block_id_lookup
@@ -453,10 +365,10 @@ impl ClarityBackingStore for ClarityDatastore {
             if value.is_some() {
                 return Ok(value.cloned());
             }
-            println!("fetching MARF from network");
-            let data = self.fetch_clarity_marf_value(key, current_block_height);
+            uprint!("fetching MARF from network");
+            let data = self.fetch_clarity_marf_value(key);
             if let Ok(Some(value)) = &data {
-                println!("network marf value: {}", value);
+                uprint!("network marf value: {}", value);
                 self.put(key, value);
             }
             data
@@ -541,17 +453,18 @@ impl ClarityBackingStore for ClarityDatastore {
         key: &str,
     ) -> Result<Option<String>> {
         println!("get_metadata({}, {})", contract, key);
-
-        match self.metadata.get(&(contract.to_string(), key.to_string())) {
-            Some(result) => Ok(Some(result.to_string())),
-            None => {
-                let data = self.fetch_clarity_metadata(contract, key);
-                if let Ok(Some(value)) = &data {
-                    let _ = self.insert_metadata(contract, key, value);
-                }
-                data
-            }
+        let metadata = self.metadata.get(&(contract.to_string(), key.to_string()));
+        if metadata.is_some() {
+            return Ok(metadata.cloned());
         }
+        if self.remote_data_settings.enabled {
+            let data = self.fetch_clarity_metadata(contract, key);
+            if let Ok(Some(value)) = &data {
+                let _ = self.insert_metadata(contract, key, value);
+            }
+            return data;
+        }
+        Ok(None)
     }
 
     fn get_contract_hash(
@@ -1022,7 +935,7 @@ impl BurnStateDB for Datastore {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(target_arch = "wasm32")))]
 mod tests {
     use clarity::types::StacksEpoch;
 
@@ -1031,7 +944,7 @@ mod tests {
     #[test]
     fn test_advance_chain_tip() {
         let mut datastore = Datastore::default();
-        let mut clarity_datastore = ClarityDatastore::new();
+        let mut clarity_datastore = ClarityDatastore::new(RemoteDataSettings::default());
         datastore.advance_burn_chain_tip(&mut clarity_datastore, 5);
         assert_eq!(datastore.stacks_chain_height, 5);
     }
@@ -1039,7 +952,7 @@ mod tests {
     #[test]
     fn test_set_current_epoch() {
         let mut datastore = Datastore::default();
-        let mut clarity_datastore = ClarityDatastore::new();
+        let mut clarity_datastore = ClarityDatastore::new(RemoteDataSettings::default());
         let epoch_id = StacksEpochId::Epoch25;
         datastore.set_current_epoch(&mut clarity_datastore, epoch_id);
         assert_eq!(datastore.current_epoch, epoch_id);
@@ -1078,7 +991,7 @@ mod tests {
     #[test]
     fn test_get_tip_burn_block_height() {
         let mut datastore = Datastore::default();
-        let mut clarity_datastore = ClarityDatastore::new();
+        let mut clarity_datastore = ClarityDatastore::new(RemoteDataSettings::default());
         let chain_height = 10;
         datastore.advance_burn_chain_tip(&mut clarity_datastore, 10);
         let tip_burn_block_height = datastore.get_tip_burn_block_height();

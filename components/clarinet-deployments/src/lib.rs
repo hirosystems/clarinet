@@ -128,7 +128,7 @@ pub fn update_session_with_deployment_plan(
     update_session_with_genesis_accounts(session, deployment);
 
     let mut boot_contracts = BTreeMap::new();
-    if !session.settings.repl_settings.network_simulation.enabled {
+    if !session.settings.repl_settings.remote_data.enabled {
         let boot_contracts_data = BOOT_CONTRACTS_DATA.clone();
 
         for (contract_id, (boot_contract, ast)) in boot_contracts_data {
@@ -348,11 +348,11 @@ pub async fn generate_default_deployment(
     };
     let session = Session::new(settings.clone());
 
-    let simnet_network_simulation = matches!(network, StacksNetwork::Simnet)
-        && session.settings.repl_settings.network_simulation.enabled;
+    let simnet_remote_data = matches!(network, StacksNetwork::Simnet)
+        && session.settings.repl_settings.remote_data.enabled;
 
     let mut boot_contracts_ids = BTreeSet::new();
-    if !simnet_network_simulation {
+    if !simnet_remote_data {
         let boot_contracts_data = BOOT_CONTRACTS_DATA.clone();
         let mut boot_contracts_asts = BTreeMap::new();
         for (id, (contract, ast)) in boot_contracts_data {
@@ -437,7 +437,7 @@ pub async fn generate_default_deployment(
                             clarity_version,
                         };
 
-                        if !simnet_network_simulation {
+                        if !simnet_remote_data {
                             emulated_contracts_publish.insert(contract_id.clone(), data);
                         }
                     } else if matches!(network, StacksNetwork::Devnet | StacksNetwork::Testnet) {
@@ -543,7 +543,7 @@ pub async fn generate_default_deployment(
         }
 
         // Avoid listing requirements as deployment transactions to the deployment specification on Mainnet
-        if !matches!(network, StacksNetwork::Mainnet) && !simnet_network_simulation {
+        if !matches!(network, StacksNetwork::Mainnet) && !simnet_remote_data {
             let mut ordered_contracts_ids = match ASTDependencyDetector::order_contracts(
                 &requirements_deps,
                 &contract_epochs,

@@ -53,10 +53,11 @@ pub struct Txid(pub [u8; 32]);
 
 impl ClarityInterpreter {
     pub fn new(tx_sender: StandardPrincipalData, repl_settings: Settings) -> Self {
+        let remote_data_settings = repl_settings.remote_data.clone();
         Self {
             tx_sender,
             repl_settings,
-            clarity_datastore: ClarityDatastore::new(),
+            clarity_datastore: ClarityDatastore::new(remote_data_settings),
             accounts: BTreeSet::new(),
             tokens: BTreeMap::new(),
             datastore: Datastore::default(),
@@ -1195,11 +1196,11 @@ impl ClarityInterpreter {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(target_arch = "wasm32")))]
 mod tests {
     use super::*;
     use crate::analysis::Settings as AnalysisSettings;
-    use crate::repl::settings::NetworkSimulationSettings;
+    use crate::repl::settings::RemoteDataSettings;
     use crate::{
         repl::session::BOOT_CONTRACTS_DATA, test_fixtures::clarity_contract::ClarityContractBuilder,
     };
@@ -1309,7 +1310,7 @@ mod tests {
     fn test_advance_stacks_chain_tip() {
         let wasm_settings = Settings {
             analysis: AnalysisSettings::default(),
-            network_simulation: NetworkSimulationSettings::default(),
+            remote_data: RemoteDataSettings::default(),
             clarity_wasm_mode: true,
             show_timings: false,
         };

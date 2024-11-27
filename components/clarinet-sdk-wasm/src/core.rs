@@ -287,6 +287,7 @@ pub struct SDK {
     contracts_interfaces: HashMap<QualifiedContractIdentifier, ContractInterface>,
     session: Option<Session>,
     file_accessor: Box<dyn FileAccessor>,
+    http_client: JsFunction,
     options: SDKOptions,
     current_test_name: String,
     costs_reports: Vec<CostsReport>,
@@ -295,10 +296,14 @@ pub struct SDK {
 #[wasm_bindgen]
 impl SDK {
     #[wasm_bindgen(constructor)]
-    pub fn new(fs_request: JsFunction, options: Option<SDKOptions>) -> Self {
+    pub fn new(
+        fs_request: JsFunction,
+        http_client: JsFunction,
+        options: Option<SDKOptions>,
+    ) -> Self {
         panic::set_hook(Box::new(console_error_panic_hook::hook));
 
-        let fs = Box::new(WASMFileSystemAccessor::new(fs_request));
+        let file_accessor = Box::new(WASMFileSystemAccessor::new(fs_request));
 
         let track_coverage = options.as_ref().map_or(false, |o| o.track_coverage);
         let track_costs = options.as_ref().map_or(false, |o| o.track_costs);
@@ -310,7 +315,8 @@ impl SDK {
             contracts_interfaces: HashMap::new(),
             contracts_locations: HashMap::new(),
             session: None,
-            file_accessor: fs,
+            file_accessor,
+            http_client,
             options: SDKOptions {
                 track_coverage,
                 track_costs,
@@ -337,12 +343,6 @@ impl SDK {
         }
     }
 
-    pub fn xhr_req(&self) -> Result<web_sys::XmlHttpRequest, JsValue> {
-        let xhr = web_sys::XmlHttpRequest::new();
-        log!("{:?}", xhr);
-        xhr
-    }
-
     #[wasm_bindgen(js_name=getDefaultClarityVersionForCurrentEpoch)]
     pub fn default_clarity_version_for_current_epoch(&self) -> ClarityVersionString {
         let session = self.get_session();
@@ -355,7 +355,12 @@ impl SDK {
 
     #[wasm_bindgen(js_name=initEmptySession)]
     pub async fn init_empty_session(&mut self) -> Result<(), String> {
-        let session = Session::new(SessionSettings::default());
+        let mut session = Session::new(SessionSettings::default());
+
+        session
+            .interpreter
+            .clarity_datastore
+            .set_http_client(self.http_client.clone());
         self.session = Some(session);
         Ok(())
     }
@@ -783,10 +788,10 @@ impl SDK {
 
     #[wasm_bindgen(js_name=callReadOnlyFn)]
     pub fn call_read_only_fn(&mut self, args: &CallFnArgs) -> Result<TransactionRes, String> {
-        let interface = self.get_function_interface(&args.contract, &args.method)?;
-        if interface.access != ContractInterfaceFunctionAccess::read_only {
-            return Err(format!("{} is not a read-only function", &args.method));
-        }
+        // let interface = self.get_function_interface(&args.contract, &args.method)?;
+        // if interface.access != ContractInterfaceFunctionAccess::read_only {
+        //     return Err(format!("{} is not a read-only function", &args.method));
+        // }
         self.call_contract_fn(args, false)
     }
 
@@ -795,10 +800,10 @@ impl SDK {
         args: &CallFnArgs,
         advance_chain_tip: bool,
     ) -> Result<TransactionRes, String> {
-        let interface = self.get_function_interface(&args.contract, &args.method)?;
-        if interface.access != ContractInterfaceFunctionAccess::public {
-            return Err(format!("{} is not a public function", &args.method));
-        }
+        // let interface = self.get_function_interface(&args.contract, &args.method)?;
+        // if interface.access != ContractInterfaceFunctionAccess::public {
+        //     return Err(format!("{} is not a public function", &args.method));
+        // }
 
         if advance_chain_tip {
             let session = self.get_session_mut();
@@ -812,10 +817,10 @@ impl SDK {
         args: &CallFnArgs,
         advance_chain_tip: bool,
     ) -> Result<TransactionRes, String> {
-        let interface = self.get_function_interface(&args.contract, &args.method)?;
-        if interface.access != ContractInterfaceFunctionAccess::private {
-            return Err(format!("{} is not a private function", &args.method));
-        }
+        // let interface = self.get_function_interface(&args.contract, &args.method)?;
+        // if interface.access != ContractInterfaceFunctionAccess::private {
+        //     return Err(format!("{} is not a private function", &args.method));
+        // }
         if advance_chain_tip {
             let session = self.get_session_mut();
             session.advance_chain_tip(1);

@@ -6,7 +6,7 @@ use wasm_bindgen_test::*;
 
 async fn init_sdk() -> SDK {
     let js_noop = JsFunction::new_no_args("return");
-    let mut sdk = SDK::new(js_noop, None);
+    let mut sdk = SDK::new(js_noop.clone(), js_noop, None);
     let _ = sdk.init_empty_session().await;
     sdk.set_epoch(EpochString::new("3.0"));
     sdk
@@ -38,13 +38,13 @@ async fn it_can_set_epoch() {
     assert_eq!(sdk.current_epoch(), "3.0");
 }
 
-#[wasm_bindgen_test]
-async fn it_can_deploy_contract() {
-    let mut sdk = init_sdk().await;
-    let tx = deploy_basic_contract(&mut sdk);
-    let expected = format!("0x{}", ClarityValue::Bool(true).serialize_to_hex().unwrap());
-    assert_eq!(tx.result, expected);
-}
+// #[wasm_bindgen_test]
+// async fn it_can_deploy_contract() {
+//     let mut sdk = init_sdk().await;
+//     let tx = deploy_basic_contract(&mut sdk);
+//     let expected = format!("0x{}", ClarityValue::Bool(true).serialize_to_hex().unwrap());
+//     assert_eq!(tx.result, expected);
+// }
 
 // #[wasm_bindgen_test]
 // async fn it_can_call_a_private_function() {

@@ -1,4 +1,6 @@
 use std::convert::TryInto;
+use std::fmt;
+use std::str::FromStr;
 
 use crate::analysis;
 use clarity::types::chainstate::StacksAddress;
@@ -40,20 +42,17 @@ pub struct Account {
 
 #[derive(Clone, Debug, Default)]
 pub struct SessionSettings {
-    pub node: String,
+    // pub node: String,
     pub include_boot_contracts: Vec<String>,
     pub include_costs: bool,
-    pub initial_contracts: Vec<InitialContract>,
     pub initial_accounts: Vec<Account>,
     pub initial_deployer: Option<Account>,
-    pub scoping_contract: Option<String>,
-    pub lazy_initial_contracts_interpretation: bool,
     pub disk_cache_enabled: bool,
     pub repl_settings: Settings,
     pub epoch_id: Option<StacksEpochId>,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
 pub struct ApiUrl(String);
 
 impl Default for ApiUrl {
@@ -62,10 +61,24 @@ impl Default for ApiUrl {
     }
 }
 
+impl FromStr for ApiUrl {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(ApiUrl(s.to_string()))
+    }
+}
+
+impl fmt::Display for ApiUrl {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 #[derive(Debug, Default, Clone, Deserialize, Serialize)]
 pub struct Settings {
     pub analysis: analysis::Settings,
-    pub network_simulation: NetworkSimulationSettings,
+    pub remote_data: RemoteDataSettings,
     #[serde(skip_serializing, skip_deserializing)]
     pub clarity_wasm_mode: bool,
     #[serde(skip_serializing, skip_deserializing)]
@@ -75,7 +88,7 @@ pub struct Settings {
 #[derive(Debug, Default, Clone, Deserialize, Serialize)]
 pub struct SettingsFile {
     analysis: Option<analysis::SettingsFile>,
-    network_simulation: Option<NetworkSimulationSettingsFile>,
+    remote_data: Option<RemoteDataSettingsFile>,
 }
 
 impl From<SettingsFile> for Settings {
@@ -85,47 +98,40 @@ impl From<SettingsFile> for Settings {
             .map(analysis::Settings::from)
             .unwrap_or_default();
 
-        let network_simulation = file
-            .network_simulation
-            .map(NetworkSimulationSettings::from)
+        let remote_data = file
+            .remote_data
+            .map(RemoteDataSettings::from)
             .unwrap_or_default();
 
         Self {
             analysis,
-            network_simulation,
+            remote_data,
             clarity_wasm_mode: false,
             show_timings: false,
         }
     }
 }
 
-// #[derive(Debug, Default, Clone, Deserialize, Serialize)]
-// pub struct SimnetSettingsFile {
-//     network_simulation: NetworkSimulationSettingsFile,
-// }
-
 #[derive(Debug, Default, Clone, Deserialize, Serialize)]
-pub struct NetworkSimulationSettingsFile {
+pub struct RemoteDataSettingsFile {
     enabled: Option<bool>,
     api_url: Option<ApiUrl>,
+    initial_height: Option<u32>,
 }
-
-// #[derive(Debug, Default, Clone, Deserialize, Serialize)]
-// pub struct SimnetSettings {
-//     pub network_simulation: NetworkSimulationSettings,
-// }
 
 #[derive(Debug, Default, Clone, Deserialize, Serialize)]
-pub struct NetworkSimulationSettings {
+pub struct RemoteDataSettings {
     pub enabled: bool,
     pub api_url: ApiUrl,
+    pub initial_height: Option<u32>,
 }
 
-impl From<NetworkSimulationSettingsFile> for NetworkSimulationSettings {
-    fn from(file: NetworkSimulationSettingsFile) -> Self {
+impl From<RemoteDataSettingsFile> for RemoteDataSettings {
+    fn from(file: RemoteDataSettingsFile) -> Self {
         Self {
             enabled: file.enabled.unwrap_or_default(),
             api_url: file.api_url.unwrap_or_default(),
+            initial_height: file.initial_height,
         }
     }
 }
