@@ -35,7 +35,6 @@ getrandom = { version = "0.2.3", features = ["js"] }
 atty = "0.2.14"
 clarity = { workspace = true }
 clar2wasm = { git = "https://github.com/stacks-network/clarity-wasm.git", branch = "main", optional = true }
-# clar2wasm = { path="../../../clarity-wasm/clar2wasm", optional = true }
 pox-locking = { git = "https://github.com/stacks-network/stacks-core.git", branch="feat/clarity-wasm-develop", optional = true, default-features = false }
 prettytable-rs = { version = "0.10.0" }
 

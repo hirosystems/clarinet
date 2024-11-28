@@ -6,6 +6,7 @@ use clarity::types::chainstate::ConsensusHash;
 use clarity::types::chainstate::SortitionId;
 use clarity::types::chainstate::StacksAddress;
 use clarity::types::chainstate::StacksBlockId;
+use clarity::types::chainstate::TrieHash;
 use clarity::types::chainstate::VRFSeed;
 use clarity::types::StacksEpochId;
 use clarity::util::hash::Sha512Trunc256Sum;
@@ -231,6 +232,21 @@ impl ClarityBackingStore for ClarityDatastore {
         }
     }
 
+    fn get_data_from_path(&mut self, _hash: &TrieHash) -> Result<Option<String>> {
+        unreachable!()
+    }
+
+    fn get_data_with_proof(&mut self, _key: &str) -> Result<Option<(String, Vec<u8>)>> {
+        Ok(None)
+    }
+
+    fn get_data_with_proof_from_path(
+        &mut self,
+        _hash: &TrieHash,
+    ) -> Result<Option<(String, Vec<u8>)>> {
+        unreachable!()
+    }
+
     fn has_entry(&mut self, key: &str) -> Result<bool> {
         Ok(self.get_data(key)?.is_some())
     }
@@ -297,10 +313,6 @@ impl ClarityBackingStore for ClarityDatastore {
             Some(result) => Ok(Some(result.to_string())),
             None => Ok(None),
         }
-    }
-
-    fn get_data_with_proof(&mut self, _key: &str) -> Result<Option<(String, Vec<u8>)>> {
-        Ok(None)
     }
 
     fn get_contract_hash(

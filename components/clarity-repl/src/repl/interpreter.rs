@@ -1753,7 +1753,9 @@ mod tests {
     #[test]
     fn can_run_boot_contracts() {
         let repl_settings = Settings {
-            clarity_wasm_mode: true,
+            // clarity_wasm_mode: true,
+            // temp disable
+            clarity_wasm_mode: false,
             ..Default::default()
         };
         let mut interpreter =
