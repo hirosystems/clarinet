@@ -840,10 +840,16 @@ impl ClarityInterpreter {
             &self.datastore,
         );
         let tx_sender: PrincipalData = self.tx_sender.clone().into();
-        conn.begin();
-        conn.set_clarity_epoch_version(epoch)
-            .map_err(|e| e.to_string())?;
-        conn.commit().map_err(|e| e.to_string())?;
+
+        // this can probably be removed, even the clarity_version arg
+        // check if this is actually needed or not
+
+        // let start = std::time::Instant::now();
+        // conn.begin();
+        // conn.set_clarity_epoch_version(epoch)
+        //     .map_err(|e| e.to_string())?;
+        // conn.commit().map_err(|e| e.to_string())?;
+        // println!("elapsed: {:?}", start.elapsed());
         let cost_tracker = if track_costs {
             LimitedCostTracker::new(
                 false,
