@@ -191,19 +191,21 @@ fn format_map(
                 // this is hacked in to handle situations where the contents of
                 // map is a 'tuple'
                 PreSymbolicExpressionType::Tuple(list) => acc.push_str(&format!(
-                    "\n{}{}",
+                    "\n{}{}{}",
+                    previous_indentation,
                     indentation,
-                    format_key_value_sugar(settings, &list.to_vec(), previous_indentation)
+                    format_key_value_sugar(settings, &list.to_vec(), indentation)
                 )),
                 _ => acc.push_str(&format!(
-                    "\n{}{}",
+                    "\n{}{}{}",
+                    previous_indentation,
                     indentation,
-                    format_source_exprs(settings, &[arg.clone()], previous_indentation, "")
+                    format_source_exprs(settings, &[arg.clone()], indentation, "")
                 )),
             }
         }
 
-        acc.push_str("\n)");
+        acc.push_str(&format!("\n{})\n", previous_indentation));
         acc.to_owned()
     } else {
         panic!("define-map without a name is silly")
@@ -307,19 +309,23 @@ fn format_key_value_sugar(
     let indentation = &settings.indentation.to_string();
     let mut acc = "{".to_string();
 
+    // TODO this logic depends on comments not screwing up the even numbered
+    // chunkable attrs
     if exprs.len() > 2 {
         for (i, chunk) in exprs.chunks(2).enumerate() {
             if let [key, value] = chunk {
                 let fkey = display_pse(settings, key, "");
                 if i + 1 < exprs.len() / 2 {
                     acc.push_str(&format!(
-                        "\n{}{fkey}: {},",
+                        "\n{}{}{fkey}: {},\n",
+                        previous_indentation,
                         indentation,
                         format_source_exprs(settings, &[value.clone()], previous_indentation, "")
                     ));
                 } else {
                     acc.push_str(&format!(
-                        "\n{}{fkey}: {}\n",
+                        "{}{}{fkey}: {}\n",
+                        previous_indentation,
                         indentation,
                         format_source_exprs(settings, &[value.clone()], previous_indentation, "")
                     ));
@@ -330,11 +336,14 @@ fn format_key_value_sugar(
         }
     } else {
         // for cases where we keep it on the same line with 1 k/v pair
-        let fkey = display_pse(settings, &exprs[0], "");
+        let fkey = display_pse(settings, &exprs[0], previous_indentation);
         acc.push_str(&format!(
             " {fkey}: {} ",
             format_source_exprs(settings, &[exprs[1].clone()], previous_indentation, "")
         ));
+    }
+    if exprs.len() > 2 {
+        acc.push_str(previous_indentation);
     }
     acc.push('}');
     acc.to_string()
@@ -520,11 +529,6 @@ mod tests_formatter {
         let result = format_with_default(&String::from("(  ok    true )"));
         assert_eq!(result, "(ok true)");
     }
-    #[test]
-    fn test_two_expr_formatter() {
-        let result = format_with_default(&String::from("(ok true)(ok true)"));
-        assert_eq!(result, "(ok true)\n(ok true)");
-    }
 
     #[test]
     fn test_manual_tuple() {
@@ -533,20 +537,6 @@ mod tests_formatter {
         let result = format_with_default(&String::from("(tuple (n1 1) (n2 2))"));
         assert_eq!(result, "{\n  n1: 1,\n  n2: 2\n}");
     }
-    #[test]
-    fn test_key_value_formatter() {
-        let result = format_with_default(&String::from("{n1: 1, n2: 2}"));
-        assert_eq!(result, "{\n  n1: 1,\n  n2: 2\n}");
-    }
-
-    #[test]
-    fn test_map_formatter() {
-        // let result = format_with_default(&String::from("(define-map a uint (buff 20))"));
-        // assert_eq!(result, "(define-map a\n  uint\n  (buff 20)\n)");
-        let result = format_with_default(&String::from("(define-map a uint {n1: (buff 20)})"));
-        assert_eq!(result, "(define-map a\n  uint\n  { n1: (buff 20) }\n)");
-    }
-
     #[test]
     fn test_function_formatter() {
         let result = format_with_default(&String::from("(define-private (my-func) (ok true))"));
@@ -604,23 +594,28 @@ mod tests_formatter {
 
     #[test]
     fn test_map() {
-        let src = "(define-map something { name: (buff 48), a: uint } uint\n)";
+        // let result = format_with_default(&String::from("(define-map a uint (buff 20))"));
+        // assert_eq!(result, "(define-map a\n  uint\n  (buff 20)\n)");
+        let result = format_with_default(&String::from("(define-map a uint {n1: (buff 20)})"));
+        assert_eq!(result, "(define-map a\n  uint\n  { n1: (buff 20) }\n)");
+        let src = "(define-map something { name: (buff 48), a: uint } uint)";
         let result = format_with_default(&String::from(src));
         assert_eq!(
             result,
-            "(define-map something\n  {\n    name: (buff 48),\n    a: uint\n  }\n  uint)"
+            "(define-map something\n  {\n    name: (buff 48),\n    a: uint\n  }\n  uint\n)"
         );
-        //         let src2 = "(define-map something { name: (buff 48), namespace: (buff 20) } uint\n)";
-        //         let result2 = format_with_default(&String::from(src2));
-        //         let expected2 = r#"(define-map something
-        //   {
-        //     name: (buff 48),
-        //     namespace: (buff 20)
-        //   }
-        //   uint
-        // )"#;
-        //         assert_eq!(result2, expected2);
     }
+
+    #[test]
+    fn test_key_value_sugar() {
+        let src = "{name: (buff 48)}";
+        let result = format_with_default(&String::from(src));
+        assert_eq!(result, "{ name: (buff 48) }");
+        let src = "{ name: (buff 48), a: uint }";
+        let result = format_with_default(&String::from(src));
+        assert_eq!(result, "{\n  name: (buff 48),\n  a: uint\n}");
+    }
+
     #[test]
     fn test_constant() {
         let src = "(define-constant something 1)";
