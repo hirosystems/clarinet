@@ -770,7 +770,7 @@ dependencies = [
 
 [[package]]
 name = "clarinet-sdk-wasm"
-version = "2.12.0-beta1"
+version = "2.11.2"
 dependencies = [
  "clarinet-deployments",
  "clarinet-files",
