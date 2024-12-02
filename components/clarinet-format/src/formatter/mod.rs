@@ -8,6 +8,15 @@ pub enum Indentation {
     Tab,
 }
 
+impl ToString for Indentation {
+    fn to_string(&self) -> String {
+        match self {
+            Indentation::Space(count) => " ".repeat(*count),
+            Indentation::Tab => "\t".to_string(),
+        }
+    }
+}
+
 pub struct Settings {
     pub indentation: Indentation,
     pub max_line_length: usize,
@@ -39,14 +48,14 @@ impl ClarityFormatter {
     }
     pub fn format(&mut self, source: &str) -> String {
         let pse = clarity::vm::ast::parser::v2::parse(source).unwrap();
-        format_source_exprs(&self.settings, &pse, "")
+        format_source_exprs(&self.settings, &pse, "", "")
     }
 }
 
 pub fn format_source_exprs(
     settings: &Settings,
-    // previous: &PreSymbolicExpression,
     expressions: &[PreSymbolicExpression],
+    previous_indentation: &str,
     acc: &str,
 ) -> String {
     if let Some((expr, remaining)) = expressions.split_first() {
@@ -54,14 +63,18 @@ pub fn format_source_exprs(
             if let Some(atom_name) = list.split_first().and_then(|(f, _)| f.match_atom()) {
                 let formatted = if let Some(native) = NativeFunctions::lookup_by_name(atom_name) {
                     match native {
-                        NativeFunctions::Let => format_let(settings, list),
-                        NativeFunctions::Begin => format_begin(settings, list),
-                        NativeFunctions::Match => format_match(settings, list),
+                        NativeFunctions::Let => format_let(settings, list, previous_indentation),
+                        NativeFunctions::Begin => {
+                            format_begin(settings, list, previous_indentation)
+                        }
+                        NativeFunctions::Match => {
+                            format_match(settings, list, previous_indentation)
+                        }
                         // (tuple (name 1))
                         // (Tuple [(PSE)])
                         NativeFunctions::TupleCons => format_tuple_cons(settings, list),
                         NativeFunctions::ListCons => format_list(settings, list),
-                        _ => format!("({})", format_source_exprs(settings, list, acc)),
+                        _ => format!("({})", format_source_exprs(settings, list, "", acc)),
                     }
                 } else if let Some(define) = DefineFunctions::lookup_by_name(atom_name) {
                     match define {
@@ -71,31 +84,37 @@ pub fn format_source_exprs(
                         DefineFunctions::Constant => format_constant(settings, list),
                         DefineFunctions::UseTrait => format_use_trait(settings, list),
                         DefineFunctions::Trait => format_trait(settings, list),
-                        DefineFunctions::Map => format_map(settings, list),
+                        DefineFunctions::Map => format_map(settings, list, previous_indentation),
                         DefineFunctions::ImplTrait => format_impl_trait(settings, list),
                         // DefineFunctions::PersistedVariable
                         // DefineFunctions::FungibleToken
                         // DefineFunctions::NonFungibleToken
-                        _ => format!("({})", format_source_exprs(settings, list, acc)),
+                        _ => format!(
+                            "({})",
+                            format_source_exprs(settings, list, previous_indentation, acc)
+                        ),
                     }
                 } else {
-                    format!("({})", format_source_exprs(settings, list, acc))
+                    format!(
+                        "({})",
+                        format_source_exprs(settings, list, previous_indentation, acc)
+                    )
                 };
 
                 return format!(
                     "{formatted}{}",
-                    format_source_exprs(settings, remaining, acc)
+                    format_source_exprs(settings, remaining, previous_indentation, acc)
                 )
                 .trim()
                 .to_owned();
             }
         }
-        let current = display_pse(settings, expr);
+        let current = display_pse(settings, expr, "");
         return format!(
             "{}{}{}",
             current,
             if current.ends_with('\n') { "" } else { " " },
-            format_source_exprs(settings, remaining, acc)
+            format_source_exprs(settings, remaining, previous_indentation, acc)
         )
         .trim()
         .to_owned();
@@ -105,15 +124,15 @@ pub fn format_source_exprs(
 
 fn format_use_trait(settings: &Settings, exprs: &[PreSymbolicExpression]) -> String {
     // delegates to display_pse
-    format_source_exprs(settings, exprs, "")
+    format_source_exprs(settings, exprs, "", "")
 }
 fn format_impl_trait(settings: &Settings, exprs: &[PreSymbolicExpression]) -> String {
     // delegates to display_pse
-    format_source_exprs(settings, exprs, "")
+    format_source_exprs(settings, exprs, "", "")
 }
 fn format_trait(settings: &Settings, exprs: &[PreSymbolicExpression]) -> String {
     // delegates to display_pse
-    format_source_exprs(settings, exprs, "")
+    format_source_exprs(settings, exprs, "", "")
 }
 
 fn name_and_args(
@@ -127,11 +146,11 @@ fn name_and_args(
 }
 
 fn format_constant(settings: &Settings, exprs: &[PreSymbolicExpression]) -> String {
-    let indentation = indentation_to_string(&settings.indentation);
+    let indentation = &settings.indentation.to_string();
     let mut acc = "(define-constant ".to_string();
 
     if let Some((name, args)) = name_and_args(exprs) {
-        acc.push_str(&format!("{}", display_pse(settings, name)));
+        acc.push_str(&display_pse(settings, name, ""));
 
         // Access the value from args
         if let Some(value) = args.first() {
@@ -139,13 +158,13 @@ fn format_constant(settings: &Settings, exprs: &[PreSymbolicExpression]) -> Stri
                 acc.push_str(&format!(
                     "\n{}({})",
                     indentation,
-                    format_source_exprs(settings, list, "")
+                    format_source_exprs(settings, list, "", "")
                 ));
                 acc.push_str("\n)");
             } else {
                 // Handle non-list values (e.g., literals or simple expressions)
                 acc.push(' ');
-                acc.push_str(&display_pse(settings, value));
+                acc.push_str(&display_pse(settings, value, ""));
                 acc.push(')');
             }
         }
@@ -156,24 +175,30 @@ fn format_constant(settings: &Settings, exprs: &[PreSymbolicExpression]) -> Stri
         panic!("Expected a valid constant definition with (name value)")
     }
 }
-fn format_map(settings: &Settings, exprs: &[PreSymbolicExpression]) -> String {
+fn format_map(
+    settings: &Settings,
+    exprs: &[PreSymbolicExpression],
+    previous_indentation: &str,
+) -> String {
     let mut acc = "(define-map ".to_string();
-    let indentation = indentation_to_string(&settings.indentation);
+    let indentation = &settings.indentation.to_string();
 
     if let Some((name, args)) = name_and_args(exprs) {
-        acc.push_str(&display_pse(settings, name));
+        acc.push_str(&display_pse(settings, name, ""));
 
         for arg in args.iter() {
             match &arg.pre_expr {
+                // this is hacked in to handle situations where the contents of
+                // map is a 'tuple'
                 PreSymbolicExpressionType::Tuple(list) => acc.push_str(&format!(
                     "\n{}{}",
                     indentation,
-                    format_key_value_sugar(settings, &list.to_vec())
+                    format_key_value_sugar(settings, &list.to_vec(), previous_indentation)
                 )),
                 _ => acc.push_str(&format!(
                     "\n{}{}",
                     indentation,
-                    format_source_exprs(settings, &[arg.clone()], "")
+                    format_source_exprs(settings, &[arg.clone()], previous_indentation, "")
                 )),
             }
         }
@@ -185,33 +210,43 @@ fn format_map(settings: &Settings, exprs: &[PreSymbolicExpression]) -> String {
     }
 }
 // *begin* never on one line
-fn format_begin(settings: &Settings, exprs: &[PreSymbolicExpression]) -> String {
+fn format_begin(
+    settings: &Settings,
+    exprs: &[PreSymbolicExpression],
+    previous_indentation: &str,
+) -> String {
     let mut begin_acc = "(begin".to_string();
-    let indentation = indentation_to_string(&settings.indentation);
+    let indentation = &settings.indentation.to_string();
 
     for arg in exprs.get(1..).unwrap_or_default() {
         if let Some(list) = arg.match_list() {
             begin_acc.push_str(&format!(
-                "\n{}({})",
+                "\n{}{}({})",
+                previous_indentation,
                 indentation,
-                format_source_exprs(settings, list, "")
+                format_source_exprs(settings, list, previous_indentation, "")
             ))
         }
     }
-    begin_acc.push_str("\n)\n");
+    begin_acc.push_str(&format!("\n{})\n", previous_indentation));
     begin_acc.to_owned()
 }
 
 // *let* never on one line
-fn format_let(settings: &Settings, exprs: &[PreSymbolicExpression]) -> String {
+fn format_let(
+    settings: &Settings,
+    exprs: &[PreSymbolicExpression],
+    previous_indentation: &str,
+) -> String {
     let mut begin_acc = "(let (".to_string();
-    let indentation = indentation_to_string(&settings.indentation);
+    let indentation = &settings.indentation.to_string();
     for arg in exprs.get(1..).unwrap_or_default() {
         if let Some(list) = arg.match_list() {
             begin_acc.push_str(&format!(
-                "\n{}({})",
+                "\n{}{}({})",
+                previous_indentation,
                 indentation,
-                format_source_exprs(settings, list, "")
+                format_source_exprs(settings, list, previous_indentation, "")
             ))
         }
     }
@@ -222,19 +257,23 @@ fn format_let(settings: &Settings, exprs: &[PreSymbolicExpression]) -> String {
 // * match *
 // One line if less than max length (unless the original source has line breaks?)
 // Multiple lines if more than max length (should the first arg be on the first line if it fits?)
-fn format_match(settings: &Settings, exprs: &[PreSymbolicExpression]) -> String {
-    println!("{:?}", exprs);
+fn format_match(
+    settings: &Settings,
+    exprs: &[PreSymbolicExpression],
+    previous_indentation: &str,
+) -> String {
     let mut acc = "(match ".to_string();
-    let indentation = indentation_to_string(&settings.indentation);
+    let indentation = &settings.indentation.to_string();
 
     if let Some((name, args)) = name_and_args(exprs) {
-        acc.push_str(&display_pse(settings, name));
+        acc.push_str(&display_pse(settings, name, ""));
         for arg in args.get(1..).unwrap_or_default() {
             if let Some(list) = arg.match_list() {
                 acc.push_str(&format!(
-                    "\n{}({})",
+                    "\n{}{}({})",
                     indentation,
-                    format_source_exprs(settings, list, "")
+                    previous_indentation,
+                    format_source_exprs(settings, list, previous_indentation, "")
                 ))
             }
         }
@@ -248,7 +287,7 @@ fn format_match(settings: &Settings, exprs: &[PreSymbolicExpression]) -> String 
 fn format_list(settings: &Settings, exprs: &[PreSymbolicExpression]) -> String {
     let mut acc = "(".to_string();
     for (i, expr) in exprs[1..].iter().enumerate() {
-        let value = format_source_exprs(settings, &[expr.clone()], "");
+        let value = format_source_exprs(settings, &[expr.clone()], "", "");
         if i < exprs.len() - 2 {
             acc.push_str(&format!("{value} "));
         } else {
@@ -260,25 +299,29 @@ fn format_list(settings: &Settings, exprs: &[PreSymbolicExpression]) -> String {
 }
 
 // used for { n1: 1 } syntax
-fn format_key_value_sugar(settings: &Settings, exprs: &[PreSymbolicExpression]) -> String {
-    let indentation = indentation_to_string(&settings.indentation);
+fn format_key_value_sugar(
+    settings: &Settings,
+    exprs: &[PreSymbolicExpression],
+    previous_indentation: &str,
+) -> String {
+    let indentation = &settings.indentation.to_string();
     let mut acc = "{".to_string();
 
     if exprs.len() > 2 {
         for (i, chunk) in exprs.chunks(2).enumerate() {
             if let [key, value] = chunk {
-                let fkey = display_pse(settings, key);
+                let fkey = display_pse(settings, key, "");
                 if i + 1 < exprs.len() / 2 {
                     acc.push_str(&format!(
                         "\n{}{fkey}: {},",
                         indentation,
-                        format_source_exprs(settings, &[value.clone()], "")
+                        format_source_exprs(settings, &[value.clone()], previous_indentation, "")
                     ));
                 } else {
                     acc.push_str(&format!(
                         "\n{}{fkey}: {}\n",
                         indentation,
-                        format_source_exprs(settings, &[value.clone()], "")
+                        format_source_exprs(settings, &[value.clone()], previous_indentation, "")
                     ));
                 }
             } else {
@@ -287,10 +330,10 @@ fn format_key_value_sugar(settings: &Settings, exprs: &[PreSymbolicExpression]) 
         }
     } else {
         // for cases where we keep it on the same line with 1 k/v pair
-        let fkey = display_pse(settings, &exprs[0]);
+        let fkey = display_pse(settings, &exprs[0], "");
         acc.push_str(&format!(
             " {fkey}: {} ",
-            format_source_exprs(settings, &[exprs[1].clone()], "")
+            format_source_exprs(settings, &[exprs[1].clone()], previous_indentation, "")
         ));
     }
     acc.push('}');
@@ -298,8 +341,12 @@ fn format_key_value_sugar(settings: &Settings, exprs: &[PreSymbolicExpression]) 
 }
 
 // used for (tuple (n1  1)) syntax
-fn format_key_value(settings: &Settings, exprs: &[PreSymbolicExpression]) -> String {
-    let indentation = indentation_to_string(&settings.indentation);
+fn format_key_value(
+    settings: &Settings,
+    exprs: &[PreSymbolicExpression],
+    previous_indentation: &str,
+) -> String {
+    let indentation = &settings.indentation.to_string();
     let mut acc = "{".to_string();
 
     if exprs.len() > 1 {
@@ -308,18 +355,18 @@ fn format_key_value(settings: &Settings, exprs: &[PreSymbolicExpression]) -> Str
                 .match_list()
                 .and_then(|list| list.split_first())
                 .unwrap();
-            let fkey = display_pse(settings, key);
+            let fkey = display_pse(settings, key, previous_indentation);
             if i < exprs.len() - 1 {
                 acc.push_str(&format!(
                     "\n{}{fkey}: {},",
                     indentation,
-                    format_source_exprs(settings, value, "")
+                    format_source_exprs(settings, value, previous_indentation, "")
                 ));
             } else {
                 acc.push_str(&format!(
                     "\n{}{fkey}: {}\n",
                     indentation,
-                    format_source_exprs(settings, value, "")
+                    format_source_exprs(settings, value, previous_indentation, "")
                 ));
             }
         }
@@ -330,10 +377,10 @@ fn format_key_value(settings: &Settings, exprs: &[PreSymbolicExpression]) -> Str
                 .match_list()
                 .and_then(|list| list.split_first())
                 .unwrap();
-            let fkey = display_pse(settings, key);
+            let fkey = display_pse(settings, key, previous_indentation);
             acc.push_str(&format!(
                 " {fkey}: {} ",
-                format_source_exprs(settings, value, "")
+                format_source_exprs(settings, value, &settings.indentation.to_string(), "")
             ));
         }
     }
@@ -343,12 +390,16 @@ fn format_key_value(settings: &Settings, exprs: &[PreSymbolicExpression]) -> Str
 fn format_tuple_cons(settings: &Settings, exprs: &[PreSymbolicExpression]) -> String {
     // if the kv map is defined with (tuple (c 1)) then we have to strip the
     // ClarityName("tuple") out first
-    format_key_value(settings, &exprs[1..])
+    format_key_value(settings, &exprs[1..], "")
 }
 
 // This should panic on most things besides atoms and values. Added this to help
 // debugging in the meantime
-fn display_pse(settings: &Settings, pse: &PreSymbolicExpression) -> String {
+fn display_pse(
+    settings: &Settings,
+    pse: &PreSymbolicExpression,
+    previous_indentation: &str,
+) -> String {
     match pse.pre_expr {
         PreSymbolicExpressionType::Atom(ref value) => {
             // println!("atom: {}", value.as_str());
@@ -359,13 +410,12 @@ fn display_pse(settings: &Settings, pse: &PreSymbolicExpression) -> String {
             value.to_string()
         }
         PreSymbolicExpressionType::List(ref items) => {
-            println!("list: {:?}", items);
             format_list(settings, items)
             // items.iter().map(display_pse).collect::<Vec<_>>().join(" ")
         }
         PreSymbolicExpressionType::Tuple(ref items) => {
             // println!("tuple: {:?}", items);
-            format_key_value_sugar(settings, items)
+            format_key_value_sugar(settings, items, previous_indentation)
             // items.iter().map(display_pse).collect::<Vec<_>>().join(", ")
         }
         PreSymbolicExpressionType::SugaredContractIdentifier(ref name) => name.to_string(),
@@ -392,25 +442,30 @@ fn display_pse(settings: &Settings, pse: &PreSymbolicExpression) -> String {
 // options always on new lines
 // Functions Always on multiple lines, even if short
 fn format_function(settings: &Settings, exprs: &[PreSymbolicExpression]) -> String {
-    let func_type = display_pse(settings, exprs.first().unwrap());
-    let indentation = indentation_to_string(&settings.indentation);
+    let func_type = display_pse(settings, exprs.first().unwrap(), "");
+    let indentation = &settings.indentation.to_string();
 
     let mut acc = format!("({func_type} (");
 
     // function name and arguments
     if let Some(def) = exprs.get(1).and_then(|f| f.match_list()) {
         if let Some((name, args)) = def.split_first() {
-            acc.push_str(&display_pse(settings, name));
+            acc.push_str(&display_pse(settings, name, ""));
             for arg in args.iter() {
                 if let Some(list) = arg.match_list() {
                     acc.push_str(&format!(
                         "\n{}{}({})",
                         indentation,
                         indentation,
-                        format_source_exprs(settings, list, "")
+                        format_source_exprs(settings, list, &settings.indentation.to_string(), "")
                     ))
                 } else {
-                    acc.push_str(&display_pse(settings, arg))
+                    acc.push_str(&format_source_exprs(
+                        settings,
+                        &[arg.clone()],
+                        &settings.indentation.to_string(),
+                        "",
+                    ))
                 }
             }
             if args.is_empty() {
@@ -425,13 +480,16 @@ fn format_function(settings: &Settings, exprs: &[PreSymbolicExpression]) -> Stri
 
     // function body expressions
     for expr in exprs.get(2..).unwrap_or_default() {
-        if let Some(list) = expr.match_list() {
-            acc.push_str(&format!(
-                "\n{}({})",
-                indentation,
-                format_source_exprs(settings, list, "")
-            ))
-        }
+        acc.push_str(&format!(
+            "\n{}{}",
+            indentation,
+            format_source_exprs(
+                settings,
+                &[expr.clone()],
+                &settings.indentation.to_string(),
+                ""
+            )
+        ))
     }
     acc.push_str("\n)\n\n");
     acc.to_owned()
@@ -546,9 +604,12 @@ mod tests_formatter {
 
     #[test]
     fn test_map() {
-        let src = "(define-map something { name: (buff 48), namespace: (buff 20) } uint\n)";
+        let src = "(define-map something { name: (buff 48), a: uint } uint\n)";
         let result = format_with_default(&String::from(src));
-        assert_eq!(result, "(define-map something\n  uint\n  uint)");
+        assert_eq!(
+            result,
+            "(define-map something\n  {\n    name: (buff 48),\n    a: uint\n  }\n  uint)"
+        );
         //         let src2 = "(define-map something { name: (buff 48), namespace: (buff 20) } uint\n)";
         //         let result2 = format_with_default(&String::from(src2));
         //         let expected2 = r#"(define-map something
@@ -569,19 +630,19 @@ mod tests_formatter {
         let result2 = format_with_default(&String::from(src2));
         assert_eq!(result2, "(define-constant something\n  (1 2)\n)");
     }
-    // #[test]
-    // fn test_end_of_line_comments_max_line_length() {
-    //     let src = "(ok true) ;; this is a comment";
 
-    //     let result = format_with(&String::from(src), Settings::new(Indentation::Space(2), 9));
-    //     let expected = ";; this is a comment\n(ok true)";
-    //     assert_eq!(result, expected);
-    // }
     #[test]
     fn test_begin_never_one_line() {
         let src = "(begin (ok true))";
         let result = format_with_default(&String::from(src));
         assert_eq!(result, "(begin\n  (ok true)\n)");
+    }
+
+    #[test]
+    fn test_begin() {
+        let src = "(begin (+ 1 1) (ok true))";
+        let result = format_with_default(&String::from(src));
+        assert_eq!(result, "(begin\n  (+ 1 1)\n  (ok true)\n)");
     }
 
     #[test]
