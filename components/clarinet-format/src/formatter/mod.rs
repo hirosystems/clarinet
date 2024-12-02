@@ -1,5 +1,7 @@
 use clarity::vm::functions::{define::DefineFunctions, NativeFunctions};
 use clarity::vm::representations::{PreSymbolicExpression, PreSymbolicExpressionType};
+use clarity::vm::types::{TupleTypeSignature, TypeSignature};
+use clarity::vm::ClarityName;
 
 pub enum Indentation {
     Space(usize),
@@ -43,19 +45,21 @@ impl ClarityFormatter {
 
 pub fn format_source_exprs(
     settings: &Settings,
+    // previous: &PreSymbolicExpression,
     expressions: &[PreSymbolicExpression],
     acc: &str,
 ) -> String {
     if let Some((expr, remaining)) = expressions.split_first() {
         if let Some(list) = expr.match_list() {
-            // println!("{:?}", list);
             if let Some(atom_name) = list.split_first().and_then(|(f, _)| f.match_atom()) {
                 let formatted = if let Some(native) = NativeFunctions::lookup_by_name(atom_name) {
                     match native {
                         NativeFunctions::Let => format_let(settings, list),
                         NativeFunctions::Begin => format_begin(settings, list),
                         NativeFunctions::Match => format_match(settings, list),
-                        NativeFunctions::TupleCons => format_tuple(settings, list),
+                        // (tuple (name 1))
+                        // (Tuple [(PSE)])
+                        NativeFunctions::TupleCons => format_tuple_cons(settings, list),
                         NativeFunctions::ListCons => format_list(settings, list),
                         _ => format!("({})", format_source_exprs(settings, list, acc)),
                     }
@@ -86,9 +90,11 @@ pub fn format_source_exprs(
                 .to_owned();
             }
         }
+        let current = display_pse(settings, expr);
         return format!(
-            "{} {}",
-            display_pse(settings, expr),
+            "{}{}{}",
+            current,
+            if current.ends_with('\n') { "" } else { " " },
             format_source_exprs(settings, remaining, acc)
         )
         .trim()
@@ -97,14 +103,17 @@ pub fn format_source_exprs(
     acc.to_owned()
 }
 
-fn format_use_trait(_settings: &Settings, _exprs: &[PreSymbolicExpression]) -> String {
-    "".to_string()
+fn format_use_trait(settings: &Settings, exprs: &[PreSymbolicExpression]) -> String {
+    // delegates to display_pse
+    format_source_exprs(settings, exprs, "")
 }
-fn format_impl_trait(_settings: &Settings, _exprs: &[PreSymbolicExpression]) -> String {
-    "".to_string()
+fn format_impl_trait(settings: &Settings, exprs: &[PreSymbolicExpression]) -> String {
+    // delegates to display_pse
+    format_source_exprs(settings, exprs, "")
 }
-fn format_trait(_settings: &Settings, _exprs: &[PreSymbolicExpression]) -> String {
-    "".to_string()
+fn format_trait(settings: &Settings, exprs: &[PreSymbolicExpression]) -> String {
+    // delegates to display_pse
+    format_source_exprs(settings, exprs, "")
 }
 
 fn name_and_args(
@@ -148,25 +157,28 @@ fn format_constant(settings: &Settings, exprs: &[PreSymbolicExpression]) -> Stri
     }
 }
 fn format_map(settings: &Settings, exprs: &[PreSymbolicExpression]) -> String {
+    let mut acc = "(define-map ".to_string();
     let indentation = indentation_to_string(&settings.indentation);
 
-    let mut acc = "(define-map ".to_string();
-
-    println!("{:?}", exprs);
     if let Some((name, args)) = name_and_args(exprs) {
         acc.push_str(&display_pse(settings, name));
 
-        // Access the value from args
         for arg in args.iter() {
-            println!("{:?}", arg);
-            acc.push_str(&format!(
-                "\n{}{}",
-                indentation,
-                format_source_exprs(settings, &[arg.clone()], "")
-            ));
+            match &arg.pre_expr {
+                PreSymbolicExpressionType::Tuple(list) => acc.push_str(&format!(
+                    "\n{}{}",
+                    indentation,
+                    format_key_value_sugar(settings, &list.to_vec())
+                )),
+                _ => acc.push_str(&format!(
+                    "\n{}{}",
+                    indentation,
+                    format_source_exprs(settings, &[arg.clone()], "")
+                )),
+            }
         }
 
-        acc.push('\n');
+        acc.push_str("\n)");
         acc.to_owned()
     } else {
         panic!("define-map without a name is silly")
@@ -247,53 +259,91 @@ fn format_list(settings: &Settings, exprs: &[PreSymbolicExpression]) -> String {
     acc.to_string()
 }
 
-// TupleCons - (tuple (name "something"))
-// fn format_tuple_base(settings: &Settings, exprs: &[PreSymbolicExpression]) -> String {
-//     let indentation = indentation_to_string(&settings.indentation);
-//     let mut acc = "(tuple".to_string();
-//     for expr in exprs[1..].iter() {
-//         let (key, value) = expr
-//             .match_list()
-//             .and_then(|list| list.split_first())
-//             .unwrap();
-//         let fkey = display_pse(settings, key);
-//         acc.push_str(&format!(
-//             "\n{}({fkey} {})",
-//             indentation,
-//             format_source_exprs(settings, value, "")
-//         ));
-//     }
-//     acc.push_str("\n)");
-//     acc.to_string()
-// }
-
-fn format_tuple(settings: &Settings, exprs: &[PreSymbolicExpression]) -> String {
+// used for { n1: 1 } syntax
+fn format_key_value_sugar(settings: &Settings, exprs: &[PreSymbolicExpression]) -> String {
     let indentation = indentation_to_string(&settings.indentation);
     let mut acc = "{".to_string();
-    for (i, expr) in exprs[1..].iter().enumerate() {
-        // println!("tuple: {:?}", items);
-        let (key, value) = expr
-            .match_list()
-            .and_then(|list| list.split_first())
-            .unwrap();
-        let fkey = display_pse(settings, key);
-        println!("key: {}", fkey);
-        if i < exprs.len() - 2 {
+
+    if exprs.len() > 2 {
+        for (i, chunk) in exprs.chunks(2).enumerate() {
+            if let [key, value] = chunk {
+                let fkey = display_pse(settings, key);
+                if i + 1 < exprs.len() / 2 {
+                    acc.push_str(&format!(
+                        "\n{}{fkey}: {},",
+                        indentation,
+                        format_source_exprs(settings, &[value.clone()], "")
+                    ));
+                } else {
+                    acc.push_str(&format!(
+                        "\n{}{fkey}: {}\n",
+                        indentation,
+                        format_source_exprs(settings, &[value.clone()], "")
+                    ));
+                }
+            } else {
+                panic!("Unpaired key values: {:?}", chunk);
+            }
+        }
+    } else {
+        // for cases where we keep it on the same line with 1 k/v pair
+        let fkey = display_pse(settings, &exprs[0]);
+        acc.push_str(&format!(
+            " {fkey}: {} ",
+            format_source_exprs(settings, &[exprs[1].clone()], "")
+        ));
+    }
+    acc.push('}');
+    acc.to_string()
+}
+
+// used for (tuple (n1  1)) syntax
+fn format_key_value(settings: &Settings, exprs: &[PreSymbolicExpression]) -> String {
+    let indentation = indentation_to_string(&settings.indentation);
+    let mut acc = "{".to_string();
+
+    if exprs.len() > 1 {
+        for (i, expr) in exprs.iter().enumerate() {
+            let (key, value) = expr
+                .match_list()
+                .and_then(|list| list.split_first())
+                .unwrap();
+            let fkey = display_pse(settings, key);
+            if i < exprs.len() - 1 {
+                acc.push_str(&format!(
+                    "\n{}{fkey}: {},",
+                    indentation,
+                    format_source_exprs(settings, value, "")
+                ));
+            } else {
+                acc.push_str(&format!(
+                    "\n{}{fkey}: {}\n",
+                    indentation,
+                    format_source_exprs(settings, value, "")
+                ));
+            }
+        }
+    } else {
+        // for cases where we keep it on the same line with 1 k/v pair
+        for expr in exprs[0..].iter() {
+            let (key, value) = expr
+                .match_list()
+                .and_then(|list| list.split_first())
+                .unwrap();
+            let fkey = display_pse(settings, key);
             acc.push_str(&format!(
-                "\n{}{fkey}: {},",
-                indentation,
-                format_source_exprs(settings, value, "")
-            ));
-        } else {
-            acc.push_str(&format!(
-                "\n{}{fkey}: {}\n",
-                indentation,
+                " {fkey}: {} ",
                 format_source_exprs(settings, value, "")
             ));
         }
     }
     acc.push('}');
     acc.to_string()
+}
+fn format_tuple_cons(settings: &Settings, exprs: &[PreSymbolicExpression]) -> String {
+    // if the kv map is defined with (tuple (c 1)) then we have to strip the
+    // ClarityName("tuple") out first
+    format_key_value(settings, &exprs[1..])
 }
 
 // This should panic on most things besides atoms and values. Added this to help
@@ -315,7 +365,7 @@ fn display_pse(settings: &Settings, pse: &PreSymbolicExpression) -> String {
         }
         PreSymbolicExpressionType::Tuple(ref items) => {
             // println!("tuple: {:?}", items);
-            format_tuple(settings, items)
+            format_key_value_sugar(settings, items)
             // items.iter().map(display_pse).collect::<Vec<_>>().join(", ")
         }
         PreSymbolicExpressionType::SugaredContractIdentifier(ref name) => name.to_string(),
@@ -328,8 +378,7 @@ fn display_pse(settings: &Settings, pse: &PreSymbolicExpression) -> String {
         }
         PreSymbolicExpressionType::TraitReference(ref name) => name.to_string(),
         PreSymbolicExpressionType::Comment(ref text) => {
-            // println!("comment: {}", text);
-            format!(";; {}\n", text.trim())
+            format!(";; {}\n", text)
         }
         PreSymbolicExpressionType::Placeholder(ref _placeholder) => {
             "".to_string() // Placeholder is for if parsing fails
@@ -420,19 +469,24 @@ mod tests_formatter {
     }
 
     #[test]
-    fn test_tuple_formatter() {
+    fn test_manual_tuple() {
+        let result = format_with_default(&String::from("(tuple (n1 1))"));
+        assert_eq!(result, "{ n1: 1 }");
         let result = format_with_default(&String::from("(tuple (n1 1) (n2 2))"));
         assert_eq!(result, "{\n  n1: 1,\n  n2: 2\n}");
-        let result = format_with_default(&String::from("{n1: (buff 10), n2: 2}"));
-        assert_eq!(result, "{\n  n1: (buff 10),\n  n2: 2\n}");
     }
     #[test]
+    fn test_key_value_formatter() {
+        let result = format_with_default(&String::from("{n1: 1, n2: 2}"));
+        assert_eq!(result, "{\n  n1: 1,\n  n2: 2\n}");
+    }
+
+    #[test]
     fn test_map_formatter() {
+        // let result = format_with_default(&String::from("(define-map a uint (buff 20))"));
+        // assert_eq!(result, "(define-map a\n  uint\n  (buff 20)\n)");
         let result = format_with_default(&String::from("(define-map a uint {n1: (buff 20)})"));
-        assert_eq!(
-            result,
-            "(define-map a\n  uint\n  {\n    n1: (buff 20)\n  }\n)"
-        );
+        assert_eq!(result, "(define-map a\n  uint\n  { n1: (buff 20) }\n)");
     }
 
     #[test]
@@ -464,14 +518,21 @@ mod tests_formatter {
         );
     }
     #[test]
-    fn test_pre_postcomments_included() {
+    fn test_pre_comments_included() {
         let src = ";; this is a pre comment\n(ok true)";
-
         let result = format_with_default(&String::from(src));
         assert_eq!(src, result);
+    }
 
+    #[test]
+    fn test_inline_comments_included() {
+        let src = "(ok true) ;; this is an inline comment\n";
+        let result = format_with_default(&String::from(src));
+        assert_eq!(src, result);
+    }
+    #[test]
+    fn test_postcomments_included() {
         let src = "(ok true)\n;; this is a post comment";
-
         let result = format_with_default(&String::from(src));
         assert_eq!(src, result);
     }
