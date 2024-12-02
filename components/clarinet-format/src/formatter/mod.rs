@@ -1,9 +1,5 @@
-use clarity::types::StacksEpochId;
-use clarity::vm::ast::{build_ast_with_rules, ASTRules};
 use clarity::vm::functions::{define::DefineFunctions, NativeFunctions};
 use clarity::vm::representations::{PreSymbolicExpression, PreSymbolicExpressionType};
-use clarity::vm::types::QualifiedContractIdentifier;
-use clarity::vm::{ClarityVersion, SymbolicExpression};
 
 pub enum Indentation {
     Space(usize),
@@ -92,7 +88,7 @@ pub fn format_source_exprs(
         }
         return format!(
             "{} {}",
-            display_pse(expr),
+            display_pse(settings, expr),
             format_source_exprs(settings, remaining, acc)
         )
         .trim()
@@ -121,39 +117,12 @@ fn name_and_args(
     }
 }
 
-// fn format_constant(settings: &Settings, exprs: &[PreSymbolicExpression]) -> String {
-//     let indentation = indentation_to_string(&settings.indentation);
-//     let mut acc = "(define-constant ".to_string();
-
-//     if let Some((name, args)) = exprs
-//         .get(1)
-//         .and_then(|f| f.match_list())
-//         .and_then(|list| list.split_first())
-//     {
-//         acc.push_str(&display_pse(name));
-
-//         for arg in args {
-//             if let Some(list) = arg.match_list() {
-//                 acc.push_str(&format!(
-//                     "\n{}({})",
-//                     indentation,
-//                     format_source_exprs(settings, list, "")
-//                 ));
-//             }
-//         }
-//         acc.push_str("\n)\n");
-//         acc.to_owned()
-//     } else {
-//         panic!("Expected a valid constant definition")
-//     }
-// }
-
 fn format_constant(settings: &Settings, exprs: &[PreSymbolicExpression]) -> String {
     let indentation = indentation_to_string(&settings.indentation);
     let mut acc = "(define-constant ".to_string();
 
     if let Some((name, args)) = name_and_args(exprs) {
-        acc.push_str(&format!("{} ", display_pse(name)));
+        acc.push_str(&format!("{}", display_pse(settings, name)));
 
         // Access the value from args
         if let Some(value) = args.first() {
@@ -163,13 +132,16 @@ fn format_constant(settings: &Settings, exprs: &[PreSymbolicExpression]) -> Stri
                     indentation,
                     format_source_exprs(settings, list, "")
                 ));
+                acc.push_str("\n)");
             } else {
                 // Handle non-list values (e.g., literals or simple expressions)
-                acc.push_str(&display_pse(value));
+                acc.push(' ');
+                acc.push_str(&display_pse(settings, value));
+                acc.push(')');
             }
         }
 
-        acc.push_str("\n)\n");
+        acc.push('\n');
         acc.to_owned()
     } else {
         panic!("Expected a valid constant definition with (name value)")
@@ -177,25 +149,27 @@ fn format_constant(settings: &Settings, exprs: &[PreSymbolicExpression]) -> Stri
 }
 fn format_map(settings: &Settings, exprs: &[PreSymbolicExpression]) -> String {
     let indentation = indentation_to_string(&settings.indentation);
-    let mut acc = "(define-map (".to_string();
-    let name_and_args = exprs.get(1).and_then(|f| f.match_list()).unwrap();
 
-    if let Some((name, args)) = name_and_args.split_first() {
-        acc.push_str(&format!("{}", display_pse(name)));
+    let mut acc = "(define-map ".to_string();
 
-        for arg in args {
-            if let Some(list) = arg.match_list() {
-                acc.push_str(&format!(
-                    "\n{}{}",
-                    indentation,
-                    format_source_exprs(settings, list, "")
-                ))
-            }
+    println!("{:?}", exprs);
+    if let Some((name, args)) = name_and_args(exprs) {
+        acc.push_str(&display_pse(settings, name));
+
+        // Access the value from args
+        for arg in args.iter() {
+            println!("{:?}", arg);
+            acc.push_str(&format!(
+                "\n{}{}",
+                indentation,
+                format_source_exprs(settings, &[arg.clone()], "")
+            ));
         }
-        acc.push_str("\n)\n");
+
+        acc.push('\n');
         acc.to_owned()
     } else {
-        String::new() // this is likely an error or unreachable
+        panic!("define-map without a name is silly")
     }
 }
 // *begin* never on one line
@@ -242,7 +216,7 @@ fn format_match(settings: &Settings, exprs: &[PreSymbolicExpression]) -> String 
     let indentation = indentation_to_string(&settings.indentation);
 
     if let Some((name, args)) = name_and_args(exprs) {
-        acc.push_str(&display_pse(name));
+        acc.push_str(&display_pse(settings, name));
         for arg in args.get(1..).unwrap_or_default() {
             if let Some(list) = arg.match_list() {
                 acc.push_str(&format!(
@@ -260,7 +234,6 @@ fn format_match(settings: &Settings, exprs: &[PreSymbolicExpression]) -> String 
 }
 
 fn format_list(settings: &Settings, exprs: &[PreSymbolicExpression]) -> String {
-    println!("here");
     let mut acc = "(".to_string();
     for (i, expr) in exprs[1..].iter().enumerate() {
         let value = format_source_exprs(settings, &[expr.clone()], "");
@@ -274,56 +247,83 @@ fn format_list(settings: &Settings, exprs: &[PreSymbolicExpression]) -> String {
     acc.to_string()
 }
 
+// TupleCons - (tuple (name "something"))
+// fn format_tuple_base(settings: &Settings, exprs: &[PreSymbolicExpression]) -> String {
+//     let indentation = indentation_to_string(&settings.indentation);
+//     let mut acc = "(tuple".to_string();
+//     for expr in exprs[1..].iter() {
+//         let (key, value) = expr
+//             .match_list()
+//             .and_then(|list| list.split_first())
+//             .unwrap();
+//         let fkey = display_pse(settings, key);
+//         acc.push_str(&format!(
+//             "\n{}({fkey} {})",
+//             indentation,
+//             format_source_exprs(settings, value, "")
+//         ));
+//     }
+//     acc.push_str("\n)");
+//     acc.to_string()
+// }
+
 fn format_tuple(settings: &Settings, exprs: &[PreSymbolicExpression]) -> String {
-    let mut tuple_acc = "{ ".to_string();
+    let indentation = indentation_to_string(&settings.indentation);
+    let mut acc = "{".to_string();
     for (i, expr) in exprs[1..].iter().enumerate() {
+        // println!("tuple: {:?}", items);
         let (key, value) = expr
             .match_list()
             .and_then(|list| list.split_first())
             .unwrap();
-        let fkey = display_pse(key);
+        let fkey = display_pse(settings, key);
+        println!("key: {}", fkey);
         if i < exprs.len() - 2 {
-            tuple_acc.push_str(&format!(
-                "{fkey}: {}, ",
+            acc.push_str(&format!(
+                "\n{}{fkey}: {},",
+                indentation,
                 format_source_exprs(settings, value, "")
             ));
         } else {
-            tuple_acc.push_str(&format!(
-                "{fkey}: {}",
+            acc.push_str(&format!(
+                "\n{}{fkey}: {}\n",
+                indentation,
                 format_source_exprs(settings, value, "")
             ));
         }
     }
-    tuple_acc.push_str(" }");
-    tuple_acc.to_string()
+    acc.push('}');
+    acc.to_string()
 }
 
 // This should panic on most things besides atoms and values. Added this to help
 // debugging in the meantime
-fn display_pse(pse: &PreSymbolicExpression) -> String {
+fn display_pse(settings: &Settings, pse: &PreSymbolicExpression) -> String {
     match pse.pre_expr {
         PreSymbolicExpressionType::Atom(ref value) => {
-            println!("atom: {}", value.as_str());
+            // println!("atom: {}", value.as_str());
             value.as_str().trim().to_string()
         }
         PreSymbolicExpressionType::AtomValue(ref value) => {
-            println!("atomvalue: {}", value);
+            // println!("atomvalue: {}", value);
             value.to_string()
         }
         PreSymbolicExpressionType::List(ref items) => {
             println!("list: {:?}", items);
-            items.iter().map(display_pse).collect::<Vec<_>>().join(" ")
+            format_list(settings, items)
+            // items.iter().map(display_pse).collect::<Vec<_>>().join(" ")
         }
         PreSymbolicExpressionType::Tuple(ref items) => {
-            println!("tuple: {:?}", items);
-            items.iter().map(display_pse).collect::<Vec<_>>().join(", ")
+            // println!("tuple: {:?}", items);
+            format_tuple(settings, items)
+            // items.iter().map(display_pse).collect::<Vec<_>>().join(", ")
         }
         PreSymbolicExpressionType::SugaredContractIdentifier(ref name) => name.to_string(),
         PreSymbolicExpressionType::SugaredFieldIdentifier(ref contract, ref field) => {
             format!("{}.{}", contract, field)
         }
         PreSymbolicExpressionType::FieldIdentifier(ref trait_id) => {
-            println!("field id: {}", trait_id);
+            // println!("field id: {}", trait_id);
             trait_id.to_string()
         }
         PreSymbolicExpressionType::TraitReference(ref name) => name.to_string(),
@@ -343,7 +343,7 @@ fn display_pse(pse: &PreSymbolicExpression) -> String {
 // options always on new lines
 // Functions Always on multiple lines, even if short
 fn format_function(settings: &Settings, exprs: &[PreSymbolicExpression]) -> String {
-    let func_type = display_pse(exprs.first().unwrap());
+    let func_type = display_pse(settings, exprs.first().unwrap());
     let indentation = indentation_to_string(&settings.indentation);
 
     let mut acc = format!("({func_type} (");
@@ -351,7 +351,7 @@ fn format_function(settings: &Settings, exprs: &[PreSymbolicExpression]) -> Stri
     // function name and arguments
     if let Some(def) = exprs.get(1).and_then(|f| f.match_list()) {
         if let Some((name, args)) = def.split_first() {
-            acc.push_str(&display_pse(name));
+            acc.push_str(&display_pse(settings, name));
             for arg in args.iter() {
                 if let Some(list) = arg.match_list() {
                     acc.push_str(&format!(
@@ -361,7 +361,7 @@ fn format_function(settings: &Settings, exprs: &[PreSymbolicExpression]) -> Stri
                         format_source_exprs(settings, list, "")
                     ))
                 } else {
-                    acc.push_str(&display_pse(arg))
+                    acc.push_str(&display_pse(settings, arg))
                 }
             }
             if args.is_empty() {
@@ -418,18 +418,20 @@ mod tests_formatter {
         let result = format_with_default(&String::from("(ok true)(ok true)"));
         assert_eq!(result, "(ok true)\n(ok true)");
     }
+
     #[test]
     fn test_tuple_formatter() {
-        let result = format_with_default(&String::from("{n1:1,n2:2,n3:3}"));
-        assert_eq!(result, "{ n1: 1, n2: 2, n3: 3 }");
+        let result = format_with_default(&String::from("(tuple (n1 1) (n2 2))"));
+        assert_eq!(result, "{\n  n1: 1,\n  n2: 2\n}");
+        let result = format_with_default(&String::from("{n1: (buff 10), n2: 2}"));
+        assert_eq!(result, "{\n  n1: (buff 10),\n  n2: 2\n}");
     }
     #[test]
-    fn test_function_and_tuple_formatter() {
-        let src = "(define-private (my-func) (ok { n1: 1, n2: 2, n3: 3 }))";
-        let result = format_with_default(&String::from(src));
+    fn test_map_formatter() {
+        let result = format_with_default(&String::from("(define-map a uint {n1: (buff 20)})"));
         assert_eq!(
             result,
-            "(define-private (my-func)\n  (ok { n1: 1, n2: 2, n3: 3 })\n)"
+            "(define-map a\n  uint\n  {\n    n1: (buff 20)\n  }\n)"
         );
     }
 
@@ -449,9 +451,7 @@ mod tests_formatter {
 
 (define-public (my-func2)
   (ok true)
-)
-
-"#;
+)"#;
         assert_eq!(expected, result);
     }
     #[test]
@@ -498,6 +498,15 @@ mod tests_formatter {
         //   uint
         // )"#;
         //         assert_eq!(result2, expected2);
+    }
+    #[test]
+    fn test_constant() {
+        let src = "(define-constant something 1)";
+        let result = format_with_default(&String::from(src));
+        assert_eq!(result, "(define-constant something 1)");
+        let src2 = "(define-constant something (1 2))";
+        let result2 = format_with_default(&String::from(src2));
+        assert_eq!(result2, "(define-constant something\n  (1 2)\n)");
     }
     // #[test]
     // fn test_end_of_line_comments_max_line_length() {
