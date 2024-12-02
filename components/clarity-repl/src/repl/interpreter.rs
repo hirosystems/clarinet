@@ -839,7 +839,11 @@ impl ClarityInterpreter {
             &self.datastore,
             &self.datastore,
         );
-
+        let tx_sender: PrincipalData = self.tx_sender.clone().into();
+        conn.begin();
+        conn.set_clarity_epoch_version(epoch)
+            .map_err(|e| e.to_string())?;
+        conn.commit().map_err(|e| e.to_string())?;
         let cost_tracker = if track_costs {
             LimitedCostTracker::new(
                 false,
@@ -866,7 +870,6 @@ impl ClarityInterpreter {
 
         let contract_context = ContractContext::new(contract_id.clone(), clarity_version);
 
-        let tx_sender: PrincipalData = self.tx_sender.clone().into();
         global_context.begin();
         let result = global_context.execute(|g| {
             let mut call_stack = CallStack::new();
@@ -875,7 +878,7 @@ impl ClarityInterpreter {
                 &contract_context,
                 &mut call_stack,
                 Some(tx_sender.clone()),
-                Some(tx_sender),
+                Some(tx_sender.clone()),
                 None,
             );
 
