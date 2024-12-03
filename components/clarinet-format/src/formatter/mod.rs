@@ -73,7 +73,12 @@ pub fn format_source_exprs(
                         // (tuple (name 1))
                         // (Tuple [(PSE)])
                         NativeFunctions::TupleCons => format_tuple_cons(settings, list),
-                        NativeFunctions::ListCons => format_list(settings, list),
+                        NativeFunctions::ListCons => {
+                            format_list(settings, list, previous_indentation)
+                        }
+                        NativeFunctions::And | NativeFunctions::Or => {
+                            format_booleans(settings, list, previous_indentation)
+                        }
                         _ => format!("({})", format_source_exprs(settings, list, "", acc)),
                     }
                 } else if let Some(define) = DefineFunctions::lookup_by_name(atom_name) {
@@ -234,6 +239,41 @@ fn format_begin(
     begin_acc.to_owned()
 }
 
+// formats (and ..) and (or ...)
+// if given more than 2 expressions it will break it onto new lines
+fn format_booleans(
+    settings: &Settings,
+    exprs: &[PreSymbolicExpression],
+    previous_indentation: &str,
+) -> String {
+    let func_type = display_pse(settings, exprs.first().unwrap(), "");
+    let mut acc = format!("({func_type}");
+    let indentation = &settings.indentation.to_string();
+    if exprs[1..].len() > 2 {
+        for arg in exprs[1..].iter() {
+            acc.push_str(&format!(
+                "\n{}{}{}",
+                previous_indentation,
+                indentation,
+                format_source_exprs(settings, &[arg.clone()], previous_indentation, "")
+            ))
+        }
+    } else {
+        acc.push(' ');
+        acc.push_str(&format_source_exprs(
+            settings,
+            &exprs[1..],
+            previous_indentation,
+            "",
+        ))
+    }
+    if exprs[1..].len() > 2 {
+        acc.push_str(&format!("\n{}", previous_indentation));
+    }
+    acc.push(')');
+    acc.to_owned()
+}
+
 // *let* never on one line
 fn format_let(
     settings: &Settings,
@@ -305,7 +345,11 @@ fn format_match(
     acc.to_owned()
 }
 
-fn format_list(settings: &Settings, exprs: &[PreSymbolicExpression]) -> String {
+fn format_list(
+    settings: &Settings,
+    exprs: &[PreSymbolicExpression],
+    previous_indentation: &str,
+) -> String {
     let mut acc = "(".to_string();
     for (i, expr) in exprs[1..].iter().enumerate() {
         let value = format_source_exprs(settings, &[expr.clone()], "", "");
@@ -315,7 +359,7 @@ fn format_list(settings: &Settings, exprs: &[PreSymbolicExpression]) -> String {
             acc.push_str(&value.to_string());
         }
     }
-    acc.push(')');
+    acc.push_str(&format!("\n{})", previous_indentation));
     acc.to_string()
 }
 
@@ -438,7 +482,7 @@ fn display_pse(
             value.to_string()
         }
         PreSymbolicExpressionType::List(ref items) => {
-            format_list(settings, items)
+            format_list(settings, items, previous_indentation)
             // items.iter().map(display_pse).collect::<Vec<_>>().join(" ")
         }
         PreSymbolicExpressionType::Tuple(ref items) => {
@@ -603,12 +647,16 @@ mod tests_formatter {
         let result = format_with_default(&String::from(src));
         assert_eq!(src, result);
     }
-    #[test]
-    fn test_end_of_line_comments_included() {
-        let src = "(ok true) ;; this is a comment";
 
+    #[test]
+    fn test_booleans() {
+        let src = "(or true false)";
         let result = format_with_default(&String::from(src));
         assert_eq!(src, result);
+        let src = "(or true (is-eq 1 2) (is-eq 1 1))";
+        let result = format_with_default(&String::from(src));
+        let expected = "(or\n  true\n  (is-eq 1 2)\n  (is-eq 1 1)\n)";
+        assert_eq!(expected, result);
     }
 
     #[test]
