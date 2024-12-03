@@ -124,8 +124,8 @@ pub fn update_session_with_deployment_plan(
     contracts_asts: Option<&BTreeMap<QualifiedContractIdentifier, ContractAST>>,
     forced_min_epoch: Option<StacksEpochId>,
 ) -> UpdateSessionExecutionResult {
-    session.advance_chain_tip(10);
-    update_session_with_genesis_accounts(session, deployment);
+    // session.advance_chain_tip(10);
+    // update_session_with_genesis_accounts(session, deployment);
 
     let mut boot_contracts = BTreeMap::new();
     if !session.settings.repl_settings.remote_data.enabled {
