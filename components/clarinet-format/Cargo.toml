@@ -7,6 +7,9 @@ edition = "2021"
 # clarity-repl = { path = "../clarity-repl" }
 clarity = { workspace = true}
 
+[dev-dependencies]
+pretty_assertions = "1.3"
+
 [features]
 default = ["cli"]
 cli = [

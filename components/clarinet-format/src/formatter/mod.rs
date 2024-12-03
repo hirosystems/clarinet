@@ -735,29 +735,35 @@ mod tests_formatter {
         assert_eq!(result, "(begin\n    (ok true)\n)");
     }
 
-    // #[test]
-    // fn test_irl_contracts() {
-    //     let golden_dir = "./tests/golden";
-    //     let intended_dir = "./tests/golden-intended";
+    #[test]
+    fn test_irl_contracts() {
+        let golden_dir = "./tests/golden";
+        let intended_dir = "./tests/golden-intended";
 
-    //     // Iterate over files in the golden directory
-    //     for entry in fs::read_dir(golden_dir).expect("Failed to read golden directory") {
-    //         let entry = entry.expect("Failed to read directory entry");
-    //         let path = entry.path();
+        // Iterate over files in the golden directory
+        for entry in fs::read_dir(golden_dir).expect("Failed to read golden directory") {
+            let entry = entry.expect("Failed to read directory entry");
+            let path = entry.path();
 
-    //         if path.is_file() {
-    //             let src = fs::read_to_string(&path).expect("Failed to read source file");
+            if path.is_file() {
+                let src = fs::read_to_string(&path).expect("Failed to read source file");
 
-    //             let file_name = path.file_name().expect("Failed to get file name");
-    //             let intended_path = Path::new(intended_dir).join(file_name);
+                let file_name = path.file_name().expect("Failed to get file name");
+                let intended_path = Path::new(intended_dir).join(file_name);
 
-    //             let intended =
-    //                 fs::read_to_string(&intended_path).expect("Failed to read intended file");
+                let intended =
+                    fs::read_to_string(&intended_path).expect("Failed to read intended file");
 
-    //             // Apply formatting and compare
-    //             let result = format_with_default(&src);
-    //             assert_eq!(result, intended, "Mismatch for file: {:?}", file_name);
-    //         }
-    //     }
-    // }
+                // Apply formatting and compare
+                let result = format_with_default(&src);
+                println!("a");
+                pretty_assertions::assert_eq!(
+                    result,
+                    intended,
+                    "Mismatch in file: {:?}",
+                    file_name
+                );
+            }
+        }
+    }
 }
