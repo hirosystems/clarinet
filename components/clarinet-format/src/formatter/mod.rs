@@ -240,25 +240,33 @@ fn format_let(
     exprs: &[PreSymbolicExpression],
     previous_indentation: &str,
 ) -> String {
-    let mut begin_acc = "(let (".to_string();
+    let mut acc = "(let (".to_string();
     let indentation = &settings.indentation.to_string();
-    for arg in exprs.get(1..).unwrap_or_default() {
-        if let Some(list) = arg.match_list() {
-            begin_acc.push_str(&format!(
-                "\n{}{}({})",
+    if let Some(args) = exprs[1].match_list() {
+        for arg in args.iter() {
+            acc.push_str(&format!(
+                "\n{}{}{}",
                 previous_indentation,
                 indentation,
-                format_source_exprs(settings, list, previous_indentation, "")
+                format_source_exprs(settings, &[arg.clone()], previous_indentation, "")
             ))
         }
     }
-    begin_acc.push_str("\n)  \n");
-    begin_acc.to_owned()
+    acc.push_str(&format!("\n{})", previous_indentation));
+    for e in exprs.get(2..).unwrap_or_default() {
+        acc.push_str(&format!(
+            "\n{}{}{}",
+            previous_indentation,
+            indentation,
+            format_source_exprs(settings, &[e.clone()], previous_indentation, "")
+        ))
+    }
+    acc.push_str(&format!("\n{})", previous_indentation));
+    acc.to_owned()
 }
 
 // * match *
-// One line if less than max length (unless the original source has line breaks?)
-// Multiple lines if more than max length (should the first arg be on the first line if it fits?)
+// always multiple lines
 fn format_match(
     settings: &Settings,
     exprs: &[PreSymbolicExpression],
@@ -267,23 +275,34 @@ fn format_match(
     let mut acc = "(match ".to_string();
     let indentation = &settings.indentation.to_string();
 
-    if let Some((name, args)) = name_and_args(exprs) {
-        acc.push_str(&display_pse(settings, name, ""));
-        for arg in args.get(1..).unwrap_or_default() {
-            if let Some(list) = arg.match_list() {
-                acc.push_str(&format!(
-                    "\n{}{}({})",
-                    indentation,
-                    previous_indentation,
-                    format_source_exprs(settings, list, previous_indentation, "")
-                ))
-            }
-        }
-        acc.push_str("\n)");
-        acc.to_owned()
+    acc.push_str(&display_pse(settings, &exprs[1], "").to_string());
+    // first branch. some or ok binding
+    acc.push_str(&format!(
+        "\n{}{}{} {}",
+        previous_indentation,
+        indentation,
+        display_pse(settings, &exprs[2], previous_indentation),
+        format_source_exprs(settings, &[exprs[3].clone()], previous_indentation, "")
+    ));
+    // second branch. none or err binding
+    if let Some(some_branch) = exprs[4].match_list() {
+        acc.push_str(&format!(
+            "\n{}{}({})",
+            previous_indentation,
+            indentation,
+            format_source_exprs(settings, some_branch, previous_indentation, "")
+        ));
     } else {
-        "".to_string()
+        acc.push_str(&format!(
+            "\n{}{}{} {}",
+            previous_indentation,
+            indentation,
+            display_pse(settings, &exprs[4], previous_indentation),
+            format_source_exprs(settings, &[exprs[5].clone()], previous_indentation, "")
+        ));
     }
+    acc.push_str(&format!("\n{})", previous_indentation));
+    acc.to_owned()
 }
 
 fn format_list(settings: &Settings, exprs: &[PreSymbolicExpression]) -> String {
@@ -594,9 +613,8 @@ mod tests_formatter {
 
     #[test]
     fn test_map() {
-        // let result = format_with_default(&String::from("(define-map a uint (buff 20))"));
-        // assert_eq!(result, "(define-map a\n  uint\n  (buff 20)\n)");
-        let result = format_with_default(&String::from("(define-map a uint {n1: (buff 20)})"));
+        let src = "(define-map a uint {n1: (buff 20)})";
+        let result = format_with_default(&String::from(src));
         assert_eq!(result, "(define-map a\n  uint\n  { n1: (buff 20) }\n)");
         let src = "(define-map something { name: (buff 48), a: uint } uint)";
         let result = format_with_default(&String::from(src));
@@ -606,6 +624,28 @@ mod tests_formatter {
         );
     }
 
+    #[test]
+    fn test_let() {
+        let src = "(let ((a 1) (b 2)) (+ a b))";
+        let result = format_with_default(&String::from(src));
+        let expected = "(let (\n  (a 1)\n  (b 2)\n)\n  (+ a b)\n)";
+        assert_eq!(expected, result);
+    }
+
+    #[test]
+    fn test_option_match() {
+        let src = "(match opt value (ok (handle-new-value value)) (ok 1))";
+        let result = format_with_default(&String::from(src));
+        let expected = "(match opt\n  value (ok (handle-new-value value))\n  (ok 1)\n)";
+        assert_eq!(result, expected);
+    }
+    #[test]
+    fn test_response_match() {
+        let src = "(match x value (ok (+ to-add value)) err-value (err err-value))";
+        let result = format_with_default(&String::from(src));
+        let expected = "(match x\n  value (ok (+ to-add value))\n  err-value (err err-value)\n)";
+        assert_eq!(result, expected);
+    }
     #[test]
     fn test_key_value_sugar() {
         let src = "{name: (buff 48)}";
