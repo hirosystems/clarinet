@@ -34,9 +34,9 @@ RUN apk --no-cache add --update \
     && /sbin/ldconfig /usr/lib /lib \
     && mkdir /out
 
-RUN wget https://github.com/bitcoin/bitcoin/archive/refs/tags/v26.0.tar.gz && tar -xvf v26.0.tar.gz
+RUN wget https://github.com/bitcoin/bitcoin/archive/refs/tags/v27.2.tar.gz && tar -xvf v27.2.tar.gz
 
-RUN cd bitcoin-26.0 \
+RUN cd bitcoin-27.2 \
     && ./autogen.sh \
     && export CXXFLAGS="-O2" \
     && ./configure \

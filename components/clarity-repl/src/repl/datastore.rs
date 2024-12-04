@@ -89,6 +89,17 @@ pub struct StacksConstants {
     pub pox_rejection_fraction: u64,
 }
 
+impl Default for StacksConstants {
+    fn default() -> Self {
+        StacksConstants {
+            burn_start_height: 1,
+            pox_prepare_length: 50,
+            pox_reward_cycle_length: 1050,
+            pox_rejection_fraction: 0,
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Datastore {
     genesis_id: StacksBlockId,
@@ -130,7 +141,11 @@ impl Default for ClarityDatastore {
 
 impl ClarityDatastore {
     pub fn new(remote_data_settings: RemoteDataSettings) -> Self {
-        let block_height = 108;
+        let block_height = if remote_data_settings.enabled {
+            remote_data_settings.initial_height.unwrap_or(32)
+        } else {
+            1
+        };
         let id = height_to_id(block_height);
         Self {
             open_chain_tip: id,
@@ -246,7 +261,7 @@ impl ClarityDatastore {
     }
 
     #[cfg(target_arch = "wasm32")]
-    fn fetch_data<T: serde::de::DeserializeOwned>(&self, path: &str) -> Result<T> {
+    fn fetch_data<T: serde::de::DeserializeOwned>(&self, path: &str) -> Result<Option<T>> {
         let url = JsString::from(format!("{}{}", self.remote_data_settings.api_url, path));
 
         match self.http_client {
@@ -255,9 +270,10 @@ impl ClarityDatastore {
                 if let Ok(response) = response {
                     let bytes = Uint8Array::from(response).to_vec();
                     let raw_result = std::str::from_utf8(bytes.as_slice()).unwrap();
-                    let data =
-                        serde_json::from_str::<T>(raw_result).expect("Failed to parse response");
-                    Ok(data)
+                    match serde_json::from_str::<T>(raw_result) {
+                        Ok(data) => Ok(Some(data)),
+                        _ => Ok(None),
+                    }
                 } else {
                     panic!("unable to fetch data: {:?}", response);
                 }
@@ -508,22 +524,18 @@ impl ClarityBackingStore for ClarityDatastore {
 
 impl Default for Datastore {
     fn default() -> Self {
-        Self::new(
-            None,
-            StacksConstants {
-                burn_start_height: 1,
-                pox_prepare_length: 50,
-                pox_reward_cycle_length: 1050,
-                pox_rejection_fraction: 0,
-            },
-        )
+        Self::new(RemoteDataSettings::default(), StacksConstants::default())
     }
 }
 
 impl Datastore {
-    pub fn new(initial_height: Option<u32>, constants: StacksConstants) -> Self {
-        let block_height = initial_height.unwrap_or(108);
-        let burn_block_height = 216;
+    pub fn new(remote_data_settings: RemoteDataSettings, constants: StacksConstants) -> Self {
+        let block_height = if remote_data_settings.enabled {
+            remote_data_settings.initial_height.unwrap_or(32)
+        } else {
+            1
+        };
+        let burn_block_height = if remote_data_settings.enabled { 145 } else { 1 };
         let bytes = height_to_hashed_bytes(block_height);
         let id = StacksBlockId(bytes);
         let sortition_id = SortitionId(bytes);

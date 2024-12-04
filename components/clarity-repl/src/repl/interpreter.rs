@@ -28,6 +28,7 @@ use clarity::vm::{events::*, ClarityVersion};
 use clarity::vm::{ContractEvaluationResult, EvalHook};
 use clarity::vm::{CostSynthesis, ExecutionResult, ParsedContract};
 
+use super::datastore::StacksConstants;
 use super::{ClarityContract, DEFAULT_EPOCH};
 
 pub const BLOCK_LIMIT_MAINNET: ExecutionCost = ExecutionCost {
@@ -57,10 +58,10 @@ impl ClarityInterpreter {
         Self {
             tx_sender,
             repl_settings,
-            clarity_datastore: ClarityDatastore::new(remote_data_settings),
+            clarity_datastore: ClarityDatastore::new(remote_data_settings.clone()),
             accounts: BTreeSet::new(),
             tokens: BTreeMap::new(),
-            datastore: Datastore::default(),
+            datastore: Datastore::new(remote_data_settings, StacksConstants::default()),
         }
     }
 

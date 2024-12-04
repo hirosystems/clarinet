@@ -27,7 +27,11 @@ function deleteExistingDeploymentPlan() {
 beforeEach(async () => {
   deleteExistingDeploymentPlan();
   simnet = await getSDK();
-  await simnet.initEmtpySession();
+  await simnet.initEmtpySession({
+    enabled: true,
+    api_url: "http://localhost:3999",
+    initial_height: 186,
+  });
 });
 
 afterEach(() => {
@@ -36,8 +40,7 @@ afterEach(() => {
 
 describe("simnet remote interactions", () => {
   it("can call a remote contract", () => {
-    const r = simnet.execute("(+ 1 1)");
-    const result = simnet.callReadOnlyFn(`${address1}.counter2`, "one", [], address2);
-    expect(result.result).toStrictEqual(Cl.int(2));
+    const result = simnet.callReadOnlyFn(`${address1}.counter`, "get-count", [], address2);
+    expect(result.result).toStrictEqual(Cl.uint(2));
   });
 });
