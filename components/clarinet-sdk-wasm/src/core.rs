@@ -348,7 +348,7 @@ impl SDK {
         }
     }
 
-    #[wasm_bindgen(js_name=initEmtpySession)]
+    #[wasm_bindgen(js_name=initEmptySession)]
     pub async fn init_empty_session(&mut self) -> Result<(), String> {
         let session = Session::new(SessionSettings::default());
         self.session = Some(session);
