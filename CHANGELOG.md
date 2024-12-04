@@ -1,17 +1,17 @@
-# [2.11.2](https://github.com/hirosystems/clarinet/compare/v2.11.2...v2.11.2) (2024-11-30)
+# [2.11.2](https://github.com/hirosystems/clarinet/compare/v2.11.2...v2.11.2) (2024-10-30)
 
 ##### Bug Fixes
 
 *  Default devnet stacker (#1602) (af78d2d6)
 
-# [2.11.1](https://github.com/hirosystems/clarinet/compare/v2.11.0...v2.11.1) (2024-11-29)
+# [2.11.1](https://github.com/hirosystems/clarinet/compare/v2.11.0...v2.11.1) (2024-10-29)
 
 ##### Refactors
 
 *  Set epoch 3.0 block height (#1599) (98ef414f)
 *  Have a stacking order by default in devnet config (#1598) (2c24ac00)
 
-# [2.11.0](https://github.com/hirosystems/clarinet/compare/v2.10.0...v2.11.0) (2024-11-28)
+# [2.11.0](https://github.com/hirosystems/clarinet/compare/v2.10.0...v2.11.0) (2024-10-28)
 
 ##### New Features
 
@@ -22,7 +22,7 @@
 
 *  Update SignerMessage codec (#1591) (9e090c58)
 
-# [2.10.0](https://github.com/hirosystems/clarinet/compare/v2.9.0...v2.10.0) (2024-11-17)
+# [2.10.0](https://github.com/hirosystems/clarinet/compare/v2.9.0...v2.10.0) (2024-10-17)
 
 ##### New Features
 
