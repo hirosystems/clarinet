@@ -34,3 +34,8 @@ web-sys = { version = "0.3" }
 chainhook-sdk = { git = "https://github.com/hirosystems/chainhook.git" }
 chainhook-types = { git = "https://github.com/hirosystems/chainhook.git" }
 stacks-codec = { path = "./components/stacks-codec" }
+
+# [patch.'https://github.com/stacks-network/stacks-core.git']
+# clarity = { path = "../stacks-core/clarity" }
+# stacks-common = { path = "../stacks-core/stacks-common" }
+# stackslib = { path = "../stacks-core/stackslib" }

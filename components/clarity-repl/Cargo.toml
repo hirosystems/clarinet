@@ -56,6 +56,7 @@ reqwest = { workspace = true }
 
 [dev-dependencies]
 test-case = "*"
+divan = "0.1"
 
 [lib]
 name = "clarity_repl"
@@ -64,6 +65,10 @@ path = "src/lib.rs"
 [[bin]]
 name = "clarity-repl"
 path = "src/bin.rs"
+
+[[bench]]
+name = "simnet"
+harness = false
 
 [features]
 default = ["cli", "dap"]

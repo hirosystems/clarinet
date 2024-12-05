@@ -41,10 +41,13 @@ fn epoch_to_peer_version(epoch: StacksEpochId) -> u8 {
 }
 
 #[derive(Clone, Debug)]
+struct StoreEntry(StacksBlockId, String);
+
+#[derive(Clone, Debug)]
 pub struct ClarityDatastore {
     open_chain_tip: StacksBlockId,
     current_chain_tip: StacksBlockId,
-    store: HashMap<StacksBlockId, HashMap<String, String>>,
+    store: HashMap<String, Vec<StoreEntry>>,
     metadata: HashMap<(String, String), String>,
     block_id_lookup: HashMap<StacksBlockId, StacksBlockId>,
     height_at_chain_tip: HashMap<StacksBlockId, u32>,
@@ -118,7 +121,7 @@ impl ClarityDatastore {
         Self {
             open_chain_tip: id,
             current_chain_tip: id,
-            store: HashMap::from([(id, HashMap::new())]),
+            store: HashMap::new(),
             metadata: HashMap::new(),
             block_id_lookup: HashMap::from([(id, id)]),
             height_at_chain_tip: HashMap::from([(id, 0)]),
@@ -177,31 +180,26 @@ impl ClarityDatastore {
         //     .expect("ERROR: Failed to commit MARF block");
     }
 
-    pub fn put(&mut self, key: &str, value: &str) {
-        let lookup_id = self
-            .block_id_lookup
-            .get(&self.open_chain_tip)
-            .expect("Could not find current chain tip in block_id_lookup map");
-
-        // if there isn't a store for the open chain_tip, make one and update the
-        // entry for the block id in the lookup table
-        if *lookup_id != self.open_chain_tip {
-            self.store.insert(
-                self.open_chain_tip,
-                self.store
-                    .get(lookup_id)
-                    .unwrap_or_else(|| panic!("Block with ID {:?} does not exist", lookup_id))
-                    .clone(),
-            );
-
-            self.block_id_lookup
-                .insert(self.open_chain_tip, self.current_chain_tip);
-        }
-
-        if let Some(map) = self.store.get_mut(&self.open_chain_tip) {
-            map.insert(key.to_string(), value.to_string());
+    fn put(&mut self, key: &str, value: &str) {
+        if let Some(entries) = self.store.get_mut(key) {
+            entries.push(StoreEntry(self.open_chain_tip, value.to_string()));
         } else {
-            panic!("Block does not exist for current chain tip");
+            self.store.insert(
+                key.to_string(),
+                vec![StoreEntry(self.open_chain_tip, value.to_string())],
+            );
+        }
+    }
+
+    fn get_latest_data(&self, data: &[StoreEntry]) -> Option<String> {
+        let StoreEntry(tip, value) = data.last()?;
+
+        if self.height_at_chain_tip.get(tip)?
+            <= self.height_at_chain_tip.get(&self.current_chain_tip)?
+        {
+            Some(value.clone())
+        } else {
+            self.get_latest_data(&data[..data.len() - 1])
         }
     }
 
@@ -220,15 +218,9 @@ impl ClarityBackingStore for ClarityDatastore {
 
     /// fetch K-V out of the committed datastore
     fn get_data(&mut self, key: &str) -> Result<Option<String>> {
-        let lookup_id = self
-            .block_id_lookup
-            .get(&self.current_chain_tip)
-            .expect("Could not find current chain tip in block_id_lookup map");
-
-        if let Some(map) = self.store.get(lookup_id) {
-            Ok(map.get(key).cloned())
-        } else {
-            panic!("Block does not exist for current chain tip");
+        match self.store.get(key) {
+            Some(data) => Ok(self.get_latest_data(data)),
+            None => Ok(None),
         }
     }
 
