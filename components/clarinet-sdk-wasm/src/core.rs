@@ -35,7 +35,6 @@ use std::{panic, path::PathBuf};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsValue;
 
-use crate::utils::costs::SerializableCostsReport;
 use crate::utils::events::serialize_event;
 
 #[wasm_bindgen]
@@ -217,6 +216,7 @@ pub struct TxArgs {
 pub struct TransactionRes {
     pub result: String,
     pub events: String,
+    pub costs: String,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -248,6 +248,7 @@ pub fn execution_result_to_transaction_res(execution: &ExecutionResult) -> Trans
     TransactionRes {
         result,
         events: json!(events_as_strings).to_string(),
+        costs: json!(execution.cost).to_string(),
     }
 }
 
@@ -1076,13 +1077,8 @@ impl SDK {
 
         let coverage = session.collect_lcov_content(&asts, &contract_paths);
 
-        let mut costs_reports = Vec::new();
-        costs_reports.append(&mut self.costs_reports);
-        let costs_reports: Vec<SerializableCostsReport> = costs_reports
-            .iter()
-            .map(SerializableCostsReport::from_vm_costs_report)
-            .collect();
-        let costs = serde_json::to_string(&costs_reports).map_err(|e| e.to_string())?;
+        let costs = serde_json::to_string(&self.costs_reports).map_err(|e| e.to_string())?;
+        self.costs_reports.clear();
 
         Ok(SessionReport { coverage, costs })
     }
