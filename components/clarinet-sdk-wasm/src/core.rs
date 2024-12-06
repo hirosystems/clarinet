@@ -21,10 +21,12 @@ use clarity_repl::clarity::{
 };
 use clarity_repl::repl::clarity_values::{uint8_to_string, uint8_to_value};
 use clarity_repl::repl::session::{CostsReport, BOOT_CONTRACTS_DATA};
+use clarity_repl::repl::settings::RemoteDataSettings;
 use clarity_repl::repl::{
     clarity_values, ClarityCodeSource, ClarityContract, ContractDeployer, Session, SessionSettings,
     DEFAULT_CLARITY_VERSION, DEFAULT_EPOCH,
 };
+use clarity_repl::uprint;
 use gloo_utils::format::JsValueSerdeExt;
 use js_sys::Function as JsFunction;
 use serde::{Deserialize, Serialize};
@@ -96,7 +98,7 @@ impl CallFnArgs {
         Self {
             contract,
             method,
-            args: args.iter().map(|a| a.to_vec()).collect(),
+            args: args.into_iter().map(|a| a.to_vec()).collect(),
             sender,
         }
     }
@@ -106,27 +108,24 @@ impl CallFnArgs {
       Because it's JSON, the Uint8Array arguments are passed as Map<index, value> instead of Vec<u8>.
       This method transform the Map back into a Vec.
     */
-    fn from_json_args(
-        CallContractArgsJSON {
-            contract,
-            method,
-            args_maps,
-            sender,
-        }: CallContractArgsJSON,
-    ) -> Self {
-        let mut args: Vec<Vec<u8>> = vec![];
-        for arg in args_maps {
-            let mut parsed_arg: Vec<u8> = vec![0; arg.len()];
-            for (i, v) in arg.iter() {
-                parsed_arg[*i] = *v;
-            }
-            args.push(parsed_arg);
-        }
+    fn from_json_args(json_args: CallContractArgsJSON) -> Self {
+        let args = json_args
+            .args_maps
+            .into_iter()
+            .map(|arg| {
+                let mut parsed_arg = vec![0; arg.len()];
+                for (i, v) in arg {
+                    parsed_arg[i] = v;
+                }
+                parsed_arg
+            })
+            .collect();
+
         Self {
-            contract,
-            method,
+            contract: json_args.contract,
+            method: json_args.method,
             args,
-            sender,
+            sender: json_args.sender,
         }
     }
 }
@@ -166,7 +165,6 @@ pub struct DeployContractArgs {
     options: ContractOptions,
     sender: String,
 }
-
 #[wasm_bindgen]
 impl DeployContractArgs {
     #[wasm_bindgen(constructor)]
@@ -289,6 +287,7 @@ pub struct SDK {
     contracts_interfaces: HashMap<QualifiedContractIdentifier, ContractInterface>,
     session: Option<Session>,
     file_accessor: Box<dyn FileAccessor>,
+    http_client: JsFunction,
     options: SDKOptions,
     current_test_name: String,
     costs_reports: Vec<CostsReport>,
@@ -297,10 +296,14 @@ pub struct SDK {
 #[wasm_bindgen]
 impl SDK {
     #[wasm_bindgen(constructor)]
-    pub fn new(fs_request: JsFunction, options: Option<SDKOptions>) -> Self {
+    pub fn new(
+        fs_request: JsFunction,
+        http_client: JsFunction,
+        options: Option<SDKOptions>,
+    ) -> Self {
         panic::set_hook(Box::new(console_error_panic_hook::hook));
 
-        let fs = Box::new(WASMFileSystemAccessor::new(fs_request));
+        let file_accessor = Box::new(WASMFileSystemAccessor::new(fs_request));
 
         let track_coverage = options.as_ref().map_or(false, |o| o.track_coverage);
         let track_costs = options.as_ref().map_or(false, |o| o.track_costs);
@@ -312,7 +315,8 @@ impl SDK {
             contracts_interfaces: HashMap::new(),
             contracts_locations: HashMap::new(),
             session: None,
-            file_accessor: fs,
+            file_accessor,
+            http_client,
             options: SDKOptions {
                 track_coverage,
                 track_costs,
@@ -350,8 +354,23 @@ impl SDK {
     }
 
     #[wasm_bindgen(js_name=initEmptySession)]
-    pub async fn init_empty_session(&mut self) -> Result<(), String> {
-        let session = Session::new(SessionSettings::default());
+    pub async fn init_empty_session(
+        &mut self,
+        remote_data_settings: JsValue,
+    ) -> Result<(), String> {
+        let config: Option<RemoteDataSettings> =
+            serde_wasm_bindgen::from_value(remote_data_settings)
+                .map_err(|e| format!("Failed to parse remote data settings: {}", e))?;
+        uprint!("Initiating empty session: {:?}", config);
+
+        let mut settings = SessionSettings::default();
+        settings.repl_settings.remote_data = config.unwrap_or_default();
+        let mut session = Session::new(settings);
+
+        session
+            .interpreter
+            .clarity_datastore
+            .set_http_client(self.http_client.clone());
         self.session = Some(session);
         Ok(())
     }
@@ -780,10 +799,10 @@ impl SDK {
 
     #[wasm_bindgen(js_name=callReadOnlyFn)]
     pub fn call_read_only_fn(&mut self, args: &CallFnArgs) -> Result<TransactionRes, String> {
-        let interface = self.get_function_interface(&args.contract, &args.method)?;
-        if interface.access != ContractInterfaceFunctionAccess::read_only {
-            return Err(format!("{} is not a read-only function", &args.method));
-        }
+        // let interface = self.get_function_interface(&args.contract, &args.method)?;
+        // if interface.access != ContractInterfaceFunctionAccess::read_only {
+        //     return Err(format!("{} is not a read-only function", &args.method));
+        // }
         self.call_contract_fn(args, false)
     }
 
@@ -792,10 +811,10 @@ impl SDK {
         args: &CallFnArgs,
         advance_chain_tip: bool,
     ) -> Result<TransactionRes, String> {
-        let interface = self.get_function_interface(&args.contract, &args.method)?;
-        if interface.access != ContractInterfaceFunctionAccess::public {
-            return Err(format!("{} is not a public function", &args.method));
-        }
+        // let interface = self.get_function_interface(&args.contract, &args.method)?;
+        // if interface.access != ContractInterfaceFunctionAccess::public {
+        //     return Err(format!("{} is not a public function", &args.method));
+        // }
 
         if advance_chain_tip {
             let session = self.get_session_mut();
@@ -809,10 +828,10 @@ impl SDK {
         args: &CallFnArgs,
         advance_chain_tip: bool,
     ) -> Result<TransactionRes, String> {
-        let interface = self.get_function_interface(&args.contract, &args.method)?;
-        if interface.access != ContractInterfaceFunctionAccess::private {
-            return Err(format!("{} is not a private function", &args.method));
-        }
+        // let interface = self.get_function_interface(&args.contract, &args.method)?;
+        // if interface.access != ContractInterfaceFunctionAccess::private {
+        //     return Err(format!("{} is not a private function", &args.method));
+        // }
         if advance_chain_tip {
             let session = self.get_session_mut();
             session.advance_chain_tip(1);

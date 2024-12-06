@@ -28,6 +28,7 @@ use clarity::vm::{events::*, ClarityVersion};
 use clarity::vm::{ContractEvaluationResult, EvalHook};
 use clarity::vm::{CostSynthesis, ExecutionResult, ParsedContract};
 
+use super::datastore::StacksConstants;
 use super::{ClarityContract, DEFAULT_EPOCH};
 
 pub const BLOCK_LIMIT_MAINNET: ExecutionCost = ExecutionCost {
@@ -53,13 +54,14 @@ pub struct Txid(pub [u8; 32]);
 
 impl ClarityInterpreter {
     pub fn new(tx_sender: StandardPrincipalData, repl_settings: Settings) -> Self {
+        let remote_data_settings = repl_settings.remote_data.clone();
         Self {
             tx_sender,
             repl_settings,
-            clarity_datastore: ClarityDatastore::new(),
+            clarity_datastore: ClarityDatastore::new(remote_data_settings.clone()),
             accounts: BTreeSet::new(),
             tokens: BTreeMap::new(),
-            datastore: Datastore::default(),
+            datastore: Datastore::new(remote_data_settings, StacksConstants::default()),
         }
     }
 
@@ -439,7 +441,7 @@ impl ClarityInterpreter {
                                 args.push(evaluated_arg);
                             }
 
-                            #[cfg(not(feature = "wasm"))]
+                            #[cfg(not(target_arch = "wasm32"))]
                             let start = std::time::Instant::now();
 
                             let args: Vec<SymbolicExpression> = args
@@ -448,9 +450,9 @@ impl ClarityInterpreter {
                                 .collect();
                             let res = env.execute_contract(&contract_id, &method, &args, false)?;
 
-                            #[cfg(not(feature = "wasm"))]
+                            #[cfg(not(target_arch = "wasm32"))]
                             if show_timings {
-                                println!("execution time: {:?}μs", start.elapsed().as_micros());
+                                println!("execution time: {:?}", start.elapsed());
                             }
 
                             return Ok(Some(res));
@@ -458,14 +460,14 @@ impl ClarityInterpreter {
                     }
                 };
 
-                #[cfg(not(feature = "wasm"))]
+                #[cfg(not(target_arch = "wasm32"))]
                 let start = std::time::Instant::now();
 
                 let result = eval(&contract_ast.expressions[0], &mut env, &context);
 
-                #[cfg(not(feature = "wasm"))]
+                #[cfg(not(target_arch = "wasm32"))]
                 if show_timings {
-                    println!("execution time: {:?}μs", start.elapsed().as_micros());
+                    println!("execution time: {:?}", start.elapsed());
                 }
 
                 return result.map(Some);
@@ -1195,10 +1197,11 @@ impl ClarityInterpreter {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(target_arch = "wasm32")))]
 mod tests {
     use super::*;
     use crate::analysis::Settings as AnalysisSettings;
+    use crate::repl::settings::RemoteDataSettings;
     use crate::{
         repl::session::BOOT_CONTRACTS_DATA, test_fixtures::clarity_contract::ClarityContractBuilder,
     };
@@ -1308,6 +1311,7 @@ mod tests {
     fn test_advance_stacks_chain_tip() {
         let wasm_settings = Settings {
             analysis: AnalysisSettings::default(),
+            remote_data: RemoteDataSettings::default(),
             clarity_wasm_mode: true,
             show_timings: false,
         };

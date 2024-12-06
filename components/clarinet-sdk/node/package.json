@@ -65,6 +65,7 @@
     "@stacks/transactions": "^6.13.0",
     "kolorist": "^1.8.0",
     "prompts": "^2.4.2",
+    "sync-request": "^6.1.0",
     "vitest": "^1.6.0",
     "yargs": "^17.7.2"
   },
