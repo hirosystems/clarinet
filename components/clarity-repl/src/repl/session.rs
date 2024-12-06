@@ -109,6 +109,7 @@ pub struct Session {
 
 impl Session {
     pub fn new(settings: SessionSettings) -> Self {
+        println!("settings: {:#?}", settings.repl_settings.remote_data);
         let tx_sender = {
             let address = match settings.initial_deployer {
                 Some(ref entry) => entry.address.clone(),
