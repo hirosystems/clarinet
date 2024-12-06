@@ -38,7 +38,7 @@ describe("the sdk handle all clarity version", () => {
     let resOk2 = simnet.execute('(index-of? "stacks" "s")');
     expect(resOk2.result).toStrictEqual(Cl.some(Cl.uint(0)));
 
-    // `block-height` is avaliable in clarity 1 & 2
+    // `block-height` is available in clarity 1 & 2
     let resOk3 = simnet.execute("(print block-height)");
     expect(resOk3.result).toStrictEqual(Cl.uint(1));
 
