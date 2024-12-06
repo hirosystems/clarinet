@@ -441,7 +441,7 @@ impl ClarityInterpreter {
                                 args.push(evaluated_arg);
                             }
 
-                            #[cfg(not(feature = "wasm"))]
+                            #[cfg(not(target_arch = "wasm32"))]
                             let start = std::time::Instant::now();
 
                             let args: Vec<SymbolicExpression> = args
@@ -450,9 +450,9 @@ impl ClarityInterpreter {
                                 .collect();
                             let res = env.execute_contract(&contract_id, &method, &args, false)?;
 
-                            #[cfg(not(feature = "wasm"))]
+                            #[cfg(not(target_arch = "wasm32"))]
                             if show_timings {
-                                println!("execution time: {:?}μs", start.elapsed().as_micros());
+                                println!("execution time: {:?}", start.elapsed());
                             }
 
                             return Ok(Some(res));
@@ -460,14 +460,14 @@ impl ClarityInterpreter {
                     }
                 };
 
-                #[cfg(not(feature = "wasm"))]
+                #[cfg(not(target_arch = "wasm32"))]
                 let start = std::time::Instant::now();
 
                 let result = eval(&contract_ast.expressions[0], &mut env, &context);
 
-                #[cfg(not(feature = "wasm"))]
+                #[cfg(not(target_arch = "wasm32"))]
                 if show_timings {
-                    println!("execution time: {:?}μs", start.elapsed().as_micros());
+                    println!("execution time: {:?}", start.elapsed());
                 }
 
                 return result.map(Some);

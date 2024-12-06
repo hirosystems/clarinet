@@ -92,7 +92,7 @@ pub struct StacksConstants {
 impl Default for StacksConstants {
     fn default() -> Self {
         StacksConstants {
-            burn_start_height: 1,
+            burn_start_height: 0,
             pox_prepare_length: 50,
             pox_reward_cycle_length: 1050,
             pox_rejection_fraction: 0,
@@ -144,7 +144,7 @@ impl ClarityDatastore {
         let block_height = if remote_data_settings.enabled {
             remote_data_settings.initial_height.unwrap_or(32)
         } else {
-            1
+            0
         };
         let id = height_to_id(block_height);
         Self {
@@ -329,6 +329,8 @@ impl ClarityDatastore {
 
     fn fetch_clarity_marf_value(&mut self, key: &str) -> Result<Option<String>> {
         let key_hash = TrieHash::from_key(key);
+        // the block height should be the min value between current block height and initial height
+        // making sure we don't ever try reading data on remote network with a higher block height than the initial one
         let block_height = self.get_current_block_height();
         let remote_chaintip = self.get_remote_chaintip(block_height);
         let path = format!(
@@ -345,6 +347,8 @@ impl ClarityDatastore {
     ) -> Result<Option<String>> {
         let addr = contract.issuer.to_string();
         let contract = contract.name.to_string();
+        // the block height should be the min value between current block height and initial height
+        // making sure we don't ever try reading data on remote network with a higher block height than the initial one
         let block_height = self.get_current_block_height();
         let remote_chaintip = self.get_remote_chaintip(block_height);
         uprint!(
@@ -358,13 +362,7 @@ impl ClarityDatastore {
             "/v2/clarity/metadata/{}/{}/{}?tip={}",
             addr, contract, key, remote_chaintip
         );
-        let data = self.fetch_remote_data(&url);
-
-        if let Ok(Some(value)) = &data {
-            uprint!("network metadata value: {}", value);
-        }
-
-        data
+        self.fetch_remote_data(&url)
     }
 }
 
@@ -378,7 +376,7 @@ impl ClarityBackingStore for ClarityDatastore {
 
     /// fetch K-V out of the committed datastore
     fn get_data(&mut self, key: &str) -> Result<Option<String>> {
-        uprint!("get_data({})", key);
+        println!("get_data({})", key);
 
         let lookup_id = self
             .block_id_lookup
@@ -391,10 +389,8 @@ impl ClarityBackingStore for ClarityDatastore {
                 return Ok(value.cloned());
             }
             if self.remote_data_settings.enabled {
-                uprint!("fetching MARF from network");
                 let data = self.fetch_clarity_marf_value(key);
                 if let Ok(Some(value)) = &data {
-                    uprint!("network marf value: {}", value);
                     self.put(key, value);
                 }
                 return data;
@@ -470,7 +466,6 @@ impl ClarityBackingStore for ClarityDatastore {
         key: &str,
         value: &str,
     ) -> Result<()> {
-        println!("inserting metadata({}, {}", contract, key);
         self.metadata
             .insert((contract.to_string(), key.to_string()), value.to_string());
         Ok(())
@@ -533,9 +528,9 @@ impl Datastore {
         let block_height = if remote_data_settings.enabled {
             remote_data_settings.initial_height.unwrap_or(32)
         } else {
-            1
+            0
         };
-        let burn_block_height = if remote_data_settings.enabled { 145 } else { 1 };
+        let burn_block_height = if remote_data_settings.enabled { 145 } else { 0 };
         let bytes = height_to_hashed_bytes(block_height);
         let id = StacksBlockId(bytes);
         let sortition_id = SortitionId(bytes);
