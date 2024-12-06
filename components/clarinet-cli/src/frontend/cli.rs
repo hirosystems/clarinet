@@ -34,6 +34,7 @@ use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
 use clarity_repl::clarity::ClarityVersion;
 use clarity_repl::frontend::terminal::print_clarity_wasm_warning;
 use clarity_repl::repl::diagnostic::output_diagnostic;
+use clarity_repl::repl::settings::{ApiUrl, RemoteDataSettings};
 use clarity_repl::repl::{ClarityCodeSource, ClarityContract, ContractDeployer, DEFAULT_EPOCH};
 use clarity_repl::{analysis, repl, Terminal};
 use stacks_network::{self, DevnetOrchestrator};
@@ -334,6 +335,7 @@ struct Console {
     /// Path to Clarinet.toml
     #[clap(long = "manifest-path", short = 'm')]
     pub manifest_path: Option<String>,
+
     /// If specified, use this deployment file
     #[clap(long = "deployment-plan-path", short = 'p')]
     pub deployment_plan_path: Option<String>,
@@ -351,6 +353,17 @@ struct Console {
         conflicts_with = "use_on_disk_deployment_plan"
     )]
     pub use_computed_deployment_plan: bool,
+
+    /// Enable remote data fetching from mainnet or a testnet
+    #[clap(long = "enable-remote-data", short = 'r')]
+    pub enable_remote_data: bool,
+    /// Set a custom Hiro API URL for remote data fetching
+    #[clap(long = "remote-data-api-url", short = 'a')]
+    pub remote_data_api_url: Option<ApiUrl>,
+    /// Initial remote Stacks block height
+    #[clap(long = "remote-data-initial-height", short = 'b')]
+    pub remote_data_initial_height: Option<u32>,
+
     /// Allow the Clarity Wasm preview to run in parallel with the Clarity interpreter (beta)
     #[clap(long = "enable-clarity-wasm")]
     pub enable_clarity_wasm: bool,
@@ -941,6 +954,12 @@ pub fn main() {
             }
         },
         Command::Console(cmd) => {
+            let remote_data_settings = RemoteDataSettings {
+                enabled: cmd.enable_remote_data,
+                api_url: cmd.remote_data_api_url.unwrap_or_default(),
+                initial_height: cmd.remote_data_initial_height,
+            };
+
             // Loop to handle `::reload` command
             loop {
                 let manifest = load_manifest_or_warn(cmd.manifest_path.clone());
@@ -988,7 +1007,8 @@ pub fn main() {
                         }
                     }
                     None => {
-                        let settings = repl::SessionSettings::default();
+                        let mut settings = repl::SessionSettings::default();
+                        settings.repl_settings.remote_data = remote_data_settings.clone();
                         if cmd.enable_clarity_wasm {
                             let mut settings_wasm = repl::SessionSettings::default();
                             settings_wasm.repl_settings.clarity_wasm_mode = true;
