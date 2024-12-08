@@ -1,5 +1,6 @@
 use super::boot::{STACKS_BOOT_CODE_MAINNET, STACKS_BOOT_CODE_TESTNET};
 use super::diagnostic::output_diagnostic;
+use super::logger_hook::LoggerHook;
 use super::{ClarityCodeSource, ClarityContract, ClarityInterpreter, ContractDeployer};
 use crate::analysis::coverage::CoverageHook;
 use crate::repl::clarity_values::value_to_string;
@@ -1800,5 +1801,58 @@ mod tests {
         };
 
         assert!(time_block_2 - time_block_1 == 600);
+    }
+}
+#[cfg(test)]
+mod logger_hook_tests {
+
+    use crate::{repl::DEFAULT_EPOCH, test_fixtures::clarity_contract::ClarityContractBuilder};
+
+    use super::*;
+
+    #[test]
+    fn can_retrieve_print_values() {
+        let settings = SessionSettings::default();
+        let mut session = Session::new(settings);
+        session.start().expect("session could not start");
+        session.update_epoch(DEFAULT_EPOCH);
+
+        // session.deploy_contract(contract, eval_hooks, cost_track, test_name, ast)
+        let snippet = [
+            "(define-public (print-and-return (input (response uint uint)))",
+            "  (begin",
+            "    (match input x (print x) y (print y))",
+            "    input",
+            "  )",
+            ")",
+        ]
+        .join("\n");
+
+        let contract = ClarityContractBuilder::new().code_source(snippet).build();
+
+        let _ = session.deploy_contract(&contract, false, None);
+        let arg = SymbolicExpression::atom_value(Value::okay(Value::UInt(42)).unwrap());
+        let res = session.call_contract_fn(
+            "contract",
+            "print-and-return",
+            &[arg],
+            &session.get_tx_sender(),
+            false,
+            false,
+        );
+
+        println!("{:?}", res);
+
+        let arg = SymbolicExpression::atom_value(Value::error(Value::UInt(404)).unwrap());
+        let res = session.call_contract_fn(
+            "contract",
+            "print-and-return",
+            &[arg],
+            &session.get_tx_sender(),
+            false,
+            false,
+        );
+
+        println!("{:?}", res);
     }
 }
