@@ -20,6 +20,9 @@ extern crate prettytable;
 #[macro_use]
 extern crate hiro_system_kit;
 
+#[macro_use]
+mod uprint;
+
 pub mod analysis;
 pub mod frontend;
 pub mod repl;
