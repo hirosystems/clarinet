@@ -88,7 +88,7 @@ pub struct ContractDefinedData {
     pub functions_completion_items: Vec<CompletionItem>,
 }
 
-impl<'a> ContractDefinedData {
+impl ContractDefinedData {
     pub fn new(expressions: &[SymbolicExpression], position: &Position) -> Self {
         let mut defined_data = ContractDefinedData {
             position: *position,
@@ -105,7 +105,7 @@ impl<'a> ContractDefinedData {
         &mut self,
         expr: &SymbolicExpression,
         name: &ClarityName,
-        parameters: &[TypedVar<'a>],
+        parameters: &[TypedVar<'_>],
     ) {
         let mut completion_args: Vec<String> = vec![];
         for (i, typed_var) in parameters.iter().enumerate() {

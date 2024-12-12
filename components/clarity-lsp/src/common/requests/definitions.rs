@@ -29,7 +29,7 @@ pub struct Definitions {
     deployer: Option<StandardPrincipalData>,
 }
 
-impl<'a> Definitions {
+impl Definitions {
     pub fn new(deployer: Option<StandardPrincipalData>) -> Self {
         Self {
             deployer,
@@ -37,7 +37,7 @@ impl<'a> Definitions {
         }
     }
 
-    pub fn run(&mut self, expressions: &'a [SymbolicExpression]) {
+    pub fn run(&mut self, expressions: &[SymbolicExpression]) {
         traverse(self, expressions);
     }
 
