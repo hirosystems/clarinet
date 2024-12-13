@@ -144,7 +144,6 @@ impl ClarityDatastore {
     ///     blockhash would already have committed and no longer exist in the save point stack.
     /// this is a "lower-level" rollback than the roll backs performed in
     ///   ClarityDatabase or AnalysisDatabase -- this is done at the backing store level.
-
     pub fn begin(&mut self, _current: &StacksBlockId, _next: &StacksBlockId) {
         // self.marf.begin(current, next)
         //     .expect(&format!("ERROR: Failed to begin new MARF block {} - {})", current, next));
