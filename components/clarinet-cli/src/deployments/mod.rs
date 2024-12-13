@@ -41,7 +41,7 @@ pub fn check_deployments(manifest: &ProjectManifest) -> Result<(), String> {
                 continue;
             }
         };
-        println!("{} {} succesfully checked", green!("✔"), relative_path);
+        println!("{} {} successfully checked", green!("✔"), relative_path);
     }
     Ok(())
 }
