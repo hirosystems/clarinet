@@ -1275,7 +1275,7 @@ impl TransactionSpendingCondition {
     }
 
     /// Linear-complexity verifying algorithm -- we verify a rolling hash over all data committed
-    /// to by order of signers (instead of re-serializing the tranasction each time).
+    /// to by order of signers (instead of re-serializing the transaction each time).
     /// Calculates the next sighash and public key, which the next verifier must verify.
     /// Used by StacksTransaction::verify*
     pub fn next_verification(
@@ -2295,7 +2295,7 @@ impl StacksTransaction {
     pub fn append_next_sponsor(&mut self, pubk: &StacksPublicKey) -> Result<(), CodecError> {
         match self.auth {
             TransactionAuth::Standard(_) => Err(CodecError::SigningError(
-                "Cannot appned a public key to the sponsor of a standard auth condition"
+                "Cannot append a public key to the sponsor of a standard auth condition"
                     .to_string(),
             )),
             TransactionAuth::Sponsored(_, ref mut sponsor_condition) => {
@@ -3832,7 +3832,7 @@ impl StacksMessageCodec for TransactionAuthField {
             }
             _ => {
                 return Err(CodecError::DeserializeError(format!(
-                    "Failed to parse auth field: unkonwn auth field ID {}",
+                    "Failed to parse auth field: unknown auth field ID {}",
                     field_id
                 )));
             }
@@ -4311,7 +4311,7 @@ impl StacksMessageCodec for PeerInfo {
         // must encode a valid string
         let server_version = String::from_utf8(bytes).map_err(|_e| {
             CodecError::DeserializeError(
-                "Failed to parse server version name: could not contruct from utf8".to_string(),
+                "Failed to parse server version name: could not construct from utf8".to_string(),
             )
         })?;
         let pox_consensus = read_next::<ConsensusHash, _>(fd)?;
