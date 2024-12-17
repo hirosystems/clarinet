@@ -17,6 +17,8 @@ impl ToString for Indentation {
     }
 }
 
+const FORMAT_IGNORE_SYNTAX: &str = "@format-ignore";
+
 pub struct Settings {
     pub indentation: Indentation,
     pub max_line_length: usize,
@@ -63,6 +65,16 @@ pub fn format_source_exprs(
     println!("exprs: {:?}", expressions);
     println!("previous: {:?}", previous_expr);
     if let Some((expr, remaining)) = expressions.split_first() {
+        let cur = display_pse(
+            &Settings::default(),
+            expr,
+            previous_indentation,
+            previous_expr.is_some(),
+        );
+        if cur.contains(FORMAT_IGNORE_SYNTAX) {
+            println!("Ignoring: {:?}", remaining)
+            //     return format!("{}{}", cur, remaining);
+        }
         if let Some(list) = expr.match_list() {
             if let Some(atom_name) = list.split_first().and_then(|(f, _)| f.match_atom()) {
                 let formatted = if let Some(native) = NativeFunctions::lookup_by_name(atom_name) {
@@ -119,7 +131,6 @@ pub fn format_source_exprs(
                         ),
                     }
                 } else {
-                    println!("else");
                     format!(
                         "({})",
                         format_source_exprs(
@@ -149,6 +160,8 @@ pub fn format_source_exprs(
         }
         let current = display_pse(settings, expr, "", previous_expr.is_some());
 
+        // if this IS NOT a pre or post comment, we need to put a space between
+        // the last expression
         let pre_space = if is_comment(expr) && previous_expr.is_some() {
             " "
         } else {
@@ -174,7 +187,7 @@ pub fn format_source_exprs(
 }
 
 // trim but leaves newlines preserved
-fn t(input: &String) -> &str {
+fn t(input: &str) -> &str {
     let start = input
         .find(|c: char| !c.is_whitespace() || c == '\n')
         .unwrap_or(0);
@@ -393,40 +406,28 @@ fn format_match(
 
     acc.push_str(&display_pse(settings, &exprs[1], "", false).to_string());
     // first branch. some or ok binding
+    let space = format!("{}{}", previous_indentation, indentation);
     acc.push_str(&format!(
-        "\n{}{}{} {}",
-        previous_indentation,
-        indentation,
-        display_pse(settings, &exprs[2], previous_indentation, false),
-        format_source_exprs(
-            settings,
-            &[exprs[3].clone()],
-            previous_indentation,
-            None,
-            ""
-        )
+        "\n{}{}\n{}{}",
+        space,
+        display_pse(settings, &exprs[2], &space, false),
+        space,
+        format_source_exprs(settings, &[exprs[3].clone()], &space, None, "")
     ));
     // second branch. none or err binding
     if let Some(some_branch) = exprs[4].match_list() {
         acc.push_str(&format!(
-            "\n{}{}({})",
-            previous_indentation,
-            indentation,
+            "\n{}({})",
+            space,
             format_source_exprs(settings, some_branch, previous_indentation, None, "")
         ));
     } else {
         acc.push_str(&format!(
-            "\n{}{}{} {}",
-            previous_indentation,
-            indentation,
-            display_pse(settings, &exprs[4], previous_indentation, false),
-            format_source_exprs(
-                settings,
-                &[exprs[5].clone()],
-                previous_indentation,
-                None,
-                ""
-            )
+            "\n{}{}\n{}{}",
+            space,
+            display_pse(settings, &exprs[4], &space, false),
+            space,
+            format_source_exprs(settings, &[exprs[5].clone()], &space, None, "")
         ));
     }
     acc.push_str(&format!("\n{})", previous_indentation));
@@ -806,7 +807,7 @@ mod tests_formatter {
     }
 
     #[test]
-    fn long() {
+    fn long_line_unwrapping() {
         let src = "(try! (unwrap! (complete-deposit-wrapper (get txid deposit) (get vout-index deposit) (get amount deposit) (get recipient deposit) (get burn-hash deposit) (get burn-height deposit) (get sweep-txid deposit)) (err (+ ERR_DEPOSIT_INDEX_PREFIX (+ u10 index)))))";
         let result = format_with_default(&String::from(src));
         let expected = "(try! (unwrap! (complete-deposit-wrapper\n  (get txid deposit)\n  (get vout-index deposit)\n  (get amount deposit)\n  (get recipient deposit)\n  (get burn-hash deposit)\n  (get burn-height deposit)\n  (get sweep-txid deposit)\n  ) (err (+ ERR_DEPOSIT_INDEX_PREFIX (+ u10 index)))))";
@@ -838,14 +839,24 @@ mod tests_formatter {
     fn test_option_match() {
         let src = "(match opt value (ok (handle-new-value value)) (ok 1))";
         let result = format_with_default(&String::from(src));
-        let expected = "(match opt\n  value (ok (handle-new-value value))\n  (ok 1)\n)";
+        // "(match opt\n
+        let expected = r#"(match opt
+  value
+  (ok (handle-new-value value))
+  (ok 1)
+)"#;
         assert_eq!(result, expected);
     }
     #[test]
     fn test_response_match() {
         let src = "(match x value (ok (+ to-add value)) err-value (err err-value))";
         let result = format_with_default(&String::from(src));
-        let expected = "(match x\n  value (ok (+ to-add value))\n  err-value (err err-value)\n)";
+        let expected = r#"(match x
+  value
+  (ok (+ to-add value))
+  err-value
+  (err err-value)
+)"#;
         assert_eq!(result, expected);
     }
     #[test]
