@@ -34,6 +34,8 @@ pub enum EpochSpec {
     Epoch2_5,
     #[serde(rename = "3.0")]
     Epoch3_0,
+    #[serde(rename = "3.1")]
+    Epoch3_1,
 }
 
 impl From<StacksEpochId> for EpochSpec {
@@ -47,6 +49,7 @@ impl From<StacksEpochId> for EpochSpec {
             StacksEpochId::Epoch24 => EpochSpec::Epoch2_4,
             StacksEpochId::Epoch25 => EpochSpec::Epoch2_5,
             StacksEpochId::Epoch30 => EpochSpec::Epoch3_0,
+            StacksEpochId::Epoch31 => EpochSpec::Epoch3_1,
             StacksEpochId::Epoch10 => unreachable!("epoch 1.0 is not supported"),
         }
     }
@@ -63,6 +66,7 @@ impl From<EpochSpec> for StacksEpochId {
             EpochSpec::Epoch2_4 => StacksEpochId::Epoch24,
             EpochSpec::Epoch2_5 => StacksEpochId::Epoch25,
             EpochSpec::Epoch3_0 => StacksEpochId::Epoch30,
+            EpochSpec::Epoch3_1 => StacksEpochId::Epoch31,
         }
     }
 }

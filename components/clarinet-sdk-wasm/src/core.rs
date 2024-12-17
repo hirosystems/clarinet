@@ -614,6 +614,7 @@ impl SDK {
             "2.4" => StacksEpochId::Epoch24,
             "2.5" => StacksEpochId::Epoch25,
             "3.0" => StacksEpochId::Epoch30,
+            "3.1" => StacksEpochId::Epoch31,
             _ => {
                 log!("Invalid epoch {epoch}. Using default epoch");
                 DEFAULT_EPOCH

@@ -372,6 +372,7 @@ fn get_epoch_and_clarity_version(
             "2.4" => StacksEpochId::Epoch24,
             "2.5" => StacksEpochId::Epoch25,
             "3" | "3.0" => StacksEpochId::Epoch30,
+            "3.1" => StacksEpochId::Epoch31,
             _ => return Err(INVALID_EPOCH.into()),
         },
     };
