@@ -37,6 +37,7 @@ fn epoch_to_peer_version(epoch: StacksEpochId) -> u8 {
         StacksEpochId::Epoch24 => PEER_VERSION_EPOCH_2_4,
         StacksEpochId::Epoch25 => PEER_VERSION_EPOCH_2_5,
         StacksEpochId::Epoch30 => PEER_VERSION_EPOCH_3_0,
+        StacksEpochId::Epoch31 => PEER_VERSION_EPOCH_3_1,
     }
 }
 

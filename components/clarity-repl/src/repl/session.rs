@@ -1012,8 +1012,9 @@ impl Session {
             Some("2.4") => StacksEpochId::Epoch24,
             Some("2.5") => StacksEpochId::Epoch25,
             Some("3.0") => StacksEpochId::Epoch30,
+            Some("3.1") => StacksEpochId::Epoch31,
             _ => {
-                return "Usage: ::set_epoch 2.0 | 2.05 | 2.1 | 2.2 | 2.3 | 2.4 | 2.5 | 3.0"
+                return "Usage: ::set_epoch 2.0 | 2.05 | 2.1 | 2.2 | 2.3 | 2.4 | 2.5 | 3.0 | 3.1"
                     .red()
                     .to_string()
             }

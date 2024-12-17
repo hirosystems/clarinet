@@ -25,7 +25,7 @@ use clarity::types::StacksEpochId;
 use clarity::vm::ClarityVersion;
 
 pub const DEFAULT_CLARITY_VERSION: ClarityVersion = ClarityVersion::Clarity3;
-pub const DEFAULT_EPOCH: StacksEpochId = StacksEpochId::Epoch30;
+pub const DEFAULT_EPOCH: StacksEpochId = StacksEpochId::Epoch31;
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct ClarityContract {
@@ -93,6 +93,9 @@ impl Serialize for ClarityContract {
             }
             StacksEpochId::Epoch30 => {
                 map.serialize_entry("epoch", &3.0)?;
+            }
+            StacksEpochId::Epoch31 => {
+                map.serialize_entry("epoch", &3.1)?;
             }
         }
         map.end()
