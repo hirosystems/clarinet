@@ -47,7 +47,6 @@
     "clean": "rimraf dist",
     "compile": "tsc -b ./tsconfig.json ./tsconfig.cjs.json",
     "build": "npm run clean; npm run compile; node ./scripts/prepare-esm-package.js",
-    "prepare": "npm run build",
     "pretest": "tsc -b ./tsconfig.json",
     "test": "vitest run"
   },
@@ -62,15 +61,15 @@
   "readme": "./README.md",
   "dependencies": {
     "@hirosystems/clarinet-sdk-wasm": "^2.11.2",
-    "@stacks/transactions": "^6.13.0",
+    "@stacks/transactions": "^7.0.0",
     "kolorist": "^1.8.0",
     "prompts": "^2.4.2",
-    "vitest": "^1.6.0",
+    "vitest": "^2.1.4",
     "yargs": "^17.7.2"
   },
   "devDependencies": {
-    "@stacks/encryption": "^6.13.0",
-    "@stacks/network": "^6.13.0",
-    "@stacks/stacking": "^6.13.0"
+    "@stacks/encryption": "^7.0.0",
+    "@stacks/network": "^7.0.0",
+    "@stacks/stacking": "^7.0.0"
   }
 }
