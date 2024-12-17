@@ -84,7 +84,7 @@ lazy_static! {
     };
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
 pub struct CostsReport {
     pub test_name: String,
     pub contract_id: String,
