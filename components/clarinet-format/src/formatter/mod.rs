@@ -260,6 +260,7 @@ fn format_map(
 ) -> String {
     let mut acc = "(define-map ".to_string();
     let indentation = &settings.indentation.to_string();
+    let space = format!("{}{}", previous_indentation, indentation);
 
     if let Some((name, args)) = name_and_args(exprs) {
         acc.push_str(&display_pse(settings, name, "", false));
@@ -269,15 +270,13 @@ fn format_map(
                 // this is hacked in to handle situations where the contents of
                 // map is a 'tuple'
                 PreSymbolicExpressionType::Tuple(list) => acc.push_str(&format!(
-                    "\n{}{}{}",
-                    previous_indentation,
-                    indentation,
+                    "\n{}{}",
+                    space,
                     format_key_value_sugar(settings, &list.to_vec(), indentation)
                 )),
                 _ => acc.push_str(&format!(
-                    "\n{}{}{}",
-                    previous_indentation,
-                    indentation,
+                    "\n{}{}",
+                    space,
                     format_source_exprs(settings, &[arg.clone()], indentation, None, "")
                 )),
             }
@@ -297,13 +296,13 @@ fn format_begin(
 ) -> String {
     let mut begin_acc = "(begin".to_string();
     let indentation = &settings.indentation.to_string();
+    let space = format!("{}{}", previous_indentation, indentation);
 
     for arg in exprs.get(1..).unwrap_or_default() {
         if let Some(list) = arg.match_list() {
             begin_acc.push_str(&format!(
-                "\n{}{}({})",
-                previous_indentation,
-                indentation,
+                "\n{}({})",
+                space,
                 format_source_exprs(settings, list, previous_indentation, None, "")
             ))
         }
@@ -329,6 +328,7 @@ fn format_booleans(
     let func_type = display_pse(settings, exprs.first().unwrap(), "", false);
     let mut acc = format!("({func_type}");
     let indentation = &settings.indentation.to_string();
+    let space = format!("{}{}", previous_indentation, indentation);
     if without_comments_len(&exprs[1..]) > 2 {
         // let mut iter = exprs[1..].iter().peekable();
 
@@ -340,9 +340,8 @@ fn format_booleans(
         //     };
         for arg in exprs[1..].iter() {
             acc.push_str(&format!(
-                "\n{}{}{}",
-                previous_indentation,
-                indentation,
+                "\n{}{}",
+                space,
                 format_source_exprs(settings, &[arg.clone()], previous_indentation, None, ""),
             ));
         }
@@ -371,12 +370,12 @@ fn format_let(
 ) -> String {
     let mut acc = "(let (".to_string();
     let indentation = &settings.indentation.to_string();
+    let space = format!("{}{}", previous_indentation, indentation);
     if let Some(args) = exprs[1].match_list() {
         for arg in args.iter() {
             acc.push_str(&format!(
-                "\n{}{}{}",
-                previous_indentation,
-                indentation,
+                "\n{}{}",
+                space,
                 format_source_exprs(settings, &[arg.clone()], previous_indentation, None, "")
             ))
         }
@@ -384,9 +383,8 @@ fn format_let(
     acc.push_str(&format!("\n{})", previous_indentation));
     for e in exprs.get(2..).unwrap_or_default() {
         acc.push_str(&format!(
-            "\n{}{}{}",
-            previous_indentation,
-            indentation,
+            "\n{}{}",
+            space,
             format_source_exprs(settings, &[e.clone()], previous_indentation, None, "")
         ))
     }
@@ -403,10 +401,10 @@ fn format_match(
 ) -> String {
     let mut acc = "(match ".to_string();
     let indentation = &settings.indentation.to_string();
+    let space = format!("{}{}", previous_indentation, indentation);
 
     acc.push_str(&display_pse(settings, &exprs[1], "", false).to_string());
     // first branch. some or ok binding
-    let space = format!("{}{}", previous_indentation, indentation);
     acc.push_str(&format!(
         "\n{}{}\n{}{}",
         space,
@@ -469,6 +467,7 @@ fn format_key_value_sugar(
     previous_indentation: &str,
 ) -> String {
     let indentation = &settings.indentation.to_string();
+    let space = format!("{}{}", previous_indentation, indentation);
     let mut acc = "{".to_string();
 
     // TODO this logic depends on comments not screwing up the even numbered
@@ -479,9 +478,8 @@ fn format_key_value_sugar(
                 let fkey = display_pse(settings, key, "", false);
                 if i + 1 < exprs.len() / 2 {
                     acc.push_str(&format!(
-                        "\n{}{}{fkey}: {},\n",
-                        previous_indentation,
-                        indentation,
+                        "\n{}{fkey}: {},\n",
+                        space,
                         format_source_exprs(
                             settings,
                             &[value.clone()],
@@ -492,9 +490,8 @@ fn format_key_value_sugar(
                     ));
                 } else {
                     acc.push_str(&format!(
-                        "{}{}{fkey}: {}\n",
-                        previous_indentation,
-                        indentation,
+                        "{}{fkey}: {}\n",
+                        space,
                         format_source_exprs(
                             settings,
                             &[value.clone()],
@@ -536,6 +533,8 @@ fn format_key_value(
     previous_indentation: &str,
 ) -> String {
     let indentation = &settings.indentation.to_string();
+    let space = format!("{}{}", previous_indentation, indentation);
+
     let mut acc = "{".to_string();
 
     if exprs.len() > 1 {
@@ -548,13 +547,13 @@ fn format_key_value(
             if i < exprs.len() - 1 {
                 acc.push_str(&format!(
                     "\n{}{fkey}: {},",
-                    indentation,
+                    space,
                     format_source_exprs(settings, value, previous_indentation, None, "")
                 ));
             } else {
                 acc.push_str(&format!(
                     "\n{}{fkey}: {}\n",
-                    indentation,
+                    space,
                     format_source_exprs(settings, value, previous_indentation, None, "")
                 ));
             }
