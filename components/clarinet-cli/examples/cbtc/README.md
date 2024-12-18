@@ -19,10 +19,9 @@ clarinet devnet start
 In another console, change the directory to `./serverless/` and run
 
 ```bash
-yarn                          # Install dependencies
-yarn start                    # Run the offline server
+npm install
+npm start
 ```
-*Note: this example requires using npm version <=16 or >=20.*
 
 Once the message `Server ready: http://localhost:3000 🚀` appears on the screen, transfers tokens back and forth between the Bitcoin Blockchain and the Stacks Blockchain can be performed
 thanks to the deployment plans:

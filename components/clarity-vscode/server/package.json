@@ -1,8 +1,8 @@
 {
-  "name": "clarity-lsp-server",
+  "name": "@hirosystems/clarity-lsp-server",
   "description": "Example implementation of a language server in a web extension.",
   "version": "1.0.0",
-  "author": "Microsoft Corporation",
+  "author": "Hugo <hugo@hiro.so>",
   "license": "MIT",
   "engines": {
     "node": "*"
