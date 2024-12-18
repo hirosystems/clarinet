@@ -129,9 +129,19 @@ pub fn format_source_exprs(
                         | DefineFunctions::PrivateFunction => format_function(settings, list),
                         DefineFunctions::Constant => format_constant(settings, list),
                         DefineFunctions::Map => format_map(settings, list, previous_indentation),
-                        // DefineFunctions::UseTrait => format_use_trait(settings, list),
+                        DefineFunctions::UseTrait | DefineFunctions::ImplTrait => {
+                            follow_with_newline(&format!(
+                                "({})",
+                                format_source_exprs(
+                                    settings,
+                                    list,
+                                    previous_indentation,
+                                    previous_expr,
+                                    acc
+                                )
+                            ))
+                        }
                         // DefineFunctions::Trait => format_trait(settings, list),
-                        // DefineFunctions::ImplTrait => format_impl_trait(settings, list),
                         // DefineFunctions::PersistedVariable
                         // DefineFunctions::FungibleToken
                         // DefineFunctions::NonFungibleToken
@@ -212,6 +222,10 @@ pub fn format_source_exprs(
         .to_owned();
     };
     acc.to_owned()
+}
+
+fn follow_with_newline(expr: &str) -> String {
+    format!("{}\n", expr)
 }
 
 // trim but leaves newlines preserved
@@ -628,32 +642,28 @@ fn display_pse(
     has_previous_expr: bool,
 ) -> String {
     match pse.pre_expr {
-        PreSymbolicExpressionType::Atom(ref value) => {
-            // println!("atom: {}", value.as_str());
-            t(value.as_str()).to_string()
-        }
-        PreSymbolicExpressionType::AtomValue(ref value) => {
-            // println!("atomvalue: {}", value);
-            value.to_string()
-        }
+        PreSymbolicExpressionType::Atom(ref value) => t(value.as_str()).to_string(),
+        PreSymbolicExpressionType::AtomValue(ref value) => value.to_string(),
         PreSymbolicExpressionType::List(ref items) => {
             format_list(settings, items, previous_indentation)
-            // items.iter().map(display_pse).collect::<Vec<_>>().join(" ")
         }
         PreSymbolicExpressionType::Tuple(ref items) => {
-            // println!("tuple: {:?}", items);
             format_key_value_sugar(settings, items, previous_indentation)
-            // items.iter().map(display_pse).collect::<Vec<_>>().join(", ")
         }
-        PreSymbolicExpressionType::SugaredContractIdentifier(ref name) => name.to_string(),
+        PreSymbolicExpressionType::SugaredContractIdentifier(ref name) => {
+            format!(".{}", name)
+        }
         PreSymbolicExpressionType::SugaredFieldIdentifier(ref contract, ref field) => {
-            format!("{}.{}", contract, field)
+            println!("sugar field id");
+            format!(".{}.{}", contract, field)
         }
         PreSymbolicExpressionType::FieldIdentifier(ref trait_id) => {
-            // println!("field id: {}", trait_id);
-            trait_id.to_string()
+            format!("'{}", trait_id)
         }
-        PreSymbolicExpressionType::TraitReference(ref name) => name.to_string(),
+        PreSymbolicExpressionType::TraitReference(ref name) => {
+            println!("trait ref: {}", name);
+            name.to_string()
+        }
         PreSymbolicExpressionType::Comment(ref text) => {
             // println!("{:?}", has_previous_expr);
             if has_previous_expr {
@@ -948,6 +958,16 @@ mod tests_formatter {
     #[ignore]
     fn test_ignore_formatting() {
         let src = ";; @format-ignore\n(    begin ( ok true ))";
+        let result = format_with(&String::from(src), Settings::new(Indentation::Space(4), 80));
+        assert_eq!(src, result);
+    }
+
+    #[test]
+    fn test_traits() {
+        let src = "(use-trait token-a-trait 'SPAXYA5XS51713FDTQ8H94EJ4V579CXMTRNBZKSF.token-a.token-trait)\n";
+        let result = format_with(&String::from(src), Settings::new(Indentation::Space(4), 80));
+        assert_eq!(src, result);
+        let src = "(as-contract (contract-call? .tokens mint! u19)) ;; Returns (ok u19)\n";
         let result = format_with(&String::from(src), Settings::new(Indentation::Space(4), 80));
         assert_eq!(src, result);
     }
