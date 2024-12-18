@@ -12,12 +12,12 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@hirosystems/clarinet-sdk": "^2.4.1",
-    "@stacks/transactions": "^6.9.0",
+    "@hirosystems/clarinet-sdk": "2.11.2",
+    "@stacks/transactions": "6.17.0",
     "chokidar-cli": "^3.0.0",
-    "typescript": "^5.2.2",
+    "typescript": "5.7.2",
     "vite": "^5.4.6",
-    "vitest": "^1.4.0",
+    "vitest": "1.6.0",
     "vitest-environment-clarinet": "^2.0.0"
   }
 }

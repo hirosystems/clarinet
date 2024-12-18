@@ -6,10 +6,6 @@ It is implemented as a dynamic library that can be loaded by Node, and will let 
 ### Installation
 
 ```bash
-# Yarn
-yarn add dev @hirosystems/stacks-devnet-js
-
-# NPM
 npm install --save-dev @hirosystems/stacks-devnet-js
 ```
 

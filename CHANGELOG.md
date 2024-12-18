@@ -1,4 +1,23 @@
-# [2.11.2](https://github.com/hirosystems/clarinet/compare/v2.11.2...v2.11.2) (2024-10-30)
+# [2.12.0](https://github.com/hirosystems/clarinet/compare/v2.11.2...v2.12.0) (2024-12-18)
+
+##### New Features
+
+*  Add costs report in sdk tx response (#1620) (6b68e00f)
+*  Epoch 3.1 support (#1630) (682daf54)
+
+##### Bug Fixes
+
+*  Typo for initEmptySession function (#1619) (1e731094)
+
+##### Performance Improvements
+
+*  Improve simnet datastore data struct (#1617) (ad66d1bd)
+
+##### Tests
+
+*  Setup basic wasm-bindgen tests for the sdk (#1614) (3f32f19c)
+
+# [2.11.2](https://github.com/hirosystems/clarinet/compare/v2.11.1...v2.11.2) (2024-10-30)
 
 ##### Bug Fixes
 
