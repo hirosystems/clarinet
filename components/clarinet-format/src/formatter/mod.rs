@@ -99,7 +99,7 @@ pub fn format_source_exprs(
                         // (Tuple [(PSE)])
                         NativeFunctions::TupleCons => {
                             println!("tuple cons");
-                            format_tuple_cons(settings, list)
+                            format_tuple_cons(settings, list, previous_indentation)
                         }
                         NativeFunctions::ListCons => {
                             println!("list cons");
@@ -149,7 +149,6 @@ pub fn format_source_exprs(
                         }
                     }
                 } else {
-                    println!("else");
                     format!(
                         "({})",
                         format_source_exprs(
@@ -446,29 +445,20 @@ fn format_match(
     let indentation = &settings.indentation.to_string();
     let space = format!("{}{}", previous_indentation, indentation);
 
-    acc.push_str(&display_pse(settings, &exprs[1], "", false).to_string());
-    // first branch. some or ok binding
-    acc.push_str(&format!(
-        "\n{}{}\n{}{}",
-        space,
-        display_pse(settings, &exprs[2], &space, false),
-        space,
-        format_source_exprs(settings, &[exprs[3].clone()], &space, None, "")
+    // value to match on
+    acc.push_str(&format_source_exprs(
+        settings,
+        &[exprs[1].clone()],
+        previous_indentation,
+        None,
+        "",
     ));
-    // second branch. none or err binding
-    if let Some(some_branch) = exprs[4].match_list() {
+    // branches evenly spaced
+    for branch in exprs[2..].iter() {
         acc.push_str(&format!(
-            "\n{}({})",
+            "\n{}{}",
             space,
-            format_source_exprs(settings, some_branch, previous_indentation, None, "")
-        ));
-    } else {
-        acc.push_str(&format!(
-            "\n{}{}\n{}{}",
-            space,
-            display_pse(settings, &exprs[4], &space, false),
-            space,
-            format_source_exprs(settings, &[exprs[5].clone()], &space, None, "")
+            format_source_exprs(settings, &[branch.clone()], &space, None, "")
         ));
     }
     acc.push_str(&format!("\n{})", previous_indentation));
@@ -615,13 +605,18 @@ fn format_key_value(
             ));
         }
     }
+    acc.push_str(previous_indentation);
     acc.push('}');
     acc.to_string()
 }
-fn format_tuple_cons(settings: &Settings, exprs: &[PreSymbolicExpression]) -> String {
+fn format_tuple_cons(
+    settings: &Settings,
+    exprs: &[PreSymbolicExpression],
+    previous_indentation: &str,
+) -> String {
     // if the kv map is defined with (tuple (c 1)) then we have to strip the
     // ClarityName("tuple") out first
-    format_key_value(settings, &exprs[1..], "")
+    format_key_value(settings, &exprs[1..], previous_indentation)
 }
 
 // This should panic on most things besides atoms and values. Added this to help
@@ -895,6 +890,7 @@ mod tests_formatter {
 )"#;
         assert_eq!(result, expected);
     }
+
     #[test]
     fn test_response_match() {
         let src = "(match x value (ok (+ to-add value)) err-value (err err-value))";
@@ -948,12 +944,13 @@ mod tests_formatter {
         assert_eq!(result, "(begin\n    (ok true)\n)\n");
     }
 
-    // #[test]
-    // fn test_ignore_formatting() {
-    //     let src = ";; @format-ignore\n(    begin ( ok true ))";
-    //     let result = format_with(&String::from(src), Settings::new(Indentation::Space(4), 80));
-    //     assert_eq!(src, result);
-    // }
+    #[test]
+    #[ignore]
+    fn test_ignore_formatting() {
+        let src = ";; @format-ignore\n(    begin ( ok true ))";
+        let result = format_with(&String::from(src), Settings::new(Indentation::Space(4), 80));
+        assert_eq!(src, result);
+    }
 
     #[test]
     #[ignore]
