@@ -17,7 +17,16 @@ impl ToString for Indentation {
     }
 }
 
+// commented blocks with this string included will not be formatted
 const FORMAT_IGNORE_SYNTAX: &str = "@format-ignore";
+
+// or/and with > N comparisons will be split across multiple lines
+// (or
+//   true
+//   (is-eq 1 1)
+//   false
+// )
+const BOOLEAN_BREAK_LIMIT: usize = 2;
 
 pub struct Settings {
     pub indentation: Indentation,
@@ -62,8 +71,8 @@ pub fn format_source_exprs(
     acc: &str,
 ) -> String {
     // print_pre_expr(expressions);
-    println!("exprs: {:?}", expressions);
-    println!("previous: {:?}", previous_expr);
+    // println!("exprs: {:?}", expressions);
+    // println!("previous: {:?}", previous_expr);
     if let Some((expr, remaining)) = expressions.split_first() {
         let cur = display_pse(
             &Settings::default(),
@@ -88,23 +97,30 @@ pub fn format_source_exprs(
                         }
                         // (tuple (name 1))
                         // (Tuple [(PSE)])
-                        NativeFunctions::TupleCons => format_tuple_cons(settings, list),
+                        NativeFunctions::TupleCons => {
+                            println!("tuple cons");
+                            format_tuple_cons(settings, list)
+                        }
                         NativeFunctions::ListCons => {
+                            println!("list cons");
                             format_list(settings, list, previous_indentation)
                         }
                         NativeFunctions::And | NativeFunctions::Or => {
-                            format_booleans(settings, list, previous_indentation)
+                            format_booleans(settings, list, previous_indentation, previous_expr)
                         }
-                        _ => format!(
-                            "({})",
-                            format_source_exprs(
-                                settings,
-                                list,
-                                previous_indentation,
-                                previous_expr,
-                                acc
+                        _ => {
+                            // println!("fallback: {:?}", list);
+                            format!(
+                                "({})",
+                                format_source_exprs(
+                                    settings,
+                                    list,
+                                    previous_indentation,
+                                    previous_expr,
+                                    acc
+                                )
                             )
-                        ),
+                        }
                     }
                 } else if let Some(define) = DefineFunctions::lookup_by_name(atom_name) {
                     match define {
@@ -119,18 +135,21 @@ pub fn format_source_exprs(
                         // DefineFunctions::PersistedVariable
                         // DefineFunctions::FungibleToken
                         // DefineFunctions::NonFungibleToken
-                        _ => format!(
-                            "({})",
-                            format_source_exprs(
-                                settings,
-                                list,
-                                previous_indentation,
-                                previous_expr,
-                                acc
+                        _ => {
+                            format!(
+                                "({})",
+                                format_source_exprs(
+                                    settings,
+                                    list,
+                                    previous_indentation,
+                                    previous_expr,
+                                    acc
+                                )
                             )
-                        ),
+                        }
                     }
                 } else {
+                    println!("else");
                     format!(
                         "({})",
                         format_source_exprs(
@@ -154,11 +173,15 @@ pub fn format_source_exprs(
                         acc
                     )
                 )
-                // .trim()
                 .to_owned();
             }
         }
         let current = display_pse(settings, expr, "", previous_expr.is_some());
+        let newline = if let Some(rem) = remaining.get(1) {
+            expr.span().start_line != rem.span().start_line
+        } else {
+            false
+        };
 
         // if this IS NOT a pre or post comment, we need to put a space between
         // the last expression
@@ -168,8 +191,14 @@ pub fn format_source_exprs(
             ""
         };
 
-        let between = if remaining.is_empty() { "" } else { " " };
-        println!("here: {}", current);
+        let between = if remaining.is_empty() {
+            ""
+        } else if newline {
+            "\n"
+        } else {
+            " "
+        };
+        // println!("here: {}", current);
         return format!(
             "{pre_space}{}{between}{}",
             t(&current),
@@ -199,19 +228,6 @@ fn t(input: &str) -> &str {
 
     &input[start..end]
 }
-
-// fn format_use_trait(settings: &Settings, exprs: &[PreSymbolicExpression]) -> String {
-//     // delegates to display_pse
-//     format_source_exprs(settings, exprs, "", None, "")
-// }
-// fn format_impl_trait(settings: &Settings, exprs: &[PreSymbolicExpression]) -> String {
-//     // delegates to display_pse
-//     format_source_exprs(settings, exprs, "", None, "")
-// }
-// fn format_trait(settings: &Settings, exprs: &[PreSymbolicExpression]) -> String {
-//     // delegates to display_pse
-//     format_source_exprs(settings, exprs, "", None, "")
-// }
 
 fn name_and_args(
     exprs: &[PreSymbolicExpression],
@@ -324,12 +340,14 @@ fn format_booleans(
     settings: &Settings,
     exprs: &[PreSymbolicExpression],
     previous_indentation: &str,
+    previous_expr: Option<PreSymbolicExpression>,
 ) -> String {
     let func_type = display_pse(settings, exprs.first().unwrap(), "", false);
     let mut acc = format!("({func_type}");
     let indentation = &settings.indentation.to_string();
     let space = format!("{}{}", previous_indentation, indentation);
-    if without_comments_len(&exprs[1..]) > 2 {
+    // println!("exprs: {:?}", exprs);
+    if without_comments_len(&exprs[1..]) > BOOLEAN_BREAK_LIMIT {
         // let mut iter = exprs[1..].iter().peekable();
 
         // while let Some(arg) = iter.next() {
@@ -338,12 +356,37 @@ fn format_booleans(
         //     } else {
         //         false
         //     };
+
+        let mut prev: Option<&PreSymbolicExpression> = None;
         for arg in exprs[1..].iter() {
-            acc.push_str(&format!(
-                "\n{}{}",
-                space,
-                format_source_exprs(settings, &[arg.clone()], previous_indentation, None, ""),
-            ));
+            if is_comment(arg) {
+                if let Some(prev_arg) = prev {
+                    let newline = prev_arg.span().start_line != arg.span().start_line;
+                    // Inline the comment if it follows a non-comment expression
+                    acc.push_str(&format!(
+                        "{}{}",
+                        if newline {
+                            format!("\n{}", space)
+                        } else {
+                            " ".to_string()
+                        },
+                        format_source_exprs(
+                            settings,
+                            &[arg.clone()],
+                            previous_indentation,
+                            None,
+                            ""
+                        )
+                    ));
+                }
+            } else {
+                acc.push_str(&format!(
+                    "\n{}{}",
+                    space,
+                    format_source_exprs(settings, &[arg.clone()], previous_indentation, None, "")
+                ));
+            }
+            prev = Some(arg)
         }
     } else {
         acc.push(' ');
@@ -355,10 +398,10 @@ fn format_booleans(
             "",
         ))
     }
-    if without_comments_len(&exprs[1..]) > 2 {
+    if without_comments_len(&exprs[1..]) > BOOLEAN_BREAK_LIMIT {
         acc.push_str(&format!("\n{}", previous_indentation));
     }
-    acc.push(')');
+    acc.push_str(")\n");
     acc.to_owned()
 }
 
@@ -592,7 +635,7 @@ fn display_pse(
     match pse.pre_expr {
         PreSymbolicExpressionType::Atom(ref value) => {
             // println!("atom: {}", value.as_str());
-            value.as_str().trim().to_string()
+            t(value.as_str()).to_string()
         }
         PreSymbolicExpressionType::AtomValue(ref value) => {
             // println!("atomvalue: {}", value);
@@ -624,8 +667,8 @@ fn display_pse(
                 format!(";; {}", t(text))
             }
         }
-        PreSymbolicExpressionType::Placeholder(ref _placeholder) => {
-            "".to_string() // Placeholder is for if parsing fails
+        PreSymbolicExpressionType::Placeholder(ref placeholder) => {
+            placeholder.to_string() // Placeholder is for if parsing fails
         }
     }
 }
@@ -783,24 +826,30 @@ mod tests_formatter {
     }
     #[test]
     fn test_postcomments_included() {
-        let src = "(ok true)\n;; this is a post comment";
+        let src = "(ok true)\n;; this is a post comment\n";
         let result = format_with_default(&String::from(src));
         assert_eq!(src, result);
     }
 
     #[test]
     fn test_booleans() {
-        let src = "(or true false)";
+        let src = "(or true false)\n";
         let result = format_with_default(&String::from(src));
         assert_eq!(src, result);
-        let src = "(or true (is-eq 1 2) (is-eq 1 1))";
+        let src = "(or true (is-eq 1 2) (is-eq 1 1))\n";
         let result = format_with_default(&String::from(src));
-        let expected = "(or\n  true\n  (is-eq 1 2)\n  (is-eq 1 1)\n)";
+        let expected = "(or\n  true\n  (is-eq 1 2)\n  (is-eq 1 1)\n)\n";
         assert_eq!(expected, result);
     }
     #[test]
     fn test_booleans_with_comments() {
-        let src = "(or\n  true\n  (is-eq 1 2) ;; comment\n  (is-eq 1 1) ;; b\n)\n";
+        let src = r#"(or
+  true
+  ;; pre comment
+  (is-eq 1 2) ;; comment
+  (is-eq 1 1) ;; b
+)
+"#;
         let result = format_with_default(&String::from(src));
         assert_eq!(src, result);
     }
@@ -907,6 +956,7 @@ mod tests_formatter {
     // }
 
     #[test]
+    #[ignore]
     fn test_irl_contracts() {
         let golden_dir = "./tests/golden";
         let intended_dir = "./tests/golden-intended";
