@@ -3576,7 +3576,7 @@ impl StacksMessageCodec for SinglesigSpendingCondition {
         if hash_mode == SinglesigHashMode::P2WPKH
             && key_encoding != TransactionPublicKeyEncoding::Compressed
         {
-            return Err(CodecError::DeserializeError("Failed to parse singlesig spending condition: incomaptible hash mode and key encoding".to_string()));
+            return Err(CodecError::DeserializeError("Failed to parse singlesig spending condition: incompatible hash mode and key encoding".to_string()));
         }
 
         Ok(SinglesigSpendingCondition {

@@ -68,7 +68,7 @@ the 2nd output of the transaction to a Stacks address, and sending the minted to
     cost: 5960
 ```
 
-Another chainhook predicate, specified in `chainhooks/unwrap-btc.json` is observing cBTC burn events occuring on the Stacks blockchain, thanks to the following configuration:
+Another chainhook predicate, specified in `chainhooks/unwrap-btc.json` is observing cBTC burn events occurring on the Stacks blockchain, thanks to the following configuration:
 
 ```json
 "if_this": {
@@ -86,7 +86,7 @@ Another chainhook predicate, specified in `chainhooks/unwrap-btc.json` is observ
 }
 ```
 
-When the authority process this chainhook occurences, it sends BTC from its reserve to `cBTC` burner, by assuming that a p2pkh is being used.
+When the authority process this chainhook occurrences, it sends BTC from its reserve to `cBTC` burner, by assuming that a p2pkh is being used.
 
 The wrap / unwrap deployment plans can both be respectively performed with the commands:
 
