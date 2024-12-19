@@ -11,6 +11,7 @@ pub struct InitializationOptions {
     completion: bool,
     pub completion_smart_parenthesis_wrap: bool,
     pub completion_include_native_placeholders: bool,
+    pub format_on_save: bool,
     document_symbols: bool,
     go_to_definition: bool,
     hover: bool,
@@ -25,6 +26,7 @@ impl InitializationOptions {
             completion_include_native_placeholders: true,
             document_symbols: false,
             go_to_definition: true,
+            format_on_save: false,
             hover: true,
             signature_help: true,
         }
@@ -64,6 +66,10 @@ pub fn get_capabilities(initialization_options: &InitializationOptions) -> Serve
                 retrigger_characters: None,
                 work_done_progress_options: Default::default(),
             }),
+            false => None,
+        },
+        document_formatting_provider: match initialization_options.format_on_save {
+            true => Some(lsp_types::OneOf::Left(true)),
             false => None,
         },
         ..ServerCapabilities::default()

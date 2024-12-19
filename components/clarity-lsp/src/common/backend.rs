@@ -213,6 +213,7 @@ pub async fn process_notification(
                 }
             };
 
+            let format_on_save = editor_state.try_read(|es| es.settings.format_on_save)?;
             // TODO(): introduce partial analysis #604
             let mut protocol_state = ProtocolState::new();
             match build_state(&manifest_location, &mut protocol_state, file_accessor).await {
@@ -221,6 +222,10 @@ pub async fn process_notification(
                         es.index_protocol(manifest_location, protocol_state);
                         if let Some(contract) = es.active_contracts.get_mut(&contract_location) {
                             contract.update_definitions();
+                            if format_on_save {
+                                // need source path
+                                println!("{:?}", contract_location);
+                            }
                         };
                     })?;
 
