@@ -27,6 +27,7 @@ use clarinet_files::{
     get_manifest_location, FileLocation, NetworkManifest, ProjectManifest, ProjectManifestFile,
     RequirementConfig,
 };
+use clarinet_format::formatter::{ClarityFormatter, Settings};
 use clarity_repl::analysis::call_checker::ContractAnalysis;
 use clarity_repl::clarity::vm::analysis::AnalysisDatabase;
 use clarity_repl::clarity::vm::costs::LimitedCostTracker;
@@ -39,7 +40,7 @@ use clarity_repl::{analysis, repl, Terminal};
 use stacks_network::{self, DevnetOrchestrator};
 use std::collections::HashMap;
 use std::fs::{self, File};
-use std::io::prelude::*;
+use std::io::{self, prelude::*};
 use std::{env, process};
 use toml;
 
@@ -94,9 +95,28 @@ enum Command {
     /// Get Clarity autocompletion and inline errors from your code editor (VSCode, vim, emacs, etc)
     #[clap(name = "lsp", bin_name = "lsp")]
     LSP,
+    /// Format clarity code files
+    #[clap(name = "format", aliases = &["fmt"], bin_name = "format")]
+    Formatter(Formatter),
     /// Step by step debugging and breakpoints from your code editor (VSCode, vim, emacs, etc)
     #[clap(name = "dap", bin_name = "dap")]
     DAP,
+}
+
+#[derive(Parser, PartialEq, Clone, Debug)]
+struct Formatter {
+    #[clap(long = "manifest-path", short = 'm')]
+    pub manifest_path: Option<String>,
+    /// If specified, format only this file
+    #[clap(long = "file", short = 'f')]
+    pub file: Option<String>,
+    #[clap(long = "max-line-length", short = 'l')]
+    pub max_line_length: Option<usize>,
+    #[clap(long = "tabs", short = 't')]
+    /// indentation size, e.g. 2
+    pub indentation: Option<usize>,
+    #[clap(long = "dry-run")]
+    pub dry_run: bool,
 }
 
 #[derive(Subcommand, PartialEq, Clone, Debug)]
@@ -1180,6 +1200,28 @@ pub fn main() {
                 process::exit(1);
             }
         },
+        Command::Formatter(cmd) => {
+            let sources = get_sources_to_format(cmd.manifest_path, cmd.file);
+            let mut settings = Settings::default();
+
+            if let Some(max_line_length) = cmd.max_line_length {
+                settings.max_line_length = max_line_length;
+            }
+
+            if let Some(indentation) = cmd.indentation {
+                settings.indentation = clarinet_format::formatter::Indentation::Space(indentation);
+            }
+            let mut formatter = ClarityFormatter::new(settings);
+
+            for (file_path, source) in &sources {
+                let output = formatter.format(source);
+                if !cmd.dry_run {
+                    let _ = overwrite_formatted(file_path, output);
+                } else {
+                    println!("{}", output);
+                }
+            }
+        }
         Command::Devnet(subcommand) => match subcommand {
             Devnet::Package(cmd) => {
                 let manifest = load_manifest_or_exit(cmd.manifest_path);
@@ -1191,6 +1233,57 @@ pub fn main() {
             Devnet::DevnetStart(cmd) => devnet_start(cmd, global_settings),
         },
     };
+}
+
+fn overwrite_formatted(file_path: &String, output: String) -> io::Result<()> {
+    let mut file = fs::File::create(file_path)?;
+
+    file.write_all(output.as_bytes())?;
+    Ok(())
+}
+
+fn from_code_source(src: ClarityCodeSource) -> String {
+    match src {
+        ClarityCodeSource::ContractOnDisk(path_buf) => {
+            path_buf.as_path().to_str().unwrap().to_owned()
+        }
+        _ => panic!("invalid code source"), // TODO
+    }
+}
+// look for files at the default code path (./contracts/) if
+// cmd.manifest_path is not specified OR if cmd.file is not specified
+fn get_sources_from_manifest(manifest_path: Option<String>) -> Vec<String> {
+    let manifest = load_manifest_or_warn(manifest_path);
+    match manifest {
+        Some(manifest_path) => {
+            let contracts = manifest_path.contracts.values().cloned();
+            contracts.map(|c| from_code_source(c.code_source)).collect()
+        }
+        None => {
+            // TODO this should probably just panic or fail gracefully because
+            // if the manifest isn't specified or found at the default location
+            // we can't do much
+            vec![]
+        }
+    }
+}
+fn get_sources_to_format(
+    manifest_path: Option<String>,
+    file: Option<String>,
+) -> Vec<(String, String)> {
+    let files: Vec<String> = match file {
+        Some(file_name) => vec![format!("{}", file_name)],
+        None => get_sources_from_manifest(manifest_path),
+    };
+    // Map each file to its source code
+    files
+        .into_iter()
+        .map(|file_path| {
+            let source = fs::read_to_string(&file_path)
+                .unwrap_or_else(|_| "Failed to read file".to_string());
+            (file_path, source)
+        })
+        .collect()
 }
 
 fn get_manifest_location_or_exit(path: Option<String>) -> FileLocation {
