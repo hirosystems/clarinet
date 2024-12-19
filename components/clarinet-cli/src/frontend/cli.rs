@@ -105,9 +105,8 @@ enum Command {
 
 #[derive(Parser, PartialEq, Clone, Debug)]
 struct Formatter {
-    /// Path to clarity files (defaults to ./contracts)
-    #[clap(long = "path", short = 'p')]
-    pub code_path: Option<String>,
+    #[clap(long = "manifest-path", short = 'm')]
+    pub manifest_path: Option<String>,
     /// If specified, format only this file
     #[clap(long = "file", short = 'f')]
     pub file: Option<String>,
@@ -1202,7 +1201,7 @@ pub fn main() {
             }
         },
         Command::Formatter(cmd) => {
-            let sources = get_source_with_path(cmd.code_path, cmd.file);
+            let sources = get_sources_to_format(cmd.manifest_path, cmd.file);
             let mut settings = Settings::default();
 
             if let Some(max_line_length) = cmd.max_line_length {
@@ -1243,32 +1242,45 @@ fn overwrite_formatted(file_path: &String, output: String) -> io::Result<()> {
     Ok(())
 }
 
-fn get_source_with_path(code_path: Option<String>, file: Option<String>) -> Vec<(String, String)> {
-    // look for files at the default code path (./contracts/) if
-    // cmd.code_path is not specified OR if cmd.file is not specified
-    let path = code_path.unwrap_or_else(|| "./contracts/".to_string());
-
-    // Collect file paths and load source code
+fn from_code_source(src: ClarityCodeSource) -> String {
+    match src {
+        ClarityCodeSource::ContractOnDisk(path_buf) => {
+            path_buf.as_path().to_str().unwrap().to_owned()
+        }
+        _ => panic!("invalid code source"), // TODO
+    }
+}
+// look for files at the default code path (./contracts/) if
+// cmd.manifest_path is not specified OR if cmd.file is not specified
+fn get_sources_from_manifest(manifest_path: Option<String>) -> Vec<String> {
+    let manifest = load_manifest_or_warn(manifest_path);
+    match manifest {
+        Some(manifest_path) => {
+            let contracts = manifest_path.contracts.values().cloned();
+            contracts.map(|c| from_code_source(c.code_source)).collect()
+        }
+        None => {
+            // TODO this should probably just panic or fail gracefully because
+            // if the manifest isn't specified or found at the default location
+            // we can't do much
+            vec![]
+        }
+    }
+}
+fn get_sources_to_format(
+    manifest_path: Option<String>,
+    file: Option<String>,
+) -> Vec<(String, String)> {
     let files: Vec<String> = match file {
         Some(file_name) => vec![format!("{}", file_name)],
-        None => match fs::read_dir(&path) {
-            Ok(entries) => entries
-                .filter_map(Result::ok)
-                .filter(|entry| entry.path().is_file())
-                .map(|entry| entry.path().to_string_lossy().into_owned())
-                .collect(),
-            Err(message) => {
-                eprintln!("{}", format_err!(message));
-                std::process::exit(1)
-            }
-        },
+        None => get_sources_from_manifest(manifest_path),
     };
     // Map each file to its source code
     files
         .into_iter()
         .map(|file_path| {
             let source = fs::read_to_string(&file_path)
-                .unwrap_or_else(|_| "// Failed to read file".to_string());
+                .unwrap_or_else(|_| "Failed to read file".to_string());
             (file_path, source)
         })
         .collect()
