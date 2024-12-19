@@ -80,7 +80,7 @@ pub async fn process_notification(
 ) -> Result<LspNotificationResponse, String> {
     match command {
         LspNotification::ManifestOpened(manifest_location) => {
-            // Only build the initial protocal state if it does not exist
+            // Only build the initial protocol state if it does not exist
             if editor_state.try_read(|es| es.protocols.contains_key(&manifest_location))? {
                 return Ok(LspNotificationResponse::default());
             }
@@ -389,7 +389,7 @@ pub fn process_mutating_request(
             }
         }
         _ => Err(format!(
-            "Unexpected command: {:?}, should not not mutate state",
+            "Unexpected command: {:?}, should not mutate state",
             &command
         )),
     }

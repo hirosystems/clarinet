@@ -18,6 +18,7 @@ import {
   type ParsedTransactionResult,
   type Execute,
   type TransferSTX,
+  parseCosts,
 } from "../../common/src/sdkProxyHelpers.js";
 
 /** @deprecated use `simnet.execute(command)` instead */
@@ -48,6 +49,7 @@ function parseTxResponse(response: TransactionRes): ParsedTransactionResult {
   return {
     result: Cl.deserialize(response.result),
     events: parseEvents(response.events),
+    costs: parseCosts(response.costs),
   };
 }
 

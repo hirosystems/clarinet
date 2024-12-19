@@ -43,9 +43,8 @@
 
 ;; test functions
 (define-public (test-mint (recipient principal))
-  (let
-    ((newId (+ (var-get lastId) u1)))
-    (asserts! (is-eq DEPLOYED_AT u1) ERR_NOT_AUTHORIZED)
+  (let ((newId (+ (var-get lastId) u1)))
+    (asserts! (is-eq DEPLOYED_AT u2) ERR_NOT_AUTHORIZED)
     (var-set lastId newId)
     (nft-mint? nft newId recipient)
   )

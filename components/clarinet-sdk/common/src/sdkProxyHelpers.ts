@@ -5,9 +5,25 @@ export type ClarityEvent = {
   data: { raw_value?: string; value?: ClarityValue; [key: string]: any };
 };
 
+export type ExecutionCost = {
+  writeLength: number;
+  writeCount: number;
+  readLength: number;
+  readCount: number;
+  runtime: number;
+};
+
+export type ClarityCosts = {
+  total: ExecutionCost;
+  limit: ExecutionCost;
+  memory: number;
+  memory_limit: number;
+};
+
 export type ParsedTransactionResult = {
   result: ClarityValue;
   events: ClarityEvent[];
+  costs: ClarityCosts | null;
 };
 
 export type CallFn = (
@@ -110,6 +126,32 @@ export function parseEvents(events: string): ClarityEvent[] {
   } catch (e) {
     console.error(`Fail to parse events: ${e}`);
     return [];
+  }
+}
+
+export function parseCosts(costs: string): ClarityCosts | null {
+  try {
+    let { memory, memory_limit, total, limit } = JSON.parse(costs);
+    return {
+      memory: memory,
+      memory_limit: memory_limit,
+      total: {
+        writeLength: total.write_length,
+        writeCount: total.write_count,
+        readLength: total.read_length,
+        readCount: total.read_count,
+        runtime: total.runtime,
+      },
+      limit: {
+        writeLength: limit.write_length,
+        writeCount: limit.write_count,
+        readLength: limit.read_length,
+        readCount: limit.read_count,
+        runtime: limit.runtime,
+      },
+    };
+  } catch (_e) {
+    return null;
   }
 }
 

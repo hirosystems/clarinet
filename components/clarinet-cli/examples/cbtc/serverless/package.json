@@ -7,16 +7,16 @@
     "start": "serverless offline --verbose"
   },
   "devDependencies": {
-    "serverless-offline": "11.3.0",
+    "serverless-offline": "^14.4.0",
     "serverless-plugin-typescript": "^2.1.5",
-    "typescript": "^4.7.2"
+    "typescript": "^5.7.2"
   },
   "dependencies": {
     "@hirosystems/chainhook-types": "^1.0.5",
     "@stacks/network": "^5.0.0",
     "@stacks/transactions": "^5.0.0",
-    "bitcore-lib": "^8.25.28",
+    "bitcore-lib": "10.5.3",
     "dotenv": "^16.0.1",
-    "serverless": "3.36.0"
+    "serverless": "^3.36.0"
   }
 }

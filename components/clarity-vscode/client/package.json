@@ -1,10 +1,10 @@
 {
-  "name": "clarity-vs-code-web-client",
+  "name": "@hirosystems/clarity-vs-code-web-client",
   "description": "VSCode client",
-  "author": "Microsoft Corporation",
+  "author": "Hugo <hugo@hiro.so>",
   "license": "MIT",
   "version": "0.0.1",
-  "publisher": "vscode",
+  "private": true,
   "repository": {
     "type": "git",
     "url": "https://github.com/Microsoft/vscode-extension-samples"
@@ -16,7 +16,7 @@
     "@types/vscode": "^1.94.0"
   },
   "dependencies": {
-    "@vscode/test-web": "0.0.63",
+    "@vscode/test-web": "0.0.65",
     "vscode-languageclient": "^9.0.1"
   }
 }

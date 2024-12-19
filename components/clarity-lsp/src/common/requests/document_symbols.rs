@@ -65,7 +65,7 @@ pub struct ASTSymbols {
     pub children_map: HashMap<u64, Vec<DocumentSymbol>>,
 }
 
-impl<'a> ASTSymbols {
+impl ASTSymbols {
     pub fn new() -> ASTSymbols {
         Self {
             symbols: Vec::new(),
@@ -73,7 +73,7 @@ impl<'a> ASTSymbols {
         }
     }
 
-    pub fn get_symbols(mut self, expressions: &'a [SymbolicExpression]) -> Vec<DocumentSymbol> {
+    pub fn get_symbols(mut self, expressions: &[SymbolicExpression]) -> Vec<DocumentSymbol> {
         traverse(&mut self, expressions);
         self.symbols
     }

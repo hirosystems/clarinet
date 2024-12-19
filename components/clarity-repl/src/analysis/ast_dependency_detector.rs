@@ -754,7 +754,7 @@ struct PreloadedVisitor<'a, 'b> {
     current_clarity_version: Option<&'a ClarityVersion>,
     current_contract: Option<&'a QualifiedContractIdentifier>,
 }
-impl<'a, 'b> ASTVisitor<'a> for PreloadedVisitor<'a, 'b> {
+impl<'a> ASTVisitor<'a> for PreloadedVisitor<'a, '_> {
     fn traverse_define_read_only(
         &mut self,
         expr: &'a SymbolicExpression,

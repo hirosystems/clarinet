@@ -28,7 +28,10 @@ function deleteExistingDeploymentPlan() {
 
 beforeEach(async () => {
   deleteExistingDeploymentPlan();
-  simnet = await initSimnet("tests/fixtures/Clarinet.toml");
+  simnet = await initSimnet("tests/fixtures/Clarinet.toml", false, {
+    trackCosts: true,
+    trackCoverage: false,
+  });
 });
 
 afterEach(() => {
@@ -77,9 +80,9 @@ describe("basic simnet interactions", () => {
 
     // @ts-ignore
     // "0" is an invalid epoch
-    // it logs that 0 is invalid and defaults to 3.0
+    // it logs that 0 is invalid and defaults to 3.1
     simnet.setEpoch("0");
-    expect(simnet.currentEpoch).toBe("3.0");
+    expect(simnet.currentEpoch).toBe("3.1");
   });
 
   it("can get default clarity version for current epoch", () => {
@@ -144,6 +147,30 @@ describe("simnet can call contracts function", () => {
     const printEvent = res.events[0];
     expect(printEvent.event).toBe("print_event");
     expect(printEvent.data.value).toStrictEqual(Cl.stringAscii("call increment"));
+  });
+
+  it("reports costs", () => {
+    const res = simnet.callPublicFn("counter", "increment", [], address1);
+
+    expect(res).toHaveProperty("costs");
+    expect(res.costs).toStrictEqual({
+      memory: 417,
+      memory_limit: 100000000,
+      total: {
+        writeLength: 44,
+        writeCount: 3,
+        readLength: 1466,
+        readCount: 8,
+        runtime: 15630,
+      },
+      limit: {
+        writeLength: 15000000,
+        writeCount: 15000,
+        readLength: 100000000,
+        readCount: 15000,
+        runtime: 5000000000,
+      },
+    });
   });
 
   it("can call public functions with arguments", () => {
