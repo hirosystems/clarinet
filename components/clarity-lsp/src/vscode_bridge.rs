@@ -12,8 +12,8 @@ use lsp_types::notification::{
     Initialized, Notification,
 };
 use lsp_types::request::{
-    Completion, DocumentSymbolRequest, GotoDefinition, HoverRequest, Initialize, Request,
-    SignatureHelpRequest,
+    Completion, DocumentSymbolRequest, Formatting, GotoDefinition, HoverRequest, Initialize,
+    Request, SignatureHelpRequest,
 };
 use lsp_types::{
     DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
@@ -26,7 +26,6 @@ use std::sync::{Arc, RwLock};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::future_to_promise;
 
-#[cfg(debug_assertions)]
 use crate::utils::log;
 
 #[wasm_bindgen]
@@ -249,6 +248,17 @@ impl LspVscodeBridge {
                 }
             }
 
+            Formatting::METHOD => {
+                let lsp_response = process_request(
+                    LspRequest::DocumentFormatting(decode_from_js(js_params)?),
+                    &EditorStateInput::RwLock(self.editor_state_lock.clone()),
+                );
+                if let Ok(LspRequestResponse::DocumentFormatting(response)) = lsp_response {
+                    log!("formatting response: {:?}", response);
+                    return response.serialize(&serializer).map_err(|_| JsValue::NULL);
+                }
+            }
+
             HoverRequest::METHOD => {
                 let lsp_response = process_request(
                     LspRequest::Hover(decode_from_js(js_params)?),
@@ -260,7 +270,6 @@ impl LspVscodeBridge {
             }
 
             _ => {
-                #[cfg(debug_assertions)]
                 log!("unexpected request ({})", method);
             }
         };

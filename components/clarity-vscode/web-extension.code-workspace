@@ -1,22 +1,24 @@
 {
   "folders": [
     {
-      "path": "./"
+      "path": "./",
     },
     {
-      "path": "../../"
-    }
+      "path": "../../",
+    },
   ],
   "settings": {
     "rust-analyzer.cargo.noDefaultFeatures": true,
     "rust-analyzer.cargo.features": ["clarity-lsp/wasm"],
+    "rust-analyzer.cargo.allTargets": false,
+    "rust-analyzer.check.workspace": false,
     "rust-analyzer.check.overrideCommand": [
       "cargo",
       "clippy",
       "--no-default-features",
       "--package=clarity-lsp",
       "--features=wasm",
-      "--message-format=json"
-    ]
-  }
+      "--message-format=json",
+    ],
+  },
 }
