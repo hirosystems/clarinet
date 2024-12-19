@@ -189,7 +189,7 @@ module.exports.unwrapBtc = async (event: HttpEvent) => {
   }
   if (cumulatedAmount < totalRequired) {
     return {
-      message: "Funding unsufficient",
+      message: "Funding insufficient",
       unspentOutputs: unspentOutputs,
       statusCode: 404,
     };

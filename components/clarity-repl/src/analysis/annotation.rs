@@ -81,7 +81,7 @@ mod tests {
     fn parse_unchecked_data() {
         match "unchecked_data".parse::<WarningKind>() {
             Ok(WarningKind::UncheckedData) => (),
-            _ => panic!("failed to parse warning kind correectly"),
+            _ => panic!("failed to parse warning kind correctly"),
         };
     }
 
@@ -97,7 +97,7 @@ mod tests {
     fn parse_allow_unchecked_data() {
         match "allow(unchecked_data)".parse::<AnnotationKind>() {
             Ok(AnnotationKind::Allow(WarningKind::UncheckedData)) => (),
-            _ => panic!("failed to parse annotation kind correectly"),
+            _ => panic!("failed to parse annotation kind correctly"),
         };
     }
 
