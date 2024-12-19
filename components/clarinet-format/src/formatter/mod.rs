@@ -71,7 +71,7 @@ pub fn format_source_exprs(
     acc: &str,
 ) -> String {
     // print_pre_expr(expressions);
-    println!("exprs: {:?}", expressions);
+    // println!("exprs: {:?}", expressions);
     // println!("previous: {:?}", previous_expr);
     if let Some((expr, remaining)) = expressions.split_first() {
         let cur = display_pse(
