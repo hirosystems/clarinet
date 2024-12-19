@@ -43,7 +43,7 @@ pub struct ActiveContractData {
     pub expressions: Option<Vec<SymbolicExpression>>,
     pub definitions: Option<HashMap<(u32, u32), DefinitionLocation>>,
     pub diagnostic: Option<ClarityDiagnostic>,
-    source: String,
+    pub source: String,
 }
 
 impl ActiveContractData {
@@ -347,6 +347,31 @@ impl EditorState {
 
         let ast_symbols = ASTSymbols::new();
         ast_symbols.get_symbols(expressions)
+    }
+
+    pub fn format_contract(&self, contract_location: &FileLocation) -> Option<lsp_types::TextEdit> {
+        let active_contract = self.active_contracts.get(contract_location)?;
+        let source = &active_contract.source;
+
+        // call requests/formmatter.rs format_contract
+        let formatted = source.clone();
+
+        // start with a format all document strategy
+        let range = lsp_types::Range {
+            start: lsp_types::Position {
+                line: 0,
+                character: 0,
+            },
+            end: lsp_types::Position {
+                line: formatted.lines().count() as u32,
+                character: 0,
+            },
+        };
+
+        Some(lsp_types::TextEdit {
+            range,
+            new_text: formatted,
+        })
     }
 
     pub fn get_definition_location(

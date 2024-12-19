@@ -66,6 +66,7 @@ pub fn get_capabilities(initialization_options: &InitializationOptions) -> Serve
             }),
             false => None,
         },
+        document_formatting_provider: Some(lsp_types::OneOf::Left(true)),
         ..ServerCapabilities::default()
     }
 }
