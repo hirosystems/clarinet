@@ -35,7 +35,6 @@ use std::{panic, path::PathBuf};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsValue;
 
-use crate::utils::costs::SerializableCostsReport;
 use crate::utils::events::serialize_event;
 
 #[wasm_bindgen]
@@ -52,6 +51,14 @@ extern "C" {
     pub type IContractAST;
     #[wasm_bindgen(typescript_type = "Map<string, IContractInterface>")]
     pub type IContractInterfaces;
+}
+
+impl EpochString {
+    pub fn new(obj: &str) -> Self {
+        Self {
+            obj: JsValue::from_str(obj),
+        }
+    }
 }
 
 macro_rules! log {
@@ -209,6 +216,7 @@ pub struct TxArgs {
 pub struct TransactionRes {
     pub result: String,
     pub events: String,
+    pub costs: String,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -240,6 +248,7 @@ pub fn execution_result_to_transaction_res(execution: &ExecutionResult) -> Trans
     TransactionRes {
         result,
         events: json!(events_as_strings).to_string(),
+        costs: json!(execution.cost).to_string(),
     }
 }
 
@@ -340,7 +349,7 @@ impl SDK {
         }
     }
 
-    #[wasm_bindgen(js_name=initEmtpySession)]
+    #[wasm_bindgen(js_name=initEmptySession)]
     pub async fn init_empty_session(&mut self) -> Result<(), String> {
         let session = Session::new(SessionSettings::default());
         self.session = Some(session);
@@ -606,6 +615,7 @@ impl SDK {
             "2.4" => StacksEpochId::Epoch24,
             "2.5" => StacksEpochId::Epoch25,
             "3.0" => StacksEpochId::Epoch30,
+            "3.1" => StacksEpochId::Epoch31,
             _ => {
                 log!("Invalid epoch {epoch}. Using default epoch");
                 DEFAULT_EPOCH
@@ -1067,13 +1077,8 @@ impl SDK {
 
         let coverage = session.collect_lcov_content(&asts, &contract_paths);
 
-        let mut costs_reports = Vec::new();
-        costs_reports.append(&mut self.costs_reports);
-        let costs_reports: Vec<SerializableCostsReport> = costs_reports
-            .iter()
-            .map(SerializableCostsReport::from_vm_costs_report)
-            .collect();
-        let costs = serde_json::to_string(&costs_reports).map_err(|e| e.to_string())?;
+        let costs = serde_json::to_string(&self.costs_reports).map_err(|e| e.to_string())?;
+        self.costs_reports.clear();
 
         Ok(SessionReport { coverage, costs })
     }

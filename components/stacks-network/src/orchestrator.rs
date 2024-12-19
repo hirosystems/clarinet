@@ -1212,6 +1212,10 @@ start_height = {epoch_2_5}
 [[burnchain.epochs]]
 epoch_name = "3.0"
 start_height = {epoch_3_0}
+
+[[burnchain.epochs]]
+epoch_name = "3.1"
+start_height = {epoch_3_1}
 "#,
             epoch_2_0 = devnet_config.epoch_2_0,
             epoch_2_05 = devnet_config.epoch_2_05,
@@ -1221,6 +1225,7 @@ start_height = {epoch_3_0}
             epoch_2_4 = devnet_config.epoch_2_4,
             epoch_2_5 = devnet_config.epoch_2_5,
             epoch_3_0 = devnet_config.epoch_3_0,
+            epoch_3_1 = devnet_config.epoch_3_1,
         ));
 
         let mut stacks_conf_path = PathBuf::from(&devnet_config.working_dir);

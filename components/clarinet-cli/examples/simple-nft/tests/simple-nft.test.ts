@@ -16,9 +16,8 @@ describe("nft basic features", () => {
       "simple-nft",
       "test-mint",
       [Cl.standardPrincipal(address1)],
-      address1
+      address1,
     );
-
     expect(result).toBeOk(Cl.bool(true));
 
     expect(events).toContainEqual({
@@ -34,13 +33,22 @@ describe("nft basic features", () => {
   });
 
   it("Ensure that nft can be transferred form one account to another", () => {
-    simnet.callPublicFn("simple-nft", "test-mint", [Cl.standardPrincipal(address1)], address1);
+    simnet.callPublicFn(
+      "simple-nft",
+      "test-mint",
+      [Cl.standardPrincipal(address1)],
+      address1,
+    );
 
     const { result, events } = simnet.callPublicFn(
       "simple-nft",
       "transfer",
-      [Cl.uint(1), Cl.standardPrincipal(address1), Cl.standardPrincipal(address2)],
-      address1
+      [
+        Cl.uint(1),
+        Cl.standardPrincipal(address1),
+        Cl.standardPrincipal(address2),
+      ],
+      address1,
     );
 
     expect(result).toBeOk(Cl.bool(true));
@@ -61,13 +69,18 @@ describe("nft basic features", () => {
   });
 
   it("Ensures that nft can be burned", () => {
-    simnet.callPublicFn("simple-nft", "test-mint", [Cl.standardPrincipal(address1)], address1);
+    simnet.callPublicFn(
+      "simple-nft",
+      "test-mint",
+      [Cl.standardPrincipal(address1)],
+      address1,
+    );
 
     const { result, events } = simnet.callPublicFn(
       "simple-nft",
       "test-burn",
       [Cl.uint(1), Cl.standardPrincipal(address1)],
-      address1
+      address1,
     );
     expect(result).toBeOk(Cl.bool(true));
 

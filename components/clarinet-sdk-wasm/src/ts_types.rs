@@ -144,7 +144,8 @@ const STACKS_EPOCH_ID_STRING: &'static str = r#"export type StacksEpochId =
   | "Epoch23"
   | "Epoch24"
   | "Epoch25"
-  | "Epoch30";"#;
+  | "Epoch30"
+  | "Epoch31";"#;
 
 #[wasm_bindgen(typescript_custom_section)]
 const CLARITY_VERSION_STRING: &'static str =

@@ -15,8 +15,8 @@ use toml::value::Value;
 
 pub const DEFAULT_DERIVATION_PATH: &str = "m/44'/5757'/0'/0/0";
 
-pub const DEFAULT_STACKS_NODE_IMAGE: &str = "quay.io/hirosystems/stacks-node:devnet-3.0";
-pub const DEFAULT_STACKS_SIGNER_IMAGE: &str = "quay.io/hirosystems/stacks-signer:devnet-3.0";
+pub const DEFAULT_STACKS_NODE_IMAGE: &str = "quay.io/hirosystems/stacks-node:devnet-3.1";
+pub const DEFAULT_STACKS_SIGNER_IMAGE: &str = "quay.io/hirosystems/stacks-signer:devnet-3.1";
 pub const DEFAULT_STACKS_API_IMAGE: &str = "hirosystems/stacks-blockchain-api:master";
 
 pub const DEFAULT_BITCOIN_NODE_IMAGE: &str = "quay.io/hirosystems/bitcoind:26.0";
@@ -47,6 +47,7 @@ pub const DEFAULT_EPOCH_2_3: u64 = 103;
 pub const DEFAULT_EPOCH_2_4: u64 = 104;
 pub const DEFAULT_EPOCH_2_5: u64 = 108;
 pub const DEFAULT_EPOCH_3_0: u64 = 142;
+pub const DEFAULT_EPOCH_3_1: u64 = 144;
 
 // Currently, the pox-4 contract has these values hardcoded:
 // https://github.com/stacks-network/stacks-core/blob/e09ab931e2f15ff70f3bb5c2f4d7afb[…]42bd7bec6/stackslib/src/chainstate/stacks/boot/pox-testnet.clar
@@ -189,6 +190,7 @@ pub struct DevnetConfigFile {
     pub epoch_2_4: Option<u64>,
     pub epoch_2_5: Option<u64>,
     pub epoch_3_0: Option<u64>,
+    pub epoch_3_1: Option<u64>,
     pub use_docker_gateway_routing: Option<bool>,
     pub docker_platform: Option<String>,
 }
@@ -360,6 +362,7 @@ pub struct DevnetConfig {
     pub epoch_2_4: u64,
     pub epoch_2_5: u64,
     pub epoch_3_0: u64,
+    pub epoch_3_1: u64,
     pub use_docker_gateway_routing: bool,
     pub docker_platform: String,
 }
@@ -743,6 +746,10 @@ impl NetworkManifest {
                     devnet_config.epoch_3_0 = Some(*val);
                 }
 
+                if let Some(ref val) = devnet_override.epoch_3_1 {
+                    devnet_config.epoch_3_1 = Some(*val);
+                }
+
                 if let Some(val) = devnet_override.network_id {
                     devnet_config.network_id = Some(val);
                 }
@@ -1062,6 +1069,7 @@ impl NetworkManifest {
                 epoch_2_4: devnet_config.epoch_2_4.unwrap_or(DEFAULT_EPOCH_2_4),
                 epoch_2_5: devnet_config.epoch_2_5.unwrap_or(DEFAULT_EPOCH_2_5),
                 epoch_3_0: devnet_config.epoch_3_0.unwrap_or(DEFAULT_EPOCH_3_0),
+                epoch_3_1: devnet_config.epoch_3_1.unwrap_or(DEFAULT_EPOCH_3_1),
                 stacks_node_env_vars: devnet_config
                     .stacks_node_env_vars
                     .take()
