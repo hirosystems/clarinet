@@ -71,7 +71,7 @@ pub fn format_source_exprs(
     acc: &str,
 ) -> String {
     // print_pre_expr(expressions);
-    // println!("exprs: {:?}", expressions);
+    println!("exprs: {:?}", expressions);
     // println!("previous: {:?}", previous_expr);
     if let Some((expr, remaining)) = expressions.split_first() {
         let cur = display_pse(
@@ -330,9 +330,6 @@ fn format_begin(
 fn is_comment(pse: &PreSymbolicExpression) -> bool {
     matches!(pse.pre_expr, PreSymbolicExpressionType::Comment(_))
 }
-fn is_list(pse: &PreSymbolicExpression) -> bool {
-    matches!(pse.pre_expr, PreSymbolicExpressionType::List(_))
-}
 pub fn without_comments_len(exprs: &[PreSymbolicExpression]) -> usize {
     exprs.iter().filter(|expr| !is_comment(expr)).count()
 }
@@ -509,41 +506,52 @@ fn format_key_value_sugar(
 ) -> String {
     let indentation = &settings.indentation.to_string();
     let space = format!("{}{}", previous_indentation, indentation);
+    let over_2_kvs = without_comments_len(exprs) > 2;
     let mut acc = "{".to_string();
+    if over_2_kvs {
+        acc.push('\n');
+    }
 
-    // TODO this logic depends on comments not screwing up the even numbered
-    // chunkable attrs
-    if exprs.len() > 2 {
-        for (i, chunk) in exprs.chunks(2).enumerate() {
-            if let [key, value] = chunk {
-                let fkey = display_pse(settings, key, "", None);
-                if i + 1 < exprs.len() / 2 {
+    // TODO this code is horrible
+    if over_2_kvs {
+        let mut counter = 1;
+        for (i, expr) in exprs.iter().enumerate() {
+            if is_comment(expr) {
+                acc.push_str(&format!(
+                    "{}{}\n",
+                    space,
+                    format_source_exprs(settings, &[expr.clone()], previous_indentation, None, "")
+                ))
+            } else {
+                let last = i == exprs.len() - 1;
+                // if counter is even we're on the value
+                if counter % 2 == 0 {
                     acc.push_str(&format!(
-                        "\n{}{fkey}: {},\n",
-                        space,
+                        ": {}{}\n",
                         format_source_exprs(
                             settings,
-                            &[value.clone()],
+                            &[expr.clone()],
                             previous_indentation,
                             None,
                             ""
-                        )
+                        ),
+                        if last { "" } else { "," }
                     ));
                 } else {
+                    // if counter is odd we're on the key
                     acc.push_str(&format!(
-                        "{}{fkey}: {}\n",
+                        "{}{}",
                         space,
                         format_source_exprs(
                             settings,
-                            &[value.clone()],
+                            &[expr.clone()],
                             previous_indentation,
                             None,
                             ""
                         )
                     ));
                 }
-            } else {
-                panic!("Unpaired key values: {:?}", chunk);
+                counter += 1
             }
         }
     } else {
@@ -776,6 +784,7 @@ mod tests_formatter {
     }
 
     #[test]
+    #[test]
     fn test_manual_tuple() {
         let result = format_with_default(&String::from("(tuple (n1 1))"));
         assert_eq!(result, "{ n1: 1 }");
@@ -921,6 +930,17 @@ mod tests_formatter {
         let src = "{ name: (buff 48), a: uint }";
         let result = format_with_default(&String::from(src));
         assert_eq!(result, "{\n  name: (buff 48),\n  a: uint\n}");
+    }
+
+    #[test]
+    fn test_key_value_sugar_comment_midrecord() {
+        let src = r#"{
+  name: (buff 48),
+  ;; comment
+  owner: send-to
+}"#;
+        let result = format_with_default(&String::from(src));
+        assert_eq!(src, result);
     }
 
     #[test]
