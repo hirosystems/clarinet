@@ -95,14 +95,12 @@ pub fn format_source_exprs(
                         NativeFunctions::Match => {
                             format_match(settings, list, previous_indentation)
                         }
-                        // (tuple (name 1))
-                        // (Tuple [(PSE)])
                         NativeFunctions::TupleCons => {
-                            println!("tuple cons");
-                            format_tuple_cons(settings, list, previous_indentation)
+                            // if the kv map is defined with (tuple (c 1)) then we strip the
+                            // ClarityName("tuple") out first and convert it to key/value syntax
+                            format_key_value(settings, &list[1..], previous_indentation)
                         }
                         NativeFunctions::ListCons => {
-                            println!("list cons");
                             format_list(settings, list, previous_indentation)
                         }
                         NativeFunctions::And | NativeFunctions::Or => {
@@ -147,6 +145,7 @@ pub fn format_source_exprs(
                         // DefineFunctions::FungibleToken
                         // DefineFunctions::NonFungibleToken
                         _ => {
+                            println!("here");
                             format!(
                                 "({})",
                                 format_source_exprs(
@@ -175,38 +174,25 @@ pub fn format_source_exprs(
             }
         }
         let current = display_pse(settings, expr, "", previous_expr);
+        // seems dumb to use the split_first above only to head the remaining
+        // likely just use peekable on the whole thing
         let newline = if let Some(rem) = remaining.get(1) {
             expr.span().start_line != rem.span().start_line
         } else {
             false
         };
-
-        // if this IS NOT a pre or post comment, we need to put a space between
-        // the last expression
-        let pre_space = if is_comment(expr) && previous_expr.is_some() {
-            // no need to space stacked consecutive comments
-            if is_comment(previous_expr.unwrap()) {
-                ""
-            // space it if the previous was a non-comment
-            } else if !is_comment(previous_expr.unwrap()) {
-                " "
-            } else {
-                ""
-            }
-        } else {
-            ""
-        };
+        println!("newline: {}", newline);
 
         let between = if remaining.is_empty() {
             ""
-        } else if newline {
+        } else if newline || is_comment(expr) {
             "\n"
         } else {
             " "
         };
         // println!("here: {}", current);
         return format!(
-            "{pre_space}{}{between}{}",
+            "{}{between}{}",
             t(&current),
             format_source_exprs(settings, remaining, previous_indentation, Some(&expr), acc)
         )
@@ -301,30 +287,52 @@ fn format_map(
         acc.push_str(&format!("\n{})\n", previous_indentation));
         acc.to_owned()
     } else {
-        panic!("define-map without a name is silly")
+        panic!("define-map without a name is invalid")
     }
 }
+
+fn is_same_line(expr1: &PreSymbolicExpression, expr2: &PreSymbolicExpression) -> bool {
+    expr1.span().start_line == expr2.span().start_line
+}
+
 // *begin* never on one line
 fn format_begin(
     settings: &Settings,
     exprs: &[PreSymbolicExpression],
     previous_indentation: &str,
 ) -> String {
-    let mut begin_acc = "(begin".to_string();
+    let mut acc = "(begin".to_string();
     let indentation = &settings.indentation.to_string();
     let space = format!("{}{}", previous_indentation, indentation);
 
-    for arg in exprs.get(1..).unwrap_or_default() {
-        if let Some(list) = arg.match_list() {
-            begin_acc.push_str(&format!(
+    let mut iter = exprs.get(1..).unwrap_or_default().iter().peekable();
+    while let Some(expr) = iter.next() {
+        // cloned() here because of the second mutable borrow on iter.next()
+        let trailing = match iter.peek().cloned() {
+            Some(next) => {
+                if is_comment(next) && is_same_line(expr, next) {
+                    iter.next();
+                    Some(next)
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        };
+        if let Some(list) = expr.match_list() {
+            acc.push_str(&format!(
                 "\n{}({})",
                 space,
                 format_source_exprs(settings, list, previous_indentation, None, "")
-            ))
+            ));
+            if let Some(comment) = trailing {
+                acc.push(' ');
+                acc.push_str(&display_pse(settings, comment, previous_indentation, None));
+            }
         }
     }
-    begin_acc.push_str(&format!("\n{})\n", previous_indentation));
-    begin_acc.to_owned()
+    acc.push_str(&format!("\n{})\n", previous_indentation));
+    acc.to_owned()
 }
 
 fn is_comment(pse: &PreSymbolicExpression) -> bool {
@@ -346,47 +354,38 @@ fn format_booleans(
     let mut acc = format!("({func_type}");
     let indentation = &settings.indentation.to_string();
     let space = format!("{}{}", previous_indentation, indentation);
-    // println!("exprs: {:?}", exprs);
-    if without_comments_len(&exprs[1..]) > BOOLEAN_BREAK_LIMIT {
-        // let mut iter = exprs[1..].iter().peekable();
-
-        // while let Some(arg) = iter.next() {
-        //     let has_eol_comment = if let Some(next_arg) = iter.peek() {
-        //         is_comment(next_arg)
-        //     } else {
-        //         false
-        //     };
-
-        let mut prev: Option<&PreSymbolicExpression> = None;
-        for arg in exprs[1..].iter() {
-            if is_comment(arg) {
-                if let Some(prev_arg) = prev {
-                    let newline = prev_arg.span().start_line != arg.span().start_line;
-                    // Inline the comment if it follows a non-comment expression
-                    acc.push_str(&format!(
-                        "{}{}",
-                        if newline {
-                            format!("\n{}", space)
-                        } else {
-                            " ".to_string()
-                        },
-                        format_source_exprs(
-                            settings,
-                            &[arg.clone()],
-                            previous_indentation,
-                            None,
-                            ""
-                        )
-                    ));
+    let break_up = without_comments_len(&exprs[1..]) > BOOLEAN_BREAK_LIMIT;
+    if break_up {
+        let mut iter = exprs.get(1..).unwrap_or_default().iter().peekable();
+        while let Some(expr) = iter.next() {
+            let trailing = match iter.peek().cloned() {
+                Some(next) => {
+                    if is_comment(next) && is_same_line(expr, next) {
+                        iter.next();
+                        Some(next)
+                    } else {
+                        None
+                    }
+                }
+                _ => None,
+            };
+            if let Some(list) = expr.match_list() {
+                acc.push_str(&format!(
+                    "\n{}({})",
+                    space,
+                    format_source_exprs(settings, list, previous_indentation, None, "")
+                ));
+                if let Some(comment) = trailing {
+                    acc.push(' ');
+                    acc.push_str(&display_pse(settings, comment, previous_indentation, None));
                 }
             } else {
                 acc.push_str(&format!(
                     "\n{}{}",
                     space,
-                    format_source_exprs(settings, &[arg.clone()], previous_indentation, None, "")
+                    format_source_exprs(settings, &[expr.clone()], previous_indentation, None, "")
                 ));
             }
-            prev = Some(arg)
         }
     } else {
         acc.push(' ');
@@ -398,7 +397,7 @@ fn format_booleans(
             "",
         ))
     }
-    if without_comments_len(&exprs[1..]) > BOOLEAN_BREAK_LIMIT {
+    if break_up {
         acc.push_str(&format!("\n{}", previous_indentation));
     }
     acc.push_str(")\n");
@@ -625,15 +624,6 @@ fn format_key_value(
     acc.push('}');
     acc.to_string()
 }
-fn format_tuple_cons(
-    settings: &Settings,
-    exprs: &[PreSymbolicExpression],
-    previous_indentation: &str,
-) -> String {
-    // if the kv map is defined with (tuple (c 1)) then we have to strip the
-    // ClarityName("tuple") out first
-    format_key_value(settings, &exprs[1..], previous_indentation)
-}
 
 // This should panic on most things besides atoms and values. Added this to help
 // debugging in the meantime
@@ -666,16 +656,15 @@ fn display_pse(
             name.to_string()
         }
         PreSymbolicExpressionType::Comment(ref text) => {
-            // println!("{:?}", has_previous_expr);
-            if let Some(prev) = previous_expr {
-                if prev.span().start_line == pse.span().start_line {
-                    format!(" ;; {}\n", t(text))
-                } else {
-                    format!(";; {}\n", t(text))
-                }
-            } else {
-                format!(";; {}", t(text))
-            }
+            // if let Some(prev) = previous_expr {
+            //     if prev.span().start_line == pse.span().start_line {
+            //         format!(" ;; {}\n", t(text))
+            //     } else {
+            //         format!(";; {}\n", t(text))
+            //     }
+            // } else {
+            format!(";; {}", t(text))
+            // }
         }
         PreSymbolicExpressionType::Placeholder(ref placeholder) => {
             placeholder.to_string() // Placeholder is for if parsing fails
@@ -698,6 +687,7 @@ fn format_function(settings: &Settings, exprs: &[PreSymbolicExpression]) -> Stri
     if let Some(def) = exprs.get(1).and_then(|f| f.match_list()) {
         if let Some((name, args)) = def.split_first() {
             acc.push_str(&display_pse(settings, name, "", None));
+
             for arg in args.iter() {
                 // TODO account for eol comments
                 if let Some(list) = arg.match_list() {
@@ -823,7 +813,6 @@ mod tests_formatter {
         );
     }
     #[test]
-    #[ignore]
     fn test_pre_comments_included() {
         let src = ";; this is a pre comment\n;; multi\n(ok true)";
         let result = format_with_default(&String::from(src));
@@ -832,14 +821,13 @@ mod tests_formatter {
 
     #[test]
     fn test_inline_comments_included() {
-        let src = "(ok true) ;; this is an inline comment\n";
+        let src = "(ok true) ;; this is an inline comment";
         let result = format_with_default(&String::from(src));
         assert_eq!(src, result);
     }
     #[test]
-    #[ignore]
     fn test_postcomments_included() {
-        let src = "(ok true)\n;; this is a post comment\n";
+        let src = "(ok true)\n;; this is a post comment";
         let result = format_with_default(&String::from(src));
         assert_eq!(src, result);
     }
@@ -968,9 +956,9 @@ mod tests_formatter {
 
     #[test]
     fn test_begin() {
-        let src = "(begin (+ 1 1) (ok true))";
+        let src = "(begin (+ 1 1) ;; a\n (ok true))";
         let result = format_with_default(&String::from(src));
-        assert_eq!(result, "(begin\n  (+ 1 1)\n  (ok true)\n)\n");
+        assert_eq!(result, "(begin\n  (+ 1 1) ;; a\n  (ok true)\n)\n");
     }
 
     #[test]
@@ -993,7 +981,7 @@ mod tests_formatter {
         let src = "(use-trait token-a-trait 'SPAXYA5XS51713FDTQ8H94EJ4V579CXMTRNBZKSF.token-a.token-trait)\n";
         let result = format_with(&String::from(src), Settings::new(Indentation::Space(4), 80));
         assert_eq!(src, result);
-        let src = "(as-contract (contract-call? .tokens mint! u19)) ;; Returns (ok u19)\n";
+        let src = "(as-contract (contract-call? .tokens mint! u19))";
         let result = format_with(&String::from(src), Settings::new(Indentation::Space(4), 80));
         assert_eq!(src, result);
     }
