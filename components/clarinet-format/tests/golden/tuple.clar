@@ -1,3 +1,4 @@
+;; max_line_length: 80, indentation: 2
 (define-public (set-user-reserve
   (user principal)
   (asset principal)
