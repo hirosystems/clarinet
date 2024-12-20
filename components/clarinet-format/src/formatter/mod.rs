@@ -109,6 +109,9 @@ pub fn format_source_exprs(
                         NativeFunctions::Match => {
                             format_match(settings, list, previous_indentation)
                         }
+                        NativeFunctions::IndexOf | NativeFunctions::IndexOfAlias => {
+                            format_index_of(settings, list, previous_indentation)
+                        }
                         NativeFunctions::TupleCons => {
                             // if the kv map is defined with (tuple (c 1)) then we strip the
                             // ClarityName("tuple") out first and convert it to key/value syntax
@@ -298,6 +301,35 @@ fn is_same_line(expr1: &PreSymbolicExpression, expr2: &PreSymbolicExpression) ->
     expr1.span().start_line == expr2.span().start_line
 }
 
+fn format_index_of(
+    settings: &Settings,
+    exprs: &[PreSymbolicExpression],
+    previous_indentation: &str,
+) -> String {
+    println!("ASDFASDF");
+    let func_type = display_pse(settings, exprs.first().unwrap(), "");
+    let mut acc = format!("({func_type}");
+    acc.push(' ');
+    acc.push_str(&format!(
+        "{} {}",
+        format_source_exprs(
+            settings,
+            &[exprs[1].clone()],
+            previous_indentation,
+            None,
+            ""
+        ),
+        format_source_exprs(
+            settings,
+            &[exprs[2].clone()],
+            previous_indentation,
+            None,
+            ""
+        )
+    ));
+    acc.push(')');
+    acc.to_owned()
+}
 // *begin* never on one line
 fn format_begin(
     settings: &Settings,
@@ -402,7 +434,7 @@ fn format_booleans(
     if break_up {
         acc.push_str(&format!("\n{}", previous_indentation));
     }
-    acc.push_str(")\n");
+    acc.push_str(")");
     acc.to_owned()
 }
 
@@ -511,6 +543,7 @@ fn format_key_value_sugar(
     let mut acc = "{".to_string();
 
     // TODO this code is horrible
+    // convert it to the peekable version like the rest
     if over_2_kvs {
         acc.push('\n');
         let mut counter = 1;
@@ -814,12 +847,12 @@ mod tests_formatter {
 
     #[test]
     fn test_booleans() {
-        let src = "(or true false)\n";
+        let src = "(or true false)";
         let result = format_with_default(&String::from(src));
         assert_eq!(src, result);
-        let src = "(or true (is-eq 1 2) (is-eq 1 1))\n";
+        let src = "(or true (is-eq 1 2) (is-eq 1 1))";
         let result = format_with_default(&String::from(src));
-        let expected = "(or\n  true\n  (is-eq 1 2)\n  (is-eq 1 1)\n)\n";
+        let expected = "(or\n  true\n  (is-eq 1 2)\n  (is-eq 1 1)\n)";
         assert_eq!(expected, result);
     }
     #[test]
@@ -829,8 +862,7 @@ mod tests_formatter {
   ;; pre comment
   (is-eq 1 2) ;; comment
   (is-eq 1 1) ;; b
-)
-"#;
+)"#;
         let result = format_with_default(&String::from(src));
         assert_eq!(src, result);
     }
@@ -841,7 +873,7 @@ mod tests_formatter {
         let src = "(try! (unwrap! (complete-deposit-wrapper (get txid deposit) (get vout-index deposit) (get amount deposit) (get recipient deposit) (get burn-hash deposit) (get burn-height deposit) (get sweep-txid deposit)) (err (+ ERR_DEPOSIT_INDEX_PREFIX (+ u10 index)))))";
         let result = format_with_default(&String::from(src));
         let expected = "(try! (unwrap! (complete-deposit-wrapper\n  (get txid deposit)\n  (get vout-index deposit)\n  (get amount deposit)\n  (get recipient deposit)\n  (get burn-hash deposit)\n  (get burn-height deposit)\n  (get sweep-txid deposit)\n  ) (err (+ ERR_DEPOSIT_INDEX_PREFIX (+ u10 index)))))";
-        assert_eq!(result, expected);
+        assert_eq!(expected, result);
     }
 
     #[test]
@@ -956,6 +988,12 @@ mod tests_formatter {
         assert_eq!(src, result);
     }
 
+    #[test]
+    fn test_index_of() {
+        let src = "(index-of? (contract-call? .pool borroweable) asset)";
+        let result = format_with_default(&String::from(src));
+        assert_eq!(src, result);
+    }
     #[test]
     fn test_traits() {
         let src = "(use-trait token-a-trait 'SPAXYA5XS51713FDTQ8H94EJ4V579CXMTRNBZKSF.token-a.token-trait)\n";
