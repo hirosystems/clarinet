@@ -1,3 +1,4 @@
+;; max_line_length: 80, indentation: 2
 (define-public (mng-name-register)
   (map-set name-properties
     {

@@ -59,7 +59,14 @@ impl ClarityFormatter {
     pub fn new(settings: Settings) -> Self {
         Self { settings }
     }
-    pub fn format(&mut self, source: &str) -> String {
+    pub fn format_file(&mut self, source: &str) -> String {
+        let pse = clarity::vm::ast::parser::v2::parse(source).unwrap();
+        let result = format_source_exprs(&self.settings, &pse, "", None, "");
+
+        // make sure the file ends with a newline
+        result.trim_end_matches('\n').to_string() + "\n"
+    }
+    pub fn format_section(&mut self, source: &str) -> String {
         let pse = clarity::vm::ast::parser::v2::parse(source).unwrap();
         format_source_exprs(&self.settings, &pse, "", None, "")
     }
@@ -72,8 +79,10 @@ pub fn format_source_exprs(
     previous_expr: Option<&PreSymbolicExpression>,
     acc: &str,
 ) -> String {
-    println!("exprs: {:?}", expressions);
+    // println!("exprs: {:?}", expressions);
     // println!("previous: {:?}", previous_expr);
+
+    // use peekable to handle trailing comments nicely
     let mut iter = expressions.iter().peekable();
     let mut result = acc.to_owned(); // Accumulate results here
 
@@ -109,8 +118,11 @@ pub fn format_source_exprs(
                         NativeFunctions::Match => {
                             format_match(settings, list, previous_indentation)
                         }
-                        NativeFunctions::IndexOf | NativeFunctions::IndexOfAlias => {
-                            format_index_of(settings, list, previous_indentation)
+                        NativeFunctions::IndexOf
+                        | NativeFunctions::IndexOfAlias
+                        | NativeFunctions::Asserts
+                        | NativeFunctions::ContractCall => {
+                            format_general(settings, list, previous_indentation)
                         }
                         NativeFunctions::TupleCons => {
                             // if the kv map is defined with (tuple (c 1)) then we strip the
@@ -301,32 +313,23 @@ fn is_same_line(expr1: &PreSymbolicExpression, expr2: &PreSymbolicExpression) ->
     expr1.span().start_line == expr2.span().start_line
 }
 
-fn format_index_of(
+// this is probably un-needed but was getting some weird artifacts for code like
+// (something (1 2 3) true) would be formatted as (something (1 2 3)true)
+fn format_general(
     settings: &Settings,
     exprs: &[PreSymbolicExpression],
     previous_indentation: &str,
 ) -> String {
-    println!("ASDFASDF");
     let func_type = display_pse(settings, exprs.first().unwrap(), "");
     let mut acc = format!("({func_type}");
     acc.push(' ');
-    acc.push_str(&format!(
-        "{} {}",
-        format_source_exprs(
-            settings,
-            &[exprs[1].clone()],
-            previous_indentation,
-            None,
-            ""
-        ),
-        format_source_exprs(
-            settings,
-            &[exprs[2].clone()],
-            previous_indentation,
-            None,
-            ""
-        )
-    ));
+    for (i, arg) in exprs[1..].iter().enumerate() {
+        acc.push_str(&format!(
+            "{}{}",
+            format_source_exprs(settings, &[arg.clone()], previous_indentation, None, ""),
+            if i < exprs.len() - 2 { " " } else { "" }
+        ))
+    }
     acc.push(')');
     acc.to_owned()
 }
@@ -770,15 +773,58 @@ fn format_function(settings: &Settings, exprs: &[PreSymbolicExpression]) -> Stri
 mod tests_formatter {
     use super::{ClarityFormatter, Settings};
     use crate::formatter::Indentation;
+    use std::collections::HashMap;
     use std::fs;
     use std::path::Path;
+    fn from_metadata(metadata: &str) -> Settings {
+        let mut max_line_length = 80;
+        let mut indent = Indentation::Space(2);
+
+        let metadata_map: HashMap<&str, &str> = metadata
+            .split(',')
+            .map(|pair| pair.trim())
+            .filter_map(|kv| kv.split_once(':'))
+            .map(|(k, v)| (k.trim(), v.trim()))
+            .collect();
+
+        if let Some(length) = metadata_map.get("max_line_length") {
+            max_line_length = length.parse().unwrap_or(max_line_length);
+        }
+
+        if let Some(&indentation) = metadata_map.get("indentation") {
+            indent = match indentation {
+                "tab" => Indentation::Tab,
+                value => {
+                    if let Ok(spaces) = value.parse::<usize>() {
+                        Indentation::Space(spaces)
+                    } else {
+                        Indentation::Space(2) // Fallback to default
+                    }
+                }
+            };
+        }
+
+        Settings {
+            max_line_length,
+            indentation: indent,
+        }
+    }
     fn format_with_default(source: &str) -> String {
         let mut formatter = ClarityFormatter::new(Settings::default());
-        formatter.format(source)
+        formatter.format_section(source)
+    }
+    fn format_file_with_metadata(source: &str) -> String {
+        let mut lines = source.lines();
+        let metadata_line = lines.next().unwrap_or_default();
+        let settings = from_metadata(metadata_line);
+
+        let real_source = lines.collect::<Vec<&str>>().join("\n");
+        let mut formatter = ClarityFormatter::new(settings);
+        formatter.format_file(&real_source)
     }
     fn format_with(source: &str, settings: Settings) -> String {
         let mut formatter = ClarityFormatter::new(settings);
-        formatter.format(source)
+        formatter.format_section(source)
     }
     #[test]
     fn test_simplest_formatter() {
@@ -1025,7 +1071,9 @@ mod tests_formatter {
                     fs::read_to_string(&intended_path).expect("Failed to read intended file");
 
                 // Apply formatting and compare
-                let result = format_with_default(&src);
+                let result = format_file_with_metadata(&src);
+                println!("intended: {:?}", intended);
+                println!("result: {:?}", result);
                 pretty_assertions::assert_eq!(
                     result,
                     intended,

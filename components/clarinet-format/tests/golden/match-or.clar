@@ -1,3 +1,4 @@
+;; max_line_length: 80, indentation: 2
 ;; Determines if a character is a vowel (a, e, i, o, u, and y).
 (define-private (is-vowel (char (buff 1)))
     (or

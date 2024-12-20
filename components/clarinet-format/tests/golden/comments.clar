@@ -1,3 +1,4 @@
+;; max_line_length: 80, indentation: 2
 ;; comment
 (define-read-only (get-offer (id uint) (w uint)) (map-get? offers-map id)
 )
