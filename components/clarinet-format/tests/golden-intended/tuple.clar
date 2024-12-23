@@ -6,7 +6,7 @@
       last-variable-borrow-cumulative-index: uint,
       origination-fee: uint,
       stable-borrow-rate: uint,
-      last-updated-block: uint,
+      last-updated-block: uint, ;; comment
       use-as-collateral: bool
     })
   )

@@ -59,6 +59,7 @@ impl ClarityFormatter {
     pub fn new(settings: Settings) -> Self {
         Self { settings }
     }
+    /// formatting for files to ensure a newline at the end
     pub fn format_file(&mut self, source: &str) -> String {
         let pse = clarity::vm::ast::parser::v2::parse(source).unwrap();
         let result = format_source_exprs(&self.settings, &pse, "", None, "");
@@ -66,6 +67,11 @@ impl ClarityFormatter {
         // make sure the file ends with a newline
         result.trim_end_matches('\n').to_string() + "\n"
     }
+    /// Alias `format_file` to `format`
+    pub fn format(&mut self, source: &str) -> String {
+        self.format_file(source)
+    }
+    /// for range formatting within editors
     pub fn format_section(&mut self, source: &str) -> String {
         let pse = clarity::vm::ast::parser::v2::parse(source).unwrap();
         format_source_exprs(&self.settings, &pse, "", None, "")
@@ -129,6 +135,7 @@ pub fn format_source_exprs(
                             // ClarityName("tuple") out first and convert it to key/value syntax
                             format_key_value(settings, &list[1..], previous_indentation)
                         }
+                        NativeFunctions::If => format_if(settings, list, previous_indentation),
                         NativeFunctions::ListCons => {
                             format_list(settings, list, previous_indentation)
                         }
@@ -161,7 +168,9 @@ pub fn format_source_exprs(
                         DefineFunctions::PublicFunction
                         | DefineFunctions::ReadOnlyFunction
                         | DefineFunctions::PrivateFunction => format_function(settings, list),
-                        DefineFunctions::Constant => format_constant(settings, list),
+                        DefineFunctions::Constant | DefineFunctions::PersistedVariable => {
+                            format_constant(settings, list)
+                        }
                         DefineFunctions::Map => format_map(settings, list, previous_indentation),
                         DefineFunctions::UseTrait | DefineFunctions::ImplTrait => {
                             // these are the same as the following but need a trailing newline
@@ -244,8 +253,9 @@ fn name_and_args(
 }
 
 fn format_constant(settings: &Settings, exprs: &[PreSymbolicExpression]) -> String {
+    let func_type = display_pse(settings, exprs.first().unwrap(), "");
     let indentation = &settings.indentation.to_string();
-    let mut acc = "(define-constant ".to_string();
+    let mut acc = format!("({func_type} ");
 
     if let Some((name, args)) = name_and_args(exprs) {
         acc.push_str(&display_pse(settings, name, ""));
@@ -437,8 +447,65 @@ fn format_booleans(
     if break_up {
         acc.push_str(&format!("\n{}", previous_indentation));
     }
-    acc.push_str(")");
+    acc.push(')');
     acc.to_owned()
+}
+
+fn format_if(
+    settings: &Settings,
+    exprs: &[PreSymbolicExpression],
+    previous_indentation: &str,
+) -> String {
+    let func_type = display_pse(settings, exprs.first().unwrap(), "");
+    let indentation = &settings.indentation.to_string();
+    let space = format!("{}{}", indentation, previous_indentation);
+
+    let mut acc = format!("({func_type} ");
+    let mut iter = exprs[1..].iter().peekable();
+    let mut index = 0;
+
+    while let Some(expr) = iter.next() {
+        let trailing = match iter.peek().cloned() {
+            Some(next) => {
+                if is_comment(next) && is_same_line(expr, next) {
+                    iter.next();
+                    Some(next)
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        };
+        if let Some(list) = expr.match_list() {
+            // expr args
+            acc.push_str(&format!(
+                "{}({})\n",
+                if index > 0 {
+                    space.clone()
+                } else {
+                    "".to_string()
+                },
+                format_source_exprs(settings, list, &space, None, "")
+            ))
+        } else {
+            // atom args
+            acc.push_str(&format_source_exprs(
+                settings,
+                &[expr.clone()],
+                &space,
+                None,
+                "",
+            ))
+        }
+        if let Some(comment) = trailing {
+            acc.push(' ');
+            acc.push_str(&display_pse(settings, comment, ""));
+        }
+        index += 1;
+    }
+    acc.push_str(previous_indentation);
+    acc.push(')');
+    acc
 }
 
 // *let* never on one line
@@ -619,42 +686,36 @@ fn format_key_value(
     let indentation = &settings.indentation.to_string();
     let space = format!("{}{}", previous_indentation, indentation);
 
-    let mut acc = "{".to_string();
+    let mut acc = previous_indentation.to_string();
+    acc.push('{');
 
-    if exprs.len() > 1 {
-        for (i, expr) in exprs.iter().enumerate() {
-            let (key, value) = expr
-                .match_list()
-                .and_then(|list| list.split_first())
-                .unwrap();
-            let fkey = display_pse(settings, key, previous_indentation);
-            if i < exprs.len() - 1 {
-                acc.push_str(&format!(
-                    "\n{}{fkey}: {},",
-                    space,
-                    format_source_exprs(settings, value, previous_indentation, None, "")
-                ));
-            } else {
-                acc.push_str(&format!(
-                    "\n{}{fkey}: {}\n",
-                    space,
-                    format_source_exprs(settings, value, previous_indentation, None, "")
-                ));
-            }
-        }
+    // for cases where we keep it on the same line with 1 k/v pair
+    let multiline = exprs.len() > 1;
+    let pre = if multiline {
+        format!("\n{}", space)
     } else {
-        // for cases where we keep it on the same line with 1 k/v pair
-        for expr in exprs[0..].iter() {
-            let (key, value) = expr
-                .match_list()
-                .and_then(|list| list.split_first())
-                .unwrap();
-            let fkey = display_pse(settings, key, previous_indentation);
-            acc.push_str(&format!(
-                " {fkey}: {} ",
-                format_source_exprs(settings, value, &settings.indentation.to_string(), None, "")
-            ));
-        }
+        " ".to_string()
+    };
+    for (i, expr) in exprs.iter().enumerate() {
+        let (key, value) = expr
+            .match_list()
+            .and_then(|list| list.split_first())
+            .unwrap();
+        let fkey = display_pse(settings, key, previous_indentation);
+        let ending = if multiline {
+            if i < exprs.len() - 1 {
+                ","
+            } else {
+                "\n"
+            }
+        } else {
+            " "
+        };
+
+        acc.push_str(&format!(
+            "{pre}{fkey}: {}{ending}",
+            format_source_exprs(settings, value, previous_indentation, None, "")
+        ));
     }
     acc.push_str(previous_indentation);
     acc.push('}');
@@ -707,6 +768,7 @@ fn display_pse(
 fn format_function(settings: &Settings, exprs: &[PreSymbolicExpression]) -> String {
     let func_type = display_pse(settings, exprs.first().unwrap(), "");
     let indentation = &settings.indentation.to_string();
+    let args_indent = format!("{}{}", indentation, indentation);
 
     let mut acc = format!("({func_type} (");
 
@@ -715,29 +777,40 @@ fn format_function(settings: &Settings, exprs: &[PreSymbolicExpression]) -> Stri
         if let Some((name, args)) = def.split_first() {
             acc.push_str(&display_pse(settings, name, ""));
 
-            for arg in args.iter() {
-                // TODO account for eol comments
+            let mut iter = args.iter().peekable();
+            while let Some(arg) = iter.next() {
+                // cloned() here because of the second mutable borrow on iter.next()
+                let trailing = match iter.peek().cloned() {
+                    Some(next) => {
+                        if is_comment(next) && is_same_line(arg, next) {
+                            iter.next();
+                            Some(next)
+                        } else {
+                            None
+                        }
+                    }
+                    _ => None,
+                };
                 if let Some(list) = arg.match_list() {
+                    // expr args
                     acc.push_str(&format!(
-                        "\n{}{}({})",
-                        indentation,
-                        indentation,
-                        format_source_exprs(
-                            settings,
-                            list,
-                            &settings.indentation.to_string(),
-                            None,
-                            ""
-                        )
+                        "\n{}({})",
+                        args_indent,
+                        format_source_exprs(settings, list, &args_indent, None, "")
                     ))
                 } else {
+                    // atom args
                     acc.push_str(&format_source_exprs(
                         settings,
                         &[arg.clone()],
-                        &settings.indentation.to_string(),
+                        &args_indent,
                         None,
                         "",
                     ))
+                }
+                if let Some(comment) = trailing {
+                    acc.push(' ');
+                    acc.push_str(&display_pse(settings, comment, ""));
                 }
             }
             if args.is_empty() {
@@ -1027,6 +1100,13 @@ mod tests_formatter {
     }
 
     #[test]
+    fn test_if() {
+        let src = "  (if (<= amount max-supply) (list) (something amount))";
+        let result = format_with_default(&String::from(src));
+        let expected = "(if (<= amount max-supply)\n  (list)\n  (something amount)\n)";
+        assert_eq!(result, expected);
+    }
+    #[test]
     #[ignore]
     fn test_ignore_formatting() {
         let src = ";; @format-ignore\n(    begin ( ok true ))";
@@ -1072,8 +1152,8 @@ mod tests_formatter {
 
                 // Apply formatting and compare
                 let result = format_file_with_metadata(&src);
-                println!("intended: {:?}", intended);
-                println!("result: {:?}", result);
+                // println!("intended: {:?}", intended);
+                // println!("result: {:?}", result);
                 pretty_assertions::assert_eq!(
                     result,
                     intended,
