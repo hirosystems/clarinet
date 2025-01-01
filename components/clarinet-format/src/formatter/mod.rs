@@ -1,9 +1,10 @@
-use std::fmt::format;
+pub mod helpers;
+pub mod ignored;
 
 use clarity::vm::functions::{define::DefineFunctions, NativeFunctions};
 use clarity::vm::representations::{PreSymbolicExpression, PreSymbolicExpressionType};
-use clarity::vm::types::{TupleTypeSignature, TypeSignature};
-use clarity::vm::ClarityName;
+use helpers::{name_and_args, t};
+use ignored::ignored_exprs;
 
 pub enum Indentation {
     Space(usize),
@@ -102,12 +103,13 @@ pub fn format_source_exprs(
             }
             _ => None,
         };
-        let cur = display_pse(&Settings::default(), expr, previous_indentation);
+        let cur = display_pse(settings, expr, previous_indentation);
         if cur.contains(FORMAT_IGNORE_SYNTAX) {
             if let Some(next) = iter.peek() {
                 // iter.next();
                 // we need PreSymbolicExpression back into orig Source
-                result.push_str(&format!("{:?}", next)); // TODO obviously wrong
+                // TODO probably very wrong
+                result.push_str(&ignored_exprs(next));
             };
             continue;
         }
@@ -206,30 +208,6 @@ pub fn format_source_exprs(
         result.push_str(&format!("{current}{between}"));
     }
     result
-}
-
-// trim but leaves newlines preserved
-fn t(input: &str) -> &str {
-    let start = input
-        .find(|c: char| !c.is_whitespace() || c == '\n')
-        .unwrap_or(0);
-
-    let end = input
-        .rfind(|c: char| !c.is_whitespace() || c == '\n')
-        .map(|pos| pos + 1)
-        .unwrap_or(0);
-
-    &input[start..end]
-}
-
-fn name_and_args(
-    exprs: &[PreSymbolicExpression],
-) -> Option<(&PreSymbolicExpression, &[PreSymbolicExpression])> {
-    if exprs.len() >= 2 {
-        Some((&exprs[1], &exprs[2..]))
-    } else {
-        None // Return None if there aren't enough items
-    }
 }
 
 fn format_constant(settings: &Settings, exprs: &[PreSymbolicExpression]) -> String {
@@ -444,6 +422,7 @@ fn format_if(
     let mut index = 0;
 
     while let Some(expr) = iter.next() {
+        println!("{:?}", expr);
         let trailing = match iter.peek().cloned() {
             Some(next) => {
                 if is_comment(next) && is_same_line(expr, next) {
@@ -455,21 +434,12 @@ fn format_if(
             }
             _ => None,
         };
-        if let Some(list) = expr.match_list() {
-            // expr args
-            acc.push_str(&format!(
-                "{}({})\n",
-                if index > 0 {
-                    space.clone()
-                } else {
-                    "".to_string()
-                },
-                format_source_exprs(settings, list, &space, "")
-            ))
-        } else {
-            // atom args
-            acc.push_str(&format_source_exprs(settings, &[expr.clone()], &space, ""))
+        if index > 0 {
+            acc.push('\n');
+            acc.push_str(&space);
+            acc.push_str(indentation);
         }
+        acc.push_str(&format_source_exprs(settings, &[expr.clone()], &space, ""));
         if let Some(comment) = trailing {
             acc.push(' ');
             acc.push_str(&display_pse(settings, comment, ""));

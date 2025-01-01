@@ -2,50 +2,48 @@ use clarity::vm::representations::{PreSymbolicExpression, PreSymbolicExpressionT
 
 use crate::formatter::helpers::t;
 
-pub fn ignored_exprs(expressions: &[PreSymbolicExpression]) -> String {
+pub fn ignored_exprs(expr: &PreSymbolicExpression) -> String {
     let mut output = String::new();
     let mut current_line = 1;
 
-    for expr in expressions {
-        let start_line = expr.span().start_line as usize;
-        let end_line = expr.span().end_line as usize;
-        let start_col = expr.span().start_column as usize;
-        let end_col = expr.span().end_column as usize;
+    let start_line = expr.span().start_line as usize;
+    let end_line = expr.span().end_line as usize;
+    let start_col = expr.span().start_column as usize;
+    let end_col = expr.span().end_column as usize;
 
-        // Add newlines if needed to reach the start line
-        while current_line < start_line {
+    // Add newlines if needed to reach the start line
+    while current_line < start_line {
+        output.push('\n');
+        current_line += 1;
+    }
+
+    // Handle single-line expressions
+    if start_line == end_line {
+        // Add padding spaces before the expression
+        output.extend(std::iter::repeat(' ').take(start_col - 1));
+        output.push_str(&display_pse_unformatted(expr));
+    } else {
+        // Handle multi-line expressions
+        let expr_str = display_pse_unformatted(expr);
+        let lines: Vec<&str> = expr_str.lines().collect();
+
+        // Print first line with proper indentation
+        output.extend(std::iter::repeat(' ').take(start_col - 1));
+        output.push_str(lines[0]);
+        output.push('\n');
+        current_line += 1;
+
+        // Print middle lines
+        for line in &lines[1..lines.len() - 1] {
+            output.push_str(line);
             output.push('\n');
             current_line += 1;
         }
 
-        // Handle single-line expressions
-        if start_line == end_line {
-            // Add padding spaces before the expression
-            output.extend(std::iter::repeat(' ').take(start_col - 1));
-            output.push_str(&display_pse_unformatted(expr));
-        } else {
-            // Handle multi-line expressions
-            let expr_str = display_pse_unformatted(&expr);
-            let lines: Vec<&str> = expr_str.lines().collect();
-
-            // Print first line with proper indentation
-            output.extend(std::iter::repeat(' ').take(start_col - 1));
-            output.push_str(lines[0]);
-            output.push('\n');
-            current_line += 1;
-
-            // Print middle lines
-            for line in &lines[1..lines.len() - 1] {
-                output.push_str(line);
-                output.push('\n');
-                current_line += 1;
-            }
-
-            // Print last line
-            if let Some(last_line) = lines.last() {
-                output.extend(std::iter::repeat(' ').take(end_col - last_line.len()));
-                output.push_str(last_line);
-            }
+        // Print last line
+        if let Some(last_line) = lines.last() {
+            output.extend(std::iter::repeat(' ').take(end_col - last_line.len()));
+            output.push_str(last_line);
         }
     }
 
