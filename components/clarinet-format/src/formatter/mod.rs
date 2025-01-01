@@ -62,7 +62,7 @@ impl ClarityFormatter {
     /// formatting for files to ensure a newline at the end
     pub fn format_file(&mut self, source: &str) -> String {
         let pse = clarity::vm::ast::parser::v2::parse(source).unwrap();
-        let result = format_source_exprs(&self.settings, &pse, "", None, "");
+        let result = format_source_exprs(&self.settings, &pse, "", "");
 
         // make sure the file ends with a newline
         result.trim_end_matches('\n').to_string() + "\n"
@@ -74,7 +74,7 @@ impl ClarityFormatter {
     /// for range formatting within editors
     pub fn format_section(&mut self, source: &str) -> String {
         let pse = clarity::vm::ast::parser::v2::parse(source).unwrap();
-        format_source_exprs(&self.settings, &pse, "", None, "")
+        format_source_exprs(&self.settings, &pse, "", "")
     }
 }
 
@@ -82,11 +82,9 @@ pub fn format_source_exprs(
     settings: &Settings,
     expressions: &[PreSymbolicExpression],
     previous_indentation: &str,
-    previous_expr: Option<&PreSymbolicExpression>,
     acc: &str,
 ) -> String {
     // println!("exprs: {:?}", expressions);
-    // println!("previous: {:?}", previous_expr);
 
     // use peekable to handle trailing comments nicely
     let mut iter = expressions.iter().peekable();
@@ -145,13 +143,7 @@ pub fn format_source_exprs(
                         _ => {
                             format!(
                                 "({}){}",
-                                format_source_exprs(
-                                    settings,
-                                    list,
-                                    previous_indentation,
-                                    previous_expr,
-                                    acc
-                                ),
+                                format_source_exprs(settings, list, previous_indentation, acc),
                                 if let Some(comment) = trailing_comment {
                                     format!(
                                         " {}",
@@ -176,13 +168,7 @@ pub fn format_source_exprs(
                             // these are the same as the following but need a trailing newline
                             format!(
                                 "({})\n",
-                                format_source_exprs(
-                                    settings,
-                                    list,
-                                    previous_indentation,
-                                    previous_expr,
-                                    acc
-                                )
+                                format_source_exprs(settings, list, previous_indentation, acc)
                             )
                         }
                         // DefineFunctions::Trait => format_trait(settings, list),
@@ -192,20 +178,14 @@ pub fn format_source_exprs(
                         _ => {
                             format!(
                                 "({})",
-                                format_source_exprs(
-                                    settings,
-                                    list,
-                                    previous_indentation,
-                                    previous_expr,
-                                    acc
-                                )
+                                format_source_exprs(settings, list, previous_indentation, acc)
                             )
                         }
                     }
                 } else {
                     format!(
                         "({})",
-                        format_source_exprs(settings, list, previous_indentation, Some(expr), acc)
+                        format_source_exprs(settings, list, previous_indentation, acc)
                     )
                 };
                 result.push_str(t(&formatted));
@@ -266,7 +246,7 @@ fn format_constant(settings: &Settings, exprs: &[PreSymbolicExpression]) -> Stri
                 acc.push_str(&format!(
                     "\n{}({})",
                     indentation,
-                    format_source_exprs(settings, list, "", None, "")
+                    format_source_exprs(settings, list, "", "")
                 ));
                 acc.push_str("\n)");
             } else {
@@ -307,7 +287,7 @@ fn format_map(
                 _ => acc.push_str(&format!(
                     "\n{}{}",
                     space,
-                    format_source_exprs(settings, &[arg.clone()], indentation, None, "")
+                    format_source_exprs(settings, &[arg.clone()], indentation, "")
                 )),
             }
         }
@@ -336,7 +316,7 @@ fn format_general(
     for (i, arg) in exprs[1..].iter().enumerate() {
         acc.push_str(&format!(
             "{}{}",
-            format_source_exprs(settings, &[arg.clone()], previous_indentation, None, ""),
+            format_source_exprs(settings, &[arg.clone()], previous_indentation, ""),
             if i < exprs.len() - 2 { " " } else { "" }
         ))
     }
@@ -371,7 +351,7 @@ fn format_begin(
             acc.push_str(&format!(
                 "\n{}({})",
                 space,
-                format_source_exprs(settings, list, previous_indentation, None, "")
+                format_source_exprs(settings, list, previous_indentation, "")
             ));
             if let Some(comment) = trailing {
                 acc.push(' ');
@@ -420,7 +400,7 @@ fn format_booleans(
                 acc.push_str(&format!(
                     "\n{}({})",
                     space,
-                    format_source_exprs(settings, list, previous_indentation, None, "")
+                    format_source_exprs(settings, list, previous_indentation, "")
                 ));
                 if let Some(comment) = trailing {
                     acc.push(' ');
@@ -430,7 +410,7 @@ fn format_booleans(
                 acc.push_str(&format!(
                     "\n{}{}",
                     space,
-                    format_source_exprs(settings, &[expr.clone()], previous_indentation, None, "")
+                    format_source_exprs(settings, &[expr.clone()], previous_indentation, "")
                 ));
             }
         }
@@ -440,7 +420,6 @@ fn format_booleans(
             settings,
             &exprs[1..],
             previous_indentation,
-            None,
             "",
         ))
     }
@@ -485,17 +464,11 @@ fn format_if(
                 } else {
                     "".to_string()
                 },
-                format_source_exprs(settings, list, &space, None, "")
+                format_source_exprs(settings, list, &space, "")
             ))
         } else {
             // atom args
-            acc.push_str(&format_source_exprs(
-                settings,
-                &[expr.clone()],
-                &space,
-                None,
-                "",
-            ))
+            acc.push_str(&format_source_exprs(settings, &[expr.clone()], &space, ""))
         }
         if let Some(comment) = trailing {
             acc.push(' ');
@@ -522,7 +495,7 @@ fn format_let(
             acc.push_str(&format!(
                 "\n{}{}",
                 space,
-                format_source_exprs(settings, &[arg.clone()], previous_indentation, None, "")
+                format_source_exprs(settings, &[arg.clone()], previous_indentation, "")
             ))
         }
     }
@@ -531,7 +504,7 @@ fn format_let(
         acc.push_str(&format!(
             "\n{}{}",
             space,
-            format_source_exprs(settings, &[e.clone()], previous_indentation, None, "")
+            format_source_exprs(settings, &[e.clone()], previous_indentation, "")
         ))
     }
     acc.push_str(&format!("\n{})", previous_indentation));
@@ -554,7 +527,6 @@ fn format_match(
         settings,
         &[exprs[1].clone()],
         previous_indentation,
-        None,
         "",
     ));
     // branches evenly spaced
@@ -562,7 +534,7 @@ fn format_match(
         acc.push_str(&format!(
             "\n{}{}",
             space,
-            format_source_exprs(settings, &[branch.clone()], &space, None, "")
+            format_source_exprs(settings, &[branch.clone()], &space, "")
         ));
     }
     acc.push_str(&format!("\n{})", previous_indentation));
@@ -577,7 +549,7 @@ fn format_list(
     let mut acc = "(".to_string();
     let breaks = line_length_over_max(settings, exprs);
     for (i, expr) in exprs[0..].iter().enumerate() {
-        let value = format_source_exprs(settings, &[expr.clone()], "", None, "");
+        let value = format_source_exprs(settings, &[expr.clone()], "", "");
         let space = if breaks { '\n' } else { ' ' };
         if i < exprs.len() - 1 {
             acc.push_str(&value.to_string());
@@ -622,7 +594,7 @@ fn format_key_value_sugar(
                 acc.push_str(&format!(
                     "{}{}\n",
                     space,
-                    format_source_exprs(settings, &[expr.clone()], previous_indentation, None, "")
+                    format_source_exprs(settings, &[expr.clone()], previous_indentation, "")
                 ))
             } else {
                 let last = i == exprs.len() - 1;
@@ -630,13 +602,7 @@ fn format_key_value_sugar(
                 if counter % 2 == 0 {
                     acc.push_str(&format!(
                         ": {}{}\n",
-                        format_source_exprs(
-                            settings,
-                            &[expr.clone()],
-                            previous_indentation,
-                            None,
-                            ""
-                        ),
+                        format_source_exprs(settings, &[expr.clone()], previous_indentation, ""),
                         if last { "" } else { "," }
                     ));
                 } else {
@@ -644,13 +610,7 @@ fn format_key_value_sugar(
                     acc.push_str(&format!(
                         "{}{}",
                         space,
-                        format_source_exprs(
-                            settings,
-                            &[expr.clone()],
-                            previous_indentation,
-                            None,
-                            ""
-                        )
+                        format_source_exprs(settings, &[expr.clone()], previous_indentation, "")
                     ));
                 }
                 counter += 1
@@ -661,13 +621,7 @@ fn format_key_value_sugar(
         let fkey = display_pse(settings, &exprs[0], previous_indentation);
         acc.push_str(&format!(
             " {fkey}: {} ",
-            format_source_exprs(
-                settings,
-                &[exprs[1].clone()],
-                previous_indentation,
-                None,
-                ""
-            )
+            format_source_exprs(settings, &[exprs[1].clone()], previous_indentation, "")
         ));
     }
     if exprs.len() > 2 {
@@ -714,7 +668,7 @@ fn format_key_value(
 
         acc.push_str(&format!(
             "{pre}{fkey}: {}{ending}",
-            format_source_exprs(settings, value, previous_indentation, None, "")
+            format_source_exprs(settings, value, previous_indentation, "")
         ));
     }
     acc.push_str(previous_indentation);
@@ -796,7 +750,7 @@ fn format_function(settings: &Settings, exprs: &[PreSymbolicExpression]) -> Stri
                     acc.push_str(&format!(
                         "\n{}({})",
                         args_indent,
-                        format_source_exprs(settings, list, &args_indent, None, "")
+                        format_source_exprs(settings, list, &args_indent, "")
                     ))
                 } else {
                     // atom args
@@ -804,7 +758,6 @@ fn format_function(settings: &Settings, exprs: &[PreSymbolicExpression]) -> Stri
                         settings,
                         &[arg.clone()],
                         &args_indent,
-                        None,
                         "",
                     ))
                 }
@@ -833,7 +786,6 @@ fn format_function(settings: &Settings, exprs: &[PreSymbolicExpression]) -> Stri
                 settings,
                 &[expr.clone()],
                 &settings.indentation.to_string(),
-                None, // TODO
                 ""
             )
         ))
