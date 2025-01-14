@@ -255,7 +255,7 @@ impl ProjectManifest {
         };
 
         let project = ProjectConfig {
-            name: project_name.clone(),
+            name: project_name,
             requirements: None,
             description: project_manifest_file
                 .project

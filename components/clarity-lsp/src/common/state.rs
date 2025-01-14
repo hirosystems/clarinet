@@ -419,7 +419,7 @@ impl EditorState {
         Some(Hover {
             contents: lsp_types::HoverContents::Markup(lsp_types::MarkupContent {
                 kind: lsp_types::MarkupKind::Markdown,
-                value: documentation.to_string(),
+                value: documentation,
             }),
             range: None,
         })
