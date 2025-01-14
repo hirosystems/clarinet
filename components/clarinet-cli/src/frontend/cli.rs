@@ -1721,7 +1721,7 @@ fn display_post_check_hint() {
         "{}",
         yellow!("    Run all run tests in the ./tests folder.\n")
     );
-    println!("{}", yellow!("Find more information on testing with Clarinet here: https://docs.hiro.so/stacks/clarinet-js-sdkk"));
+    println!("{}", yellow!("Find more information on testing with Clarinet here: https://docs.hiro.so/stacks/clarinet-js-sdk"));
     display_hint_footer();
 }
 
