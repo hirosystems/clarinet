@@ -131,15 +131,16 @@ pub const MAINNET_25_START_HEIGHT: u32 = 147_290;
 pub const MAINNET_30_START_HEIGHT: u32 = 171_833;
 pub const MAINNET_31_START_HEIGHT: u32 = 340_555;
 
-pub const TESTNET_20_START_HEIGHT: u32 = 0;
+// the current primary testnet starts directly in epoch 2.5 (pox-4 deployment)
+pub const TESTNET_20_START_HEIGHT: u32 = 1;
 pub const TESTNET_2_05_START_HEIGHT: u32 = 1;
-pub const TESTNET_21_START_HEIGHT: u32 = 2;
-pub const TESTNET_22_START_HEIGHT: u32 = 3;
-pub const TESTNET_23_START_HEIGHT: u32 = 4;
-pub const TESTNET_24_START_HEIGHT: u32 = 5;
-pub const TESTNET_25_START_HEIGHT: u32 = 6;
-pub const TESTNET_30_START_HEIGHT: u32 = 45_560;
-pub const TESTNET_31_START_HEIGHT: u32 = 199_005;
+pub const TESTNET_21_START_HEIGHT: u32 = 1;
+pub const TESTNET_22_START_HEIGHT: u32 = 1;
+pub const TESTNET_23_START_HEIGHT: u32 = 1;
+pub const TESTNET_24_START_HEIGHT: u32 = 1;
+pub const TESTNET_25_START_HEIGHT: u32 = 1;
+pub const TESTNET_30_START_HEIGHT: u32 = 320;
+pub const TESTNET_31_START_HEIGHT: u32 = 814;
 
 fn epoch_for_height(is_mainnet: bool, height: u32) -> StacksEpochId {
     if is_mainnet {
