@@ -54,7 +54,7 @@ pub struct SessionSettings {
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
-pub struct ApiUrl(String);
+pub struct ApiUrl(pub String);
 impl Default for ApiUrl {
     fn default() -> Self {
         ApiUrl("http://api.hiro.so".to_string())

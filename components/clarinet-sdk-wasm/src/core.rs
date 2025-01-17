@@ -371,6 +371,7 @@ impl SDK {
             .interpreter
             .clarity_datastore
             .set_http_client(self.http_client.clone());
+
         self.session = Some(session);
         Ok(())
     }
@@ -383,7 +384,7 @@ impl SDK {
             .ok_or("Failed to parse manifest location")?;
 
         let ProjectCache {
-            session,
+            mut session,
             contracts_interfaces,
             contracts_locations,
             accounts,
@@ -391,6 +392,11 @@ impl SDK {
             Some(cache) => cache.clone(),
             None => self.setup_session(&manifest_location).await?,
         };
+
+        session
+            .interpreter
+            .clarity_datastore
+            .set_http_client(self.http_client.clone());
 
         self.deployer = session.interpreter.get_tx_sender().to_string();
 

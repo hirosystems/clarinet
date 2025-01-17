@@ -30,7 +30,7 @@ beforeEach(async () => {
   await simnet.initEmptySession({
     enabled: true,
     api_url: "http://localhost:3999",
-    initial_height: 186,
+    initial_height: 56,
   });
 });
 

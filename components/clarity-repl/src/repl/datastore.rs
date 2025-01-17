@@ -13,6 +13,7 @@ use clarity::vm::errors::InterpreterResult as Result;
 use clarity::vm::types::{QualifiedContractIdentifier, TupleData};
 use clarity::vm::StacksEpoch;
 use pox_locking::handle_contract_call_special_cases;
+use serde::Deserialize;
 use sha2::{Digest, Sha512_256};
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::JsValue;
@@ -41,6 +42,57 @@ fn epoch_to_peer_version(epoch: StacksEpochId) -> u8 {
     }
 }
 
+#[derive(Deserialize)]
+struct ClarityDataResponse {
+    pub data: String,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct RpcBlockInfoResponse {
+    pub height: u32,
+    pub burn_block_height: u32,
+    pub tenure_height: u32,
+    pub block_time: u64,
+    pub burn_block_time: u64,
+    pub hash: String,
+    pub index_block_hash: String,
+    pub burn_block_hash: String,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[allow(dead_code)]
+struct RpcBlockInfo {
+    pub height: u32,
+    pub burn_block_height: u32,
+    pub tenure_height: u32,
+    pub block_time: u64,
+    pub burn_block_time: u64,
+    pub hash: BlockHeaderHash,
+    pub index_block_hash: StacksBlockId,
+    pub burn_block_hash: BurnchainHeaderHash,
+}
+
+impl From<RpcBlockInfoResponse> for RpcBlockInfo {
+    fn from(response: RpcBlockInfoResponse) -> Self {
+        let hash = BlockHeaderHash::from_hex(&response.hash.replacen("0x", "", 1)).unwrap();
+        let index_block_hash =
+            StacksBlockId::from_hex(&response.index_block_hash.replacen("0x", "", 1)).unwrap();
+        let burn_block_hash =
+            BurnchainHeaderHash::from_hex(&response.burn_block_hash.replacen("0x", "", 1)).unwrap();
+
+        RpcBlockInfo {
+            height: response.height,
+            burn_block_height: response.burn_block_height,
+            tenure_height: response.tenure_height,
+            block_time: response.block_time,
+            burn_block_time: response.burn_block_time,
+            hash,
+            index_block_hash,
+            burn_block_hash,
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 struct StoreEntry(StacksBlockId, String);
 
@@ -54,20 +106,10 @@ pub struct ClarityDatastore {
     height_at_chain_tip: HashMap<StacksBlockId, u32>,
 
     remote_data_settings: RemoteDataSettings,
-    remote_chaintip_cache: HashMap<u32, String>,
+    remote_block_info_cache: HashMap<u32, RpcBlockInfo>,
 
     #[cfg(target_arch = "wasm32")]
     http_client: Option<JsFunction>,
-}
-
-#[derive(Deserialize)]
-struct ClarityDataResponse {
-    pub data: String,
-}
-
-#[derive(Deserialize)]
-struct BlockInfoResponse {
-    pub index_block_hash: String,
 }
 
 #[derive(Clone, Debug)]
@@ -146,7 +188,7 @@ impl Default for ClarityDatastore {
 impl ClarityDatastore {
     pub fn new(remote_data_settings: RemoteDataSettings) -> Self {
         let block_height = if remote_data_settings.enabled {
-            remote_data_settings.initial_height.unwrap_or(32)
+            remote_data_settings.initial_height.unwrap_or(0)
         } else {
             0
         };
@@ -160,7 +202,7 @@ impl ClarityDatastore {
             height_at_chain_tip: HashMap::from([(id, block_height)]),
 
             remote_data_settings,
-            remote_chaintip_cache: HashMap::new(),
+            remote_block_info_cache: HashMap::new(),
             #[cfg(target_arch = "wasm32")]
             http_client: None,
         }
@@ -280,29 +322,62 @@ impl ClarityDatastore {
         }
     }
 
-    fn get_remote_chaintip(&mut self, height: u32) -> String {
-        if let Some(cached) = self.remote_chaintip_cache.get(&height) {
-            println!("using cached chaintip for height: {}", height);
-            return cached.to_string();
-        }
-        println!("fetching remote chaintip for height: {}", height);
-
-        let url = format!("/extended/v2/blocks/{}", height);
-
-        let data = self
-            .fetch_data::<BlockInfoResponse>(&url)
+    fn fetch_block_info(&self, url: &str) -> RpcBlockInfo {
+        let raw_block_info = self
+            .fetch_data::<RpcBlockInfoResponse>(url)
             .unwrap_or_else(|e| {
                 panic!("unable to parse json, error: {}", e);
             })
             .unwrap_or_else(|| {
-                panic!("unable to get remote chaintip");
+                panic!("unable to get remote block info");
             });
 
-        let block_hash = data.index_block_hash.replacen("0x", "", 1);
-        self.remote_chaintip_cache
-            .insert(height, block_hash.clone());
+        RpcBlockInfo::from(raw_block_info.clone())
+    }
 
-        block_hash
+    fn get_remote_block_info_from_height(&mut self, height: u32) -> RpcBlockInfo {
+        let url = format!("/extended/v2/blocks/{}", height);
+
+        if let Some(cached) = self.remote_block_info_cache.get(&height) {
+            return cached.clone();
+        }
+
+        let block_info = self.fetch_block_info(&url);
+
+        self.remote_block_info_cache
+            .insert(height, block_info.clone());
+
+        self.height_at_chain_tip
+            .insert(block_info.index_block_hash, height);
+
+        block_info
+    }
+
+    fn get_remote_block_info_from_hash(&mut self, hash: &StacksBlockId) -> RpcBlockInfo {
+        if let Some(height) = self.height_at_chain_tip.get(hash) {
+            return self.get_remote_block_info_from_height(*height);
+        }
+
+        let url = format!("/extended/v2/blocks/{}", hash);
+
+        let block_info = self.fetch_block_info(&url);
+
+        self.remote_block_info_cache
+            .insert(block_info.height, block_info.clone());
+
+        self.height_at_chain_tip
+            .insert(block_info.index_block_hash, block_info.height);
+
+        block_info
+    }
+
+    fn get_remote_chaintip(&mut self) -> String {
+        let height = self
+            .get_current_block_height()
+            .min(self.remote_data_settings.initial_height.unwrap());
+        println!("get_remote_chaintip: {}", height);
+        let block_info = self.get_remote_block_info_from_height(height);
+        block_info.index_block_hash.to_string()
     }
 
     fn fetch_remote_data(&mut self, path: &str) -> Result<Option<String>> {
@@ -327,15 +402,9 @@ impl ClarityDatastore {
 
     fn fetch_clarity_marf_value(&mut self, key: &str) -> Result<Option<String>> {
         let key_hash = TrieHash::from_key(key);
-        // the block height should be the min value between current block height and initial height
-        // making sure we don't ever try reading data on remote network with a higher block height than the initial one
-        let block_height = self.get_current_block_height();
-        let remote_chaintip = self.get_remote_chaintip(block_height);
-        let path = format!(
-            "/v2/clarity/marf/{}?tip={}&proof=false",
-            key_hash, remote_chaintip
-        );
-        self.fetch_remote_data(&path)
+        let tip = self.get_remote_chaintip();
+        let url = format!("/v2/clarity/marf/{}?tip={}&proof=false", key_hash, tip);
+        self.fetch_remote_data(&url)
     }
 
     fn fetch_clarity_metadata(
@@ -345,20 +414,12 @@ impl ClarityDatastore {
     ) -> Result<Option<String>> {
         let addr = contract.issuer.to_string();
         let contract = contract.name.to_string();
-        // the block height should be the min value between current block height and initial height
-        // making sure we don't ever try reading data on remote network with a higher block height than the initial one
-        let block_height = self.get_current_block_height();
-        let remote_chaintip = self.get_remote_chaintip(block_height);
-        uprint!(
-            "fetching METADATA from network, {}/{}/{}",
-            addr,
-            contract,
-            key
-        );
-
+        println!("CURRENT {}", self.current_chain_tip);
+        println!("OPEN {}", self.open_chain_tip);
+        let tip = self.get_remote_chaintip();
         let url = format!(
             "/v2/clarity/metadata/{}/{}/{}?tip={}",
-            addr, contract, key, remote_chaintip
+            addr, contract, key, tip
         );
         self.fetch_remote_data(&url)
     }
@@ -374,21 +435,24 @@ impl ClarityBackingStore for ClarityDatastore {
 
     /// fetch K-V out of the committed datastore
     fn get_data(&mut self, key: &str) -> Result<Option<String>> {
-        println!("get_data({})", key);
-
-        match self.store.get(key) {
-            Some(data) => Ok(self.get_latest_data(data)),
-            None => {
-                if self.remote_data_settings.enabled {
-                    let data = self.fetch_clarity_marf_value(key);
-                    if let Ok(Some(value)) = &data {
-                        self.put(key, value);
-                    }
-                    return data;
+        if let Some(data) = self.store.get(key) {
+            if self.remote_data_settings.enabled && self.current_chain_tip != self.open_chain_tip {
+                let data = self.fetch_clarity_marf_value(key);
+                if let Ok(Some(value)) = &data {
+                    self.put(key, value);
                 }
-                Ok(None)
+                return data;
             }
+            return Ok(self.get_latest_data(data));
         }
+        if self.remote_data_settings.enabled {
+            let data = self.fetch_clarity_marf_value(key);
+            if let Ok(Some(value)) = &data {
+                self.put(key, value);
+            }
+            return data;
+        }
+        Ok(None)
     }
 
     fn get_data_from_path(&mut self, _hash: &TrieHash) -> Result<Option<String>> {
@@ -420,6 +484,13 @@ impl ClarityBackingStore for ClarityDatastore {
     }
 
     fn get_block_at_height(&mut self, height: u32) -> Option<StacksBlockId> {
+        println!("calling get_block_at_height");
+        if self.remote_data_settings.enabled
+            && height <= self.remote_data_settings.initial_height.unwrap()
+        {
+            let block_info = self.get_remote_block_info_from_height(height);
+            return Some(block_info.index_block_hash);
+        }
         Some(height_to_id(height))
     }
 
@@ -427,13 +498,22 @@ impl ClarityBackingStore for ClarityDatastore {
     ///  i.e., it changes on time-shifted evaluation. the open_chain_tip functions always
     ///   return data about the chain tip that is currently open for writing.
     fn get_current_block_height(&mut self) -> u32 {
-        *self
-            .height_at_chain_tip
-            .get(&self.current_chain_tip)
-            .unwrap_or(&u32::MAX)
+        if let Some(height) = self.height_at_chain_tip.get(&self.current_chain_tip) {
+            return *height;
+        }
+        if self.remote_data_settings.enabled {
+            let hash = self.current_chain_tip;
+            let block_info = self.get_remote_block_info_from_hash(&hash);
+            if block_info.height <= self.remote_data_settings.initial_height.unwrap() {
+                return block_info.height;
+            }
+        }
+
+        u32::MAX
     }
 
     fn get_open_chain_tip_height(&mut self) -> u32 {
+        println!("calling get_open_chain_tip_height");
         self.height_at_chain_tip
             .get(&self.open_chain_tip)
             .copied()
@@ -441,6 +521,7 @@ impl ClarityBackingStore for ClarityDatastore {
     }
 
     fn get_open_chain_tip(&mut self) -> StacksBlockId {
+        println!("calling get_open_chain_tip");
         self.open_chain_tip
     }
 
@@ -466,7 +547,6 @@ impl ClarityBackingStore for ClarityDatastore {
         contract: &QualifiedContractIdentifier,
         key: &str,
     ) -> Result<Option<String>> {
-        println!("get_metadata({}, {})", contract, key);
         let metadata = self.metadata.get(&(contract.to_string(), key.to_string()));
         if metadata.is_some() {
             return Ok(metadata.cloned());
@@ -498,6 +578,7 @@ impl ClarityBackingStore for ClarityDatastore {
     }
 
     fn get_cc_special_cases_handler(&self) -> Option<clarity::vm::database::SpecialCaseHandler> {
+        println!("calling get_cc_special_cases_handler");
         Some(&handle_contract_call_special_cases)
     }
 
@@ -723,6 +804,7 @@ impl HeadersDB for Datastore {
         id_bhh: &StacksBlockId,
         _epoch_id: &StacksEpochId,
     ) -> Option<BlockHeaderHash> {
+        println!("calling get_stacks_block_header_hash_for_block");
         self.stacks_blocks
             .get(id_bhh)
             .map(|id| id.block_header_hash)
@@ -732,6 +814,7 @@ impl HeadersDB for Datastore {
         &self,
         id_bhh: &StacksBlockId,
     ) -> Option<BurnchainHeaderHash> {
+        println!("calling get_burn_header_hash_for_block");
         self.stacks_blocks
             .get(id_bhh)
             .map(|block| block.burn_block_header_hash)
@@ -742,6 +825,7 @@ impl HeadersDB for Datastore {
         id_bhh: &StacksBlockId,
         _epoch_id: &StacksEpochId,
     ) -> Option<ConsensusHash> {
+        println!("calling get_consensus_hash_for_block");
         self.stacks_blocks.get(id_bhh).map(|id| id.consensus_hash)
     }
 
@@ -750,10 +834,12 @@ impl HeadersDB for Datastore {
         id_bhh: &StacksBlockId,
         _epoch_id: &StacksEpochId,
     ) -> Option<VRFSeed> {
+        println!("calling get_vrf_seed_for_block");
         self.stacks_blocks.get(id_bhh).map(|id| id.vrf_seed)
     }
 
     fn get_stacks_block_time_for_block(&self, id_bhh: &StacksBlockId) -> Option<u64> {
+        println!("calling get_stacks_block_time_for_block");
         self.stacks_blocks
             .get(id_bhh)
             .map(|id| id.stacks_block_time)
@@ -764,12 +850,14 @@ impl HeadersDB for Datastore {
         id_bhh: &StacksBlockId,
         _epoch_id: Option<&StacksEpochId>,
     ) -> Option<u64> {
+        println!("calling get_burn_block_time_for_block");
         self.get_burn_header_hash_for_block(id_bhh)
             .and_then(|hash| self.burn_blocks.get(&hash))
             .map(|b| b.burn_block_time)
     }
 
     fn get_burn_block_height_for_block(&self, id_bhh: &StacksBlockId) -> Option<u32> {
+        println!("calling get_burn_block_height_for_block");
         self.get_burn_header_hash_for_block(id_bhh)
             .and_then(|hash| self.burn_blocks.get(&hash))
             .map(|b| b.burn_block_height)
@@ -780,6 +868,7 @@ impl HeadersDB for Datastore {
         _id_bhh: &StacksBlockId,
         tenure_height: u32,
     ) -> Option<u32> {
+        println!("calling get_stacks_height_for_tenure_height");
         self.tenure_blocks_height.get(&tenure_height).copied()
     }
 
@@ -860,6 +949,7 @@ impl BurnStateDB for Datastore {
     }
 
     fn get_tip_sortition_id(&self) -> Option<SortitionId> {
+        println!("calling get_tip_sortition_id");
         let bytes = height_to_hashed_bytes(self.stacks_chain_height);
         let sortition_id = SortitionId(bytes);
         Some(sortition_id)
@@ -900,6 +990,7 @@ impl BurnStateDB for Datastore {
         _height: u32,
         sortition_id: &SortitionId,
     ) -> Option<BurnchainHeaderHash> {
+        println!("calling get_burn_header_hash");
         self.sortition_lookup
             .get(sortition_id)
             .and_then(|id| self.stacks_blocks.get(id))
@@ -913,6 +1004,7 @@ impl BurnStateDB for Datastore {
         &self,
         consensus_hash: &ConsensusHash,
     ) -> Option<SortitionId> {
+        println!("calling get_sortition_id_from_consensus_hash");
         self.consensus_hash_lookup.get(consensus_hash).copied()
     }
 
