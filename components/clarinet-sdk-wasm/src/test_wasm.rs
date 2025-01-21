@@ -7,7 +7,7 @@ use wasm_bindgen_test::*;
 
 async fn init_sdk() -> SDK {
     let js_noop = JsFunction::new_no_args("return");
-    let mut sdk = SDK::new(js_noop.clone(), js_noop, None);
+    let mut sdk = SDK::new(js_noop, None);
     let _ = sdk.init_empty_session(JsValue::undefined()).await;
     sdk.set_epoch(EpochString::new("3.0"));
     sdk

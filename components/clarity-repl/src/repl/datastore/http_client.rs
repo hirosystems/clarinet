@@ -5,9 +5,16 @@ use clarity::{
 use serde::de::DeserializeOwned;
 
 #[cfg(target_arch = "wasm32")]
-use wasm_bindgen::JsValue;
+use js_sys::{JsString, Uint8Array};
 #[cfg(target_arch = "wasm32")]
-use web_sys::js_sys::{Function as JsFunction, JsString, Uint8Array};
+use wasm_bindgen::prelude::*;
+
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen(module = "/js/index.js")]
+extern "C" {
+    #[wasm_bindgen(js_name = httpClient)]
+    fn http_client(method: &JsString, path: &JsString) -> Uint8Array;
+}
 
 use crate::repl::settings::ApiUrl;
 
@@ -62,83 +69,42 @@ impl From<Block> for ParsedBlock {
     }
 }
 
-pub trait HttpClientTrait {
-    fn fetch_data<T: DeserializeOwned>(&self, path: &str) -> InterpreterResult<Option<T>>;
-    fn fetch_block(&self, url: &str) -> ParsedBlock;
-    fn fetch_clarity_data(&self, path: &str) -> InterpreterResult<Option<String>>;
-}
-
 #[derive(Clone, Debug)]
 pub struct HttpClient {
-    #[cfg(not(target_arch = "wasm32"))]
-    client: reqwest::blocking::Client,
-    #[cfg(target_arch = "wasm32")]
-    client: JsFunction,
     url: ApiUrl,
 }
 
-#[cfg(not(target_arch = "wasm32"))]
 impl HttpClient {
     pub fn new(url: ApiUrl) -> Self {
-        HttpClient {
-            client: reqwest::blocking::Client::new(),
-            url,
-        }
+        HttpClient { url }
     }
 
     #[cfg(not(target_arch = "wasm32"))]
     fn get<T: DeserializeOwned>(&self, path: &str) -> Option<T> {
         let url = format!("{}{}", self.url, path);
         println!("fetching data from: {}", url);
-        match self.client.get(&url).send() {
-            Ok(response) => match response.json::<T>() {
-                Ok(data) => Some(data),
-                Err(_) => None,
-            },
+        match reqwest::blocking::get(&url) {
+            Ok(response) => response.json::<T>().ok(),
             Err(_) => None,
-        }
-    }
-}
-
-#[cfg(target_arch = "wasm32")]
-impl HttpClient {
-    pub fn new(url: ApiUrl, client: JsFunction) -> Self {
-        HttpClient {
-            #[cfg(not(target_arch = "wasm32"))]
-            client: reqwest::blocking::Client::new(),
-            #[cfg(target_arch = "wasm32")]
-            client,
-            url,
         }
     }
 
     #[cfg(target_arch = "wasm32")]
-    fn get<T: DeserializeOwned>(&self, url: &str) -> Option<T> {
-        let url = JsString::from(url);
-
-        match self
-            .client
-            .call2(&JsValue::NULL, &JsString::from("GET"), &url)
-        {
-            Ok(response) => {
-                let bytes = Uint8Array::from(response).to_vec();
-                let raw_result = std::str::from_utf8(bytes.as_slice()).unwrap();
-                match serde_json::from_str::<T>(raw_result) {
-                    Ok(data) => Some(data),
-                    _ => None,
-                }
-            }
-            Err(_) => None,
-        }
+    fn get<T: DeserializeOwned>(&self, path: &str) -> Option<T> {
+        uprint!("fetching data from: {}", path);
+        let url = JsString::from(format!("{}{}", self.url, path));
+        let response = http_client(&JsString::from("GET"), &url);
+        let bytes = response.to_vec();
+        let raw_result = std::str::from_utf8(bytes.as_slice()).unwrap();
+        serde_json::from_str::<T>(raw_result).ok()
     }
-}
 
-impl HttpClientTrait for HttpClient {
     fn fetch_data<T: DeserializeOwned>(&self, path: &str) -> InterpreterResult<Option<T>> {
+        uprint!("fetching data from: {}", path);
         Ok(self.get::<T>(path))
     }
 
-    fn fetch_block(&self, url: &str) -> ParsedBlock {
+    pub fn fetch_block(&self, url: &str) -> ParsedBlock {
         let block = self
             .fetch_data::<Block>(url)
             .unwrap_or_else(|e| {
@@ -151,7 +117,7 @@ impl HttpClientTrait for HttpClient {
         ParsedBlock::from(block.clone())
     }
 
-    fn fetch_clarity_data(&self, path: &str) -> InterpreterResult<Option<String>> {
+    pub fn fetch_clarity_data(&self, path: &str) -> InterpreterResult<Option<String>> {
         let data = self
             .fetch_data::<ClarityDataResponse>(path)
             .unwrap_or_else(|e| {
@@ -159,14 +125,7 @@ impl HttpClientTrait for HttpClient {
             });
 
         match data {
-            Some(data) => {
-                let value = if data.data.starts_with("0x") {
-                    data.data[2..].to_string()
-                } else {
-                    data.data
-                };
-                Ok(Some(value))
-            }
+            Some(data) => Ok(Some(data.data.replacen("0x", "", 1))),
             None => Ok(None),
         }
     }

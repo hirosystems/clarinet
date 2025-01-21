@@ -8,7 +8,6 @@ export {
   type Tx,
   type TransferSTX,
 } from "../../common/src/sdkProxyHelpers.js";
-import { httpClient } from "../../common/src/httpClient.js";
 
 import { vfs } from "./vfs.js";
 import { Simnet, getSessionProxy } from "./sdkProxy.js";
@@ -23,19 +22,13 @@ BigInt.prototype.toJSON = function () {
   return this.toString();
 };
 
-// @ts-ignore
-globalThis.httpClient = httpClient;
-
 type Options = { trackCosts: boolean; trackCoverage: boolean };
 
 export async function getSDK(options?: Options): Promise<Simnet> {
   const module = await wasmModule;
   let sdkOptions = new SDKOptions(!!options?.trackCosts, !!options?.trackCoverage);
 
-  const simnet = new Proxy(
-    new module.SDK(vfs, httpClient, sdkOptions),
-    getSessionProxy(),
-  ) as unknown as Simnet;
+  const simnet = new Proxy(new module.SDK(vfs, sdkOptions), getSessionProxy()) as unknown as Simnet;
   return simnet;
 }
 

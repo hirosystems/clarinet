@@ -10,7 +10,7 @@ use clarinet_deployments::{
 use clarinet_files::StacksNetwork;
 use clarinet_files::{FileAccessor, FileLocation, ProjectManifest, WASMFileSystemAccessor};
 use clarity_repl::clarity::analysis::contract_interface_builder::{
-    ContractInterface, ContractInterfaceFunction, ContractInterfaceFunctionAccess,
+    ContractInterface, ContractInterfaceFunction,
 };
 use clarity_repl::clarity::chainstate::StacksAddress;
 use clarity_repl::clarity::vm::types::{
@@ -28,7 +28,7 @@ use clarity_repl::repl::{
 };
 use clarity_repl::uprint;
 use gloo_utils::format::JsValueSerdeExt;
-use js_sys::{Function as JsFunction, JsString, Uint8Array};
+use js_sys::Function as JsFunction;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use serde_wasm_bindgen::to_value as encode_to_js;
@@ -53,9 +53,6 @@ extern "C" {
     pub type IContractAST;
     #[wasm_bindgen(typescript_type = "Map<string, IContractInterface>")]
     pub type IContractInterfaces;
-    // (method: HttpVerb, path: string, options?: HttpOptions): Uint8Array
-    #[wasm_bindgen(js_name = httpClient)]
-    fn http_client(method: &JsString, path: &JsString) -> Uint8Array;
 }
 
 impl EpochString {
@@ -290,7 +287,6 @@ pub struct SDK {
     contracts_interfaces: HashMap<QualifiedContractIdentifier, ContractInterface>,
     session: Option<Session>,
     file_accessor: Box<dyn FileAccessor>,
-    http_client: JsFunction,
     options: SDKOptions,
     current_test_name: String,
     costs_reports: Vec<CostsReport>,
@@ -299,11 +295,7 @@ pub struct SDK {
 #[wasm_bindgen]
 impl SDK {
     #[wasm_bindgen(constructor)]
-    pub fn new(
-        fs_request: JsFunction,
-        http_client: JsFunction,
-        options: Option<SDKOptions>,
-    ) -> Self {
+    pub fn new(fs_request: JsFunction, options: Option<SDKOptions>) -> Self {
         panic::set_hook(Box::new(console_error_panic_hook::hook));
 
         let file_accessor = Box::new(WASMFileSystemAccessor::new(fs_request));
@@ -319,7 +311,6 @@ impl SDK {
             contracts_locations: HashMap::new(),
             session: None,
             file_accessor,
-            http_client,
             options: SDKOptions {
                 track_coverage,
                 track_costs,
@@ -370,11 +361,6 @@ impl SDK {
         settings.repl_settings.remote_data = config.unwrap_or_default();
         let session = Session::new(settings);
 
-        // session
-        //     .interpreter
-        //     .clarity_datastore
-        //     .set_http_client(self.http_client.clone());
-
         self.session = Some(session);
         Ok(())
     }
@@ -395,11 +381,6 @@ impl SDK {
             Some(cache) => cache.clone(),
             None => self.setup_session(&manifest_location).await?,
         };
-
-        // session
-        //     .interpreter
-        //     .clarity_datastore
-        //     .set_http_client(self.http_client.clone());
 
         self.deployer = session.interpreter.get_tx_sender().to_string();
 
@@ -704,6 +685,7 @@ impl SDK {
             .get_data_var(&contract_id, var_name)
             .ok_or("value not found".into())
     }
+
     #[wasm_bindgen(js_name=getBlockTime)]
     pub fn get_block_time(&mut self) -> u64 {
         self.get_session_mut().interpreter.get_block_time()

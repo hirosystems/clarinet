@@ -27,9 +27,6 @@ use std::collections::{BTreeMap, HashMap};
 use std::fmt;
 use std::num::ParseIntError;
 
-#[cfg(target_arch = "wasm32")]
-use js_sys::Function as JsFunction;
-
 #[cfg(feature = "cli")]
 use clarity::vm::analysis::ContractAnalysis;
 

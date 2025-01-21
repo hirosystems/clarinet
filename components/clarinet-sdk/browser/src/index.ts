@@ -1,7 +1,5 @@
 import init, { SDK } from "@hirosystems/clarinet-sdk-wasm-browser";
 
-import { httpClient } from "../../common/src/httpClient.js";
-
 import { Simnet, getSessionProxy } from "./sdkProxy.js";
 import { defaultVfs } from "./defaultVfs.js";
 
@@ -25,7 +23,6 @@ export { defaultVfs, defaultFileStore } from "./defaultVfs.js";
 
 export const initSimnet = async (virtualFileSystem?: Function) => {
   await init();
-
   const vfs = virtualFileSystem ? virtualFileSystem : defaultVfs;
-  return new Proxy(new SDK(vfs, httpClient), getSessionProxy()) as unknown as Simnet;
+  return new Proxy(new SDK(vfs), getSessionProxy()) as unknown as Simnet;
 };

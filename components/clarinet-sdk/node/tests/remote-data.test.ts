@@ -5,13 +5,11 @@ import { describe, expect, it, beforeEach, afterEach } from "vitest";
 
 // test the built package and not the source code
 // makes it simpler to handle wasm build
-import { Simnet, getSDK, initSimnet, tx } from "..";
+import { getSDK } from "..";
 
-const deployerAddr = "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM";
-const address1 = "ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5";
-const address2 = "ST2CY5V39NHDPWSXMW9QDT3HC3GD6Q6XX4CFRK9AG";
-
-let simnet: Simnet;
+const api_url = "https://api.testnet.hiro.so";
+const counterAddress = "STJCAB2T9TR2EJM7YS4DM2CGBBVTF7BV237Y8KNV.counter";
+const sender = "ST2CY5V39NHDPWSXMW9QDT3HC3GD6Q6XX4CFRK9AG";
 
 const deploymentPlanPath = path.join(
   process.cwd(),
@@ -26,21 +24,47 @@ function deleteExistingDeploymentPlan() {
 
 beforeEach(async () => {
   deleteExistingDeploymentPlan();
-  simnet = await getSDK();
-  await simnet.initEmptySession({
-    enabled: true,
-    api_url: "http://localhost:3999",
-    initial_height: 56,
-  });
 });
 
 afterEach(() => {
   deleteExistingDeploymentPlan();
 });
 
-describe("simnet remote interactions", () => {
-  it("can call a remote contract", () => {
-    const result = simnet.callReadOnlyFn(`${address1}.counter`, "get-count", [], address2);
-    expect(result.result).toStrictEqual(Cl.uint(2));
+describe("simnet remote interactions", async () => {
+  const simnet = await getSDK();
+
+  it("can call a remote contract", async () => {
+    await simnet.initEmptySession({
+      enabled: true,
+      api_url: "https://api.testnet.hiro.so",
+      initial_height: 56230,
+    });
+    const { result } = simnet.callReadOnlyFn(counterAddress, "get-count", [], sender);
+    expect(result).toStrictEqual(Cl.uint(0));
+  });
+
+  it("can call a remote contract", async () => {
+    await simnet.initEmptySession({
+      enabled: true,
+      api_url: "https://api.testnet.hiro.so",
+      initial_height: 57000,
+    });
+    const { result } = simnet.callReadOnlyFn(counterAddress, "get-count", [], sender);
+    expect(result).toStrictEqual(Cl.uint(1));
+  });
+
+  it("can use at-block", async () => {
+    await simnet.initEmptySession({
+      enabled: true,
+      api_url: "https://api.testnet.hiro.so",
+      initial_height: 57000,
+    });
+    const { result } = simnet.callReadOnlyFn(
+      counterAddress,
+      "get-count-at-block",
+      [Cl.uint(56230)],
+      sender,
+    );
+    expect(result).toStrictEqual(Cl.ok(Cl.uint(0)));
   });
 });
