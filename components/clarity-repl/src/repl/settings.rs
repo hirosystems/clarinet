@@ -43,7 +43,6 @@ pub struct Account {
 
 #[derive(Clone, Debug, Default)]
 pub struct SessionSettings {
-    // pub node: String,
     pub include_boot_contracts: Vec<String>,
     pub include_costs: bool,
     pub initial_accounts: Vec<Account>,

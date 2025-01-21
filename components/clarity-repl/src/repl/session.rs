@@ -27,6 +27,9 @@ use std::collections::{BTreeMap, HashMap};
 use std::fmt;
 use std::num::ParseIntError;
 
+#[cfg(target_arch = "wasm32")]
+use js_sys::Function as JsFunction;
+
 #[cfg(feature = "cli")]
 use clarity::vm::analysis::ContractAnalysis;
 
@@ -109,7 +112,6 @@ pub struct Session {
 
 impl Session {
     pub fn new(settings: SessionSettings) -> Self {
-        println!("settings: {:#?}", settings.repl_settings.remote_data);
         let tx_sender = {
             let address = match settings.initial_deployer {
                 Some(ref entry) => entry.address.clone(),
@@ -1339,7 +1341,7 @@ fn clarity_keywords() -> HashMap<String, String> {
 }
 
 #[allow(clippy::items_after_test_module)]
-#[cfg(test)]
+#[cfg(all(test, not(target_arch = "wasm32")))]
 mod tests {
     use clarity::vm::types::TupleData;
 

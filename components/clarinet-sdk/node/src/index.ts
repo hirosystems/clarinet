@@ -23,11 +23,15 @@ BigInt.prototype.toJSON = function () {
   return this.toString();
 };
 
+// @ts-ignore
+globalThis.httpClient = httpClient;
+
 type Options = { trackCosts: boolean; trackCoverage: boolean };
 
 export async function getSDK(options?: Options): Promise<Simnet> {
   const module = await wasmModule;
   let sdkOptions = new SDKOptions(!!options?.trackCosts, !!options?.trackCoverage);
+
   const simnet = new Proxy(
     new module.SDK(vfs, httpClient, sdkOptions),
     getSessionProxy(),

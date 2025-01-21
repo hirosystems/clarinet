@@ -35,7 +35,7 @@ async fn it_can_execute_clarity_code() {
 #[wasm_bindgen_test]
 async fn it_can_set_epoch() {
     let mut sdk = init_sdk().await;
-    assert_eq!(sdk.block_height(), 33);
+    assert_eq!(sdk.block_height(), 1);
     assert_eq!(sdk.current_epoch(), "3.0");
 }
 

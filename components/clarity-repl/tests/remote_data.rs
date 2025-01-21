@@ -82,9 +82,9 @@ fn it_handles_at_block() {
     // block 42000 hash
     let id_header_hash = "0xb4678e059aa9b82b1473597087876ef61a5c6a0c35910cd4b797201d6b423a07";
 
-    // let snippet = format!("(at-block {} stacks-block-height)", id_header_hash);
-    // let result = eval_snippet(&mut session, &snippet);
-    // assert_eq!(result, Value::UInt(42000));
+    let snippet = format!("(at-block {} stacks-block-height)", id_header_hash);
+    let result = eval_snippet(&mut session, &snippet);
+    assert_eq!(result, Value::UInt(42000));
 
     let snippet_get_count_at_10k = format!(
         "(contract-call? '{} get-count-at-block u10000)",
@@ -93,17 +93,17 @@ fn it_handles_at_block() {
     let result = eval_snippet(&mut session, &snippet_get_count_at_10k);
     assert_eq!(result, Value::okay(Value::none()).unwrap());
 
-    // let snippet_get_count_at_42k = format!(
-    //     "(contract-call? '{} get-count-at-block u42000)",
-    //     COUNTER_CONTRACT
-    // );
-    // let result = eval_snippet(&mut session, &snippet_get_count_at_42k);
-    // assert_eq!(result, Value::okay(Value::UInt(0)).unwrap());
+    let snippet_get_count_at_42k = format!(
+        "(contract-call? '{} get-count-at-block u42000)",
+        COUNTER_CONTRACT
+    );
+    let result = eval_snippet(&mut session, &snippet_get_count_at_42k);
+    assert_eq!(result, Value::okay(Value::UInt(0)).unwrap());
 
-    // let snippet_get_count_at_57k = format!(
-    //     "(contract-call? '{} get-count-at-block u57000)",
-    //     COUNTER_CONTRACT
-    // );
-    // let result = eval_snippet(&mut session, &snippet_get_count_at_57k);
-    // assert_eq!(result, Value::okay(Value::UInt(1)).unwrap());
+    let snippet_get_count_at_57k = format!(
+        "(contract-call? '{} get-count-at-block u57000)",
+        COUNTER_CONTRACT
+    );
+    let result = eval_snippet(&mut session, &snippet_get_count_at_57k);
+    assert_eq!(result, Value::okay(Value::UInt(1)).unwrap());
 }

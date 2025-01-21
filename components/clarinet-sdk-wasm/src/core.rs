@@ -28,7 +28,7 @@ use clarity_repl::repl::{
 };
 use clarity_repl::uprint;
 use gloo_utils::format::JsValueSerdeExt;
-use js_sys::Function as JsFunction;
+use js_sys::{Function as JsFunction, JsString, Uint8Array};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use serde_wasm_bindgen::to_value as encode_to_js;
@@ -53,6 +53,9 @@ extern "C" {
     pub type IContractAST;
     #[wasm_bindgen(typescript_type = "Map<string, IContractInterface>")]
     pub type IContractInterfaces;
+    // (method: HttpVerb, path: string, options?: HttpOptions): Uint8Array
+    #[wasm_bindgen(js_name = httpClient)]
+    fn http_client(method: &JsString, path: &JsString) -> Uint8Array;
 }
 
 impl EpochString {
@@ -365,12 +368,12 @@ impl SDK {
 
         let mut settings = SessionSettings::default();
         settings.repl_settings.remote_data = config.unwrap_or_default();
-        let mut session = Session::new(settings);
+        let session = Session::new(settings);
 
-        session
-            .interpreter
-            .clarity_datastore
-            .set_http_client(self.http_client.clone());
+        // session
+        //     .interpreter
+        //     .clarity_datastore
+        //     .set_http_client(self.http_client.clone());
 
         self.session = Some(session);
         Ok(())
@@ -384,7 +387,7 @@ impl SDK {
             .ok_or("Failed to parse manifest location")?;
 
         let ProjectCache {
-            mut session,
+            session,
             contracts_interfaces,
             contracts_locations,
             accounts,
@@ -393,10 +396,10 @@ impl SDK {
             None => self.setup_session(&manifest_location).await?,
         };
 
-        session
-            .interpreter
-            .clarity_datastore
-            .set_http_client(self.http_client.clone());
+        // session
+        //     .interpreter
+        //     .clarity_datastore
+        //     .set_http_client(self.http_client.clone());
 
         self.deployer = session.interpreter.get_tx_sender().to_string();
 

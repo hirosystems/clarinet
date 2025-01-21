@@ -3,8 +3,7 @@ use std::collections::{btree_map::Entry, BTreeMap, BTreeSet};
 use crate::analysis::annotation::{Annotation, AnnotationKind};
 use crate::analysis::ast_dependency_detector::{ASTDependencyDetector, Dependency};
 use crate::analysis::{self};
-use crate::repl::datastore::ClarityDatastore;
-use crate::repl::datastore::Datastore;
+use crate::repl::datastore::{ClarityDatastore, Datastore};
 use crate::repl::Settings;
 use clarity::consts::CHAIN_ID_TESTNET;
 use clarity::types::StacksEpochId;
@@ -55,6 +54,7 @@ pub struct Txid(pub [u8; 32]);
 impl ClarityInterpreter {
     pub fn new(tx_sender: StandardPrincipalData, repl_settings: Settings) -> Self {
         let remote_data_settings = repl_settings.remote_data.clone();
+
         Self {
             tx_sender,
             repl_settings,
@@ -1211,6 +1211,14 @@ mod tests {
     };
 
     #[track_caller]
+    fn get_interpreter(settings: Option<Settings>) -> ClarityInterpreter {
+        ClarityInterpreter::new(
+            StandardPrincipalData::transient(),
+            settings.unwrap_or_default(),
+        )
+    }
+
+    #[track_caller]
     fn deploy_contract(
         interpreter: &mut ClarityInterpreter,
         contract: &ClarityContract,
@@ -1262,8 +1270,7 @@ mod tests {
 
     #[test]
     fn test_get_tx_sender() {
-        let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let mut interpreter = get_interpreter(None);
         let tx_sender = StandardPrincipalData::transient();
         interpreter.set_tx_sender(tx_sender.clone());
         assert_eq!(interpreter.get_tx_sender(), tx_sender);
@@ -1271,8 +1278,7 @@ mod tests {
 
     #[test]
     fn test_set_tx_sender() {
-        let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let mut interpreter = get_interpreter(None);
 
         let addr = StacksAddress::from_string("ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5").unwrap();
         let tx_sender = StandardPrincipalData::from(addr);
@@ -1282,23 +1288,20 @@ mod tests {
 
     #[test]
     fn test_get_block_time() {
-        let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let mut interpreter = get_interpreter(None);
         let bt = interpreter.get_block_time();
         assert_ne!(bt, 0); // TODO placeholder
     }
 
     #[test]
     fn test_get_block_height() {
-        let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let mut interpreter = get_interpreter(None);
         assert_eq!(interpreter.get_block_height(), 0);
     }
 
     #[test]
     fn test_advance_stacks_chain_tip_pre_epoch_3() {
-        let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let mut interpreter = get_interpreter(None);
         interpreter.set_current_epoch(StacksEpochId::Epoch2_05);
         let count = 5;
         let initial_block_height = interpreter.get_burn_block_height();
@@ -1315,8 +1318,7 @@ mod tests {
             clarity_wasm_mode: true,
             show_timings: false,
         };
-        let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), wasm_settings);
+        let mut interpreter = get_interpreter(Some(wasm_settings));
         interpreter.set_current_epoch(StacksEpochId::Epoch30);
         interpreter.advance_burn_chain_tip(1);
         let count = 5;
@@ -1331,8 +1333,7 @@ mod tests {
 
     #[test]
     fn test_advance_chain_tip_pre_epoch3() {
-        let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let mut interpreter = get_interpreter(None);
         interpreter.set_current_epoch(StacksEpochId::Epoch2_05);
         let count = 5;
         let initial_block_height = interpreter.get_block_height();
@@ -1346,8 +1347,7 @@ mod tests {
 
     #[test]
     fn test_advance_chain_tip() {
-        let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let mut interpreter = get_interpreter(None);
         interpreter.set_current_epoch(StacksEpochId::Epoch30);
         let count = 5;
         let initial_block_height = interpreter.get_block_height();
@@ -1361,8 +1361,7 @@ mod tests {
 
     #[test]
     fn test_get_assets_maps() {
-        let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let mut interpreter = get_interpreter(None);
         let addr = "ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5";
         let amount = 1000;
         interpreter.credit_token(addr.into(), "STX".into(), amount);
@@ -1379,8 +1378,7 @@ mod tests {
 
     #[test]
     fn test_get_tokens() {
-        let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let mut interpreter = get_interpreter(None);
         let addr = "ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5";
         interpreter.credit_token(addr.into(), "STX".into(), 1000);
 
@@ -1390,8 +1388,7 @@ mod tests {
 
     #[test]
     fn test_get_accounts() {
-        let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let mut interpreter = get_interpreter(None);
         let addr = "ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5";
         interpreter.credit_token(addr.into(), "STX".into(), 1000);
 
@@ -1401,8 +1398,7 @@ mod tests {
 
     #[test]
     fn test_get_balance_for_account() {
-        let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let mut interpreter = get_interpreter(None);
 
         let addr = "ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5";
         let amount = 1000;
@@ -1414,8 +1410,7 @@ mod tests {
 
     #[test]
     fn test_credit_any_token() {
-        let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let mut interpreter = get_interpreter(None);
 
         let addr = "ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5";
         let amount = 1000;
@@ -1427,8 +1422,7 @@ mod tests {
 
     #[test]
     fn test_mint_stx_balance() {
-        let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let mut interpreter = get_interpreter(None);
         let recipient = PrincipalData::Standard(StandardPrincipalData::transient());
         let amount = 1000;
 
@@ -1441,8 +1435,7 @@ mod tests {
 
     #[test]
     fn test_run_valid_contract() {
-        let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let mut interpreter = get_interpreter(None);
         let contract = ClarityContract::fixture();
         let result = interpreter.run_interpreter(&contract, None, false, None);
         assert!(result.is_ok());
@@ -1451,8 +1444,7 @@ mod tests {
 
     #[test]
     fn test_run_invalid_contract() {
-        let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let mut interpreter = get_interpreter(None);
 
         let snippet = "(define-public (add) (ok (+ u1 1)))";
         //                                            ^ should be uint
@@ -1467,8 +1459,7 @@ mod tests {
 
     #[test]
     fn test_run_runtime_error() {
-        let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let mut interpreter = get_interpreter(None);
 
         let snippet = "(/ u1 u0)";
         let contract = ClarityContractBuilder::default()
@@ -1494,8 +1485,7 @@ mod tests {
 
     #[test]
     fn test_build_ast() {
-        let interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let interpreter = get_interpreter(None);
         let contract = ClarityContract::fixture();
         let (_ast, diagnostics, success) = interpreter.build_ast(&contract);
         assert!(success);
@@ -1504,8 +1494,7 @@ mod tests {
 
     #[test]
     fn test_execute() {
-        let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let mut interpreter = get_interpreter(None);
 
         let contract = ClarityContract::fixture();
         let result = deploy_contract(&mut interpreter, &contract);
@@ -1521,8 +1510,7 @@ mod tests {
 
     #[test]
     fn test_call_contract_fn() {
-        let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let mut interpreter = get_interpreter(None);
 
         let contract = ClarityContract::fixture();
         let source = contract.expect_in_memory_code_source();
@@ -1546,8 +1534,7 @@ mod tests {
 
     #[test]
     fn test_run_both() {
-        let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let mut interpreter = get_interpreter(None);
 
         let contract = ClarityContract::fixture();
         let _ = deploy_contract(&mut interpreter, &contract);
@@ -1560,8 +1547,7 @@ mod tests {
 
     #[test]
     fn test_get_data_var() {
-        let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let mut interpreter = get_interpreter(None);
         let contract = ClarityContractBuilder::default()
             .code_source(["(define-data-var count uint u9)"].join("\n"))
             .build();
@@ -1583,8 +1569,7 @@ mod tests {
 
     #[test]
     fn test_get_map_entry() {
-        let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let mut interpreter = get_interpreter(None);
         let contract = ClarityContractBuilder::default()
             .code_source(
                 [
@@ -1610,8 +1595,7 @@ mod tests {
 
     #[test]
     fn test_execute_stx_events() {
-        let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let mut interpreter = get_interpreter(None);
         let account = PrincipalData::parse("S1G2081040G2081040G2081040G208105NK8PE5").unwrap();
         let _ = interpreter.mint_stx_balance(account, 100000);
 
@@ -1661,8 +1645,7 @@ mod tests {
 
     #[test]
     fn test_execute_ft_events() {
-        let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let mut interpreter = get_interpreter(None);
 
         let contract = ClarityContractBuilder::default()
             .code_source(
@@ -1707,8 +1690,7 @@ mod tests {
 
     #[test]
     fn test_execute_nft_events() {
-        let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let mut interpreter = get_interpreter(None);
 
         let contract = ClarityContractBuilder::default()
             .code_source(
@@ -1762,8 +1744,7 @@ mod tests {
             clarity_wasm_mode: false,
             ..Default::default()
         };
-        let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), repl_settings);
+        let mut interpreter = get_interpreter(Some(repl_settings));
 
         let boot_contracts_data = BOOT_CONTRACTS_DATA.clone();
 
@@ -1781,8 +1762,7 @@ mod tests {
 
     #[test]
     fn block_height_support_in_clarity2_epoch2() {
-        let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let mut interpreter = get_interpreter(None);
 
         let snippet = [
             "(define-read-only (get-height)",
@@ -1851,8 +1831,7 @@ mod tests {
 
     #[test]
     fn block_height_support_in_clarity2_epoch3() {
-        let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let mut interpreter = get_interpreter(None);
 
         interpreter.advance_burn_chain_tip(1);
 
@@ -1904,8 +1883,7 @@ mod tests {
 
     #[test]
     fn block_height_support_in_clarity3_epoch3() {
-        let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let mut interpreter = get_interpreter(None);
 
         interpreter.advance_burn_chain_tip(1);
 
@@ -1993,8 +1971,7 @@ mod tests {
 
     #[test]
     fn burn_block_time_is_realistic_in_epoch_3_0() {
-        let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let mut interpreter = get_interpreter(None);
 
         interpreter.set_current_epoch(StacksEpochId::Epoch30);
         interpreter.advance_burn_chain_tip(3);
@@ -2023,8 +2000,7 @@ mod tests {
 
     #[test]
     fn first_stacks_block_time_in_a_tenure() {
-        let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let mut interpreter = get_interpreter(None);
 
         interpreter.set_current_epoch(StacksEpochId::Epoch30);
         let _ = interpreter.advance_burn_chain_tip(2);
@@ -2053,8 +2029,7 @@ mod tests {
 
     #[test]
     fn stacks_block_time_is_realistic_in_epoch_3_0() {
-        let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let mut interpreter = get_interpreter(None);
 
         interpreter.set_current_epoch(StacksEpochId::Epoch30);
         let _ = interpreter.advance_stacks_chain_tip(3);
@@ -2083,8 +2058,7 @@ mod tests {
 
     #[test]
     fn burn_block_time_after_many_stacks_blocks_is_realistic_in_epoch_3_0() {
-        let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let mut interpreter = get_interpreter(None);
 
         interpreter.set_current_epoch(StacksEpochId::Epoch30);
         // by advancing stacks_chain_tip by 101, we are getting a tenure of more than 600 seconds
@@ -2141,8 +2115,7 @@ mod tests {
 
     #[test]
     fn can_call_a_public_function() {
-        let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let mut interpreter = get_interpreter(None);
 
         let contract = ClarityContractBuilder::default()
             .code_source("(define-public (public-func) (ok true))".into())
@@ -2172,8 +2145,7 @@ mod tests {
 
     #[test]
     fn can_call_a_private_function() {
-        let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let mut interpreter = get_interpreter(None);
 
         let contract = ClarityContractBuilder::default()
             .code_source("(define-private (private-func) true)".into())
@@ -2203,8 +2175,7 @@ mod tests {
 
     #[test]
     fn can_not_call_a_private_function_without_allow_private() {
-        let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let mut interpreter = get_interpreter(None);
 
         let contract = ClarityContractBuilder::default()
             .code_source("(define-private (private-func) true)".into())
