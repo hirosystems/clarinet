@@ -104,6 +104,7 @@ where
         _ => None,
     }
 }
+
 pub fn format_source_exprs(
     settings: &Settings,
     expressions: &[PreSymbolicExpression],
@@ -136,12 +137,12 @@ pub fn format_source_exprs(
                         NativeFunctions::Match => {
                             format_match(settings, list, previous_indentation)
                         }
-                        NativeFunctions::IndexOf
-                        | NativeFunctions::IndexOfAlias
-                        | NativeFunctions::Asserts
-                        | NativeFunctions::ContractCall => {
-                            format_general(settings, list, previous_indentation)
-                        }
+                        // NativeFunctions::IndexOf
+                        // | NativeFunctions::IndexOfAlias
+                        // | NativeFunctions::Asserts
+                        // | NativeFunctions::ContractCall => {
+                        //     format_general(settings, list, previous_indentation)
+                        // }
                         NativeFunctions::TupleCons => {
                             // if the kv map is defined with (tuple (c 1)) then we strip the
                             // ClarityName("tuple") out first and convert it to key/value syntax
@@ -159,23 +160,8 @@ pub fn format_source_exprs(
                             // Since we do expr.match_list() up above we only have the contents
                             // We should ideally be able to format!("{}", format_source_exprs(.., &[expr.clone()]))
                             // but that stack overflows so we manually print out the inner contents
-                            let inner_content = list
-                                .iter()
-                                .enumerate()
-                                .map(|(i, expr)| {
-                                    let formatted = format_source_exprs(
-                                        settings,
-                                        &[expr.clone()],
-                                        previous_indentation,
-                                    );
-                                    if i < list.len() - 1 {
-                                        // Add space after each element except the last
-                                        format!("{} ", t(&formatted))
-                                    } else {
-                                        t(&formatted).to_string()
-                                    }
-                                })
-                                .collect::<String>();
+                            let inner_content =
+                                to_inner_content(list, settings, previous_indentation);
 
                             format!(
                                 "({}){}",
@@ -216,23 +202,7 @@ pub fn format_source_exprs(
                         _ => format_source_exprs(settings, &[expr.clone()], previous_indentation),
                     }
                 } else {
-                    let inner_content = list
-                        .iter()
-                        .enumerate()
-                        .map(|(i, expr)| {
-                            let formatted = format_source_exprs(
-                                settings,
-                                &[expr.clone()],
-                                previous_indentation,
-                            );
-                            if i < list.len() - 1 {
-                                // Add space after each element except the last
-                                format!("{} ", t(&formatted))
-                            } else {
-                                t(&formatted).to_string()
-                            }
-                        })
-                        .collect::<String>();
+                    let inner_content = to_inner_content(list, settings, previous_indentation);
                     format!("({})", inner_content)
                 };
                 result.push_str(t(&formatted));
@@ -326,26 +296,32 @@ fn is_same_line(expr1: &PreSymbolicExpression, expr2: &PreSymbolicExpression) ->
     expr1.span().start_line == expr2.span().start_line
 }
 
+fn width(exprs: &[PreSymbolicExpression]) -> usize {
+    match exprs.last() {
+        Some(expr) => expr.span().end_column as usize,
+        None => 0,
+    }
+}
 // this is probably un-needed but was getting some weird artifacts for code like
 // (something (1 2 3) true) would be formatted as (something (1 2 3)true)
-fn format_general(
-    settings: &Settings,
-    exprs: &[PreSymbolicExpression],
-    previous_indentation: &str,
-) -> String {
-    let func_type = display_pse(settings, exprs.first().unwrap(), "");
-    let mut acc = format!("({func_type}");
-    acc.push(' ');
-    for (i, arg) in exprs[1..].iter().enumerate() {
-        acc.push_str(&format!(
-            "{}{}",
-            format_source_exprs(settings, &[arg.clone()], previous_indentation),
-            if i < exprs.len() - 2 { " " } else { "" }
-        ))
-    }
-    acc.push(')');
-    acc.to_owned()
-}
+// fn format_general(
+//     settings: &Settings,
+//     exprs: &[PreSymbolicExpression],
+//     previous_indentation: &str,
+// ) -> String {
+//     let func_type = display_pse(settings, exprs.first().unwrap(), "");
+//     let mut acc = format!("({func_type}");
+//     acc.push(' ');
+//     for (i, arg) in exprs[1..].iter().enumerate() {
+//         acc.push_str(&format!(
+//             "{}{}",
+//             format_source_exprs(settings, &[arg.clone()], previous_indentation),
+//             if i < exprs.len() - 2 { " " } else { "" }
+//         ))
+//     }
+//     acc.push(')');
+//     acc.to_owned()
+// }
 // *begin* never on one line
 fn format_begin(
     settings: &Settings,
@@ -444,8 +420,10 @@ fn format_if(
     let mut index = 0;
 
     // if the 'if' statement doesn't start at the current indentation level, we
-    // add an extra indent to the body
-    let is_nested = opening.span().start_column as usize != previous_indentation.len();
+    // add an extra indent to the body.
+    // we add 2 to the previous indent comparison to account for spans starting
+    // at 1 and the leading '('
+    let is_nested = opening.span().start_column as usize != previous_indentation.len() + 2;
 
     while let Some(expr) = iter.next() {
         let trailing = get_trailing_comment(expr, &mut iter);
@@ -768,7 +746,6 @@ fn format_function(settings: &Settings, exprs: &[PreSymbolicExpression]) -> Stri
     }
 
     // function body expressions
-    // TODO this should account for comments
     for expr in exprs.get(2..).unwrap_or_default() {
         acc.push_str(&format!(
             "\n{}{}",
@@ -778,6 +755,47 @@ fn format_function(settings: &Settings, exprs: &[PreSymbolicExpression]) -> Stri
     }
     acc.push_str("\n)\n\n");
     acc.to_owned()
+}
+
+fn to_inner_content(
+    list: &[PreSymbolicExpression],
+    settings: &Settings,
+    previous_indentation: &str,
+) -> String {
+    let mut result = String::new();
+    let mut current_line_width = previous_indentation.len();
+    let mut first_on_line = true;
+    let base_indent = format!(
+        "{}{}",
+        previous_indentation,
+        settings.indentation.to_string()
+    );
+
+    for expr in list.iter() {
+        let formatted = format_source_exprs(settings, &[expr.clone()], &base_indent);
+        let trimmed = t(&formatted);
+        let expr_width = trimmed.len();
+
+        if !first_on_line {
+            // For subexpressions that would exceed line length, add newline with increased indent
+            if current_line_width + expr_width + 1 > 80 {
+                result.push('\n');
+                result.push_str(&base_indent);
+                current_line_width = base_indent.len() + settings.indentation.to_string().len();
+            } else {
+                result.push(' ');
+                current_line_width += 1;
+            }
+        }
+
+        result.push_str(trimmed);
+        current_line_width += expr_width;
+        first_on_line = false;
+    }
+
+    // TODO need closing newline handling here
+
+    result
 }
 
 #[cfg(test)]
@@ -929,8 +947,20 @@ mod tests_formatter {
     fn long_line_unwrapping() {
         let src = "(try! (unwrap! (complete-deposit-wrapper (get txid deposit) (get vout-index deposit) (get amount deposit) (get recipient deposit) (get burn-hash deposit) (get burn-height deposit) (get sweep-txid deposit)) (err (+ ERR_DEPOSIT_INDEX_PREFIX (+ u10 index)))))";
         let result = format_with_default(&String::from(src));
-        let expected = "(try! (unwrap! (complete-deposit-wrapper\n  (get txid deposit)\n  (get vout-index deposit)\n  (get amount deposit)\n  (get recipient deposit)\n  (get burn-hash deposit)\n  (get burn-height deposit)\n  (get sweep-txid deposit)\n  ) (err (+ ERR_DEPOSIT_INDEX_PREFIX (+ u10 index)))))";
+        let expected = r#"(try!
+  (unwrap!
+    (complete-deposit-wrapper (get txid deposit) (get vout-index deposit)
+      (get amount deposit) (get recipient deposit) (get burn-hash deposit)
+      (get burn-height deposit) (get sweep-txid deposit))
+    (err (+ ERR_DEPOSIT_INDEX_PREFIX (+ u10 index)))
+  )
+)"#;
         assert_eq!(expected, result);
+
+        // non-max-length sanity case
+        let src = "(try! (unwrap! (something) (err SOME_ERR)))";
+        let result = format_with_default(&String::from(src));
+        assert_eq!(src, result);
     }
 
     #[test]
@@ -1076,7 +1106,7 @@ mod tests_formatter {
 
     #[test]
     fn test_if() {
-        let src = "  (if (<= amount max-supply) (list ) (something amount))";
+        let src = "(if (<= amount max-supply) (list ) (something amount))";
         let result = format_with_default(&String::from(src));
         let expected = "(if (<= amount max-supply)\n  (list)\n  (something amount)\n)";
         assert_eq!(result, expected);
@@ -1110,7 +1140,7 @@ mod tests_formatter {
     // logic
     #[test]
     fn spacing_for_inner_expr() {
-        let src = "(no-to-treasury (- (/ balance-sender one-8) (/ (- balance-sender amount-or-id) one-8)))";
+        let src = "(something (- (/ b o) (/ (- balance-sender a) o)))";
         let result = format_with_default(src);
         assert_eq!(src, result)
     }
@@ -1119,9 +1149,9 @@ mod tests_formatter {
         let src = "(something (if (true) (list) (list 1 2 3)))";
         let result = format_with_default(src);
         let expected = r#"(something (if (true)
-    (list)
-    (list 1 2 3)
-  )
+      (list)
+      (list 1 2 3)
+    )
 )"#;
         assert_eq!(expected, result)
     }
