@@ -1522,7 +1522,7 @@ mod tests {
             result.split('\n').next().unwrap(),
             format!(
                 "encode:1:1: {} use of unresolved function 'foo'",
-                "error:".red()
+                "error:".bold().red()
             )
         );
     }
