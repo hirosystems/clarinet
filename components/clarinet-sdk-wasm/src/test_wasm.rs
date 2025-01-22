@@ -1,6 +1,13 @@
 use super::core::DeployContractArgs;
+
 use crate::core::{CallFnArgs, ContractOptions, EpochString, TransactionRes, SDK};
+
 use clarity::vm::Value as ClarityValue;
+use clarity_repl::{
+    repl::settings::{ApiUrl, RemoteDataSettings},
+    uprint,
+};
+use gloo_utils::format::JsValueSerdeExt;
 use js_sys::Function as JsFunction;
 use wasm_bindgen::JsValue;
 use wasm_bindgen_test::*;
@@ -63,18 +70,28 @@ async fn it_can_call_a_private_function() {
     assert_eq!(tx.result, expected);
 }
 
-// #[wasm_bindgen_test]
-// async fn it_can_call_remote_data() {
-//     let mut sdk = init_sdk().await;
-//     let _ = deploy_basic_contract(&mut sdk);
-//     let tx = sdk
-//         .call_private_fn(&CallFnArgs::new(
-//             "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.basic-contract".into(),
-//             "two".into(),
-//             vec![],
-//             "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM".into(),
-//         ))
-//         .unwrap();
-//     let expected = format!("0x{}", ClarityValue::UInt(2).serialize_to_hex().unwrap());
-//     assert_eq!(tx.result, expected);
-// }
+#[wasm_bindgen_test]
+async fn it_can_call_remote_data() {
+    let js_noop = JsFunction::new_no_args("return");
+    let mut sdk = SDK::new(js_noop, None);
+    let options = RemoteDataSettings {
+        enabled: true,
+        api_url: ApiUrl("https://api.testnet.hiro.so".to_string()),
+        initial_height: Some(42000),
+    };
+    let _ = sdk
+        .init_empty_session(JsValue::from_serde(&options).unwrap())
+        .await;
+    sdk.set_epoch(EpochString::new("3.0"));
+
+    let tx = sdk.call_public_fn(&CallFnArgs::new(
+        "STJCAB2T9TR2EJM7YS4DM2CGBBVTF7BV237Y8KNV.counter".into(),
+        "get-count".into(),
+        vec![],
+        "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM".into(),
+    ));
+
+    uprint!("tx: {:?}", tx);
+
+    // let expected = format!("0x{}", ClarityValue::UInt(0).serialize_to_hex().unwrap());
+}

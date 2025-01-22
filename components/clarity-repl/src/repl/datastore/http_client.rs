@@ -82,7 +82,6 @@ impl HttpClient {
     #[cfg(not(target_arch = "wasm32"))]
     fn get<T: DeserializeOwned>(&self, path: &str) -> Option<T> {
         let url = format!("{}{}", self.url, path);
-        println!("fetching data from: {}", url);
         match reqwest::blocking::get(&url) {
             Ok(response) => response.json::<T>().ok(),
             Err(_) => None,
@@ -91,7 +90,6 @@ impl HttpClient {
 
     #[cfg(target_arch = "wasm32")]
     fn get<T: DeserializeOwned>(&self, path: &str) -> Option<T> {
-        uprint!("fetching data from: {}", path);
         let url = JsString::from(format!("{}{}", self.url, path));
         let response = http_client(&JsString::from("GET"), &url);
         let bytes = response.to_vec();
@@ -100,7 +98,6 @@ impl HttpClient {
     }
 
     fn fetch_data<T: DeserializeOwned>(&self, path: &str) -> InterpreterResult<Option<T>> {
-        uprint!("fetching data from: {}", path);
         Ok(self.get::<T>(path))
     }
 

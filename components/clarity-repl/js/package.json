@@ -7,6 +7,6 @@
   "license": "GPL-3.0",
   "readme": "./README.md",
   "dependencies": {
-    "sync-request": "^6.1.0"
+    "sync-request": "6.1.0"
   }
 }

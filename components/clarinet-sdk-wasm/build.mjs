@@ -8,9 +8,17 @@ import path from "node:path";
 const rootDir = new URL(".", import.meta.url).pathname;
 
 /**
- * build
+ * build sdk js script
  */
-async function build() {
+async function build_wasm_js_scripts() {
+  const dir = path.join(rootDir, "../clarity-repl/js");
+  await execCommand("npm", ["install"], dir);
+}
+
+/**
+ * build clarinet-sdk-wasm
+ */
+async function build_wasm_sdk() {
   console.log("Deleting pkg-node");
   await rmIfExists(path.join(rootDir, "pkg-node"));
   console.log("Deleting pkg-browser");
@@ -40,6 +48,8 @@ async function build() {
   ]);
 
   await updatePackageName();
+  await updatePackageJson("pkg-node/package.json");
+  await updatePackageJson("pkg-browser/package.json");
 }
 
 /**
@@ -48,11 +58,10 @@ async function build() {
  * @param {string[]} args
  * @returns
  */
-export const execCommand = async (command, args) => {
-  console.log(`Building ${args[5]}`);
+export const execCommand = async (command, args, cwd = rootDir) => {
   return new Promise((resolve, reject) => {
     const childProcess = spawn(command, args, {
-      cwd: rootDir,
+      cwd,
     });
     childProcess.stdout.on("data", (data) => {
       process.stdout.write(data.toString());
@@ -99,11 +108,28 @@ async function updatePackageName() {
     '"name": "@hirosystems/clarinet-sdk-wasm-browser"',
   );
   await fs.writeFile(filePath, updatedData, "utf-8");
-  console.log("✅ Package name updated successfully.");
+  console.log("✅ pkg-browser/package.json name updated");
+}
+
+/**
+ * updatePackagesIncludedFiles
+ * Include snippets/ files and add the sync-request dependency
+ * @param {string} path
+ */
+async function updatePackageJson(file) {
+  const filePath = path.join(rootDir, file);
+
+  const fileData = JSON.parse(await fs.readFile(filePath, "utf-8"));
+  fileData.files.push("snippets/");
+
+  fileData.dependencies = { "sync-request": "6.1.0" };
+  await fs.writeFile(filePath, JSON.stringify(fileData, null, 2), "utf-8");
+  console.log(`✅ ${file} updated`);
 }
 
 try {
-  await build();
+  await build_wasm_js_scripts();
+  await build_wasm_sdk();
   console.log("\n✅ Project successfully built.\n🚀 Ready to publish.");
   console.log("Run the following commands to publish");
   console.log("\n```");
