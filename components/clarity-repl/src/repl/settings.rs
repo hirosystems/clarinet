@@ -2,11 +2,14 @@ use std::convert::TryInto;
 use std::fmt;
 use std::str::FromStr;
 
+use clarity::consts::NETWORK_ID_MAINNET;
 use clarity::types::chainstate::StacksAddress;
 use clarity::types::StacksEpochId;
 use clarity::vm::types::{PrincipalData, QualifiedContractIdentifier, StandardPrincipalData};
 
 use crate::analysis;
+
+use super::datastore::http_client::HttpClient;
 
 #[derive(Clone, Debug)]
 pub struct InitialContract {
@@ -56,7 +59,7 @@ pub struct SessionSettings {
 pub struct ApiUrl(pub String);
 impl Default for ApiUrl {
     fn default() -> Self {
-        ApiUrl("http://api.hiro.so".to_string())
+        ApiUrl("https://api.hiro.so".to_string())
     }
 }
 
@@ -125,6 +128,15 @@ pub struct RemoteDataSettings {
     pub initial_height: Option<u32>,
 }
 
+#[derive(Debug, Default, Clone, Deserialize, Serialize)]
+pub struct InitialRemoteData {
+    pub api_url: ApiUrl,
+    pub initial_height: u32,
+    pub network_id: u32,
+    pub stacks_tip_height: u32,
+    pub is_mainnet: bool,
+}
+
 impl From<RemoteDataSettingsFile> for RemoteDataSettings {
     fn from(file: RemoteDataSettingsFile) -> Self {
         Self {
@@ -132,5 +144,34 @@ impl From<RemoteDataSettingsFile> for RemoteDataSettings {
             api_url: file.api_url.unwrap_or_default(),
             initial_height: file.initial_height,
         }
+    }
+}
+
+impl RemoteDataSettings {
+    pub fn get_initial_remote_data(
+        &self,
+        client: &HttpClient,
+    ) -> Result<InitialRemoteData, String> {
+        let info = client.fetch_info();
+
+        let initial_height = match self.initial_height {
+            Some(initial_height) => {
+                if initial_height > info.stacks_tip_height {
+                    return Err("Initial height is greater than the current tip height".to_string());
+                }
+                initial_height
+            }
+            None => info.stacks_tip_height,
+        };
+
+        let initial_remote_data = InitialRemoteData {
+            api_url: self.api_url.clone(),
+            initial_height,
+            network_id: info.network_id,
+            stacks_tip_height: info.stacks_tip_height,
+            is_mainnet: info.network_id == NETWORK_ID_MAINNET,
+        };
+
+        Ok(initial_remote_data)
     }
 }

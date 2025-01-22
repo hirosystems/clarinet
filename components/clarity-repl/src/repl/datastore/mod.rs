@@ -17,7 +17,7 @@ use pox_locking::handle_contract_call_special_cases;
 use sha2::{Digest, Sha512_256};
 
 use super::interpreter::BLOCK_LIMIT_MAINNET;
-use super::settings::{ApiUrl, RemoteDataSettings};
+use super::settings::{ApiUrl, InitialRemoteData};
 
 pub mod http_client;
 
@@ -51,7 +51,7 @@ pub struct ClarityDatastore {
     metadata: HashMap<(String, String), String>,
     height_at_chain_tip: HashMap<StacksBlockId, u32>,
 
-    remote_data_settings: RemoteDataSettings,
+    initial_remote_data: Option<InitialRemoteData>,
     remote_block_info_cache: HashMap<u32, ParsedBlock>,
 
     client: HttpClient,
@@ -127,14 +127,14 @@ fn height_to_burn_block_header_hash(height: u32) -> BurnchainHeaderHash {
 impl Default for ClarityDatastore {
     fn default() -> Self {
         let client = HttpClient::new(ApiUrl("https://api.tesnet.hiro.so".to_string()));
-        Self::new(RemoteDataSettings::default(), client)
+        Self::new(None, client)
     }
 }
 
 impl ClarityDatastore {
-    pub fn new(remote_data_settings: RemoteDataSettings, client: HttpClient) -> Self {
-        if remote_data_settings.enabled {
-            return Self::new_with_remote_data(remote_data_settings, client);
+    pub fn new(initial_remote_data: Option<InitialRemoteData>, client: HttpClient) -> Self {
+        if let Some(initial_remote_data) = initial_remote_data {
+            return Self::new_with_remote_data(initial_remote_data, client);
         }
 
         let block_height = 0;
@@ -147,15 +147,15 @@ impl ClarityDatastore {
             metadata: HashMap::new(),
             height_at_chain_tip: HashMap::from([(id, block_height)]),
 
-            remote_data_settings,
+            initial_remote_data: None,
             remote_block_info_cache: HashMap::new(),
 
             client,
         }
     }
 
-    fn new_with_remote_data(remote_data_settings: RemoteDataSettings, client: HttpClient) -> Self {
-        let height = remote_data_settings.initial_height.unwrap_or(0);
+    fn new_with_remote_data(initial_remote_data: InitialRemoteData, client: HttpClient) -> Self {
+        let height = initial_remote_data.initial_height;
         let path = format!("/extended/v2/blocks/{}", height);
         let block = client.fetch_block(&path);
         let cache = HashMap::from([(block.height, block.clone())]);
@@ -169,7 +169,7 @@ impl ClarityDatastore {
             metadata: HashMap::new(),
             height_at_chain_tip: HashMap::from([(id, height)]),
 
-            remote_data_settings,
+            initial_remote_data: Some(initial_remote_data),
             remote_block_info_cache: cache,
 
             client,
@@ -281,9 +281,8 @@ impl ClarityDatastore {
     }
 
     fn get_remote_chaintip(&mut self) -> String {
-        let height = self
-            .get_current_block_height()
-            .min(self.remote_data_settings.initial_height.unwrap());
+        let initial_height = self.initial_remote_data.as_ref().unwrap().initial_height;
+        let height = self.get_current_block_height().min(initial_height);
         println!("get_remote_chaintip: {}", height);
         let block_info = self.get_remote_block_info_from_height(height);
         block_info.index_block_hash.to_string()
@@ -325,7 +324,7 @@ impl ClarityBackingStore for ClarityDatastore {
     /// fetch K-V out of the committed datastore
     fn get_data(&mut self, key: &str) -> Result<Option<String>> {
         if let Some(data) = self.store.get(key) {
-            if self.remote_data_settings.enabled && self.current_chain_tip != self.open_chain_tip {
+            if self.initial_remote_data.is_some() && self.current_chain_tip != self.open_chain_tip {
                 let data = self.fetch_clarity_marf_value(key);
                 if let Ok(Some(value)) = &data {
                     self.put(key, value);
@@ -334,7 +333,7 @@ impl ClarityBackingStore for ClarityDatastore {
             }
             return Ok(self.get_latest_data(data));
         }
-        if self.remote_data_settings.enabled {
+        if self.initial_remote_data.is_some() {
             let data = self.fetch_clarity_marf_value(key);
             if let Ok(Some(value)) = &data {
                 self.put(key, value);
@@ -374,11 +373,11 @@ impl ClarityBackingStore for ClarityDatastore {
 
     fn get_block_at_height(&mut self, height: u32) -> Option<StacksBlockId> {
         println!("calling get_block_at_height");
-        if self.remote_data_settings.enabled
-            && height <= self.remote_data_settings.initial_height.unwrap()
-        {
-            let block_info = self.get_remote_block_info_from_height(height);
-            return Some(block_info.index_block_hash);
+        if let Some(initial_remote_data) = &self.initial_remote_data {
+            if height <= initial_remote_data.initial_height {
+                let block_info = self.get_remote_block_info_from_height(height);
+                return Some(block_info.index_block_hash);
+            }
         }
         Some(height_to_id(height))
     }
@@ -390,10 +389,12 @@ impl ClarityBackingStore for ClarityDatastore {
         if let Some(height) = self.height_at_chain_tip.get(&self.current_chain_tip) {
             return *height;
         }
-        if self.remote_data_settings.enabled {
+
+        // @todo: remove clone?
+        if let Some(initial_remote_data) = self.initial_remote_data.clone() {
             let hash = self.current_chain_tip;
             let block_info = self.get_remote_block_info_from_hash(&hash);
-            if block_info.height <= self.remote_data_settings.initial_height.unwrap() {
+            if block_info.height <= initial_remote_data.initial_height {
                 return block_info.height;
             }
         }
@@ -440,7 +441,7 @@ impl ClarityBackingStore for ClarityDatastore {
         if metadata.is_some() {
             return Ok(metadata.cloned());
         }
-        if self.remote_data_settings.enabled {
+        if self.initial_remote_data.is_some() {
             let data = self.fetch_clarity_metadata(contract, key);
             if let Ok(Some(value)) = &data {
                 let _ = self.insert_metadata(contract, key, value);
@@ -490,7 +491,7 @@ impl ClarityBackingStore for ClarityDatastore {
 
 impl Datastore {
     pub fn new(clarity_datastore: &ClarityDatastore, constants: StacksConstants) -> Self {
-        if clarity_datastore.remote_data_settings.enabled {
+        if clarity_datastore.initial_remote_data.is_some() {
             return Self::new_with_remote_data(clarity_datastore, constants);
         }
 
@@ -552,32 +553,30 @@ impl Datastore {
             .unwrap();
 
         let burn_block_height = block.burn_block_height;
-
         let id = block.index_block_hash;
+        let burn_block_header_hash = block.burn_block_hash;
+
         let bytes = height_to_hashed_bytes(*block_height);
         let sortition_id = SortitionId(bytes);
-        let genesis_time = chrono::Utc::now().timestamp() as u64;
 
-        let first_burn_block_header_hash = height_to_burn_block_header_hash(burn_block_height);
-
-        let genesis_burn_block = BurnBlockInfo {
-            burn_block_time: genesis_time,
+        let burn_block = BurnBlockInfo {
+            burn_block_time: block.burn_block_time,
             burn_block_height,
         };
 
-        let genesis_block = StacksBlockInfo {
+        let stacks_block = StacksBlockInfo {
             block_header_hash: BlockHeaderHash(bytes),
-            burn_block_header_hash: first_burn_block_header_hash,
+            burn_block_header_hash,
             consensus_hash: ConsensusHash::from_bytes(&bytes[0..20]).unwrap(),
             vrf_seed: VRFSeed(bytes),
-            stacks_block_time: genesis_time + SECONDS_BETWEEN_STACKS_BLOCKS,
+            stacks_block_time: block.block_time,
         };
 
         let sortition_lookup = HashMap::from([(sortition_id, id)]);
-        let consensus_hash_lookup = HashMap::from([(genesis_block.consensus_hash, sortition_id)]);
+        let consensus_hash_lookup = HashMap::from([(stacks_block.consensus_hash, sortition_id)]);
         let tenure_blocks_height = HashMap::from([(1, 1)]);
-        let burn_blocks = HashMap::from([(first_burn_block_header_hash, genesis_burn_block)]);
-        let stacks_blocks = HashMap::from([(id, genesis_block)]);
+        let burn_blocks = HashMap::from([(burn_block_header_hash, burn_block)]);
+        let stacks_blocks = HashMap::from([(id, stacks_block)]);
 
         Datastore {
             genesis_id: id,
@@ -989,6 +988,8 @@ impl BurnStateDB for Datastore {
 mod tests {
     use clarity::types::StacksEpoch;
 
+    use crate::repl::settings::RemoteDataSettings;
+
     use super::*;
 
     // impl Default for Datastore {
@@ -1003,10 +1004,9 @@ mod tests {
     // }
 
     fn get_datastores() -> (ClarityDatastore, Datastore) {
-        let settings = RemoteDataSettings::default();
         let client = HttpClient::new(ApiUrl("https://api.tesnet.hiro.so".to_string()));
         let constants = StacksConstants::default();
-        let clarity_datastore = ClarityDatastore::new(settings, client);
+        let clarity_datastore = ClarityDatastore::new(None, client);
         let datastore = Datastore::new(&clarity_datastore, constants);
         (clarity_datastore, datastore)
     }

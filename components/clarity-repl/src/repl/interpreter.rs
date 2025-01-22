@@ -58,7 +58,17 @@ impl ClarityInterpreter {
         let remote_data_settings = repl_settings.remote_data.clone();
 
         let client = HttpClient::new(ApiUrl(remote_data_settings.api_url.to_string()));
-        let clarity_datastore = ClarityDatastore::new(remote_data_settings.clone(), client);
+        let initial_remote_data = if remote_data_settings.enabled {
+            Some(
+                remote_data_settings
+                    .get_initial_remote_data(&client)
+                    .unwrap(),
+            )
+        } else {
+            None
+        };
+
+        let clarity_datastore = ClarityDatastore::new(initial_remote_data, client);
         let datastore = Datastore::new(&clarity_datastore, StacksConstants::default());
 
         Self {

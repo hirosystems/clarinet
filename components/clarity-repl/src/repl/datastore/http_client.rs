@@ -24,6 +24,13 @@ pub struct ClarityDataResponse {
 }
 
 #[derive(Clone, Debug, Deserialize)]
+#[allow(dead_code)]
+pub struct Info {
+    pub network_id: u32,
+    pub stacks_tip_height: u32,
+}
+
+#[derive(Clone, Debug, Deserialize)]
 pub struct Block {
     pub height: u32,
     pub burn_block_height: u32,
@@ -99,6 +106,16 @@ impl HttpClient {
 
     fn fetch_data<T: DeserializeOwned>(&self, path: &str) -> InterpreterResult<Option<T>> {
         Ok(self.get::<T>(path))
+    }
+
+    pub fn fetch_info(&self) -> Info {
+        self.fetch_data::<Info>("/v2/info")
+            .unwrap_or_else(|e| {
+                panic!("unable to parse json, error: {}", e);
+            })
+            .unwrap_or_else(|| {
+                panic!("unable to get remote info");
+            })
     }
 
     pub fn fetch_block(&self, url: &str) -> ParsedBlock {
