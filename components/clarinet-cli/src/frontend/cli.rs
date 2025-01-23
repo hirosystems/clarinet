@@ -1124,7 +1124,8 @@ pub fn main() {
             }
         }
         Command::Check(cmd) => {
-            let manifest = load_manifest_or_exit(cmd.manifest_path);
+            let mut manifest = load_manifest_or_exit(cmd.manifest_path);
+            manifest.repl_settings.remote_data.enabled = false;
             let (deployment, _, artifacts) = load_deployment_and_artifacts_or_exit(
                 &manifest,
                 &cmd.deployment_plan_path,

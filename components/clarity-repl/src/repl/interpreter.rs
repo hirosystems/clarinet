@@ -27,8 +27,8 @@ use clarity::vm::{events::*, ClarityVersion};
 use clarity::vm::{ContractEvaluationResult, EvalHook};
 use clarity::vm::{CostSynthesis, ExecutionResult, ParsedContract};
 
-use super::datastore::http_client::HttpClient;
 use super::datastore::StacksConstants;
+use super::remote_data::HttpClient;
 use super::settings::ApiUrl;
 use super::{ClarityContract, DEFAULT_EPOCH};
 

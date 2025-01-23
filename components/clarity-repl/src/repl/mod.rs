@@ -3,6 +3,7 @@ pub mod clarity_values;
 pub mod datastore;
 pub mod diagnostic;
 pub mod interpreter;
+pub mod remote_data;
 pub mod session;
 pub mod settings;
 pub mod tracer;

@@ -614,6 +614,7 @@ impl SDK {
 
     #[wasm_bindgen(js_name=setEpoch)]
     pub fn set_epoch(&mut self, epoch: EpochString) {
+        // @todo: unwrap to default epoch?? DEFAULT_EPOCH.to_string()
         let epoch = epoch.as_string().unwrap_or("2.4".into());
         let epoch = match epoch.as_str() {
             "2.0" => StacksEpochId::Epoch20,

@@ -1,5 +1,8 @@
 use clarity::{
-    types::chainstate::{BlockHeaderHash, BurnchainHeaderHash, StacksBlockId},
+    types::{
+        chainstate::{BlockHeaderHash, BurnchainHeaderHash, StacksBlockId},
+        StacksEpochId,
+    },
     vm::errors::InterpreterResult,
 };
 use serde::de::DeserializeOwned;
@@ -17,6 +20,79 @@ extern "C" {
 }
 
 use crate::repl::settings::ApiUrl;
+
+pub const MAINNET_20_START_HEIGHT: u32 = 1;
+pub const MAINNET_2_05_START_HEIGHT: u32 = 40_607;
+pub const MAINNET_21_START_HEIGHT: u32 = 99_113;
+pub const MAINNET_22_START_HEIGHT: u32 = 103_900;
+pub const MAINNET_23_START_HEIGHT: u32 = 104_359;
+pub const MAINNET_24_START_HEIGHT: u32 = 107_055;
+pub const MAINNET_25_START_HEIGHT: u32 = 147_290;
+pub const MAINNET_30_START_HEIGHT: u32 = 171_833;
+pub const MAINNET_31_START_HEIGHT: u32 = 340_555;
+
+// the current primary testnet starts directly in epoch 2.5 (pox-4 deployment)
+pub const TESTNET_20_START_HEIGHT: u32 = 1;
+pub const TESTNET_2_05_START_HEIGHT: u32 = 1;
+pub const TESTNET_21_START_HEIGHT: u32 = 1;
+pub const TESTNET_22_START_HEIGHT: u32 = 1;
+pub const TESTNET_23_START_HEIGHT: u32 = 1;
+pub const TESTNET_24_START_HEIGHT: u32 = 1;
+pub const TESTNET_25_START_HEIGHT: u32 = 1;
+pub const TESTNET_30_START_HEIGHT: u32 = 320;
+pub const TESTNET_31_START_HEIGHT: u32 = 814;
+
+pub fn epoch_for_height(is_mainnet: bool, height: u32) -> StacksEpochId {
+    if is_mainnet {
+        epoch_for_mainnet_height(height)
+    } else {
+        epoch_for_testnet_height(height)
+    }
+}
+
+fn epoch_for_mainnet_height(height: u32) -> StacksEpochId {
+    if height < MAINNET_2_05_START_HEIGHT {
+        StacksEpochId::Epoch20
+    } else if height < MAINNET_21_START_HEIGHT {
+        StacksEpochId::Epoch2_05
+    } else if height < MAINNET_22_START_HEIGHT {
+        StacksEpochId::Epoch21
+    } else if height < MAINNET_23_START_HEIGHT {
+        StacksEpochId::Epoch22
+    } else if height < MAINNET_24_START_HEIGHT {
+        StacksEpochId::Epoch23
+    } else if height < MAINNET_25_START_HEIGHT {
+        StacksEpochId::Epoch24
+    } else if height < MAINNET_30_START_HEIGHT {
+        StacksEpochId::Epoch25
+    } else if height < MAINNET_31_START_HEIGHT {
+        StacksEpochId::Epoch30
+    } else {
+        StacksEpochId::Epoch31
+    }
+}
+
+fn epoch_for_testnet_height(height: u32) -> StacksEpochId {
+    if height < TESTNET_2_05_START_HEIGHT {
+        StacksEpochId::Epoch20
+    } else if height < TESTNET_21_START_HEIGHT {
+        StacksEpochId::Epoch2_05
+    } else if height < TESTNET_22_START_HEIGHT {
+        StacksEpochId::Epoch21
+    } else if height < TESTNET_23_START_HEIGHT {
+        StacksEpochId::Epoch22
+    } else if height < TESTNET_24_START_HEIGHT {
+        StacksEpochId::Epoch23
+    } else if height < TESTNET_25_START_HEIGHT {
+        StacksEpochId::Epoch24
+    } else if height < TESTNET_30_START_HEIGHT {
+        StacksEpochId::Epoch25
+    } else if height < TESTNET_31_START_HEIGHT {
+        StacksEpochId::Epoch30
+    } else {
+        StacksEpochId::Epoch31
+    }
+}
 
 #[derive(Deserialize)]
 pub struct ClarityDataResponse {

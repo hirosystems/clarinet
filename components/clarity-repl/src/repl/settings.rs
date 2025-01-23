@@ -9,7 +9,7 @@ use clarity::vm::types::{PrincipalData, QualifiedContractIdentifier, StandardPri
 
 use crate::analysis;
 
-use super::datastore::http_client::HttpClient;
+use super::remote_data::HttpClient;
 
 #[derive(Clone, Debug)]
 pub struct InitialContract {
