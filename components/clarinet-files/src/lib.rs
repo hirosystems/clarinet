@@ -101,6 +101,13 @@ impl FileLocation {
     }
 
     pub fn from_url_string(url_string: &str) -> Result<FileLocation, String> {
+        // Handle Windows-style paths specially
+        if url_string.contains('\\') || url_string.contains(':') {
+            let path = PathBuf::from(url_string);
+            if path.exists() {
+                return Ok(FileLocation::FileSystem { path });
+            }
+        }
         let url = Url::from_str(url_string)
             .map_err(|e| format!("unable to parse {} as a url\n{:?}", url_string, e))?;
 
@@ -129,15 +136,26 @@ impl FileLocation {
                 path.extend(&path_to_append);
             }
             FileLocation::Url { url } => {
+                // Handle Windows paths first
+                if url.scheme() == "file" && url.path().starts_with("/C:") {
+                    let new_path = url.path().trim_start_matches('/').to_string();
+                    url.set_path(&new_path);
+                }
                 let mut paths_segments = url
                     .path_segments_mut()
                     .map_err(|_| "unable to mutate url".to_string())?;
+
+                // Clear existing empty segments at the end
+                paths_segments.pop_if_empty();
+
                 for component in path_to_append.components() {
                     let segment = component
                         .as_os_str()
                         .to_str()
                         .ok_or(format!("unable to format component {:?}", component))?;
-                    paths_segments.push(segment);
+                    if !segment.is_empty() {
+                        paths_segments.push(segment);
+                    }
                 }
             }
         }
@@ -408,6 +426,80 @@ pub fn get_manifest_location(path: Option<String>) -> Option<FileLocation> {
             if !current_dir.pop() {
                 return None;
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+    use url::Url;
+
+    #[test]
+    fn test_windows_url_mutation() {
+        // Windows file URLs typically start with a drive letter
+        let windows_url = Url::parse("file:///C:/Users/test/project/")
+            .expect("Failed to parse Windows-style URL");
+        let mut location = FileLocation::from_url(windows_url);
+
+        let result = location.append_path("subdir\\file.txt");
+        assert!(result.is_ok());
+    }
+    #[test]
+    fn test_valid_url_mutation() {
+        // Create a regular URL that should work
+        let valid_url =
+            Url::parse("file:///home/user/project/").expect("Failed to parse Unix-style URL");
+
+        let mut location = FileLocation::from_url(valid_url);
+
+        // This should succeed
+        let result = location.append_path("subdir/file.txt");
+        assert!(result.is_ok());
+
+        if let FileLocation::Url { url } = location {
+            assert_eq!(url.path(), "/home/user/project/subdir/file.txt");
+        } else {
+            panic!("Expected URL variant");
+        }
+    }
+
+    #[test]
+    fn test_windows_drive_letter_parsing() {
+        // Test parsing a Windows-style file URL
+        let result = FileLocation::from_url_string("file:///C:/Users/test/project");
+        assert!(result.is_ok(), "Windows file URL should parse");
+    }
+
+    #[test]
+    fn test_try_parse_windows_paths() {
+        // Test relative Windows path
+        let result = FileLocation::try_parse("folder\\file.txt", None);
+        assert!(
+            result.is_none(),
+            "Relative Windows path without hint should return None"
+        );
+
+        // Test absolute Windows path
+        let result = FileLocation::try_parse("C:\\Users\\test\\file.txt", None);
+        assert!(result.is_some(), "Absolute Windows path should parse");
+    }
+
+    #[test]
+    fn test_append_with_windows_separators() {
+        let mut location = FileLocation::from_path(PathBuf::from("/base/path"));
+
+        // Test appending Windows-style path
+        let result = location.append_path("subdir\\file.txt");
+        assert!(result.is_ok(), "Should handle Windows separators");
+
+        if let FileLocation::FileSystem { path } = &location {
+            let path_str = path.to_string_lossy();
+            assert!(
+                path_str.contains("subdir") && path_str.contains("file.txt"),
+                "Path should contain appended components"
+            );
         }
     }
 }
