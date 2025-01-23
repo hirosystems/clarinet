@@ -137,12 +137,6 @@ pub fn format_source_exprs(
                         NativeFunctions::Match => {
                             format_match(settings, list, previous_indentation)
                         }
-                        // NativeFunctions::IndexOf
-                        // | NativeFunctions::IndexOfAlias
-                        // | NativeFunctions::Asserts
-                        // | NativeFunctions::ContractCall => {
-                        //     format_general(settings, list, previous_indentation)
-                        // }
                         NativeFunctions::TupleCons => {
                             // if the kv map is defined with (tuple (c 1)) then we strip the
                             // ClarityName("tuple") out first and convert it to key/value syntax
@@ -302,26 +296,6 @@ fn width(exprs: &[PreSymbolicExpression]) -> usize {
         None => 0,
     }
 }
-// this is probably un-needed but was getting some weird artifacts for code like
-// (something (1 2 3) true) would be formatted as (something (1 2 3)true)
-// fn format_general(
-//     settings: &Settings,
-//     exprs: &[PreSymbolicExpression],
-//     previous_indentation: &str,
-// ) -> String {
-//     let func_type = display_pse(settings, exprs.first().unwrap(), "");
-//     let mut acc = format!("({func_type}");
-//     acc.push(' ');
-//     for (i, arg) in exprs[1..].iter().enumerate() {
-//         acc.push_str(&format!(
-//             "{}{}",
-//             format_source_exprs(settings, &[arg.clone()], previous_indentation),
-//             if i < exprs.len() - 2 { " " } else { "" }
-//         ))
-//     }
-//     acc.push(')');
-//     acc.to_owned()
-// }
 // *begin* never on one line
 fn format_begin(
     settings: &Settings,
@@ -408,8 +382,6 @@ fn format_if(
     exprs: &[PreSymbolicExpression],
     previous_indentation: &str,
 ) -> String {
-    println!("Starting format_if");
-
     let opening = exprs.first().unwrap();
     let func_type = display_pse(settings, opening, "");
     let indentation = &settings.indentation.to_string();
@@ -421,7 +393,7 @@ fn format_if(
 
     // if the 'if' statement doesn't start at the current indentation level, we
     // add an extra indent to the body.
-    // we add 2 to the previous indent comparison to account for spans starting
+    // Note: we add 2 to the previous indent comparison to account for spans starting
     // at 1 and the leading '('
     let is_nested = opening.span().start_column as usize != previous_indentation.len() + 2;
 
@@ -448,10 +420,8 @@ fn format_if(
     }
 
     acc.push(')');
-    println!("is_nested: {} for expr: {:?}", is_nested, opening);
 
     if is_nested {
-        println!("Adding newline for expr: {:?}", opening);
         acc.push('\n');
     }
     acc
@@ -912,13 +882,6 @@ mod tests_formatter {
         let result = format_with_default(&String::from(src));
         assert_eq!(src, result);
     }
-    #[test]
-    #[ignore]
-    fn test_postcomments_included() {
-        let src = "(ok true)\n;; this is a post comment";
-        let result = format_with_default(&String::from(src));
-        assert_eq!(src, result);
-    }
 
     #[test]
     fn test_booleans() {
@@ -943,7 +906,6 @@ mod tests_formatter {
     }
 
     #[test]
-    #[ignore]
     fn long_line_unwrapping() {
         let src = "(try! (unwrap! (complete-deposit-wrapper (get txid deposit) (get vout-index deposit) (get amount deposit) (get recipient deposit) (get burn-hash deposit) (get burn-height deposit) (get sweep-txid deposit)) (err (+ ERR_DEPOSIT_INDEX_PREFIX (+ u10 index)))))";
         let result = format_with_default(&String::from(src));
@@ -952,9 +914,7 @@ mod tests_formatter {
     (complete-deposit-wrapper (get txid deposit) (get vout-index deposit)
       (get amount deposit) (get recipient deposit) (get burn-hash deposit)
       (get burn-height deposit) (get sweep-txid deposit))
-    (err (+ ERR_DEPOSIT_INDEX_PREFIX (+ u10 index)))
-  )
-)"#;
+    (err (+ ERR_DEPOSIT_INDEX_PREFIX (+ u10 index)))))"#;
         assert_eq!(expected, result);
 
         // non-max-length sanity case
@@ -1153,7 +1113,7 @@ mod tests_formatter {
       (list 1 2 3)
     )
 )"#;
-        assert_eq!(expected, result)
+        assert_eq!(expected, result);
     }
     #[test]
     #[ignore]

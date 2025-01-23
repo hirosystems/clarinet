@@ -24,7 +24,8 @@
 (define-read-only (is-borroweable-isolated
     (asset principal)
   )
-  (match (index-of? (contract-call? .pool-reserve-data get-borroweable-isolated-read) asset)
+  (match (index-of? (contract-call? .pool-reserve-data get-borroweable-isolated-read)
+    asset)
     res
     true
     false
