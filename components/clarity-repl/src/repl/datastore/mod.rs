@@ -988,20 +988,7 @@ impl BurnStateDB for Datastore {
 mod tests {
     use clarity::types::StacksEpoch;
 
-    use crate::repl::settings::RemoteDataSettings;
-
     use super::*;
-
-    // impl Default for Datastore {
-    //     fn default() -> Self {
-    //         let client = HttpClient::new(ApiUrl("https://api.hiro.so".to_string()));
-    //         Self::new(
-    //             RemoteDataSettings::default(),
-    //             StacksConstants::default(),
-    //             client,
-    //         )
-    //     }
-    // }
 
     fn get_datastores() -> (ClarityDatastore, Datastore) {
         let client = HttpClient::new(ApiUrl("https://api.tesnet.hiro.so".to_string()));
