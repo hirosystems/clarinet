@@ -96,7 +96,6 @@ pub struct CostsReport {
 #[derive(Clone, Debug)]
 pub struct Session {
     pub settings: SessionSettings,
-    pub current_epoch: StacksEpochId,
     pub contracts: BTreeMap<QualifiedContractIdentifier, ParsedContract>,
     pub interpreter: ClarityInterpreter,
     api_reference: HashMap<String, String>,
@@ -120,7 +119,7 @@ impl Session {
 
         Self {
             interpreter: ClarityInterpreter::new(tx_sender, settings.repl_settings.clone()),
-            current_epoch: settings.epoch_id.unwrap_or(StacksEpochId::Epoch2_05),
+            // current_epoch: settings.epoch_id.unwrap_or(StacksEpochId::Epoch2_05),
             contracts: BTreeMap::new(),
             api_reference: build_api_reference(),
             show_costs: false,
@@ -551,12 +550,13 @@ impl Session {
         cost_track: bool,
         ast: Option<&ContractAST>,
     ) -> Result<ExecutionResult, Vec<Diagnostic>> {
-        if contract.epoch != self.current_epoch {
+        let current_epoch = self.interpreter.datastore.get_current_epoch();
+        if contract.epoch != current_epoch {
             let diagnostic = Diagnostic {
                 level: Level::Error,
                 message: format!(
                     "contract epoch ({}) does not match current epoch ({})",
-                    contract.epoch, self.current_epoch
+                    contract.epoch, current_epoch
                 ),
                 spans: vec![],
                 suggestion: None,
@@ -620,12 +620,13 @@ impl Session {
             hooks.push(coverage_hook);
         }
 
+        let current_epoch = self.interpreter.datastore.get_current_epoch();
         let execution = match self.interpreter.call_contract_fn(
             &QualifiedContractIdentifier::parse(&contract_id_str).unwrap(),
             method,
             args,
-            self.current_epoch,
-            ClarityVersion::default_for_epoch(self.current_epoch),
+            current_epoch,
+            ClarityVersion::default_for_epoch(current_epoch),
             track_costs,
             allow_private,
             hooks,
@@ -651,12 +652,13 @@ impl Session {
         snippet: String,
         cost_track: bool,
     ) -> Result<ExecutionResult, Vec<Diagnostic>> {
+        let current_epoch = self.interpreter.datastore.get_current_epoch();
         let contract = ClarityContract {
             code_source: ClarityCodeSource::ContractInMemory(snippet),
             name: format!("contract-{}", self.contracts.len()),
             deployer: ContractDeployer::DefaultDeployer,
-            clarity_version: ClarityVersion::default_for_epoch(self.current_epoch),
-            epoch: self.current_epoch,
+            clarity_version: ClarityVersion::default_for_epoch(current_epoch),
+            epoch: current_epoch,
         };
         let contract_identifier =
             contract.expect_resolved_contract_identifier(Some(&self.interpreter.get_tx_sender()));
@@ -690,12 +692,13 @@ impl Session {
         eval_hooks: Option<Vec<&mut dyn EvalHook>>,
         cost_track: bool,
     ) -> Result<ExecutionResult, Vec<Diagnostic>> {
+        let current_epoch = self.interpreter.datastore.get_current_epoch();
         let contract = ClarityContract {
             code_source: ClarityCodeSource::ContractInMemory(snippet),
             name: format!("contract-{}", self.contracts.len()),
             deployer: ContractDeployer::DefaultDeployer,
-            clarity_version: ClarityVersion::default_for_epoch(self.current_epoch),
-            epoch: self.current_epoch,
+            clarity_version: ClarityVersion::default_for_epoch(current_epoch),
+            epoch: current_epoch,
         };
         let contract_identifier =
             contract.expect_resolved_contract_identifier(Some(&self.interpreter.get_tx_sender()));
@@ -999,7 +1002,8 @@ impl Session {
     }
 
     pub fn get_epoch(&mut self) -> String {
-        format!("Current epoch: {}", self.current_epoch)
+        let current_epoch = self.interpreter.datastore.get_current_epoch();
+        format!("Current epoch: {}", current_epoch)
     }
 
     pub fn set_epoch(&mut self, cmd: &str) -> String {
@@ -1024,7 +1028,6 @@ impl Session {
     }
 
     pub fn update_epoch(&mut self, epoch: StacksEpochId) {
-        self.current_epoch = epoch;
         self.interpreter.set_current_epoch(epoch);
         if epoch >= StacksEpochId::Epoch30 {
             self.interpreter.set_tenure_height();

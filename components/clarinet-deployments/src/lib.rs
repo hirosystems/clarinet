@@ -341,16 +341,19 @@ pub async fn generate_default_deployment(
     let mut requirements_data = BTreeMap::new();
     let mut requirements_deps = BTreeMap::new();
 
+    let mut repl_settings = manifest.repl_settings.clone();
+    repl_settings.remote_data.enabled = false;
     let settings = SessionSettings {
-        repl_settings: manifest.repl_settings.clone(),
+        repl_settings,
         ..Default::default()
     };
     let session = Session::new(settings.clone());
 
-    let simnet_remote_data = matches!(network, StacksNetwork::Simnet)
-        && session.settings.repl_settings.remote_data.enabled;
+    let simnet_remote_data =
+        matches!(network, StacksNetwork::Simnet) && manifest.repl_settings.remote_data.enabled;
 
     let mut boot_contracts_ids = BTreeSet::new();
+
     if !simnet_remote_data {
         let boot_contracts_data = BOOT_CONTRACTS_DATA.clone();
         let mut boot_contracts_asts = BTreeMap::new();
@@ -541,7 +544,7 @@ pub async fn generate_default_deployment(
             };
         }
 
-        // Avoid listing requirements as deployment transactions to the deployment specification on Mainnet
+        // Don't list requirements as deployment transactions to the deployment specification on Mainnet
         if !matches!(network, StacksNetwork::Mainnet) && !simnet_remote_data {
             let mut ordered_contracts_ids = match ASTDependencyDetector::order_contracts(
                 &requirements_deps,

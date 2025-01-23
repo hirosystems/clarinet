@@ -340,8 +340,9 @@ impl SDK {
     #[wasm_bindgen(js_name=getDefaultClarityVersionForCurrentEpoch)]
     pub fn default_clarity_version_for_current_epoch(&self) -> ClarityVersionString {
         let session = self.get_session();
+        let current_epoch = session.interpreter.datastore.get_current_epoch();
         ClarityVersionString {
-            obj: ClarityVersion::default_for_epoch(session.current_epoch)
+            obj: ClarityVersion::default_for_epoch(current_epoch)
                 .to_string()
                 .into(),
         }
@@ -609,7 +610,11 @@ impl SDK {
     #[wasm_bindgen(getter, js_name=currentEpoch)]
     pub fn current_epoch(&mut self) -> String {
         let session = self.get_session_mut();
-        session.current_epoch.to_string()
+        session
+            .interpreter
+            .datastore
+            .get_current_epoch()
+            .to_string()
     }
 
     #[wasm_bindgen(js_name=setEpoch)]
@@ -868,13 +873,14 @@ impl SDK {
             if advance_chain_tip {
                 session.advance_chain_tip(1);
             }
+            let current_epoch = session.interpreter.datastore.get_current_epoch();
 
             let contract = ClarityContract {
                 code_source: ClarityCodeSource::ContractInMemory(args.content.clone()),
                 name: args.name.clone(),
                 deployer: ContractDeployer::Address(args.sender.to_string()),
                 clarity_version: args.options.clarity_version,
-                epoch: session.current_epoch,
+                epoch: current_epoch,
             };
 
             match session.deploy_contract(&contract, false, None) {
