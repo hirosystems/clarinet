@@ -35,7 +35,7 @@ default = ["cli"]
 cli = ["bitcoin", "clarity-repl/sdk"]
 wasm = [
   "js-sys",
-  # "web-sys",
+  "web-sys",
   "serde-wasm-bindgen",
   "wasm-bindgen",
   "wasm-bindgen-futures",
