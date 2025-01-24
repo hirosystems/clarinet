@@ -27,12 +27,15 @@ serde-wasm-bindgen = { version = "0.6.4", optional = true }
 wasm-bindgen = { workspace = true, optional = true }
 wasm-bindgen-futures = { version = "0.4", optional = true }
 serde_json = "1.0.114"
+web-sys = { workspace = true, features = ["console"], optional = true }
+
 
 [features]
 default = ["cli"]
 cli = ["bitcoin", "clarity-repl/sdk"]
 wasm = [
   "js-sys",
+  # "web-sys",
   "serde-wasm-bindgen",
   "wasm-bindgen",
   "wasm-bindgen-futures",
