@@ -437,6 +437,14 @@ describe("the simnet can execute commands", () => {
   });
 });
 
+describe("custom manifest path", () => {
+  it("initSimnet handles absolute path", async () => {
+    const manifestPath = path.join(process.cwd(), "tests/fixtures/Clarinet.toml");
+    const simnet = await initSimnet(manifestPath);
+    expect(simnet.blockHeight).toBe(1);
+  });
+});
+
 describe("the sdk handles multiple manifests project", () => {
   it("handle invalid project", () => {
     // the lsp displays paths with the unix notation, hence why we are hardcoding the contract path with `/`
