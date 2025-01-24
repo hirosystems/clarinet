@@ -17,8 +17,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build_and_test_sdk:
-    name: Build and test clarinet-sdk packages
+  build_wasm:
+    name: Build Wasm packages
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -39,21 +39,20 @@ jobs:
           echo "RUST_VERSION_HASH=$(rustc --version | sha256sum | awk '{print $1}')" >> $GITHUB_ENV
           echo "NODE_VERSION_HASH=$(node --version | sha256sum | awk '{print $1}')" >> $GITHUB_ENV
 
+      # - name: Cache npm
+      #   uses: actions/cache@v4
+      #   with:
+      #     path: |
+      #       ~/node_modules/
+      #     key: clarinet-sdk-npm-${{ runner.os }}-${{ env.NODE_VERSION_HASH }}-${{ hashFiles('./package-lock.json') }}
+
       - name: Cache cargo
         uses: actions/cache@v4
         with:
           path: |
-            ~/.cargo/
-            ~/target/release/build/
-            ~/target/wasm32-unknown-unknown/build/
+            target/release/build/
+            target/wasm32-unknown-unknown/
           key: clarinet-sdk-cargo-${{ runner.os }}-${{ env.RUST_VERSION_HASH }}-${{ hashFiles('./Cargo.lock') }}
-
-      - name: Cache npm
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/node_modules/
-          key: clarinet-sdk-npm-${{ runner.os }}-${{ env.NODE_VERSION_HASH }}-${{ hashFiles('./package-lock.json') }}
 
       - name: Install wasm-pack
         run: npm install -g wasm-pack
@@ -61,8 +60,39 @@ jobs:
       - name: Run wasm-bindgen-test
         run: wasm-pack test --node components/clarinet-sdk-wasm
 
+
       - name: Build Wasm packages
         run: npm run build:sdk-wasm
+
+      - name: Upload Wasm artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: wasm-artifacts
+          path: components/clarinet-sdk-wasm/pkg-*
+
+  test:
+    name: Run tests on multiple platforms
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    needs: build_wasm
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Download Wasm artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: wasm-artifacts
+          path: components/clarinet-sdk-wasm
+      - name: Display structure of downloaded files
+        run: ls -R components/clarinet-sdk-wasm
 
       - name: Install dependencies
         run: npm ci

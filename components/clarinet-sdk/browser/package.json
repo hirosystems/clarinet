@@ -15,7 +15,7 @@
   "scripts": {
     "clean": "rimraf dist",
     "compile": "tsc -b ./tsconfig.json",
-    "build": "npm run clean; npm run compile",
+    "build": "npm run clean && npm run compile",
     "prepare": "npm run build"
   },
   "keywords": [

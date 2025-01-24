@@ -26,8 +26,8 @@
     "lint": "eslint ./client/src ./server/src",
     "dev:watch": "webpack -c ./webpack.config.dev.js -w",
     "dev:browser": "vscode-test-web --extensionDevelopmentPath=. ./test-data --open-devtools",
-    "dev": "webpack -c ./webpack.config.dev.js; concurrently \"npm:dev:*\"",
-    "vscode:prepublish": "npm run clean; NODE_ENV=production webpack",
+    "dev": "webpack -c ./webpack.config.dev.js && concurrently \"npm:dev:*\"",
+    "vscode:prepublish": "npm run clean && NODE_ENV=production webpack",
     "vsce:package": "vsce package",
     "vsce:publish": "vsce publish",
     "vsce:prerelease": "vsce publish --pre-release"
