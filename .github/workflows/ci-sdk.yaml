@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   build_wasm:
-    name: Build Wasm packages
+    name: Build and test Wasm packages
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -63,7 +63,7 @@ jobs:
           path: components/clarinet-sdk-wasm/pkg-*
 
   test:
-    name: Run tests on multiple platforms
+    name: Run clarinet-sdk tests
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
