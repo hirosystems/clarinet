@@ -39,13 +39,6 @@ jobs:
           echo "RUST_VERSION_HASH=$(rustc --version | sha256sum | awk '{print $1}')" >> $GITHUB_ENV
           echo "NODE_VERSION_HASH=$(node --version | sha256sum | awk '{print $1}')" >> $GITHUB_ENV
 
-      # - name: Cache npm
-      #   uses: actions/cache@v4
-      #   with:
-      #     path: |
-      #       ~/node_modules/
-      #     key: clarinet-sdk-npm-${{ runner.os }}-${{ env.NODE_VERSION_HASH }}-${{ hashFiles('./package-lock.json') }}
-
       - name: Cache cargo
         uses: actions/cache@v4
         with:
@@ -59,7 +52,6 @@ jobs:
 
       - name: Run wasm-bindgen-test
         run: wasm-pack test --node components/clarinet-sdk-wasm
-
 
       - name: Build Wasm packages
         run: npm run build:sdk-wasm
