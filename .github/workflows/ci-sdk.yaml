@@ -91,8 +91,6 @@ jobs:
         with:
           name: wasm-artifacts
           path: components/clarinet-sdk-wasm
-      - name: Display structure of downloaded files
-        run: ls -R components/clarinet-sdk-wasm
 
       - name: Install dependencies
         run: npm ci
