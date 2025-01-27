@@ -180,7 +180,7 @@ pub async fn process_notification(
                 })?;
             }
 
-            // Only build the initial protocal state if it does not exist
+            // Only build the initial protocol state if it does not exist
             if editor_state.try_read(|es| es.protocols.contains_key(&manifest_location))? {
                 return Ok(LspNotificationResponse::default());
             }
