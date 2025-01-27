@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use super::remote_data::{epoch_for_height, HttpClient, ParsedBlock};
+use super::remote_data::{epoch_for_height, Block, HttpClient};
 use clarity::types::chainstate::{
     BlockHeaderHash, BurnchainHeaderHash, ConsensusHash, SortitionId, StacksAddress, StacksBlockId,
     TrieHash, VRFSeed,
@@ -50,7 +50,7 @@ pub struct ClarityDatastore {
     height_at_chain_tip: HashMap<StacksBlockId, u32>,
 
     initial_remote_data: Option<InitialRemoteData>,
-    remote_block_info_cache: HashMap<u32, ParsedBlock>,
+    remote_block_info_cache: HashMap<u32, Block>,
 
     client: HttpClient,
 }
@@ -248,7 +248,7 @@ impl ClarityDatastore {
         format!("clarity-contract::{}", contract)
     }
 
-    fn get_remote_block_info_from_height(&mut self, height: u32) -> ParsedBlock {
+    fn get_remote_block_info_from_height(&mut self, height: u32) -> Block {
         let url = format!("/extended/v2/blocks/{}", height);
 
         if let Some(cached) = self.remote_block_info_cache.get(&height) {
@@ -263,7 +263,7 @@ impl ClarityDatastore {
         block
     }
 
-    fn get_remote_block_info_from_hash(&mut self, hash: &StacksBlockId) -> ParsedBlock {
+    fn get_remote_block_info_from_hash(&mut self, hash: &StacksBlockId) -> Block {
         if let Some(height) = self.height_at_chain_tip.get(hash) {
             return self.get_remote_block_info_from_height(*height);
         }
@@ -300,8 +300,6 @@ impl ClarityDatastore {
     ) -> Result<Option<String>> {
         let addr = contract.issuer.to_string();
         let contract = contract.name.to_string();
-        println!("CURRENT {}", self.current_chain_tip);
-        println!("OPEN {}", self.open_chain_tip);
         let tip = { self.get_remote_chaintip() };
         let url = format!(
             "/v2/clarity/metadata/{}/{}/{}?tip={}",
@@ -472,17 +470,6 @@ impl ClarityBackingStore for ClarityDatastore {
     }
 }
 
-// impl Default for Datastore {
-//     fn default() -> Self {
-//         let client = HttpClient::new(ApiUrl("https://api.hiro.so".to_string()));
-//         Self::new(
-//             RemoteDataSettings::default(),
-//             StacksConstants::default(),
-//             client,
-//         )
-//     }
-// }
-
 impl Datastore {
     pub fn new(clarity_datastore: &ClarityDatastore, constants: StacksConstants) -> Self {
         if clarity_datastore.initial_remote_data.is_some() {
@@ -555,18 +542,19 @@ impl Datastore {
         let burn_chain_height = block.burn_block_height;
         let id = block.index_block_hash;
         let burn_block_header_hash = block.burn_block_hash;
+        let block_header_hash = block.hash;
 
+        let sortition = clarity_datastore
+            .client
+            .fetch_sortition(&burn_block_header_hash);
+        let sortition_id = sortition.sortition_id;
+        let consensus_hash = sortition.consensus_hash;
+
+        // @todo: get vrf-seed from endpoint
+        // once available: https://github.com/stacks-network/stacks-core/issues/5738
         let bytes = height_to_hashed_bytes(*stacks_chain_height);
-        let sortition_id = SortitionId(bytes);
-        let block_header_hash = BlockHeaderHash(bytes);
-        let consensus_hash = ConsensusHash::from_bytes(&bytes[0..20]).unwrap();
         let vrf_seed = VRFSeed(bytes);
 
-        uprint!("stacks_chain_height: {}", stacks_chain_height);
-        uprint!(
-            "epoch_for_height: {}",
-            epoch_for_height(is_mainnet, *stacks_chain_height)
-        );
         let burn_block = BurnBlockInfo {
             burn_block_time: block.burn_block_time,
             burn_chain_height,
@@ -582,7 +570,7 @@ impl Datastore {
 
         let sortition_lookup = HashMap::from([(sortition_id, id)]);
         let consensus_hash_lookup = HashMap::from([(stacks_block.consensus_hash, sortition_id)]);
-        let tenure_blocks_height = HashMap::from([(1, 1)]);
+        let tenure_blocks_height = HashMap::from([(burn_chain_height, block.tenure_height)]);
         let burn_blocks = HashMap::from([(burn_block_header_hash, burn_block)]);
         let stacks_blocks = HashMap::from([(id, stacks_block)]);
 
@@ -614,7 +602,6 @@ impl Datastore {
     }
 
     fn build_next_stacks_block(&self, clarity_datastore: &ClarityDatastore) -> StacksBlockInfo {
-        let burn_chain_height = self.burn_chain_height;
         let stacks_block_height = self.stacks_chain_height;
 
         let last_stacks_block = self
@@ -623,7 +610,7 @@ impl Datastore {
             .expect("current chain tip missing in stacks block table");
         let last_burn_block = self
             .burn_blocks
-            .get(&height_to_burn_block_header_hash(burn_chain_height))
+            .get(&last_stacks_block.burn_block_header_hash)
             .expect("burn block missing in burn block table");
 
         let last_block_time = std::cmp::max(
@@ -638,17 +625,9 @@ impl Datastore {
             buffer[0] = 1;
             BlockHeaderHash(buffer)
         };
-        let burn_block_header_hash = height_to_burn_block_header_hash(burn_chain_height);
-        let consensus_hash = {
-            let mut buffer = bytes;
-            buffer[0] = 3;
-            ConsensusHash::from_bytes(&buffer[0..20]).unwrap()
-        };
-        let vrf_seed = {
-            let mut buffer = bytes;
-            buffer[0] = 4;
-            VRFSeed(buffer)
-        };
+        let burn_block_header_hash = last_stacks_block.burn_block_header_hash;
+        let consensus_hash = last_stacks_block.consensus_hash;
+        let vrf_seed = last_stacks_block.vrf_seed;
         let stacks_block_time: u64 = last_block_time + SECONDS_BETWEEN_STACKS_BLOCKS;
 
         StacksBlockInfo {
@@ -924,7 +903,7 @@ impl BurnStateDB for Datastore {
 
     /// Returns the burnchain header hash for the given burn block height, as queried from the given SortitionId.
     ///
-    /// Returns Some if `self.get_burn_start_height() <= height < self.get_burn_block_height(sorition_id)`, and None otherwise.
+    /// Returns Some if `self.get_burn_start_height() <= height < self.get_burn_block_height(sortition_id)`, and None otherwise.
     fn get_burn_header_hash(
         &self,
         _height: u32,

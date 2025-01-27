@@ -41,6 +41,7 @@ ehttp = "0.5.0"
 
 # wasm
 wasm-bindgen = { workspace = true, optional = true }
+serde-wasm-bindgen = { version = "0.6.4", optional = true }
 web-sys = { workspace = true, optional = true, features = ["XmlHttpRequest"]}
 js-sys = { version = "0.3", optional = true }
 
@@ -109,6 +110,7 @@ wasm = [
     "clarity/devtools",
     "pox-locking/wasm",
     "wasm-bindgen",
+    "serde-wasm-bindgen",
     "web-sys",
     "js-sys",
 ]

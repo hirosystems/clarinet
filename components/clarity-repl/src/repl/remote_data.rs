@@ -1,6 +1,8 @@
 use clarity::{
     types::{
-        chainstate::{BlockHeaderHash, BurnchainHeaderHash, StacksBlockId},
+        chainstate::{
+            BlockHeaderHash, BurnchainHeaderHash, ConsensusHash, SortitionId, StacksBlockId,
+        },
         StacksEpochId,
     },
     vm::errors::InterpreterResult,
@@ -100,14 +102,52 @@ pub struct ClarityDataResponse {
 }
 
 #[derive(Clone, Debug, Deserialize)]
-#[allow(dead_code)]
 pub struct Info {
     pub network_id: u32,
     pub stacks_tip_height: u32,
 }
 
 #[derive(Clone, Debug, Deserialize)]
-pub struct Block {
+pub struct RawSortition {
+    pub burn_block_hash: String,
+    pub burn_block_height: u32,
+    pub consensus_hash: String,
+    pub sortition_id: String,
+    pub parent_sortition_id: String,
+}
+
+#[derive(Clone, Debug)]
+pub struct Sortition {
+    pub burn_block_hash: BurnchainHeaderHash,
+    pub burn_block_height: u32,
+    pub consensus_hash: ConsensusHash,
+    pub sortition_id: SortitionId,
+    pub parent_sortition_id: SortitionId,
+}
+
+impl Sortition {
+    pub fn from(response: RawSortition) -> Self {
+        let burn_block_hash =
+            BurnchainHeaderHash::from_hex(&response.burn_block_hash.replacen("0x", "", 1)).unwrap();
+        let consensus_hash =
+            ConsensusHash::from_hex(&response.consensus_hash.replacen("0x", "", 1)).unwrap();
+        let sortition_id =
+            SortitionId::from_hex(&response.sortition_id.replacen("0x", "", 1)).unwrap();
+        let parent_sortition_id =
+            SortitionId::from_hex(&response.parent_sortition_id.replacen("0x", "", 1)).unwrap();
+
+        Sortition {
+            burn_block_hash,
+            burn_block_height: response.burn_block_height,
+            consensus_hash,
+            sortition_id,
+            parent_sortition_id,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct RawBlock {
     pub height: u32,
     pub burn_block_height: u32,
     pub tenure_height: u32,
@@ -118,9 +158,9 @@ pub struct Block {
     pub burn_block_hash: String,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug)]
 #[allow(dead_code)]
-pub struct ParsedBlock {
+pub struct Block {
     pub height: u32,
     pub burn_block_height: u32,
     pub tenure_height: u32,
@@ -131,15 +171,15 @@ pub struct ParsedBlock {
     pub burn_block_hash: BurnchainHeaderHash,
 }
 
-impl From<Block> for ParsedBlock {
-    fn from(response: Block) -> Self {
+impl From<RawBlock> for Block {
+    fn from(response: RawBlock) -> Self {
         let hash = BlockHeaderHash::from_hex(&response.hash.replacen("0x", "", 1)).unwrap();
         let index_block_hash =
             StacksBlockId::from_hex(&response.index_block_hash.replacen("0x", "", 1)).unwrap();
         let burn_block_hash =
             BurnchainHeaderHash::from_hex(&response.burn_block_hash.replacen("0x", "", 1)).unwrap();
 
-        ParsedBlock {
+        Block {
             height: response.height,
             burn_block_height: response.burn_block_height,
             tenure_height: response.tenure_height,
@@ -155,17 +195,29 @@ impl From<Block> for ParsedBlock {
 #[derive(Clone, Debug)]
 pub struct HttpClient {
     url: ApiUrl,
+    #[allow(dead_code)]
+    api_key: Option<String>,
 }
 
 impl HttpClient {
     pub fn new(url: ApiUrl) -> Self {
-        HttpClient { url }
+        #[cfg(not(target_arch = "wasm32"))]
+        let api_key = std::env::var("HIRO_API_KEY").ok();
+        #[cfg(target_arch = "wasm32")]
+        let api_key = None;
+
+        HttpClient { url, api_key }
     }
 
     #[cfg(not(target_arch = "wasm32"))]
     fn get<T: DeserializeOwned>(&self, path: &str) -> Option<T> {
         let url = format!("{}{}", self.url, path);
-        match reqwest::blocking::get(&url) {
+        let client = reqwest::blocking::Client::new();
+        let mut request = client.get(&url).header("x-hiro-product", "clarinet-cli");
+        if let Some(ref api_key) = self.api_key {
+            request = request.header("x-api-key", api_key);
+        }
+        match request.send() {
             Ok(response) => response.json::<T>().ok(),
             Err(_) => None,
         }
@@ -194,9 +246,24 @@ impl HttpClient {
             })
     }
 
-    pub fn fetch_block(&self, url: &str) -> ParsedBlock {
+    pub fn fetch_sortition(&self, burn_block_hash: &BurnchainHeaderHash) -> Sortition {
+        let url = dbg!(format!("/v3/sortitions/burn/{}", burn_block_hash));
+        let sortition = self
+            .fetch_data::<Vec<RawSortition>>(&url)
+            .unwrap_or_else(|e| {
+                panic!("unable to parse json, error: {}", e);
+            })
+            .unwrap_or_else(|| {
+                panic!("unable to get remote sortition info");
+            });
+
+        println!("sortition {:?}", sortition);
+        Sortition::from(sortition.first().unwrap().clone())
+    }
+
+    pub fn fetch_block(&self, url: &str) -> Block {
         let block = self
-            .fetch_data::<Block>(url)
+            .fetch_data::<RawBlock>(url)
             .unwrap_or_else(|e| {
                 panic!("unable to parse json, error: {}", e);
             })
@@ -204,7 +271,7 @@ impl HttpClient {
                 panic!("unable to get remote block info");
             });
 
-        ParsedBlock::from(block.clone())
+        Block::from(block.clone())
     }
 
     pub fn fetch_clarity_data(&self, path: &str) -> InterpreterResult<Option<String>> {

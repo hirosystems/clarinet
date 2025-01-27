@@ -22,6 +22,7 @@ use clarinet_deployments::types::{DeploymentGenerationArtifacts, DeploymentSpeci
 use clarinet_deployments::{
     get_default_deployment_path, load_deployment, setup_session_with_deployment,
 };
+use clarinet_files::clarinetrc::ClarinetRC;
 use clarinet_files::StacksNetwork;
 use clarinet_files::{
     get_manifest_location, FileLocation, NetworkManifest, ProjectManifest, ProjectManifestFile,
@@ -43,8 +44,6 @@ use std::fs::{self, File};
 use std::io::prelude::*;
 use std::{env, process};
 use toml;
-
-use super::clarinetrc::GlobalSettings;
 
 #[cfg(feature = "telemetry")]
 use super::telemetry::{telemetry_report_event, DeveloperUsageDigest, DeveloperUsageEvent};
@@ -467,7 +466,7 @@ pub fn main() {
         }
     };
 
-    let global_settings = GlobalSettings::from_global_file();
+    let clarinetrc = ClarinetRC::from_rc_file();
 
     match opts.command {
         Command::Completions(cmd) => {
@@ -533,7 +532,7 @@ pub fn main() {
                 if project_opts.disable_telemetry {
                     false
                 } else {
-                    match global_settings.enable_telemetry {
+                    match clarinetrc.enable_telemetry {
                         Some(enable) => enable,
                         _ => {
                             println!("{}", yellow!("Send usage data to Hiro."));
@@ -546,7 +545,7 @@ pub fn main() {
                                 "{}",
                                 blue!(format!(
                                     "  $ mkdir -p ~/.clarinet; echo \"enable_telemetry = true\" >> {}",
-                                    GlobalSettings::get_settings_file_path()
+                                    ClarinetRC::get_settings_file_path()
                                 ))
                             );
                             // TODO(lgalabru): once we have a privacy policy available, add a link
@@ -591,7 +590,7 @@ pub fn main() {
             if !execute_changes(changes) {
                 std::process::exit(1);
             }
-            if global_settings.enable_hints.unwrap_or(true) {
+            if clarinetrc.enable_hints.unwrap_or(true) {
                 display_contract_new_hint(Some(project_opts.name.as_str()));
             }
             if telemetry_enabled {
@@ -892,7 +891,7 @@ pub fn main() {
                 if !execute_changes(changes) {
                     std::process::exit(1);
                 }
-                if global_settings.enable_hints.unwrap_or(true) {
+                if clarinetrc.enable_hints.unwrap_or(true) {
                     display_post_check_hint();
                 }
             }
@@ -923,7 +922,7 @@ pub fn main() {
                 if !execute_changes(changes) {
                     std::process::exit(1);
                 }
-                if global_settings.enable_hints.unwrap_or(true) {
+                if clarinetrc.enable_hints.unwrap_or(true) {
                     display_post_check_hint();
                 }
             }
@@ -948,7 +947,7 @@ pub fn main() {
                 if !execute_changes(vec![Changes::EditTOML(change)]) {
                     std::process::exit(1);
                 }
-                if global_settings.enable_hints.unwrap_or(true) {
+                if clarinetrc.enable_hints.unwrap_or(true) {
                     display_post_check_hint();
                 }
             }
@@ -1055,7 +1054,7 @@ pub fn main() {
                 }
             }
 
-            if global_settings.enable_hints.unwrap_or(true) {
+            if clarinetrc.enable_hints.unwrap_or(true) {
                 display_contract_new_hint(None);
             }
         }
@@ -1175,7 +1174,7 @@ pub fn main() {
                 false => 1,
             };
 
-            if global_settings.enable_hints.unwrap_or(true) {
+            if clarinetrc.enable_hints.unwrap_or(true) {
                 display_post_check_hint();
             }
             if manifest.project.telemetry {
@@ -1191,7 +1190,7 @@ pub fn main() {
                 "{}",
                 format_warn!("This command is deprecated. Use 'clarinet devnet start' instead"),
             );
-            devnet_start(cmd, global_settings)
+            devnet_start(cmd, clarinetrc)
         }
         Command::LSP => run_lsp(),
         Command::DAP => match super::dap::run_dap() {
@@ -1209,7 +1208,7 @@ pub fn main() {
                     process::exit(1);
                 }
             }
-            Devnet::DevnetStart(cmd) => devnet_start(cmd, global_settings),
+            Devnet::DevnetStart(cmd) => devnet_start(cmd, clarinetrc),
         },
     };
 }
@@ -1716,14 +1715,14 @@ fn display_hint_footer() {
         "{}",
         yellow!(format!(
             "These hints can be disabled in the {} file.",
-            GlobalSettings::get_settings_file_path()
+            ClarinetRC::get_settings_file_path()
         ))
     );
     println!(
         "{}",
         blue!(format!(
             "  $ mkdir -p ~/.clarinet; echo \"enable_hints = false\" >> {}",
-            GlobalSettings::get_settings_file_path()
+            ClarinetRC::get_settings_file_path()
         ))
     );
     display_separator();
@@ -1807,7 +1806,7 @@ fn display_deploy_hint() {
     display_hint_footer();
 }
 
-fn devnet_start(cmd: DevnetStart, global_settings: GlobalSettings) {
+fn devnet_start(cmd: DevnetStart, clarinetrc: ClarinetRC) {
     let manifest = load_manifest_or_exit(cmd.manifest_path);
     println!("Computing deployment plan");
     let result = match cmd.deployment_plan_path {
@@ -1906,7 +1905,7 @@ fn devnet_start(cmd: DevnetStart, global_settings: GlobalSettings) {
             process::exit(1);
         }
         Ok(_) => {
-            if global_settings.enable_hints.unwrap_or(true) {
+            if clarinetrc.enable_hints.unwrap_or(true) {
                 display_deploy_hint();
             }
             process::exit(0);

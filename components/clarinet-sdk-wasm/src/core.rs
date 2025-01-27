@@ -356,7 +356,6 @@ impl SDK {
         let config: Option<RemoteDataSettings> =
             serde_wasm_bindgen::from_value(remote_data_settings)
                 .map_err(|e| format!("Failed to parse remote data settings: {}", e))?;
-        uprint!("Initiating empty session: {:?}", config);
 
         let mut settings = SessionSettings::default();
         settings.repl_settings.remote_data = config.unwrap_or_default();
