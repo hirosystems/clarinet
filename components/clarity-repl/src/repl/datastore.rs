@@ -286,7 +286,6 @@ impl ClarityDatastore {
     }
 
     fn fetch_clarity_marf_value(&mut self, key: &str) -> Result<Option<String>> {
-        uprint!("fetching clarity marf value for {}", key);
         let key_hash = TrieHash::from_key(key);
         let tip = self.get_remote_chaintip();
         let url = format!("/v2/clarity/marf/{}?tip={}&proof=false", key_hash, tip);
