@@ -1341,7 +1341,7 @@ fn clarity_keywords() -> HashMap<String, String> {
 }
 
 #[allow(clippy::items_after_test_module)]
-#[cfg(all(test, not(target_arch = "wasm32")))]
+#[cfg(test)]
 mod tests {
     use clarity::vm::types::TupleData;
 

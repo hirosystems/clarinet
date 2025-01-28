@@ -10,7 +10,7 @@ use clarinet_deployments::{
 use clarinet_files::StacksNetwork;
 use clarinet_files::{FileAccessor, FileLocation, ProjectManifest, WASMFileSystemAccessor};
 use clarity_repl::clarity::analysis::contract_interface_builder::{
-    ContractInterface, ContractInterfaceFunction,
+    ContractInterface, ContractInterfaceFunction, ContractInterfaceFunctionAccess,
 };
 use clarity_repl::clarity::chainstate::StacksAddress;
 use clarity_repl::clarity::vm::types::{
@@ -717,6 +717,7 @@ impl SDK {
         method: &str,
     ) -> Result<&ContractInterfaceFunction, String> {
         let contract_id = self.desugar_contract_id(contract)?;
+        uprint!("contract_id: {}", contract_id);
         let contract_interface = self
             .contracts_interfaces
             .get(&contract_id)
@@ -795,10 +796,11 @@ impl SDK {
 
     #[wasm_bindgen(js_name=callReadOnlyFn)]
     pub fn call_read_only_fn(&mut self, args: &CallFnArgs) -> Result<TransactionRes, String> {
-        // let interface = self.get_function_interface(&args.contract, &args.method)?;
-        // if interface.access != ContractInterfaceFunctionAccess::read_only {
-        //     return Err(format!("{} is not a read-only function", &args.method));
-        // }
+        if let Ok(interface) = self.get_function_interface(&args.contract, &args.method) {
+            if interface.access != ContractInterfaceFunctionAccess::read_only {
+                return Err(format!("{} is not a read-only function", &args.method));
+            }
+        }
         self.call_contract_fn(args, false)
     }
 
@@ -807,10 +809,11 @@ impl SDK {
         args: &CallFnArgs,
         advance_chain_tip: bool,
     ) -> Result<TransactionRes, String> {
-        // let interface = self.get_function_interface(&args.contract, &args.method)?;
-        // if interface.access != ContractInterfaceFunctionAccess::public {
-        //     return Err(format!("{} is not a public function", &args.method));
-        // }
+        if let Ok(interface) = self.get_function_interface(&args.contract, &args.method) {
+            if interface.access != ContractInterfaceFunctionAccess::public {
+                return Err(format!("{} is not a public function", &args.method));
+            }
+        }
 
         if advance_chain_tip {
             let session = self.get_session_mut();
@@ -824,10 +827,11 @@ impl SDK {
         args: &CallFnArgs,
         advance_chain_tip: bool,
     ) -> Result<TransactionRes, String> {
-        // let interface = self.get_function_interface(&args.contract, &args.method)?;
-        // if interface.access != ContractInterfaceFunctionAccess::private {
-        //     return Err(format!("{} is not a private function", &args.method));
-        // }
+        if let Ok(interface) = self.get_function_interface(&args.contract, &args.method) {
+            if interface.access != ContractInterfaceFunctionAccess::private {
+                return Err(format!("{} is not a private function", &args.method));
+            }
+        }
         if advance_chain_tip {
             let session = self.get_session_mut();
             session.advance_chain_tip(1);
