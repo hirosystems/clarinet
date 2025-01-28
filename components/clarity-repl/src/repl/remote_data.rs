@@ -247,7 +247,7 @@ impl HttpClient {
     }
 
     pub fn fetch_sortition(&self, burn_block_hash: &BurnchainHeaderHash) -> Sortition {
-        let url = dbg!(format!("/v3/sortitions/burn/{}", burn_block_hash));
+        let url = format!("/v3/sortitions/burn/{}", burn_block_hash);
         let sortition = self
             .fetch_data::<Vec<RawSortition>>(&url)
             .unwrap_or_else(|e| {
@@ -257,7 +257,6 @@ impl HttpClient {
                 panic!("unable to get remote sortition info");
             });
 
-        println!("sortition {:?}", sortition);
         Sortition::from(sortition.first().unwrap().clone())
     }
 

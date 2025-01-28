@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use super::remote_data::{epoch_for_height, Block, HttpClient};
 use clarity::types::chainstate::{
@@ -39,13 +39,10 @@ fn epoch_to_peer_version(epoch: StacksEpochId) -> u8 {
 }
 
 #[derive(Clone, Debug)]
-struct StoreEntry(StacksBlockId, String);
-
-#[derive(Clone, Debug)]
 pub struct ClarityDatastore {
     open_chain_tip: StacksBlockId,
     current_chain_tip: StacksBlockId,
-    store: HashMap<String, Vec<StoreEntry>>,
+    store: HashMap<String, BTreeMap<StacksBlockId, String>>,
     metadata: HashMap<(String, String), String>,
     height_at_chain_tip: HashMap<StacksBlockId, u32>,
 
@@ -222,26 +219,10 @@ impl ClarityDatastore {
     }
 
     fn put(&mut self, key: &str, value: &str) {
-        if let Some(entries) = self.store.get_mut(key) {
-            entries.push(StoreEntry(self.open_chain_tip, value.to_string()));
-        } else {
-            self.store.insert(
-                key.to_string(),
-                vec![StoreEntry(self.open_chain_tip, value.to_string())],
-            );
-        }
-    }
-
-    fn get_latest_data(&self, data: &[StoreEntry]) -> Option<String> {
-        let StoreEntry(tip, value) = data.last()?;
-
-        if self.height_at_chain_tip.get(tip)?
-            <= self.height_at_chain_tip.get(&self.current_chain_tip)?
-        {
-            Some(value.clone())
-        } else {
-            self.get_latest_data(&data[..data.len() - 1])
-        }
+        self.store
+            .entry(key.to_string())
+            .or_default()
+            .insert(self.current_chain_tip, value.to_string());
     }
 
     pub fn make_contract_hash_key(contract: &QualifiedContractIdentifier) -> String {
@@ -318,24 +299,29 @@ impl ClarityBackingStore for ClarityDatastore {
 
     /// fetch K-V out of the committed datastore
     fn get_data(&mut self, key: &str) -> Result<Option<String>> {
-        if let Some(data) = self.store.get(key) {
-            if self.initial_remote_data.is_some() && self.current_chain_tip != self.open_chain_tip {
-                let data = self.fetch_clarity_marf_value(key);
-                if let Ok(Some(value)) = &data {
-                    self.put(key, value);
-                }
-                return data;
-            }
-            return Ok(self.get_latest_data(data));
-        }
+        let values = self.store.get(key);
+
         if self.initial_remote_data.is_some() {
+            // if the value for the exact current_chain_tip is present, return it
+            if let Some(data) = values.and_then(|data| data.get(&self.current_chain_tip)) {
+                return Ok(Some(data.clone()));
+            }
             let data = self.fetch_clarity_marf_value(key);
             if let Ok(Some(value)) = &data {
                 self.put(key, value);
             }
             return data;
         }
-        Ok(None)
+
+        Ok(values.and_then(|data| {
+            data.iter()
+                .rev()
+                .find(|(tip, _)| {
+                    self.height_at_chain_tip.get(tip)
+                        <= self.height_at_chain_tip.get(&self.current_chain_tip)
+                })
+                .map(|(_, value)| value.clone())
+        }))
     }
 
     fn get_data_from_path(&mut self, _hash: &TrieHash) -> Result<Option<String>> {
