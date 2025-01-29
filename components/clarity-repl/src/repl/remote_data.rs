@@ -15,7 +15,7 @@ use js_sys::{JsString, Uint8Array};
 use wasm_bindgen::prelude::*;
 
 #[cfg(target_arch = "wasm32")]
-#[wasm_bindgen(module = "/js/index.js")]
+#[wasm_bindgen(module = "/js/index.mjs")]
 extern "C" {
     #[wasm_bindgen(js_name = httpClient)]
     fn http_client(method: &JsString, path: &JsString) -> Uint8Array;
