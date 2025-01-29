@@ -26,7 +26,6 @@ use clarity_repl::repl::{
     clarity_values, ClarityCodeSource, ClarityContract, ContractDeployer, Session, SessionSettings,
     DEFAULT_CLARITY_VERSION, DEFAULT_EPOCH,
 };
-use clarity_repl::uprint;
 use gloo_utils::format::JsValueSerdeExt;
 use js_sys::Function as JsFunction;
 use serde::{Deserialize, Serialize};
@@ -717,7 +716,6 @@ impl SDK {
         method: &str,
     ) -> Result<&ContractInterfaceFunction, String> {
         let contract_id = self.desugar_contract_id(contract)?;
-        uprint!("contract_id: {}", contract_id);
         let contract_interface = self
             .contracts_interfaces
             .get(&contract_id)

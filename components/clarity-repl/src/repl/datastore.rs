@@ -302,6 +302,7 @@ impl ClarityBackingStore for ClarityDatastore {
         Ok(())
     }
 
+    // @todo: this whole logic can be simplified
     /// fetch K-V out of the committed datastore
     fn get_data(&mut self, key: &str) -> Result<Option<String>> {
         let current_height = self.get_current_block_height();
@@ -607,10 +608,15 @@ impl Datastore {
             .stacks_blocks
             .get(&clarity_datastore.current_chain_tip)
             .expect("current chain tip missing in stacks block table");
+
+        // @todo: have a clear condition to check which hash should be used to get burn_blocks
+        // also, there is no unit-test for the `.or()`
         let last_burn_block = self
             .burn_blocks
             .get(&height_to_burn_block_header_hash(self.burn_chain_height))
-            // .get(&last_stacks_block.burn_block_header_hash)
+            .or(self
+                .burn_blocks
+                .get(&last_stacks_block.burn_block_header_hash))
             .expect("burn block missing in burn block table");
 
         let last_block_time = std::cmp::max(
