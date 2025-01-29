@@ -143,20 +143,17 @@ pub fn format_source_exprs(
                             format_key_value(settings, &list[1..], previous_indentation)
                         }
                         NativeFunctions::If => format_if(settings, list, previous_indentation),
-                        NativeFunctions::ListCons => {
-                            format_list(settings, list, previous_indentation)
-                        }
                         NativeFunctions::And | NativeFunctions::Or => {
                             format_booleans(settings, list, previous_indentation)
                         }
                         _ => {
+                            let inner_content =
+                                to_inner_content(list, settings, previous_indentation);
+
                             // There's an annoying thing happening here
                             // Since we do expr.match_list() up above we only have the contents
                             // We should ideally be able to format!("{}", format_source_exprs(.., &[expr.clone()]))
                             // but that stack overflows so we manually print out the inner contents
-                            let inner_content =
-                                to_inner_content(list, settings, previous_indentation);
-
                             format!(
                                 "({}){}",
                                 inner_content,
@@ -333,7 +330,12 @@ fn is_comment(pse: &PreSymbolicExpression) -> bool {
 pub fn without_comments_len(exprs: &[PreSymbolicExpression]) -> usize {
     exprs.iter().filter(|expr| !is_comment(expr)).count()
 }
-
+// if the exprs are already broken onto different lines, return true
+fn differing_lines(exprs: &[PreSymbolicExpression]) -> bool {
+    !exprs
+        .windows(2)
+        .all(|window| window[0].span().start_line == window[1].span().start_line)
+}
 // formats (and ..) and (or ...)
 // if given more than BOOLEAN_BREAK_LIMIT expressions it will break it onto new lines
 fn format_booleans(
@@ -345,9 +347,10 @@ fn format_booleans(
     let mut acc = format!("({func_type}");
     let indentation = &settings.indentation.to_string();
     let space = format!("{}{}", previous_indentation, indentation);
-    let break_up = without_comments_len(&exprs[1..]) > BOOLEAN_BREAK_LIMIT;
+    let break_up =
+        without_comments_len(&exprs[1..]) > BOOLEAN_BREAK_LIMIT || differing_lines(exprs);
+    let mut iter = exprs.get(1..).unwrap_or_default().iter().peekable();
     if break_up {
-        let mut iter = exprs.get(1..).unwrap_or_default().iter().peekable();
         while let Some(expr) = iter.next() {
             let trailing = get_trailing_comment(expr, &mut iter);
             acc.push_str(&format!(
@@ -361,13 +364,20 @@ fn format_booleans(
             }
         }
     } else {
-        for arg in exprs[1..].iter() {
+        while let Some(expr) = iter.next() {
+            let trailing = get_trailing_comment(expr, &mut iter);
             acc.push(' ');
             acc.push_str(&format_source_exprs(
                 settings,
-                &[arg.clone()],
+                &[expr.clone()],
                 previous_indentation,
-            ))
+            ));
+            if let Some(comment) = trailing {
+                acc.push(' ');
+                acc.push_str(&display_pse(settings, comment, previous_indentation));
+                acc.push('\n');
+                acc.push_str(&space)
+            }
         }
     }
     if break_up {
@@ -501,32 +511,19 @@ fn format_list(
     previous_indentation: &str,
 ) -> String {
     let mut acc = "(".to_string();
-    let breaks = line_length_over_max(settings, exprs);
     for (i, expr) in exprs[0..].iter().enumerate() {
         let value = format_source_exprs(settings, &[expr.clone()], previous_indentation);
-        let space = if breaks { '\n' } else { ' ' };
         if i < exprs.len() - 1 {
             acc.push_str(&value.to_string());
-            acc.push(space);
+            acc.push(' ');
         } else {
             acc.push_str(&value.to_string());
         }
     }
-    acc.push_str(&format!(
-        "{}{})",
-        if breaks { previous_indentation } else { "" },
-        if breaks { "\n" } else { "" },
-    ));
+    acc.push(')');
     t(&acc).to_string()
 }
 
-fn line_length_over_max(settings: &Settings, exprs: &[PreSymbolicExpression]) -> bool {
-    if let Some(last_expr) = exprs.last() {
-        last_expr.span.end_column >= settings.max_line_length.try_into().unwrap()
-    } else {
-        false
-    }
-}
 // used for { n1: 1 } syntax
 fn format_key_value_sugar(
     settings: &Settings,
@@ -893,6 +890,7 @@ mod tests_formatter {
         let expected = "(or\n  true\n  (is-eq 1 2)\n  (is-eq 1 1)\n)";
         assert_eq!(expected, result);
     }
+
     #[test]
     fn test_booleans_with_comments() {
         let src = r#"(or
@@ -901,6 +899,15 @@ mod tests_formatter {
   (is-eq 1 2) ;; comment
   (is-eq 1 1) ;; b
 )"#;
+        let result = format_with_default(&String::from(src));
+        assert_eq!(src, result);
+
+        let src = r#"(asserts!
+  (or
+    (is-eq merkle-root txid) ;; true, if the transaction is the only transaction
+    (try! (verify-merkle-proof reversed-txid (reverse-buff32 merkle-root) proof))
+  )
+  (err ERR-INVALID-MERKLE-PROOF))"#;
         let result = format_with_default(&String::from(src));
         assert_eq!(src, result);
     }
