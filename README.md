@@ -1,7 +1,7 @@
 # Clarinet
 
 Clarinet is a Clarity runtime packaged as a command line tool, designed to facilitate smart contract understanding,
-development, testing and deployment. Clarinet consists of a Clarity Read-Evaluate-Print-Loop (REPL) environment and a testing harness. When used together, Clarity and the REPL environment enable you to rapidly develop and test a Clarity smart contract, allowing you to deploy the contract to [devnet, testnet, or mainnet](https://docs.hiro.so/stacks/clarinet/concepts/network-types).
+development, testing and deployment. Clarinet consists of a Clarity Read-Evaluate-Print-Loop (REPL) environment and a testing harness. When used together, Clarity and the REPL environment enable you to rapidly develop and test a Clarity smart contract, allowing you to deploy the contract to [devnet, testnet, or mainnet](https://docs.hiro.so/stacks/clarinet/concepts#network-types).
 
 Clarity is a **decidable** smart contract language that optimizes for predictability and security, meaning you can know with certainty, from the code itself, what the program will do. Smart contracts allow you to encode essential business logic on a blockchain.
 
