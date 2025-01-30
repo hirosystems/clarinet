@@ -119,7 +119,6 @@ impl Session {
 
         Self {
             interpreter: ClarityInterpreter::new(tx_sender, settings.repl_settings.clone()),
-            // current_epoch: settings.epoch_id.unwrap_or(StacksEpochId::Epoch2_05),
             contracts: BTreeMap::new(),
             api_reference: build_api_reference(),
             show_costs: false,
@@ -1746,8 +1745,6 @@ mod tests {
         // deploy default contract
         let contract = ClarityContractBuilder::default().build();
         let _ = session.deploy_contract(&contract, false, None);
-
-        dbg!(&contract);
 
         let result = session.call_contract_fn(
             "contract",

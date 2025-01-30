@@ -38,8 +38,6 @@ fn epoch_to_peer_version(epoch: StacksEpochId) -> u8 {
     }
 }
 
-// key: key string, value: (block height, value)
-
 #[derive(Clone, Debug)]
 pub struct ClarityDatastore {
     open_chain_tip: StacksBlockId,

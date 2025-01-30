@@ -2,7 +2,6 @@ use std::convert::TryInto;
 use std::fmt;
 use std::str::FromStr;
 
-use clarity::consts::NETWORK_ID_MAINNET;
 use clarity::types::chainstate::StacksAddress;
 use clarity::types::StacksEpochId;
 use clarity::vm::types::{PrincipalData, QualifiedContractIdentifier, StandardPrincipalData};
@@ -170,7 +169,7 @@ impl RemoteDataSettings {
             initial_height,
             network_id: info.network_id,
             stacks_tip_height: info.stacks_tip_height,
-            is_mainnet: info.network_id == NETWORK_ID_MAINNET,
+            is_mainnet: info.network_id == 1,
         };
 
         Ok(initial_remote_data)

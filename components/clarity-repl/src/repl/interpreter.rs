@@ -5,7 +5,7 @@ use crate::analysis::ast_dependency_detector::{ASTDependencyDetector, Dependency
 use crate::analysis::{self};
 use crate::repl::datastore::{ClarityDatastore, Datastore};
 use crate::repl::Settings;
-use clarity::consts::CHAIN_ID_TESTNET;
+use clarity::consts::{CHAIN_ID_MAINNET, CHAIN_ID_TESTNET};
 use clarity::types::StacksEpochId;
 use clarity::vm::analysis::ContractAnalysis;
 use clarity::vm::ast::{build_ast_with_diagnostics, ContractAST};
@@ -29,7 +29,7 @@ use clarity::vm::{CostSynthesis, ExecutionResult, ParsedContract};
 
 use super::datastore::StacksConstants;
 use super::remote_data::HttpClient;
-use super::settings::ApiUrl;
+use super::settings::{ApiUrl, InitialRemoteData};
 use super::{ClarityContract, DEFAULT_EPOCH};
 
 pub const BLOCK_LIMIT_MAINNET: ExecutionCost = ExecutionCost {
@@ -45,6 +45,7 @@ pub struct ClarityInterpreter {
     pub clarity_datastore: ClarityDatastore,
     pub datastore: Datastore,
     pub repl_settings: Settings,
+    initial_remote_data: Option<InitialRemoteData>,
     tx_sender: StandardPrincipalData,
     accounts: BTreeSet<String>,
     tokens: BTreeMap<String, BTreeMap<String, u128>>,
@@ -68,12 +69,13 @@ impl ClarityInterpreter {
             None
         };
 
-        let clarity_datastore = ClarityDatastore::new(initial_remote_data, client);
+        let clarity_datastore = ClarityDatastore::new(initial_remote_data.clone(), client);
         let datastore = Datastore::new(&clarity_datastore, StacksConstants::default());
 
         Self {
             tx_sender,
             repl_settings,
+            initial_remote_data,
             clarity_datastore,
             datastore,
             accounts: BTreeSet::new(),
@@ -374,6 +376,52 @@ impl ClarityInterpreter {
         Some(format!("0x{value_hex}"))
     }
 
+    fn get_global_context(
+        &mut self,
+        epoch: StacksEpochId,
+        cost_track: bool,
+    ) -> Result<GlobalContext, String> {
+        let is_mainnet = self
+            .initial_remote_data
+            .as_ref()
+            .map_or(false, |data| data.is_mainnet);
+        let chain_id = if is_mainnet {
+            CHAIN_ID_MAINNET
+        } else {
+            CHAIN_ID_TESTNET
+        };
+
+        let mut conn = ClarityDatabase::new(
+            &mut self.clarity_datastore,
+            &self.datastore,
+            &self.datastore,
+        );
+        conn.begin();
+        conn.set_clarity_epoch_version(epoch)
+            .map_err(|e| e.to_string())?;
+        conn.commit().map_err(|e| e.to_string())?;
+        let cost_tracker = if cost_track {
+            LimitedCostTracker::new(
+                is_mainnet,
+                chain_id,
+                BLOCK_LIMIT_MAINNET.clone(),
+                &mut conn,
+                epoch,
+            )
+            .map_err(|e| format!("failed to initialize cost tracker: {e}"))?
+        } else {
+            LimitedCostTracker::new_free()
+        };
+
+        Ok(GlobalContext::new(
+            is_mainnet,
+            chain_id,
+            conn,
+            cost_tracker,
+            epoch,
+        ))
+    }
+
     fn execute(
         &mut self,
         contract: &ClarityContract,
@@ -387,30 +435,12 @@ impl ClarityInterpreter {
         let mut contract_context =
             ContractContext::new(contract_id.clone(), contract.clarity_version);
 
-        let mut conn = ClarityDatabase::new(
-            &mut self.clarity_datastore,
-            &self.datastore,
-            &self.datastore,
-        );
+        #[cfg(not(feature = "wasm"))]
+        let show_timings = self.repl_settings.show_timings;
+
         let tx_sender: PrincipalData = self.tx_sender.clone().into();
-        conn.begin();
-        conn.set_clarity_epoch_version(contract.epoch)
-            .map_err(|e| e.to_string())?;
-        conn.commit().map_err(|e| e.to_string())?;
-        let cost_tracker = if cost_track {
-            LimitedCostTracker::new(
-                false,
-                CHAIN_ID_TESTNET,
-                BLOCK_LIMIT_MAINNET.clone(),
-                &mut conn,
-                contract.epoch,
-            )
-            .map_err(|e| format!("failed to initialize cost tracker: {e}"))?
-        } else {
-            LimitedCostTracker::new_free()
-        };
-        let mut global_context =
-            GlobalContext::new(false, CHAIN_ID_TESTNET, conn, cost_tracker, contract.epoch);
+
+        let mut global_context = self.get_global_context(contract.epoch, cost_track)?;
 
         if let Some(mut in_hooks) = eval_hooks {
             let mut hooks: Vec<&mut dyn EvalHook> = Vec::new();
@@ -419,9 +449,6 @@ impl ClarityInterpreter {
             }
             global_context.eval_hooks = Some(hooks);
         }
-
-        #[cfg(not(feature = "wasm"))]
-        let show_timings = self.repl_settings.show_timings;
 
         global_context.begin();
         let result = global_context.execute(|g| {
@@ -616,30 +643,10 @@ impl ClarityInterpreter {
         let mut contract_context =
             ContractContext::new(contract_id.clone(), contract.clarity_version);
 
-        let mut conn = ClarityDatabase::new(
-            &mut self.clarity_datastore,
-            &self.datastore,
-            &self.datastore,
-        );
+        let show_timings = self.repl_settings.show_timings;
         let tx_sender: PrincipalData = self.tx_sender.clone().into();
-        conn.begin();
-        conn.set_clarity_epoch_version(contract.epoch)
-            .expect("failed to set epoch");
-        conn.commit().expect("failed to commit");
-        let cost_tracker = if cost_track {
-            LimitedCostTracker::new(
-                false,
-                CHAIN_ID_TESTNET,
-                BLOCK_LIMIT_MAINNET.clone(),
-                &mut conn,
-                contract.epoch,
-            )
-            .map_err(|e| format!("failed to initialize cost tracker: {e}"))?
-        } else {
-            LimitedCostTracker::new_free()
-        };
-        let mut global_context =
-            GlobalContext::new(false, CHAIN_ID_TESTNET, conn, cost_tracker, contract.epoch);
+
+        let mut global_context = self.get_global_context(contract.epoch, cost_track)?;
 
         if let Some(mut in_hooks) = eval_hooks {
             let mut hooks: Vec<&mut dyn EvalHook> = Vec::new();
@@ -648,8 +655,6 @@ impl ClarityInterpreter {
             }
             global_context.eval_hooks = Some(hooks);
         }
-
-        let show_timings = self.repl_settings.show_timings;
 
         global_context.begin();
         let result = global_context.execute(|g| {
@@ -852,31 +857,9 @@ impl ClarityInterpreter {
         allow_private: bool,
         mut eval_hooks: Vec<&mut dyn EvalHook>,
     ) -> Result<ExecutionResult, String> {
-        let mut conn = ClarityDatabase::new(
-            &mut self.clarity_datastore,
-            &self.datastore,
-            &self.datastore,
-        );
         let tx_sender: PrincipalData = self.tx_sender.clone().into();
-        conn.begin();
-        conn.set_clarity_epoch_version(epoch)
-            .map_err(|e| e.to_string())?;
-        conn.commit().map_err(|e| e.to_string())?;
-        let cost_tracker = if track_costs {
-            LimitedCostTracker::new(
-                false,
-                CHAIN_ID_TESTNET,
-                BLOCK_LIMIT_MAINNET.clone(),
-                &mut conn,
-                epoch,
-            )
-            .map_err(|e| format!("failed to initialize cost tracker: {e}"))?
-        } else {
-            LimitedCostTracker::new_free()
-        };
 
-        let mut global_context =
-            GlobalContext::new(false, CHAIN_ID_TESTNET, conn, cost_tracker, epoch);
+        let mut global_context = self.get_global_context(epoch, track_costs)?;
 
         let mut hooks: Vec<&mut dyn EvalHook> = Vec::new();
         for hook in eval_hooks.drain(..) {
@@ -1065,19 +1048,8 @@ impl ClarityInterpreter {
         amount: u64,
     ) -> Result<String, String> {
         let final_balance = {
-            let conn = ClarityDatabase::new(
-                &mut self.clarity_datastore,
-                &self.datastore,
-                &self.datastore,
-            );
+            let mut global_context = self.get_global_context(DEFAULT_EPOCH, false)?;
 
-            let mut global_context = GlobalContext::new(
-                false,
-                CHAIN_ID_TESTNET,
-                conn,
-                LimitedCostTracker::new_free(),
-                DEFAULT_EPOCH,
-            );
             global_context.begin();
             let mut cur_balance = global_context
                 .database
