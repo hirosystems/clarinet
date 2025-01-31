@@ -1122,6 +1122,7 @@ mod tests_formatter {
 )"#;
         assert_eq!(expected, result);
     }
+
     #[test]
     #[ignore]
     fn test_irl_contracts() {

@@ -115,8 +115,10 @@ struct Formatter {
     #[clap(long = "tabs", short = 't')]
     /// indentation size, e.g. 2
     pub indentation: Option<usize>,
-    #[clap(long = "dry-run")]
+    #[clap(long = "dry-run", conflicts_with = "in_place")]
     pub dry_run: bool,
+    #[clap(long = "in-place", conflicts_with = "dry_run")]
+    pub in_place: bool,
 }
 
 #[derive(Subcommand, PartialEq, Clone, Debug)]
@@ -1234,10 +1236,12 @@ pub fn main() {
 
             for (file_path, source) in &sources {
                 let output = formatter.format(source);
-                if !cmd.dry_run {
+                if cmd.in_place {
                     let _ = overwrite_formatted(file_path, output);
-                } else {
+                } else if cmd.dry_run {
                     println!("{}", output);
+                } else {
+                    eprintln!("required flags: in-place or dry-run");
                 }
             }
         }
