@@ -1042,6 +1042,10 @@ impl ClarityInterpreter {
         (events, accounts_to_credit, accounts_to_debit)
     }
 
+    pub fn save_genesis_accounts(&mut self, addresses: Vec<StandardPrincipalData>) {
+        self.clarity_datastore.save_local_account(addresses);
+    }
+
     pub fn mint_stx_balance(
         &mut self,
         recipient: PrincipalData,

@@ -11,7 +11,9 @@ use clarity::vm::analysis::AnalysisDatabase;
 use clarity::vm::database::BurnStateDB;
 use clarity::vm::database::{ClarityBackingStore, HeadersDB};
 use clarity::vm::errors::InterpreterResult as Result;
-use clarity::vm::types::{QualifiedContractIdentifier, TupleData};
+use clarity::vm::types::{
+    PrincipalData, QualifiedContractIdentifier, StandardPrincipalData, TupleData,
+};
 use clarity::vm::StacksEpoch;
 use pox_locking::handle_contract_call_special_cases;
 use sha2::{Digest, Sha512_256};
@@ -49,6 +51,7 @@ pub struct ClarityDatastore {
 
     initial_remote_data: Option<InitialRemoteData>,
     remote_block_info_cache: HashMap<u32, Block>,
+    local_accounts: Vec<StandardPrincipalData>,
 
     client: HttpClient,
 }
@@ -172,6 +175,7 @@ impl ClarityDatastore {
 
             initial_remote_data: None,
             remote_block_info_cache: HashMap::new(),
+            local_accounts: Vec::new(),
 
             client,
         }
@@ -195,6 +199,7 @@ impl ClarityDatastore {
 
             initial_remote_data: Some(initial_remote_data),
             remote_block_info_cache: cache,
+            local_accounts: Vec::new(),
 
             client,
         }
@@ -245,6 +250,22 @@ impl ClarityDatastore {
         // self.side_store.commit(&self.chain_tip);
         // self.marf.commit_to(final_bhh)
         //     .expect("ERROR: Failed to commit MARF block");
+    }
+
+    pub fn save_local_account(&mut self, local_accounts: Vec<StandardPrincipalData>) {
+        self.local_accounts = local_accounts;
+    }
+
+    fn is_key_from_local_account(&mut self, key: &str) -> bool {
+        let parts: Vec<&str> = key.split("::").collect();
+        if let Ok(principal) = PrincipalData::parse(parts[1]) {
+            let standard_principal = match principal {
+                PrincipalData::Contract(contract) => contract.issuer,
+                PrincipalData::Standard(standard) => standard,
+            };
+            return self.local_accounts.contains(&standard_principal);
+        }
+        false
     }
 
     fn put(&mut self, key: &str, value: &str) {
@@ -326,19 +347,23 @@ impl ClarityBackingStore for ClarityDatastore {
     /// fetch K-V out of the committed datastore
     fn get_data(&mut self, key: &str) -> Result<Option<String>> {
         let current_height = self.get_current_block_height();
+        let fetch_remote_data =
+            self.initial_remote_data.is_some() && !self.is_key_from_local_account(key);
+
         let values_map = self.store.get(key);
 
-        if let Some(initial_remote_data) = &self.initial_remote_data {
+        if fetch_remote_data {
             // if the value for the exact current_chain_tip is present, return it
             if let Some(data) = values_map.and_then(|data| data.get(&current_height)) {
                 return Ok(Some(data.clone()));
             }
 
-            if current_height > initial_remote_data.initial_height {
+            let initial_height = self.initial_remote_data.as_ref().unwrap().initial_height;
+            if current_height > initial_height {
                 if let Some((_, value)) = values_map.and_then(|data| {
-                    data.iter().rev().find(|(height, _)| {
-                        height > &&initial_remote_data.initial_height && height <= &&current_height
-                    })
+                    data.iter()
+                        .rev()
+                        .find(|(height, _)| height > &&initial_height && height <= &&current_height)
                 }) {
                     return Ok(Some(value.clone()));
                 }
@@ -453,7 +478,7 @@ impl ClarityBackingStore for ClarityDatastore {
         if metadata.is_some() {
             return Ok(metadata.cloned());
         }
-        if self.initial_remote_data.is_some() {
+        if self.initial_remote_data.is_some() && !self.local_accounts.contains(&contract.issuer) {
             let data = self.fetch_clarity_metadata(contract, key);
             if let Ok(Some(value)) = &data {
                 let _ = self.insert_metadata(contract, key, value);
@@ -821,7 +846,7 @@ impl HeadersDB for Datastore {
     }
 
     fn get_burn_block_height_for_block(&self, id_bhh: &StacksBlockId) -> Option<u32> {
-        self.get_burn_header_hash_for_block(id_bhh)
+        self.get_burn_header_hash_for_block(dbg!(id_bhh))
             .and_then(|hash| self.burn_blocks.get(&hash))
             .map(|b| b.burn_chain_height)
     }

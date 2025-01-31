@@ -106,6 +106,9 @@ fn update_session_with_genesis_accounts(
     deployment: &DeploymentSpecification,
 ) {
     if let Some(ref spec) = deployment.genesis {
+        let addresses: Vec<_> = spec.wallets.iter().map(|w| w.address.clone()).collect();
+        session.interpreter.save_genesis_accounts(addresses);
+
         for wallet in spec.wallets.iter() {
             let _ = session.interpreter.mint_stx_balance(
                 wallet.address.clone().into(),

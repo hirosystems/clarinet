@@ -1043,6 +1043,19 @@ impl SDK {
         session.handle_command(&snippet)
     }
 
+    #[wasm_bindgen(js_name=setLocalAccounts)]
+    pub fn set_local_accounts(&mut self, addresses: Vec<String>) {
+        let principals = addresses
+            .into_iter()
+            .map(|a| StandardPrincipalData::from(StacksAddress::from_string(&a).unwrap()))
+            .collect();
+        let session = self.get_session_mut();
+        session
+            .interpreter
+            .clarity_datastore
+            .save_local_account(principals);
+    }
+
     #[wasm_bindgen(js_name=mintSTX)]
     pub fn mint_stx(&mut self, recipient: String, amount: u64) -> Result<String, String> {
         let session = self.get_session_mut();

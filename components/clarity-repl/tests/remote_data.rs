@@ -85,9 +85,9 @@ fn it_handles_at_block() {
     let mut session = init_session(60000);
 
     // block 42000 hash
-    let id_header_hash = "0xb4678e059aa9b82b1473597087876ef61a5c6a0c35910cd4b797201d6b423a07";
+    let hash = "0xb4678e059aa9b82b1473597087876ef61a5c6a0c35910cd4b797201d6b423a07";
 
-    let snippet = format!("(at-block {} stacks-block-height)", id_header_hash);
+    let snippet = format!("(at-block {} stacks-block-height)", hash);
     let result = eval_snippet(&mut session, &snippet);
     assert_eq!(result, Value::UInt(42000));
 
@@ -111,6 +111,29 @@ fn it_handles_at_block() {
     );
     let result = eval_snippet(&mut session, &snippet_get_count_at_57k);
     assert_eq!(result, Value::okay(Value::UInt(1)).unwrap());
+}
+
+#[test]
+fn it_can_get_heights() {
+    let mut session = init_session(57000);
+
+    let result = eval_snippet(&mut session, "stacks-block-height");
+    assert_eq!(result, Value::UInt(57000));
+    let result = eval_snippet(&mut session, "burn-block-height");
+    assert_eq!(result, Value::UInt(6603));
+    let result = eval_snippet(&mut session, "tenure-height");
+    assert_eq!(result, Value::UInt(4251));
+
+    let hash = "0xb4678e059aa9b82b1473597087876ef61a5c6a0c35910cd4b797201d6b423a07";
+    let snippet = format!("(at-block {hash} stacks-block-height)");
+    let result = eval_snippet(&mut session, &snippet);
+    assert_eq!(result, Value::UInt(42000));
+    // let snippet = format!("(at-block {hash} burn-block-height)");
+    // let result = eval_snippet(&mut session, &snippet);
+    // assert_eq!(result, Value::UInt(5560));
+    // let snippet = format!("(at-block {hash} tenure-height)");
+    // let result = eval_snippet(&mut session, &snippet);
+    // assert_eq!(result, Value::UInt(3302));
 }
 
 #[test]

@@ -82,7 +82,8 @@ async fn it_can_call_remote_data() {
     let _ = sdk
         .init_empty_session(JsValue::from_serde(&options).unwrap())
         .await;
-    sdk.set_epoch(EpochString::new("3.0"));
+
+    assert_eq!(sdk.current_epoch(), "3.1");
 
     let tx = sdk.call_public_fn(&CallFnArgs::new(
         "STJCAB2T9TR2EJM7YS4DM2CGBBVTF7BV237Y8KNV.counter".into(),
@@ -93,5 +94,6 @@ async fn it_can_call_remote_data() {
 
     uprint!("tx: {:?}", tx);
 
-    // let expected = format!("0x{}", ClarityValue::UInt(0).serialize_to_hex().unwrap());
+    let expected = format!("0x{}", ClarityValue::UInt(0).serialize_to_hex().unwrap());
+    assert_eq!(tx.unwrap().result, expected);
 }
