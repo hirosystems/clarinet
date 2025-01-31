@@ -1,4 +1,5 @@
 use std::collections::{BTreeMap, HashMap};
+use std::sync::{Arc, RwLock};
 
 use super::remote_data::{epoch_for_height, Block, HttpClient};
 use clarity::types::chainstate::{
@@ -43,14 +44,14 @@ fn epoch_to_peer_version(epoch: StacksEpochId) -> u8 {
 #[derive(Clone, Debug)]
 pub struct ClarityDatastore {
     open_chain_tip: StacksBlockId,
-    current_chain_tip: StacksBlockId,
+    current_chain_tip: Arc<RwLock<StacksBlockId>>,
     store: HashMap<String, BTreeMap<u32, String>>,
     metadata: HashMap<(String, String), String>,
     height_at_chain_tip: HashMap<StacksBlockId, u32>,
     chain_tip_at_height: HashMap<u32, StacksBlockId>,
 
     initial_remote_data: Option<InitialRemoteData>,
-    remote_block_info_cache: HashMap<u32, Block>,
+    remote_block_info_cache: Arc<RwLock<HashMap<StacksBlockId, Block>>>,
     local_accounts: Vec<StandardPrincipalData>,
 
     client: HttpClient,
@@ -103,6 +104,8 @@ pub struct Datastore {
     genesis_id: StacksBlockId,
     burn_chain_tip: BurnchainHeaderHash,
     burn_chain_height: u32,
+    current_chain_tip: Arc<RwLock<StacksBlockId>>,
+    remote_block_info_cache: Arc<RwLock<HashMap<StacksBlockId, Block>>>,
     burn_blocks: HashMap<BurnchainHeaderHash, BurnBlockInfo>,
     stacks_chain_height: u32,
     stacks_blocks: HashMap<StacksBlockId, StacksBlockInfo>,
@@ -167,14 +170,14 @@ impl ClarityDatastore {
 
         Self {
             open_chain_tip: id,
-            current_chain_tip: id,
+            current_chain_tip: Arc::new(RwLock::new(id)),
             store: HashMap::new(),
             metadata: HashMap::new(),
             height_at_chain_tip: HashMap::from([(id, height)]),
             chain_tip_at_height: HashMap::from([(height, id)]),
 
             initial_remote_data: None,
-            remote_block_info_cache: HashMap::new(),
+            remote_block_info_cache: Arc::new(RwLock::new(HashMap::new())),
             local_accounts: Vec::new(),
 
             client,
@@ -185,20 +188,20 @@ impl ClarityDatastore {
         let height = initial_remote_data.initial_height;
         let path = format!("/extended/v2/blocks/{}", height);
         let block = client.fetch_block(&path);
-        let cache = HashMap::from([(block.height, block.clone())]);
+        let cache = HashMap::from([(block.index_block_hash, block.clone())]);
 
         let id = block.index_block_hash;
 
         Self {
             open_chain_tip: id,
-            current_chain_tip: id,
+            current_chain_tip: Arc::new(RwLock::new(id)),
             store: HashMap::new(),
             metadata: HashMap::new(),
             height_at_chain_tip: HashMap::from([(id, height)]),
             chain_tip_at_height: HashMap::from([(height, id)]),
 
             initial_remote_data: Some(initial_remote_data),
-            remote_block_info_cache: cache,
+            remote_block_info_cache: Arc::new(RwLock::new(cache)),
             local_accounts: Vec::new(),
 
             client,
@@ -283,7 +286,9 @@ impl ClarityDatastore {
     fn fetch_block(&mut self, url: &str) -> Block {
         let block = self.client.fetch_block(url);
         self.remote_block_info_cache
-            .insert(block.height, block.clone());
+            .write()
+            .unwrap()
+            .insert(block.index_block_hash, block.clone());
         self.height_at_chain_tip
             .insert(block.index_block_hash, block.height);
         self.chain_tip_at_height
@@ -292,15 +297,15 @@ impl ClarityDatastore {
     }
 
     fn get_remote_block_info_from_height(&mut self, height: u32) -> Block {
-        if let Some(cached) = self.remote_block_info_cache.get(&height) {
-            return cached.clone();
+        if let Some(hash) = self.chain_tip_at_height.get(&height) {
+            return self.get_remote_block_info_from_hash(&hash.clone());
         }
         self.fetch_block(&format!("/extended/v2/blocks/{}", height))
     }
 
     fn get_remote_block_info_from_hash(&mut self, hash: &StacksBlockId) -> Block {
-        if let Some(height) = self.height_at_chain_tip.get(hash) {
-            return self.get_remote_block_info_from_height(*height);
+        if let Some(cached) = self.remote_block_info_cache.read().unwrap().get(hash) {
+            return cached.clone();
         }
         self.fetch_block(&format!("/extended/v2/blocks/{}", hash))
     }
@@ -408,7 +413,10 @@ impl ClarityBackingStore for ClarityDatastore {
     /// returns the previous block header hash on success
     fn set_block_hash(&mut self, bhh: StacksBlockId) -> Result<StacksBlockId> {
         let prior_tip = self.open_chain_tip;
-        self.current_chain_tip = bhh;
+        self.current_chain_tip.write().unwrap().clone_from(&bhh);
+        if self.initial_remote_data.is_some() {
+            self.get_remote_block_info_from_hash(&bhh);
+        }
         Ok(prior_tip)
     }
 
@@ -426,13 +434,13 @@ impl ClarityBackingStore for ClarityDatastore {
     ///  i.e., it changes on time-shifted evaluation. the open_chain_tip functions always
     ///   return data about the chain tip that is currently open for writing.
     fn get_current_block_height(&mut self) -> u32 {
-        if let Some(height) = self.height_at_chain_tip.get(&self.current_chain_tip) {
+        let current_chain_tip = *self.current_chain_tip.read().unwrap();
+        if let Some(height) = self.height_at_chain_tip.get(&current_chain_tip) {
             return *height;
         }
 
         if let Some(initial_height) = self.initial_remote_data.as_ref().map(|d| d.initial_height) {
-            let hash = self.current_chain_tip;
-            let block_info = self.get_remote_block_info_from_hash(&hash);
+            let block_info = self.get_remote_block_info_from_hash(&current_chain_tip);
             if block_info.height <= initial_height {
                 return block_info.height;
             }
@@ -554,6 +562,8 @@ impl Datastore {
             genesis_id: id,
             burn_chain_tip: burn_block_header_hash,
             burn_chain_height,
+            current_chain_tip: Arc::clone(&clarity_datastore.current_chain_tip),
+            remote_block_info_cache: Arc::clone(&clarity_datastore.remote_block_info_cache),
             burn_blocks,
             stacks_chain_height,
             stacks_blocks,
@@ -570,15 +580,16 @@ impl Datastore {
         clarity_datastore: &ClarityDatastore,
         constants: StacksConstants,
     ) -> Self {
+        let current_chain_tip = clarity_datastore.current_chain_tip.read().unwrap();
         let stacks_chain_height = clarity_datastore
             .height_at_chain_tip
-            .get(&clarity_datastore.current_chain_tip)
+            .get(&current_chain_tip)
             .unwrap();
 
-        let block = clarity_datastore
-            .remote_block_info_cache
-            .get(stacks_chain_height)
-            .unwrap();
+        let block = {
+            let cache = clarity_datastore.remote_block_info_cache.read().unwrap();
+            cache.get(&current_chain_tip).unwrap().clone()
+        };
 
         let is_mainnet = clarity_datastore
             .initial_remote_data
@@ -626,6 +637,8 @@ impl Datastore {
             genesis_id: id,
             burn_chain_tip: burn_block_header_hash,
             burn_chain_height,
+            current_chain_tip: Arc::clone(&clarity_datastore.current_chain_tip),
+            remote_block_info_cache: Arc::clone(&clarity_datastore.remote_block_info_cache),
             burn_blocks,
             stacks_chain_height: *stacks_chain_height,
             stacks_blocks,
@@ -653,9 +666,10 @@ impl Datastore {
     fn build_next_stacks_block(&self, clarity_datastore: &ClarityDatastore) -> StacksBlockInfo {
         let stacks_block_height = self.stacks_chain_height;
 
+        let current_chain_tip = clarity_datastore.current_chain_tip.read().unwrap();
         let previous_stacks_block = self
             .stacks_blocks
-            .get(&clarity_datastore.current_chain_tip)
+            .get(&current_chain_tip)
             .expect("current chain tip missing in stacks block table");
         let last_burn_block = self
             .burn_blocks
@@ -687,31 +701,35 @@ impl Datastore {
         count: u32,
     ) -> u32 {
         for _ in 1..=count {
-            let last_stacks_block = self
-                .stacks_blocks
-                .get(&clarity_datastore.current_chain_tip)
-                .unwrap_or_else(|| {
-                    panic!(
-                        "current chain tip missing in stacks_blocks table: {}",
-                        clarity_datastore.current_chain_tip
-                    )
-                });
-            let last_burn_block = self
-                .burn_blocks
-                .get(&self.burn_chain_tip)
-                .unwrap_or_else(|| {
-                    panic!(
-                        "burn block missing in burn_blocks table: {}",
-                        self.burn_chain_tip
-                    )
-                });
+            let next_burn_block_time = {
+                let current_chain_tip = clarity_datastore.current_chain_tip.read().unwrap();
+                let last_stacks_block =
+                    self.stacks_blocks
+                        .get(&current_chain_tip)
+                        .unwrap_or_else(|| {
+                            panic!(
+                                "current chain tip missing in stacks_blocks table: {}",
+                                current_chain_tip
+                            )
+                        });
+                let last_burn_block =
+                    self.burn_blocks
+                        .get(&self.burn_chain_tip)
+                        .unwrap_or_else(|| {
+                            panic!(
+                                "burn block missing in burn_blocks table: {}",
+                                self.burn_chain_tip
+                            )
+                        });
 
-            let mut next_burn_block_time =
-                last_burn_block.burn_block_time + SECONDS_BETWEEN_BURN_BLOCKS;
-            if last_stacks_block.stacks_block_time > next_burn_block_time {
-                next_burn_block_time =
-                    last_stacks_block.stacks_block_time + SECONDS_BETWEEN_STACKS_BLOCKS;
-            }
+                let mut next_burn_block_time =
+                    last_burn_block.burn_block_time + SECONDS_BETWEEN_BURN_BLOCKS;
+                if last_stacks_block.stacks_block_time > next_burn_block_time {
+                    next_burn_block_time =
+                        last_stacks_block.stacks_block_time + SECONDS_BETWEEN_STACKS_BLOCKS;
+                }
+                next_burn_block_time
+            };
 
             let height = self.burn_chain_height + 1;
             let burn_block_hashes = BurnBlockHashes::from_height(height);
@@ -761,7 +779,11 @@ impl Datastore {
                 .entry(self.stacks_chain_height)
                 .or_insert(id);
             clarity_datastore.open_chain_tip = id;
-            clarity_datastore.current_chain_tip = id;
+            clarity_datastore
+                .current_chain_tip
+                .write()
+                .unwrap()
+                .clone_from(&id);
         }
 
         self.stacks_chain_height
@@ -932,10 +954,24 @@ impl BurnStateDB for Datastore {
     }
 
     fn get_tip_burn_block_height(&self) -> Option<u32> {
-        Some(self.burn_chain_height)
+        let current_chain_tip = self.current_chain_tip.read().unwrap();
+        let height = self.get_burn_block_height_for_block(&current_chain_tip);
+
+        if height.is_some() {
+            return height;
+        }
+
+        // @todo: ideally, we should only do that if initial_remote_data is enabled
+        return self
+            .remote_block_info_cache
+            .try_read()
+            .unwrap()
+            .get(&current_chain_tip)
+            .map(|block| block.burn_block_height);
     }
 
     fn get_tip_sortition_id(&self) -> Option<SortitionId> {
+        // @todo: same logic as get_tip_burn_block_height above?
         self.burn_blocks
             .get(&self.burn_chain_tip)
             .map(|block| block.sortition_id)

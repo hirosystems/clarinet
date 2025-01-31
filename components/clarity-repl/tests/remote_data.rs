@@ -128,12 +128,12 @@ fn it_can_get_heights() {
     let snippet = format!("(at-block {hash} stacks-block-height)");
     let result = eval_snippet(&mut session, &snippet);
     assert_eq!(result, Value::UInt(42000));
-    // let snippet = format!("(at-block {hash} burn-block-height)");
-    // let result = eval_snippet(&mut session, &snippet);
-    // assert_eq!(result, Value::UInt(5560));
-    // let snippet = format!("(at-block {hash} tenure-height)");
-    // let result = eval_snippet(&mut session, &snippet);
-    // assert_eq!(result, Value::UInt(3302));
+    let snippet = format!("(at-block {hash} burn-block-height)");
+    let result = eval_snippet(&mut session, &snippet);
+    assert_eq!(result, Value::UInt(5560));
+    let snippet = format!("(at-block {hash} tenure-height)");
+    let result = eval_snippet(&mut session, &snippet);
+    assert_eq!(result, Value::UInt(3302));
 }
 
 #[test]
