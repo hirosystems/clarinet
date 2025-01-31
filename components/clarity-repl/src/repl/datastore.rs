@@ -666,10 +666,9 @@ impl Datastore {
     fn build_next_stacks_block(&self, clarity_datastore: &ClarityDatastore) -> StacksBlockInfo {
         let stacks_block_height = self.stacks_chain_height;
 
-        let current_chain_tip = clarity_datastore.current_chain_tip.read().unwrap();
         let previous_stacks_block = self
             .stacks_blocks
-            .get(&current_chain_tip)
+            .get(&clarity_datastore.open_chain_tip)
             .expect("current chain tip missing in stacks block table");
         let last_burn_block = self
             .burn_blocks
@@ -702,16 +701,15 @@ impl Datastore {
     ) -> u32 {
         for _ in 1..=count {
             let next_burn_block_time = {
-                let current_chain_tip = clarity_datastore.current_chain_tip.read().unwrap();
-                let last_stacks_block =
-                    self.stacks_blocks
-                        .get(&current_chain_tip)
-                        .unwrap_or_else(|| {
-                            panic!(
-                                "current chain tip missing in stacks_blocks table: {}",
-                                current_chain_tip
-                            )
-                        });
+                let last_stacks_block = self
+                    .stacks_blocks
+                    .get(&clarity_datastore.open_chain_tip)
+                    .unwrap_or_else(|| {
+                        panic!(
+                            "current chain tip missing in stacks_blocks table: {}",
+                            clarity_datastore.open_chain_tip
+                        )
+                    });
                 let last_burn_block =
                     self.burn_blocks
                         .get(&self.burn_chain_tip)
@@ -868,7 +866,7 @@ impl HeadersDB for Datastore {
     }
 
     fn get_burn_block_height_for_block(&self, id_bhh: &StacksBlockId) -> Option<u32> {
-        self.get_burn_header_hash_for_block(dbg!(id_bhh))
+        self.get_burn_header_hash_for_block(id_bhh)
             .and_then(|hash| self.burn_blocks.get(&hash))
             .map(|b| b.burn_chain_height)
     }

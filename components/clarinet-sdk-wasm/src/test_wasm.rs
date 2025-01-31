@@ -92,8 +92,6 @@ async fn it_can_call_remote_data() {
         "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM".into(),
     ));
 
-    uprint!("tx: {:?}", tx);
-
     let expected = format!("0x{}", ClarityValue::UInt(0).serialize_to_hex().unwrap());
     assert_eq!(tx.unwrap().result, expected);
 }

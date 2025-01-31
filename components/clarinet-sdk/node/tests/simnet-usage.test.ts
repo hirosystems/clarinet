@@ -50,6 +50,7 @@ describe("basic simnet interactions", () => {
     simnet.mineEmptyBlocks(4);
     expect(simnet.blockHeight).toBe(blockHeight + 5);
   });
+
   it("can not mine empty stacks block in pre-3.0", () => {
     expect(() => simnet.mineEmptyStacksBlock()).toThrowError(
       "use mineEmptyBurnBlock in epoch lower than 3.0",
