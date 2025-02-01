@@ -434,7 +434,12 @@ impl ClarityBackingStore for ClarityDatastore {
     fn set_block_hash(&mut self, bhh: StacksBlockId) -> Result<StacksBlockId> {
         let prior_tip = self.open_chain_tip;
         if self.initial_remote_data.is_some() {
-            self.get_remote_block_info_from_hash(&bhh);
+            #[allow(clippy::map_entry)]
+            if !self.height_at_chain_tip.contains_key(&bhh) {
+                let block_info = self.get_remote_block_info_from_hash(&bhh);
+                self.height_at_chain_tip.insert(bhh, block_info.height);
+                self.chain_tip_at_height.insert(block_info.height, bhh);
+            }
         }
         *self.current_chain_tip.borrow_mut() = bhh;
         Ok(prior_tip)

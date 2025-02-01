@@ -219,7 +219,10 @@ impl HttpClient {
         }
         match request.send() {
             Ok(response) => response.json::<T>().ok(),
-            Err(_) => None,
+            Err(e) => {
+                uprint!("unable to fetch data from remote: {}", e);
+                None
+            }
         }
     }
 
@@ -267,7 +270,7 @@ impl HttpClient {
                 panic!("unable to parse json, error: {}", e);
             })
             .unwrap_or_else(|| {
-                panic!("unable to get remote block info");
+                panic!("unable to get remote block info for: {}", url);
             });
 
         Block::from(block.clone())
