@@ -3,10 +3,7 @@ use super::core::DeployContractArgs;
 use crate::core::{CallFnArgs, ContractOptions, EpochString, TransactionRes, SDK};
 
 use clarity::vm::Value as ClarityValue;
-use clarity_repl::{
-    repl::settings::{ApiUrl, RemoteDataSettings},
-    uprint,
-};
+use clarity_repl::repl::settings::{ApiUrl, RemoteDataSettings};
 use gloo_utils::format::JsValueSerdeExt;
 use js_sys::Function as JsFunction;
 use wasm_bindgen::JsValue;
