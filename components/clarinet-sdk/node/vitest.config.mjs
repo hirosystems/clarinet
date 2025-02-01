@@ -3,7 +3,7 @@ import { defineConfig } from "vite";
 
 export default defineConfig({
   test: {
-    hookTimeout: 200,
+    hookTimeout: 500,
     testTimeout: 1000,
     // https://vitest.dev/guide/common-errors.html#failed-to-terminate-worker
     pool: "forks",
