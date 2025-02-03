@@ -434,15 +434,15 @@ pub async fn generate_default_deployment(
 
                     // Build the struct representing the requirement in the deployment
                     if matches!(network, StacksNetwork::Simnet) {
-                        let data = EmulatedContractPublishSpecification {
-                            contract_name: contract_id.name.clone(),
-                            emulated_sender: contract_id.issuer.clone(),
-                            source: source.clone(),
-                            location: contract_location,
-                            clarity_version,
-                        };
-
                         if !simnet_remote_data {
+                            let data = EmulatedContractPublishSpecification {
+                                contract_name: contract_id.name.clone(),
+                                emulated_sender: contract_id.issuer.clone(),
+                                source: source.clone(),
+                                location: contract_location,
+                                clarity_version,
+                            };
+
                             emulated_contracts_publish.insert(contract_id.clone(), data);
                         }
                     } else if matches!(network, StacksNetwork::Devnet | StacksNetwork::Testnet) {

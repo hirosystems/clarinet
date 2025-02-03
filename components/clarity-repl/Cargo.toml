@@ -37,7 +37,6 @@ clarity = { workspace = true }
 clar2wasm = { git = "https://github.com/stacks-network/clarity-wasm.git", branch = "main", optional = true }
 pox-locking = { git = "https://github.com/stacks-network/stacks-core.git", branch="feat/clarity-wasm-develop", optional = true, default-features = false }
 prettytable-rs = { version = "0.10.0" }
-ehttp = "0.5.0"
 
 # wasm
 wasm-bindgen = { workspace = true, optional = true }
