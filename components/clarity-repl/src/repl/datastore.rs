@@ -60,6 +60,9 @@ pub struct ClarityDatastore {
 
 impl Clone for ClarityDatastore {
     fn clone(&self) -> Self {
+        // for performance optimization, a simnet session can be stored and cached
+        // when cloning the session (and the datastore), we do not want to keep the
+        // current_chain_tip RefCell value, but rather sync it with the open_chain_tip
         *self.current_chain_tip.borrow_mut() = self.open_chain_tip;
         Self {
             open_chain_tip: self.open_chain_tip,
@@ -68,11 +71,9 @@ impl Clone for ClarityDatastore {
             metadata: self.metadata.clone(),
             height_at_chain_tip: self.height_at_chain_tip.clone(),
             chain_tip_at_height: self.chain_tip_at_height.clone(),
-
             initial_remote_data: self.initial_remote_data.clone(),
             remote_block_info_cache: Rc::clone(&self.remote_block_info_cache),
             local_accounts: self.local_accounts.clone(),
-
             client: self.client.clone(),
         }
     }
