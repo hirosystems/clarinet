@@ -301,10 +301,6 @@ impl ClarityDatastore {
             .insert(height, value.to_string());
     }
 
-    pub fn make_contract_hash_key(contract: &QualifiedContractIdentifier) -> String {
-        format!("clarity-contract::{}", contract)
-    }
-
     fn fetch_block(&mut self, url: &str) -> Block {
         let block = self.client.fetch_block(url);
         self.remote_block_info_cache
@@ -1200,5 +1196,24 @@ mod tests {
                 network_epoch: clarity::consts::PEER_VERSION_EPOCH_2_05,
             })
         );
+    }
+
+    // make that the when a ClarityDatastore is clone, the current values is reset to the initial value
+    #[test]
+    fn test_clarity_datastore_caching() {
+        let (mut clarity_datastore, mut datastore) = get_datastores();
+
+        let initial_tip = *clarity_datastore.current_chain_tip.borrow();
+
+        let cache = clarity_datastore.clone();
+
+        datastore.advance_burn_chain_tip(&mut clarity_datastore, 10);
+
+        let current_tip = *clarity_datastore.current_chain_tip.borrow();
+        assert_ne!(current_tip, initial_tip);
+
+        let clarity_datastore = cache.clone();
+        let current_tip = *clarity_datastore.current_chain_tip.borrow();
+        assert_eq!(current_tip, initial_tip);
     }
 }
