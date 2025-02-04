@@ -112,9 +112,12 @@ struct Formatter {
     pub file: Option<String>,
     #[clap(long = "max-line-length", short = 'l')]
     pub max_line_length: Option<usize>,
-    #[clap(long = "tabs", short = 't')]
+    #[clap(long = "indent", short = 'i', conflicts_with = "use_tabs")]
     /// indentation size, e.g. 2
     pub indentation: Option<usize>,
+    #[clap(long = "tabs", short = 't', conflicts_with = "indentation", action = clap::ArgAction::SetTrue)]
+    /// indentation size, e.g. 2
+    pub use_tabs: bool,
     #[clap(long = "dry-run", conflicts_with = "in_place")]
     pub dry_run: bool,
     #[clap(long = "in-place", conflicts_with = "dry_run")]
@@ -1231,6 +1234,9 @@ pub fn main() {
 
             if let Some(indentation) = cmd.indentation {
                 settings.indentation = clarinet_format::formatter::Indentation::Space(indentation);
+            }
+            if cmd.use_tabs {
+                settings.indentation = clarinet_format::formatter::Indentation::Tab;
             }
             let mut formatter = ClarityFormatter::new(settings);
 
