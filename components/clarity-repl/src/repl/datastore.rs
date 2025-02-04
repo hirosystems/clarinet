@@ -358,7 +358,6 @@ impl ClarityBackingStore for ClarityDatastore {
         Ok(())
     }
 
-    // @todo: this whole logic can be simplified
     /// fetch K-V out of the committed datastore
     fn get_data(&mut self, key: &str) -> Result<Option<String>> {
         let current_height = self.get_current_block_height();
@@ -623,10 +622,10 @@ impl Datastore {
         let sortition_id = sortition.sortition_id;
         let consensus_hash = sortition.consensus_hash;
 
-        // @todo: get vrf-seed from endpoint
-        // once available: https://github.com/stacks-network/stacks-core/issues/5738
-        let bytes = height_to_hashed_bytes(burn_chain_height);
-        let vrf_seed = VRFSeed(bytes);
+        let vrf_seed = sortition.vrf_seed.unwrap_or_else(|| {
+            let bytes = height_to_hashed_bytes(burn_chain_height);
+            VRFSeed(bytes)
+        });
 
         let burn_block = BurnBlockInfo {
             consensus_hash,
@@ -978,9 +977,9 @@ impl BurnStateDB for Datastore {
     }
 
     fn get_tip_sortition_id(&self) -> Option<SortitionId> {
-        // @todo: same logic as get_tip_burn_block_height above?
-        self.burn_blocks
-            .get(&self.burn_chain_tip)
+        let current_chain_tip = self.current_chain_tip.borrow();
+        self.get_burn_header_hash_for_block(&current_chain_tip)
+            .and_then(|hash| self.burn_blocks.get(&hash))
             .map(|block| block.sortition_id)
     }
 

@@ -1,5 +1,7 @@
 use clarity::types::{
-    chainstate::{BlockHeaderHash, BurnchainHeaderHash, ConsensusHash, SortitionId, StacksBlockId},
+    chainstate::{
+        BlockHeaderHash, BurnchainHeaderHash, ConsensusHash, SortitionId, StacksBlockId, VRFSeed,
+    },
     StacksEpochId,
 };
 use clarity::vm::errors::InterpreterResult;
@@ -153,6 +155,19 @@ where
     BlockHeaderHash::from_hex(s.trim_start_matches("0x")).map_err(SerdeError::custom)
 }
 
+fn deserialize_vrf_seed<'de, D>(deserializer: D) -> Result<Option<VRFSeed>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s: Option<String> = Option::deserialize(deserializer)?;
+    match s {
+        Some(s) => VRFSeed::from_hex(s.trim_start_matches("0x"))
+            .map_err(SerdeError::custom)
+            .map(Some),
+        None => Ok(None),
+    }
+}
+
 #[derive(Clone, Debug, Deserialize)]
 pub struct Sortition {
     #[serde(deserialize_with = "deserialize_burnchain_header_hash")]
@@ -164,6 +179,9 @@ pub struct Sortition {
     pub sortition_id: SortitionId,
     #[serde(deserialize_with = "deserialize_sortition_id")]
     pub parent_sortition_id: SortitionId,
+    // @todo: remove serde(default) and Option<> when stacks-network#5772 is merged
+    #[serde(default, deserialize_with = "deserialize_vrf_seed")]
+    pub vrf_seed: Option<VRFSeed>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -240,8 +258,8 @@ impl HttpClient {
 
     pub fn fetch_sortition(&self, burn_block_hash: &BurnchainHeaderHash) -> Sortition {
         let url = format!("/v3/sortitions/burn/{}", burn_block_hash);
-        let soritions = self.get::<Vec<Sortition>>(&url).unwrap();
-        soritions.into_iter().next().unwrap()
+        let sortitions = self.get::<Vec<Sortition>>(&url).unwrap();
+        sortitions.into_iter().next().unwrap()
     }
 
     pub fn fetch_block(&self, url: &str) -> Block {
