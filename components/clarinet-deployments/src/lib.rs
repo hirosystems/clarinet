@@ -547,7 +547,7 @@ pub async fn generate_default_deployment(
             };
         }
 
-        // Don't list requirements as deployment transactions to the deployment specification on Mainnet
+        // Avoid listing requirements as deployment transactions to the deployment specification on Mainnet
         if !matches!(network, StacksNetwork::Mainnet) && !simnet_remote_data {
             let mut ordered_contracts_ids = match ASTDependencyDetector::order_contracts(
                 &requirements_deps,
