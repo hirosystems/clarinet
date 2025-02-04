@@ -1064,7 +1064,7 @@ impl BurnStateDB for Datastore {
     }
 }
 
-#[cfg(all(test, not(target_arch = "wasm32")))]
+#[cfg(test)]
 mod tests {
     use clarity::types::StacksEpoch;
 
