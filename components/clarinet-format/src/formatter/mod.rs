@@ -430,9 +430,6 @@ fn format_if(
 
     acc.push(')');
 
-    if is_nested {
-        acc.push('\n');
-    }
     acc
 }
 
@@ -493,12 +490,19 @@ fn format_match(
         previous_indentation,
     ));
     // branches evenly spaced
-    for branch in exprs[2..].iter() {
+
+    let mut iter = exprs[2..].iter().peekable();
+    while let Some(branch) = iter.next() {
+        let trailing = get_trailing_comment(branch, &mut iter);
         acc.push_str(&format!(
             "\n{}{}",
             space,
             format_source_exprs(settings, &[branch.clone()], &space)
         ));
+        if let Some(comment) = trailing {
+            acc.push(' ');
+            acc.push_str(&display_pse(settings, comment, previous_indentation));
+        }
     }
     acc.push_str(&format!("\n{})", previous_indentation));
     acc.to_owned()
@@ -562,7 +566,7 @@ fn format_key_value_sugar(
                 counter += 1
             }
         }
-        acc.push_str(&space);
+        acc.push_str(previous_indentation);
     } else {
         // for cases where we keep it on the same line with 1 k/v pair
         let fkey = display_pse(settings, &exprs[0], previous_indentation);
@@ -577,6 +581,9 @@ fn format_key_value_sugar(
 }
 
 // used for (tuple (n1  1)) syntax
+// Note: Converted to a { a: 1 } style map
+// TODO: This should be rolled into format_key_value_sugar, but the PSE
+// structure is different so it would take some finagling
 fn format_key_value(
     settings: &Settings,
     exprs: &[PreSymbolicExpression],
@@ -595,14 +602,19 @@ fn format_key_value(
     } else {
         " ".to_string()
     };
-    for (i, expr) in exprs.iter().enumerate() {
-        let (key, value) = expr
+
+    let mut index = 0;
+    let mut iter = exprs.iter().peekable();
+    while let Some(arg) = iter.next() {
+        // cloned() here because of the second mutable borrow on iter.next()
+        let trailing = get_trailing_comment(arg, &mut iter);
+        let (key, value) = arg
             .match_list()
             .and_then(|list| list.split_first())
             .unwrap();
         let fkey = display_pse(settings, key, previous_indentation);
         let ending = if multiline {
-            if i < exprs.len() - 1 {
+            if index < exprs.len() - 1 {
                 ","
             } else {
                 "\n"
@@ -615,6 +627,11 @@ fn format_key_value(
             "{pre}{fkey}: {}{ending}",
             format_source_exprs(settings, value, previous_indentation)
         ));
+        if let Some(comment) = trailing {
+            acc.push(' ');
+            acc.push_str(&display_pse(settings, comment, previous_indentation));
+        }
+        index += 1;
     }
     acc.push_str(previous_indentation);
     acc.push('}');
@@ -910,7 +927,8 @@ mod tests_formatter {
     (is-eq merkle-root txid) ;; true, if the transaction is the only transaction
     (try! (verify-merkle-proof reversed-txid (reverse-buff32 merkle-root) proof))
   )
-  (err ERR-INVALID-MERKLE-PROOF))"#;
+  (err ERR-INVALID-MERKLE-PROOF)
+)"#;
         let result = format_with_default(&String::from(src));
         assert_eq!(src, result);
     }
@@ -923,8 +941,11 @@ mod tests_formatter {
   (unwrap!
     (complete-deposit-wrapper (get txid deposit) (get vout-index deposit)
       (get amount deposit) (get recipient deposit) (get burn-hash deposit)
-      (get burn-height deposit) (get sweep-txid deposit))
-    (err (+ ERR_DEPOSIT_INDEX_PREFIX (+ u10 index)))))"#;
+      (get burn-height deposit) (get sweep-txid deposit)
+    )
+    (err (+ ERR_DEPOSIT_INDEX_PREFIX (+ u10 index)))
+  )
+)"#;
         assert_eq!(expected, result);
 
         // non-max-length sanity case
@@ -1131,9 +1152,10 @@ mod tests_formatter {
         let src = r#"(if (true)
   (let (
     (a (if (true)
-        (list)
-        (list)
-      ))
+          (list)
+          (list)
+        )
+    )
   )
     (list)
   )
@@ -1152,13 +1174,13 @@ mod tests_formatter {
     ctx: {
       a: b,
       c: d
-      }
-    })"#;
+    }
+  }
+)"#;
         assert_eq!(result, expected);
     }
 
     #[test]
-    #[ignore]
     fn test_irl_contracts() {
         let golden_dir = "./tests/golden";
         let intended_dir = "./tests/golden-intended";
@@ -1174,6 +1196,7 @@ mod tests_formatter {
                 let file_name = path.file_name().expect("Failed to get file name");
                 let intended_path = Path::new(intended_dir).join(file_name);
 
+                println!("Running {:?}", file_name);
                 let intended =
                     fs::read_to_string(&intended_path).expect("Failed to read intended file");
 

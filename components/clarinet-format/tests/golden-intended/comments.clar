@@ -10,17 +10,17 @@
   (ok 1)
 )
 
- ;; top comment
- ;; @ignore-formatting
+;; top comment
+;; @ignore-formatting
 (define-constant something
   (+ 1 1)
-) ;; eol comment
-
+)
 (define-read-only (something-else)
   (begin
     (+ 1 1)
     (ok true)
   )
+
 )
 
 (define-public (something-else
@@ -30,4 +30,5 @@
     (+ 1 1)
     (ok true)
   )
+
 )

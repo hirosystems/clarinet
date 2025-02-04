@@ -25,7 +25,8 @@
     (asset principal)
   )
   (match (index-of? (contract-call? .pool-reserve-data get-borroweable-isolated-read)
-    asset)
+    asset
+  )
     res
     true
     false
