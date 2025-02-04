@@ -1,13 +1,10 @@
-use clarity::{
-    types::{
-        chainstate::{
-            BlockHeaderHash, BurnchainHeaderHash, ConsensusHash, SortitionId, StacksBlockId,
-        },
-        StacksEpochId,
-    },
-    vm::errors::InterpreterResult,
+use clarity::types::{
+    chainstate::{BlockHeaderHash, BurnchainHeaderHash, ConsensusHash, SortitionId, StacksBlockId},
+    StacksEpochId,
 };
-use serde::de::DeserializeOwned;
+use clarity::vm::errors::InterpreterResult;
+use serde::de::Error as SerdeError;
+use serde::{de::DeserializeOwned, Deserialize, Deserializer};
 
 #[cfg(target_arch = "wasm32")]
 use js_sys::{JsString, Uint8Array};
@@ -107,58 +104,62 @@ pub struct Info {
     pub stacks_tip_height: u32,
 }
 
-#[derive(Clone, Debug, Deserialize)]
-pub struct RawSortition {
-    pub burn_block_hash: String,
-    pub burn_block_height: u32,
-    pub consensus_hash: String,
-    pub sortition_id: String,
-    pub parent_sortition_id: String,
+fn deserialize_burnchain_header_hash<'de, D>(
+    deserializer: D,
+) -> Result<BurnchainHeaderHash, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s: String = String::deserialize(deserializer)?;
+    BurnchainHeaderHash::from_hex(s.trim_start_matches("0x")).map_err(SerdeError::custom)
 }
 
-#[derive(Clone, Debug)]
+fn deserialize_consensus_hash<'de, D>(deserializer: D) -> Result<ConsensusHash, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s: String = String::deserialize(deserializer)?;
+    ConsensusHash::from_hex(s.trim_start_matches("0x")).map_err(SerdeError::custom)
+}
+
+fn deserialize_sortition_id<'de, D>(deserializer: D) -> Result<SortitionId, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s: String = String::deserialize(deserializer)?;
+    SortitionId::from_hex(s.trim_start_matches("0x")).map_err(SerdeError::custom)
+}
+
+fn deserialize_stacks_block_id<'de, D>(deserializer: D) -> Result<StacksBlockId, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s: String = String::deserialize(deserializer)?;
+    StacksBlockId::from_hex(s.trim_start_matches("0x")).map_err(SerdeError::custom)
+}
+
+fn deserialize_block_header_hash<'de, D>(deserializer: D) -> Result<BlockHeaderHash, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s: String = String::deserialize(deserializer)?;
+    BlockHeaderHash::from_hex(s.trim_start_matches("0x")).map_err(SerdeError::custom)
+}
+
+#[derive(Clone, Debug, Deserialize)]
 pub struct Sortition {
+    #[serde(deserialize_with = "deserialize_burnchain_header_hash")]
     pub burn_block_hash: BurnchainHeaderHash,
     pub burn_block_height: u32,
+    #[serde(deserialize_with = "deserialize_consensus_hash")]
     pub consensus_hash: ConsensusHash,
+    #[serde(deserialize_with = "deserialize_sortition_id")]
     pub sortition_id: SortitionId,
+    #[serde(deserialize_with = "deserialize_sortition_id")]
     pub parent_sortition_id: SortitionId,
 }
 
-impl Sortition {
-    pub fn from(response: RawSortition) -> Self {
-        let burn_block_hash =
-            BurnchainHeaderHash::from_hex(&response.burn_block_hash.replacen("0x", "", 1)).unwrap();
-        let consensus_hash =
-            ConsensusHash::from_hex(&response.consensus_hash.replacen("0x", "", 1)).unwrap();
-        let sortition_id =
-            SortitionId::from_hex(&response.sortition_id.replacen("0x", "", 1)).unwrap();
-        let parent_sortition_id =
-            SortitionId::from_hex(&response.parent_sortition_id.replacen("0x", "", 1)).unwrap();
-
-        Sortition {
-            burn_block_hash,
-            burn_block_height: response.burn_block_height,
-            consensus_hash,
-            sortition_id,
-            parent_sortition_id,
-        }
-    }
-}
-
 #[derive(Clone, Debug, Deserialize)]
-pub struct RawBlock {
-    pub height: u32,
-    pub burn_block_height: u32,
-    pub tenure_height: u32,
-    pub block_time: u64,
-    pub burn_block_time: u64,
-    pub hash: String,
-    pub index_block_hash: String,
-    pub burn_block_hash: String,
-}
-
-#[derive(Clone, Debug)]
 #[allow(dead_code)]
 pub struct Block {
     pub height: u32,
@@ -166,30 +167,12 @@ pub struct Block {
     pub tenure_height: u32,
     pub block_time: u64,
     pub burn_block_time: u64,
+    #[serde(deserialize_with = "deserialize_block_header_hash")]
     pub hash: BlockHeaderHash,
+    #[serde(deserialize_with = "deserialize_stacks_block_id")]
     pub index_block_hash: StacksBlockId,
+    #[serde(deserialize_with = "deserialize_burnchain_header_hash")]
     pub burn_block_hash: BurnchainHeaderHash,
-}
-
-impl From<RawBlock> for Block {
-    fn from(response: RawBlock) -> Self {
-        let hash = BlockHeaderHash::from_hex(&response.hash.replacen("0x", "", 1)).unwrap();
-        let index_block_hash =
-            StacksBlockId::from_hex(&response.index_block_hash.replacen("0x", "", 1)).unwrap();
-        let burn_block_hash =
-            BurnchainHeaderHash::from_hex(&response.burn_block_hash.replacen("0x", "", 1)).unwrap();
-
-        Block {
-            height: response.height,
-            burn_block_height: response.burn_block_height,
-            tenure_height: response.tenure_height,
-            block_time: response.block_time,
-            burn_block_time: response.burn_block_time,
-            hash,
-            index_block_hash,
-            burn_block_hash,
-        }
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -210,82 +193,207 @@ impl HttpClient {
     }
 
     #[cfg(not(target_arch = "wasm32"))]
-    fn get<T: DeserializeOwned>(&self, path: &str) -> Option<T> {
+    fn get<T: DeserializeOwned>(&self, path: &str) -> Result<T, String> {
         let url = format!("{}{}", self.url, path);
         let client = reqwest::blocking::Client::new();
         let mut request = client.get(&url).header("x-hiro-product", "clarinet-cli");
         if let Some(ref api_key) = self.api_key {
             request = request.header("x-api-key", api_key);
         }
-        match request.send() {
-            Ok(response) => response.json::<T>().ok(),
-            Err(e) => {
-                uprint!("unable to fetch data from remote: {}", e);
-                None
-            }
-        }
+
+        let response = request.send().map_err(|e| e.to_string())?;
+        response.json::<T>().map_err(|e| e.to_string())
     }
 
     #[cfg(target_arch = "wasm32")]
-    fn get<T: DeserializeOwned>(&self, path: &str) -> Option<T> {
+    fn get<T: DeserializeOwned>(&self, path: &str) -> Result<T, String> {
         let url = JsString::from(format!("{}{}", self.url, path));
         let response = http_client(&JsString::from("GET"), &url);
         let bytes = response.to_vec();
         let raw_result = std::str::from_utf8(bytes.as_slice()).unwrap();
-        serde_json::from_str::<T>(raw_result).ok()
-    }
-
-    fn fetch_data<T: DeserializeOwned>(&self, path: &str) -> InterpreterResult<Option<T>> {
-        Ok(self.get::<T>(path))
+        serde_json::from_str::<T>(raw_result).map_err(|e| e.to_string())
     }
 
     pub fn fetch_info(&self) -> Info {
-        self.fetch_data::<Info>("/v2/info")
-            .unwrap_or_else(|e| {
-                panic!("unable to parse json, error: {}", e);
-            })
-            .unwrap_or_else(|| {
-                panic!("unable to get remote info");
-            })
+        self.get::<Info>("/v2/info").unwrap_or_else(|e| {
+            panic!("unable to parse json, error: {}", e);
+        })
     }
 
     pub fn fetch_sortition(&self, burn_block_hash: &BurnchainHeaderHash) -> Sortition {
         let url = format!("/v3/sortitions/burn/{}", burn_block_hash);
-        let sortition = self
-            .fetch_data::<Vec<RawSortition>>(&url)
-            .unwrap_or_else(|e| {
-                panic!("unable to parse json, error: {}", e);
-            })
-            .unwrap_or_else(|| {
-                panic!("unable to get remote sortition info");
-            });
-
-        Sortition::from(sortition.first().unwrap().clone())
+        let soritions = self.get::<Vec<Sortition>>(&url).unwrap_or_else(|e| {
+            panic!("unable to parse json, error: {}", e);
+        });
+        soritions.into_iter().next().unwrap()
     }
 
     pub fn fetch_block(&self, url: &str) -> Block {
-        let block = self
-            .fetch_data::<RawBlock>(url)
-            .unwrap_or_else(|e| {
-                panic!("unable to parse json, error: {}", e);
-            })
-            .unwrap_or_else(|| {
-                panic!("unable to get remote block info for: {}", url);
-            });
-
-        Block::from(block.clone())
+        self.get::<Block>(url).unwrap_or_else(|e| {
+            panic!("unable to parse json, error: {}", e);
+        })
     }
 
     pub fn fetch_clarity_data(&self, path: &str) -> InterpreterResult<Option<String>> {
-        let data = self
-            .fetch_data::<ClarityDataResponse>(path)
-            .unwrap_or_else(|e| {
-                panic!("unable to parse json, error: {}", e);
-            });
-
-        match data {
-            Some(data) => Ok(Some(data.data.replacen("0x", "", 1))),
-            None => Ok(None),
+        match self.get::<ClarityDataResponse>(path) {
+            Ok(data) => Ok(Some(data.data.trim_start_matches("0x").to_string())),
+            Err(_) => Ok(None),
         }
+    }
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_http_client_fetch_info() {
+        let mut server = mockito::Server::new();
+        let _m = server
+            .mock("GET", "/v2/info")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(r#"{
+                "peer_version": 402653196,
+                "pox_consensus": "0ce291b675bb0148b435a884e250aafc3fd6bc86",
+                "burn_block_height": 882262,
+                "stable_pox_consensus": "f517f5aced5be836f9fe10980ff06108a6a2acec",
+                "stable_burn_block_height": 882255,
+                "network_id": 1,
+                "parent_network_id": 3652501241,
+                "stacks_tip_height": 556946,
+                "stacks_tip": "70526983b920b31d5e0d65750033a4dc2f328f31a3ffeb1f8780bfb164d50502",
+                "stacks_tip_consensus_hash": "0ce291b675bb0148b435a884e250aafc3fd6bc86",
+                "genesis_chainstate_hash": "74237aa39aa50a83de11a4f53e9d3bb7d43461d1de9873f402e5453ae60bc59b",
+                "unanchored_tip": null,
+                "unanchored_seq": null,
+                "tenure_height": 184037,
+                "is_fully_synced": true,
+                "node_public_key": "02e0ce39375d699d164f90cc815427943c5acccca02069e394f9ed28d2c2bca317",
+                "node_public_key_hash": "d5b1f3c7f9b2ffa8ac610170d1352550d240197c",
+                "stackerdbs": []
+            }"#)
+            .create();
+
+        let client = HttpClient::new(ApiUrl(server.url()));
+        let info = client.fetch_info();
+        assert_eq!(info.network_id, 1);
+        assert_eq!(info.stacks_tip_height, 556946);
+    }
+
+    #[test]
+    fn test_http_client_fetch_sortition() {
+        let mut server = mockito::Server::new();
+
+        let _m = server
+            .mock("GET", "/v3/sortitions/burn/000000000000000000012f34a6727bf7dc9ceae203022cb14a3b37fe8de0e6ad")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                r#"[{
+                    "burn_block_hash": "0x000000000000000000012f34a6727bf7dc9ceae203022cb14a3b37fe8de0e6ad",
+                    "burn_block_height": 882262,
+                    "burn_header_timestamp": 1738666756,
+                    "sortition_id": "0x6e79b604db6d97b9289f04f446e78ec871a6b16972b02674bc3ea2bdec200fb9",
+                    "parent_sortition_id": "0x8b2dedebf5b8c72c1e8ede00abd1f417d755ac7f513dbf3c3d007494404115d3",
+                    "consensus_hash": "0x0ce291b675bb0148b435a884e250aafc3fd6bc86",
+                    "was_sortition": true,
+                    "miner_pk_hash160": "0x37e79a837b4071a1fc6c1b49208e7d2141a25905",
+                    "stacks_parent_ch": "0xcd18600459e4da24ede6662cc4df6bcece61b5f9",
+                    "last_sortition_ch": "0xcd18600459e4da24ede6662cc4df6bcece61b5f9",
+                    "committed_block_hash": "0xbf7e26ee22b18461dfed70cc114372a0f8a61249de2f20b120e6fe63da5a45e4"
+                }]"#,
+            )
+            .create();
+
+        let client = HttpClient::new(ApiUrl(server.url()));
+        let sortition = client.fetch_sortition(
+            &BurnchainHeaderHash::from_hex(
+                "000000000000000000012f34a6727bf7dc9ceae203022cb14a3b37fe8de0e6ad",
+            )
+            .unwrap(),
+        );
+
+        assert_eq!(sortition.burn_block_height, 882262);
+        assert_eq!(
+            sortition.consensus_hash,
+            ConsensusHash::from_hex("0ce291b675bb0148b435a884e250aafc3fd6bc86").unwrap()
+        );
+        assert_eq!(
+            sortition.sortition_id,
+            SortitionId::from_hex(
+                "6e79b604db6d97b9289f04f446e78ec871a6b16972b02674bc3ea2bdec200fb9"
+            )
+            .unwrap()
+        );
+        assert_eq!(
+            sortition.parent_sortition_id,
+            SortitionId::from_hex(
+                "8b2dedebf5b8c72c1e8ede00abd1f417d755ac7f513dbf3c3d007494404115d3"
+            )
+            .unwrap()
+        );
+    }
+
+    #[test]
+    fn test_http_client_fetch_block() {
+        let mut server = mockito::Server::new();
+        let _m = server
+            .mock("GET", "/extended/v2/blocks/556946")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                r#"{
+                    "canonical": true,
+                    "height": 556946,
+                    "hash": "0x70526983b920b31d5e0d65750033a4dc2f328f31a3ffeb1f8780bfb164d50502",
+                    "block_time": 1738667305,
+                    "block_time_iso": "2025-02-04T11:08:25.000Z",
+                    "tenure_height": 184037,
+                    "index_block_hash": "0xa246be7256de49aa6923074a53507a839b2ba356f8809f8e7448c87b5c1891e9",
+                    "parent_block_hash": "0x06dd38d5315c133b08cefdedb5c51f2e91fd8a0474e07b3d1a740c19bc21842e",
+                    "parent_index_block_hash": "0x1d39f5eb45aa0e78cc256ea6ed180dcb9e8c87bea11ecf8102ef9bced5f3f73b",
+                    "burn_block_time": 1738666756,
+                    "burn_block_time_iso": "2025-02-04T10:59:16.000Z",
+                    "burn_block_hash": "0x000000000000000000012f34a6727bf7dc9ceae203022cb14a3b37fe8de0e6ad",
+                    "burn_block_height": 882262,
+                    "miner_txid": "0x2ca4c7f6d36f32f3c2f1c5ebae3816690a9ba2258c38ef6a4494d315873a0448",
+                    "tx_count": 1,
+                    "execution_cost_read_count": 0,
+                    "execution_cost_read_length": 0,
+                    "execution_cost_runtime": 0,
+                    "execution_cost_write_count": 0,
+                    "execution_cost_write_length": 0
+                }"#,
+            )
+            .create();
+
+        let client = HttpClient::new(ApiUrl(server.url()));
+        let block = client.fetch_block("/extended/v2/blocks/556946");
+        assert_eq!(block.height, 556946);
+        assert_eq!(block.burn_block_height, 882262);
+        assert_eq!(block.tenure_height, 184037);
+        assert_eq!(block.block_time, 1738667305);
+        assert_eq!(block.burn_block_time, 1738666756);
+        assert_eq!(
+            block.hash,
+            BlockHeaderHash::from_hex(
+                "70526983b920b31d5e0d65750033a4dc2f328f31a3ffeb1f8780bfb164d50502"
+            )
+            .unwrap()
+        );
+        assert_eq!(
+            block.index_block_hash,
+            StacksBlockId::from_hex(
+                "a246be7256de49aa6923074a53507a839b2ba356f8809f8e7448c87b5c1891e9"
+            )
+            .unwrap()
+        );
+        assert_eq!(
+            block.burn_block_hash,
+            BurnchainHeaderHash::from_hex(
+                "000000000000000000012f34a6727bf7dc9ceae203022cb14a3b37fe8de0e6ad"
+            )
+            .unwrap()
+        );
     }
 }
