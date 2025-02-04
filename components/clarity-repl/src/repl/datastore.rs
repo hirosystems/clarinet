@@ -21,7 +21,7 @@ use pox_locking::handle_contract_call_special_cases;
 use sha2::{Digest, Sha512_256};
 
 use super::interpreter::BLOCK_LIMIT_MAINNET;
-use super::settings::InitialRemoteData;
+use super::settings::RemoteNetworkInfo;
 
 const SECONDS_BETWEEN_BURN_BLOCKS: u64 = 600;
 const SECONDS_BETWEEN_STACKS_BLOCKS: u64 = 10;
@@ -51,7 +51,7 @@ pub struct ClarityDatastore {
     height_at_chain_tip: HashMap<StacksBlockId, u32>,
     chain_tip_at_height: HashMap<u32, StacksBlockId>,
 
-    initial_remote_data: Option<InitialRemoteData>,
+    remote_network_info: Option<RemoteNetworkInfo>,
     remote_block_info_cache: Rc<RefCell<HashMap<StacksBlockId, Block>>>,
     local_accounts: Vec<StandardPrincipalData>,
 
@@ -71,7 +71,7 @@ impl Clone for ClarityDatastore {
             metadata: self.metadata.clone(),
             height_at_chain_tip: self.height_at_chain_tip.clone(),
             chain_tip_at_height: self.chain_tip_at_height.clone(),
-            initial_remote_data: self.initial_remote_data.clone(),
+            remote_network_info: self.remote_network_info.clone(),
             remote_block_info_cache: Rc::clone(&self.remote_block_info_cache),
             local_accounts: self.local_accounts.clone(),
             client: self.client.clone(),
@@ -175,9 +175,9 @@ impl BurnBlockHashes {
 }
 
 impl ClarityDatastore {
-    pub fn new(initial_remote_data: Option<InitialRemoteData>, client: HttpClient) -> Self {
-        if let Some(initial_remote_data) = initial_remote_data {
-            return Self::new_with_remote_data(initial_remote_data, client);
+    pub fn new(remote_network_info: Option<RemoteNetworkInfo>, client: HttpClient) -> Self {
+        if let Some(remote_network_info) = remote_network_info {
+            return Self::new_with_remote_data(remote_network_info, client);
         }
 
         let height = 0;
@@ -191,7 +191,7 @@ impl ClarityDatastore {
             height_at_chain_tip: HashMap::from([(id, height)]),
             chain_tip_at_height: HashMap::from([(height, id)]),
 
-            initial_remote_data: None,
+            remote_network_info: None,
             remote_block_info_cache: Rc::new(RefCell::new(HashMap::new())),
             local_accounts: Vec::new(),
 
@@ -199,8 +199,8 @@ impl ClarityDatastore {
         }
     }
 
-    fn new_with_remote_data(initial_remote_data: InitialRemoteData, client: HttpClient) -> Self {
-        let height = initial_remote_data.initial_height;
+    fn new_with_remote_data(remote_network_info: RemoteNetworkInfo, client: HttpClient) -> Self {
+        let height = remote_network_info.initial_height;
         let path = format!("/extended/v2/blocks/{}", height);
         let block = client.fetch_block(&path);
         let cache = HashMap::from([(block.index_block_hash, block.clone())]);
@@ -215,7 +215,7 @@ impl ClarityDatastore {
             height_at_chain_tip: HashMap::from([(id, height)]),
             chain_tip_at_height: HashMap::from([(height, id)]),
 
-            initial_remote_data: Some(initial_remote_data),
+            remote_network_info: Some(remote_network_info),
             remote_block_info_cache: Rc::new(RefCell::new(cache)),
             local_accounts: Vec::new(),
 
@@ -321,7 +321,7 @@ impl ClarityDatastore {
     }
 
     fn get_remote_chaintip(&mut self) -> String {
-        let initial_height = self.initial_remote_data.as_ref().unwrap().initial_height;
+        let initial_height = self.remote_network_info.as_ref().unwrap().initial_height;
         let height = self.get_current_block_height().min(initial_height);
         let block_info = self.get_remote_block_info_from_height(height);
         block_info.index_block_hash.to_string()
@@ -363,7 +363,7 @@ impl ClarityBackingStore for ClarityDatastore {
     fn get_data(&mut self, key: &str) -> Result<Option<String>> {
         let current_height = self.get_current_block_height();
         let fetch_remote_data =
-            self.initial_remote_data.is_some() && !self.is_key_from_local_account(key);
+            self.remote_network_info.is_some() && !self.is_key_from_local_account(key);
 
         let values_map = self.store.get(key);
 
@@ -373,7 +373,7 @@ impl ClarityBackingStore for ClarityDatastore {
                 return Ok(Some(data.clone()));
             }
 
-            let initial_height = self.initial_remote_data.as_ref().unwrap().initial_height;
+            let initial_height = self.remote_network_info.as_ref().unwrap().initial_height;
             if current_height > initial_height {
                 if let Some((_, value)) = values_map.and_then(|data| {
                     data.iter()
@@ -423,7 +423,7 @@ impl ClarityBackingStore for ClarityDatastore {
     /// returns the previous block header hash on success
     fn set_block_hash(&mut self, bhh: StacksBlockId) -> Result<StacksBlockId> {
         let prior_tip = self.open_chain_tip;
-        if self.initial_remote_data.is_some() {
+        if self.remote_network_info.is_some() {
             #[allow(clippy::map_entry)]
             if !self.height_at_chain_tip.contains_key(&bhh) {
                 let block_info = self.get_remote_block_info_from_hash(&bhh);
@@ -436,8 +436,8 @@ impl ClarityBackingStore for ClarityDatastore {
     }
 
     fn get_block_at_height(&mut self, height: u32) -> Option<StacksBlockId> {
-        if let Some(initial_remote_data) = &self.initial_remote_data {
-            if height <= initial_remote_data.initial_height {
+        if let Some(remote_network_info) = &self.remote_network_info {
+            if height <= remote_network_info.initial_height {
                 let block_info = self.get_remote_block_info_from_height(height);
                 return Some(block_info.index_block_hash);
             }
@@ -454,7 +454,7 @@ impl ClarityBackingStore for ClarityDatastore {
             return height;
         }
 
-        if let Some(initial_height) = self.initial_remote_data.as_ref().map(|d| d.initial_height) {
+        if let Some(initial_height) = self.remote_network_info.as_ref().map(|d| d.initial_height) {
             let block_info = self.get_remote_block_info_from_hash(&current_chain_tip);
             if block_info.height <= initial_height {
                 return block_info.height;
@@ -501,7 +501,7 @@ impl ClarityBackingStore for ClarityDatastore {
         if metadata.is_some() {
             return Ok(metadata.cloned());
         }
-        if self.initial_remote_data.is_some() && !self.local_accounts.contains(&contract.issuer) {
+        if self.remote_network_info.is_some() && !self.local_accounts.contains(&contract.issuer) {
             let data = self.fetch_clarity_metadata(contract, key);
             if let Ok(Some(value)) = &data {
                 let _ = self.insert_metadata(contract, key, value);
@@ -539,7 +539,7 @@ impl ClarityBackingStore for ClarityDatastore {
 
 impl Datastore {
     pub fn new(clarity_datastore: &ClarityDatastore, constants: StacksConstants) -> Self {
-        if clarity_datastore.initial_remote_data.is_some() {
+        if clarity_datastore.remote_network_info.is_some() {
             return Self::new_with_remote_data(clarity_datastore, constants);
         }
 
@@ -607,7 +607,7 @@ impl Datastore {
         };
 
         let is_mainnet = clarity_datastore
-            .initial_remote_data
+            .remote_network_info
             .as_ref()
             .unwrap()
             .is_mainnet;
@@ -970,7 +970,6 @@ impl BurnStateDB for Datastore {
             return height;
         }
 
-        // @todo: ideally, we should only do that if initial_remote_data is enabled
         return self
             .remote_block_info_cache
             .borrow()
@@ -1125,7 +1124,7 @@ mod tests {
         let client = HttpClient::new(ApiUrl(server.url()));
         let constants = StacksConstants::default();
         let clarity_datastore = ClarityDatastore::new(
-            Some(InitialRemoteData {
+            Some(RemoteNetworkInfo {
                 initial_height: 10,
                 is_mainnet: false,
                 api_url: ApiUrl(server.url().to_string()),

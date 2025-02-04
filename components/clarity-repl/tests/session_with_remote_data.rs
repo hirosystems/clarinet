@@ -30,16 +30,6 @@ fn init_session(initial_heigth: u32) -> Session {
 // the initial count value is 0 and is incremented by 1 at #56232
 const COUNTER_ADDR: &str = "STJCAB2T9TR2EJM7YS4DM2CGBBVTF7BV237Y8KNV.counter";
 
-#[ignore]
-#[test]
-fn it_handles_not_found_contract() {
-    let mut session = init_session(40000);
-
-    let snippet = format!("(contract-call? '{} get-count)", COUNTER_ADDR);
-    let result = eval_snippet(&mut session, &snippet);
-    println!("result: {:?}", result);
-}
-
 #[test]
 fn it_starts_in_the_right_epoch() {
     let session = init_session(42000);

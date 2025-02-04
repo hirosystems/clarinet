@@ -129,7 +129,7 @@ pub struct RemoteDataSettings {
 }
 
 #[derive(Debug, Default, Clone, Deserialize, Serialize)]
-pub struct InitialRemoteData {
+pub struct RemoteNetworkInfo {
     pub api_url: ApiUrl,
     pub initial_height: u32,
     pub network_id: u32,
@@ -148,10 +148,10 @@ impl From<RemoteDataSettingsFile> for RemoteDataSettings {
 }
 
 impl RemoteDataSettings {
-    pub fn get_initial_remote_data(
+    pub fn get_initial_remote_network_info(
         &self,
         client: &HttpClient,
-    ) -> Result<InitialRemoteData, String> {
+    ) -> Result<RemoteNetworkInfo, String> {
         let info = client.fetch_info();
 
         let initial_height = match self.initial_height {
@@ -164,14 +164,12 @@ impl RemoteDataSettings {
             None => info.stacks_tip_height,
         };
 
-        let initial_remote_data = InitialRemoteData {
+        Ok(RemoteNetworkInfo {
             api_url: self.api_url.clone(),
             initial_height,
             network_id: info.network_id,
             stacks_tip_height: info.stacks_tip_height,
             is_mainnet: info.network_id == 1,
-        };
-
-        Ok(initial_remote_data)
+        })
     }
 }

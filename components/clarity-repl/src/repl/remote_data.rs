@@ -411,6 +411,7 @@ mod tests {
         );
     }
 
+    // we should better handle network errors. tracked in #1646
     #[test]
     #[should_panic]
     fn test_http_client_error() {

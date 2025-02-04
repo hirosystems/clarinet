@@ -29,7 +29,7 @@ use clarity::vm::{CostSynthesis, ExecutionResult, ParsedContract};
 
 use super::datastore::StacksConstants;
 use super::remote_data::HttpClient;
-use super::settings::{ApiUrl, InitialRemoteData};
+use super::settings::{ApiUrl, RemoteNetworkInfo};
 use super::{ClarityContract, DEFAULT_EPOCH};
 
 pub const BLOCK_LIMIT_MAINNET: ExecutionCost = ExecutionCost {
@@ -45,7 +45,7 @@ pub struct ClarityInterpreter {
     pub clarity_datastore: ClarityDatastore,
     pub datastore: Datastore,
     pub repl_settings: Settings,
-    initial_remote_data: Option<InitialRemoteData>,
+    remote_network_info: Option<RemoteNetworkInfo>,
     tx_sender: StandardPrincipalData,
     accounts: BTreeSet<String>,
     tokens: BTreeMap<String, BTreeMap<String, u128>>,
@@ -59,23 +59,23 @@ impl ClarityInterpreter {
         let remote_data_settings = repl_settings.remote_data.clone();
 
         let client = HttpClient::new(ApiUrl(remote_data_settings.api_url.to_string()));
-        let initial_remote_data = if remote_data_settings.enabled {
+        let remote_network_info = if remote_data_settings.enabled {
             Some(
                 remote_data_settings
-                    .get_initial_remote_data(&client)
+                    .get_initial_remote_network_info(&client)
                     .unwrap(),
             )
         } else {
             None
         };
 
-        let clarity_datastore = ClarityDatastore::new(initial_remote_data.clone(), client);
+        let clarity_datastore = ClarityDatastore::new(remote_network_info.clone(), client);
         let datastore = Datastore::new(&clarity_datastore, StacksConstants::default());
 
         Self {
             tx_sender,
             repl_settings,
-            initial_remote_data,
+            remote_network_info,
             clarity_datastore,
             datastore,
             accounts: BTreeSet::new(),
@@ -382,7 +382,7 @@ impl ClarityInterpreter {
         cost_track: bool,
     ) -> Result<GlobalContext, String> {
         let is_mainnet = self
-            .initial_remote_data
+            .remote_network_info
             .as_ref()
             .map_or(false, |data| data.is_mainnet);
         let chain_id = if is_mainnet {
