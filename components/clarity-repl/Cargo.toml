@@ -63,7 +63,6 @@ reqwest = { workspace = true, features = ["blocking"] }
 [dev-dependencies]
 test-case = "*"
 divan = "0.1"
-wasm-bindgen-test = "0.3.0"
 mockito = "1.6"
 
 [lib]

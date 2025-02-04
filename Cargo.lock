@@ -908,7 +908,6 @@ dependencies = [
  "tokio",
  "tokio-util",
  "wasm-bindgen",
- "wasm-bindgen-test",
  "web-sys",
 ]
 
