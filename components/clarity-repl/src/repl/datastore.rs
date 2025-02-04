@@ -821,9 +821,18 @@ impl HeadersDB for Datastore {
         id_bhh: &StacksBlockId,
         _epoch_id: &StacksEpochId,
     ) -> Option<BlockHeaderHash> {
-        self.stacks_blocks
+        if let Some(hash) = self
+            .stacks_blocks
             .get(id_bhh)
             .map(|id| id.block_header_hash)
+        {
+            return Some(hash);
+        };
+
+        self.remote_block_info_cache
+            .borrow()
+            .get(id_bhh)
+            .map(|block| block.hash)
     }
 
     fn get_burn_header_hash_for_block(
@@ -860,9 +869,18 @@ impl HeadersDB for Datastore {
     }
 
     fn get_stacks_block_time_for_block(&self, id_bhh: &StacksBlockId) -> Option<u64> {
-        self.stacks_blocks
+        if let Some(time) = self
+            .stacks_blocks
             .get(id_bhh)
             .map(|id| id.stacks_block_time)
+        {
+            return Some(time);
+        };
+
+        self.remote_block_info_cache
+            .borrow()
+            .get(id_bhh)
+            .map(|block| block.block_time)
     }
 
     fn get_burn_block_time_for_block(
@@ -876,9 +894,18 @@ impl HeadersDB for Datastore {
     }
 
     fn get_burn_block_height_for_block(&self, id_bhh: &StacksBlockId) -> Option<u32> {
-        self.get_burn_header_hash_for_block(id_bhh)
+        if let Some(height) = self
+            .get_burn_header_hash_for_block(id_bhh)
             .and_then(|hash| self.burn_blocks.get(&hash))
             .map(|b| b.burn_chain_height)
+        {
+            return Some(height);
+        }
+
+        self.remote_block_info_cache
+            .borrow()
+            .get(id_bhh)
+            .map(|block| block.burn_block_height)
     }
 
     fn get_stacks_height_for_tenure_height(

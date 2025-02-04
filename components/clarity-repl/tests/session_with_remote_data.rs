@@ -1,5 +1,8 @@
 use clarity::{
-    types::StacksEpochId,
+    types::{
+        chainstate::{BlockHeaderHash, StacksBlockId},
+        StacksEpochId,
+    },
     vm::{EvaluationResult, Value},
 };
 use clarity_repl::repl::{
@@ -52,6 +55,37 @@ fn it_can_fetch_remote() {
     let snippet = format!("(contract-call? '{} get-count)", COUNTER_ADDR);
     let result = eval_snippet(&mut session, &snippet);
     assert_eq!(result, Value::UInt(1));
+}
+
+#[test]
+fn it_can_get_stacks_block_info() {
+    let mut session = init_session(57000);
+
+    let snippet = "(get-stacks-block-info? id-header-hash u42000)";
+    let result = eval_snippet(&mut session, snippet);
+    let hash =
+        StacksBlockId::from_hex("b4678e059aa9b82b1473597087876ef61a5c6a0c35910cd4b797201d6b423a07")
+            .unwrap();
+    assert_eq!(
+        result,
+        Value::some(Value::buff_from(hash.to_bytes().to_vec()).unwrap()).unwrap()
+    );
+
+    let snippet = "(get-stacks-block-info? header-hash u42000)";
+    let result = eval_snippet(&mut session, snippet);
+    let hash = BlockHeaderHash::from_hex(
+        "eabe9273e76a55384be01866e01a72564a1a1772aa1c2d578c4e918875575840",
+    )
+    .unwrap();
+    assert_eq!(
+        result,
+        Value::some(Value::buff_from(hash.to_bytes().to_vec()).unwrap()).unwrap()
+    );
+
+    let snippet = "(get-stacks-block-info? time u42000)";
+    let result = eval_snippet(&mut session, snippet);
+
+    assert_eq!(result, Value::some(Value::UInt(1736792439)).unwrap());
 }
 
 #[test]
