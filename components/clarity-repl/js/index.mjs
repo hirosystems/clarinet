@@ -14,7 +14,7 @@ export function getHiroApiKey() {
  * httpClient
  * @param {import("sync-request").HttpVerb} method
  * @param {string} path
- * @returns {Uint8Array}
+ * @returns {{ status: number, body: Uint8Array }}
  */
 export function httpClient(method, path) {
   const options = {
@@ -29,7 +29,11 @@ export function httpClient(method, path) {
 
   const response = request(method, path, options);
   if (typeof response.body === "string") {
-    return encoder.encode(response.body);
+    return { status: response.statusCode, body: encoder.encode(response.body) };
   }
-  return response.body;
+
+  return {
+    status: response.statusCode,
+    body: new Uint8Array(response.body),
+  };
 }

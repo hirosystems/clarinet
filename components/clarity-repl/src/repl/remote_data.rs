@@ -7,15 +7,22 @@ use serde::de::Error as SerdeError;
 use serde::{de::DeserializeOwned, Deserialize, Deserializer};
 
 #[cfg(target_arch = "wasm32")]
-use js_sys::{JsString, Uint8Array};
+use js_sys::JsString;
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen]
+#[derive(Deserialize)]
+struct JsHttpClientResponse {
+    status: u16,
+    body: Vec<u8>,
+}
 
 #[cfg(target_arch = "wasm32")]
 #[wasm_bindgen(module = "/js/index.mjs")]
 extern "C" {
     #[wasm_bindgen(js_name = httpClient)]
-    fn http_client(method: &JsString, path: &JsString) -> Uint8Array;
+    fn http_client(method: &JsString, path: &JsString) -> JsValue;
 }
 
 use crate::repl::settings::ApiUrl;
@@ -200,38 +207,45 @@ impl HttpClient {
         if let Some(ref api_key) = self.api_key {
             request = request.header("x-api-key", api_key);
         }
-
         let response = request.send().map_err(|e| e.to_string())?;
+        if response.status() != 200 {
+            return Err(format!(
+                "http error - status: {} - message: {}",
+                response.status(),
+                response.text().unwrap()
+            ));
+        }
         response.json::<T>().map_err(|e| e.to_string())
     }
 
     #[cfg(target_arch = "wasm32")]
     fn get<T: DeserializeOwned>(&self, path: &str) -> Result<T, String> {
         let url = JsString::from(format!("{}{}", self.url, path));
-        let response = http_client(&JsString::from("GET"), &url);
-        let bytes = response.to_vec();
-        let raw_result = std::str::from_utf8(bytes.as_slice()).unwrap();
-        serde_json::from_str::<T>(raw_result).map_err(|e| e.to_string())
+        let raw_response = http_client(&JsString::from("GET"), &url);
+        let response: JsHttpClientResponse =
+            serde_wasm_bindgen::from_value(raw_response).map_err(|e| e.to_string())?;
+        let body = std::str::from_utf8(&response.body).unwrap();
+        if response.status != 200 {
+            return Err(format!(
+                "http error - status: {} - message: {}",
+                response.status, body
+            ));
+        }
+        serde_json::from_str::<T>(body).map_err(|e| e.to_string())
     }
 
     pub fn fetch_info(&self) -> Info {
-        self.get::<Info>("/v2/info").unwrap_or_else(|e| {
-            panic!("unable to parse json, error: {}", e);
-        })
+        self.get::<Info>("/v2/info").unwrap()
     }
 
     pub fn fetch_sortition(&self, burn_block_hash: &BurnchainHeaderHash) -> Sortition {
         let url = format!("/v3/sortitions/burn/{}", burn_block_hash);
-        let soritions = self.get::<Vec<Sortition>>(&url).unwrap_or_else(|e| {
-            panic!("unable to parse json, error: {}", e);
-        });
+        let soritions = self.get::<Vec<Sortition>>(&url).unwrap();
         soritions.into_iter().next().unwrap()
     }
 
     pub fn fetch_block(&self, url: &str) -> Block {
-        self.get::<Block>(url).unwrap_or_else(|e| {
-            panic!("unable to parse json, error: {}", e);
-        })
+        self.get::<Block>(url).unwrap()
     }
 
     pub fn fetch_clarity_data(&self, path: &str) -> InterpreterResult<Option<String>> {
@@ -248,7 +262,7 @@ mod tests {
     #[test]
     fn test_http_client_fetch_info() {
         let mut server = mockito::Server::new();
-        let _m = server
+        let _ = server
             .mock("GET", "/v2/info")
             .with_status(200)
             .with_header("content-type", "application/json")
@@ -284,7 +298,7 @@ mod tests {
     fn test_http_client_fetch_sortition() {
         let mut server = mockito::Server::new();
 
-        let _m = server
+        let _ = server
             .mock("GET", "/v3/sortitions/burn/000000000000000000012f34a6727bf7dc9ceae203022cb14a3b37fe8de0e6ad")
             .with_status(200)
             .with_header("content-type", "application/json")
@@ -337,7 +351,7 @@ mod tests {
     #[test]
     fn test_http_client_fetch_block() {
         let mut server = mockito::Server::new();
-        let _m = server
+        let _ = server
             .mock("GET", "/extended/v2/blocks/556946")
             .with_status(200)
             .with_header("content-type", "application/json")
@@ -395,5 +409,21 @@ mod tests {
             )
             .unwrap()
         );
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_http_client_error() {
+        let mut server = mockito::Server::new();
+        let _ = server
+            .mock("GET", "/extended/v2/blocks/9999999999999")
+            .with_status(404)
+            .with_header("content-type", "application/json")
+            .with_body(r#"{"statusCode":404,"error":"Not Found","message":"Block not found"}"#)
+            .create();
+
+        let client = HttpClient::new(ApiUrl(server.url()));
+
+        let _block = client.fetch_block("/extended/v2/blocks/9999999999999");
     }
 }

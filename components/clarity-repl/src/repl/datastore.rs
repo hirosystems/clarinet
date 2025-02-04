@@ -21,7 +21,7 @@ use pox_locking::handle_contract_call_special_cases;
 use sha2::{Digest, Sha512_256};
 
 use super::interpreter::BLOCK_LIMIT_MAINNET;
-use super::settings::{ApiUrl, InitialRemoteData};
+use super::settings::InitialRemoteData;
 
 const SECONDS_BETWEEN_BURN_BLOCKS: u64 = 600;
 const SECONDS_BETWEEN_STACKS_BLOCKS: u64 = 10;
@@ -171,13 +171,6 @@ impl BurnBlockHashes {
             vrf_seed,
             sortition_id: SortitionId(bytes),
         }
-    }
-}
-
-impl Default for ClarityDatastore {
-    fn default() -> Self {
-        let client = HttpClient::new(ApiUrl("https://api.tesnet.hiro.so".to_string()));
-        Self::new(None, client)
     }
 }
 
@@ -457,8 +450,8 @@ impl ClarityBackingStore for ClarityDatastore {
     ///   return data about the chain tip that is currently open for writing.
     fn get_current_block_height(&mut self) -> u32 {
         let current_chain_tip = *self.current_chain_tip.borrow();
-        if let Some(height) = self.height_at_chain_tip.get(&current_chain_tip) {
-            return *height;
+        if let Some(&height) = self.height_at_chain_tip.get(&current_chain_tip) {
+            return height;
         }
 
         if let Some(initial_height) = self.initial_remote_data.as_ref().map(|d| d.initial_height) {
@@ -1076,12 +1069,71 @@ impl BurnStateDB for Datastore {
 mod tests {
     use clarity::types::StacksEpoch;
 
+    use crate::repl::settings::ApiUrl;
+
     use super::*;
 
     fn get_datastores() -> (ClarityDatastore, Datastore) {
         let client = HttpClient::new(ApiUrl("https://api.tesnet.hiro.so".to_string()));
         let constants = StacksConstants::default();
         let clarity_datastore = ClarityDatastore::new(None, client);
+        let datastore = Datastore::new(&clarity_datastore, constants);
+        (clarity_datastore, datastore)
+    }
+
+    fn get_datastores_with_remote_data() -> (ClarityDatastore, Datastore) {
+        let mut server = mockito::Server::new();
+        let _ = server
+            .mock("GET", "/extended/v2/blocks/10")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                r#"{
+                    "canonical": true,
+                    "height": 10,
+                    "hash": "0xaff3b535a135348ed00023ec1bdc3da9005253a9ce80a4906ade03ea6685d342",
+                    "block_time": 1735934294,
+                    "block_time_iso": "2025-01-03T19:58:14.000Z",
+                    "tenure_height": 10,
+                    "index_block_hash": "0x201cf66636e693d95998b40ddd0cbe038432806046eed11866052f15a9fa8fc5",
+                    "parent_block_hash": "0x94c3d8f56ed2e1093f26089572af9cc5d5b097d461dcc184196f1ee2070de063",
+                    "parent_index_block_hash": "0x1969bdddb9902162f5fdd2ff49cabb30300a9819c89bedd4c27fed82f8c9cf4b",
+                    "burn_block_time": 1735451504,
+                    "burn_block_time_iso": "2024-12-29T05:51:44.000Z",
+                    "burn_block_hash": "0x57f3e2bd4519e4263353bf6b7614a9cee7f2d36fe61409852d42e41afe5e6cad",
+                    "burn_block_height": 798,
+                    "miner_txid": "0x5fb426cf9eb4577b545bd731634886d5bd5c9d40d573e2cdb95100f483913491",
+                    "tx_count": 2
+                }"#,
+            )
+            .create();
+        let _ = server
+            .mock("GET", "/v3/sortitions/burn/57f3e2bd4519e4263353bf6b7614a9cee7f2d36fe61409852d42e41afe5e6cad")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                r#"[{
+                    "burn_block_hash": "0x57f3e2bd4519e4263353bf6b7614a9cee7f2d36fe61409852d42e41afe5e6cad",
+                    "burn_block_height":798,
+                    "burn_header_timestamp": 1735451504,
+                    "sortition_id": "0x71e332329133c0f331c6b5e9b21a415ea0c32aa300a0e94a88e7c30d4aaf78c6",
+                    "parent_sortition_id": "0xd6bffd8c4cd86428d5404ef36867319976008e84047d2acbae9079fd918c4de9",
+                    "consensus_hash": "0x44f6511f569d3ed78d437af619d529b6c66a4fa2"
+                }]"#,
+            )
+            .create();
+        let client = HttpClient::new(ApiUrl(server.url()));
+        let constants = StacksConstants::default();
+        let clarity_datastore = ClarityDatastore::new(
+            Some(InitialRemoteData {
+                initial_height: 10,
+                is_mainnet: false,
+                api_url: ApiUrl(server.url().to_string()),
+                network_id: 2147483648,
+                stacks_tip_height: 10,
+            }),
+            client,
+        );
         let datastore = Datastore::new(&clarity_datastore, constants);
         (clarity_datastore, datastore)
     }
@@ -1198,7 +1250,21 @@ mod tests {
         );
     }
 
-    // make that the when a ClarityDatastore is clone, the current values is reset to the initial value
+    #[test]
+    fn test_get_current_block_height() {
+        let (mut clarity_datastore, _) = get_datastores();
+        let height = clarity_datastore.get_current_block_height();
+        assert_eq!(height, 0);
+    }
+
+    #[test]
+    fn test_get_current_block_heigth_with_remote_data() {
+        let (mut clarity_datastore, _datastore) = get_datastores_with_remote_data();
+        let height = clarity_datastore.get_current_block_height();
+        assert_eq!(height, 10);
+    }
+
+    // make sure that when a ClarityDatastore is clones, the current_chain_tip is reset
     #[test]
     fn test_clarity_datastore_caching() {
         let (mut clarity_datastore, mut datastore) = get_datastores();
