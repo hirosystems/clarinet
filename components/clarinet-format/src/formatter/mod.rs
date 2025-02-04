@@ -155,7 +155,7 @@ pub fn format_source_exprs(
                             // We should ideally be able to format!("{}", format_source_exprs(.., &[expr.clone()]))
                             // but that stack overflows so we manually print out the inner contents
                             format!(
-                                "({}){}",
+                                "{}{}",
                                 inner_content,
                                 if let Some(comment) = trailing_comment {
                                     format!(
@@ -193,8 +193,7 @@ pub fn format_source_exprs(
                         _ => format_source_exprs(settings, &[expr.clone()], previous_indentation),
                     }
                 } else {
-                    let inner_content = to_inner_content(list, settings, previous_indentation);
-                    format!("({})", inner_content)
+                    to_inner_content(list, settings, previous_indentation)
                 };
                 result.push_str(t(&formatted));
                 continue;
@@ -535,8 +534,6 @@ fn format_key_value_sugar(
     let over_2_kvs = without_comments_len(exprs) > 2;
     let mut acc = "{".to_string();
 
-    // TODO this code is horrible
-    // convert it to the peekable version like the rest
     if over_2_kvs {
         acc.push('\n');
         let mut counter = 1;
@@ -551,11 +548,9 @@ fn format_key_value_sugar(
                 let last = i == exprs.len() - 1;
                 // if counter is even we're on the value
                 if counter % 2 == 0 {
-                    acc.push_str(&format!(
-                        ": {}{}\n",
-                        format_source_exprs(settings, &[expr.clone()], previous_indentation),
-                        if last { "" } else { "," }
-                    ));
+                    // Pass the current indentation level to nested formatting
+                    let value_str = format_source_exprs(settings, &[expr.clone()], &space);
+                    acc.push_str(&format!(": {}{}\n", value_str, if last { "" } else { "," }));
                 } else {
                     // if counter is odd we're on the key
                     acc.push_str(&format!(
@@ -567,6 +562,7 @@ fn format_key_value_sugar(
                 counter += 1
             }
         }
+        acc.push_str(&space);
     } else {
         // for cases where we keep it on the same line with 1 k/v pair
         let fkey = display_pse(settings, &exprs[0], previous_indentation);
@@ -575,9 +571,7 @@ fn format_key_value_sugar(
             format_source_exprs(settings, &[exprs[1].clone()], previous_indentation)
         ));
     }
-    if exprs.len() > 2 {
-        acc.push_str(previous_indentation);
-    }
+
     acc.push('}');
     acc.to_string()
 }
@@ -724,6 +718,8 @@ fn format_function(settings: &Settings, exprs: &[PreSymbolicExpression]) -> Stri
     acc.to_owned()
 }
 
+// This code handles the line width wrapping and happens near the bottom of the
+// traversal
 fn to_inner_content(
     list: &[PreSymbolicExpression],
     settings: &Settings,
@@ -756,13 +752,16 @@ fn to_inner_content(
         }
 
         result.push_str(trimmed);
+
         current_line_width += expr_width;
         first_on_line = false;
     }
 
     // TODO need closing newline handling here
 
-    result
+    let multi_line = result.contains('\n');
+    let b = format!("\n{})", previous_indentation);
+    format!("({}{}", result, if multi_line { &b } else { ")" })
 }
 
 #[cfg(test)]
@@ -772,6 +771,18 @@ mod tests_formatter {
     use std::collections::HashMap;
     use std::fs;
     use std::path::Path;
+
+    fn format_with_default(source: &str) -> String {
+        let mut formatter = ClarityFormatter::new(Settings::default());
+        formatter.format_section(source)
+    }
+
+    fn format_with(source: &str, settings: Settings) -> String {
+        let mut formatter = ClarityFormatter::new(settings);
+        formatter.format_section(source)
+    }
+
+    /// This is strictly for reading top metadata from golden tests
     fn from_metadata(metadata: &str) -> Settings {
         let mut max_line_length = 80;
         let mut indent = Indentation::Space(2);
@@ -805,10 +816,6 @@ mod tests_formatter {
             indentation: indent,
         }
     }
-    fn format_with_default(source: &str) -> String {
-        let mut formatter = ClarityFormatter::new(Settings::default());
-        formatter.format_section(source)
-    }
     fn format_file_with_metadata(source: &str) -> String {
         let mut lines = source.lines();
         let metadata_line = lines.next().unwrap_or_default();
@@ -817,10 +824,6 @@ mod tests_formatter {
         let real_source = lines.collect::<Vec<&str>>().join("\n");
         let mut formatter = ClarityFormatter::new(settings);
         formatter.format_file(&real_source)
-    }
-    fn format_with(source: &str, settings: Settings) -> String {
-        let mut formatter = ClarityFormatter::new(settings);
-        formatter.format_section(source)
     }
     #[test]
     fn test_simplest_formatter() {
@@ -1121,6 +1124,37 @@ mod tests_formatter {
     )
 )"#;
         assert_eq!(expected, result);
+    }
+
+    #[test]
+    fn if_let_if() {
+        let src = r#"(if (true)
+  (let (
+    (a (if (true)
+        (list)
+        (list)
+      ))
+  )
+    (list)
+  )
+  (list)
+)"#;
+        let result = format_with_default(src);
+        assert_eq!(src, result);
+    }
+
+    #[test]
+    fn map_in_map() {
+        let src = "(ok { a: b, ctx: { a: b, c: d }})";
+        let result = format_with_default(src);
+        let expected = r#"(ok {
+    a: b,
+    ctx: {
+      a: b,
+      c: d
+      }
+    })"#;
+        assert_eq!(result, expected);
     }
 
     #[test]
