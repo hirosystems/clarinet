@@ -1,12 +1,10 @@
 pub mod helpers;
-pub mod ignored;
 
 use std::iter::Peekable;
 
 use clarity::vm::functions::{define::DefineFunctions, NativeFunctions};
 use clarity::vm::representations::{PreSymbolicExpression, PreSymbolicExpressionType};
 use helpers::{name_and_args, t};
-use ignored::ignored_exprs;
 
 pub enum Indentation {
     Space(usize),
@@ -21,11 +19,6 @@ impl ToString for Indentation {
         }
     }
 }
-
-// commented blocks with this string included will not be formatted
-const FORMAT_IGNORE_SYNTAX: &str = "@format-ignore";
-// commented blocks with this string won't wrap
-const NO_WRAP_SYNTAX: &str = "@no-wrap";
 
 // or/and with > N comparisons will be split across multiple lines
 // (or
@@ -116,16 +109,6 @@ pub fn format_source_exprs(
 
     while let Some(expr) = iter.next() {
         let trailing_comment = get_trailing_comment(expr, &mut iter);
-        let cur = display_pse(settings, expr, previous_indentation);
-        if cur.contains(FORMAT_IGNORE_SYNTAX) {
-            if let Some(next) = iter.peek() {
-                // iter.next();
-                // we need PreSymbolicExpression back into orig Source
-                // TODO very wrong
-                result.push_str(&ignored_exprs(next));
-            };
-            continue;
-        }
         if let Some(list) = expr.match_list() {
             if let Some(atom_name) = list.split_first().and_then(|(f, _)| f.match_atom()) {
                 let formatted = if let Some(native) = NativeFunctions::lookup_by_name(atom_name) {
