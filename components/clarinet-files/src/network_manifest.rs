@@ -1,16 +1,13 @@
 use std::collections::BTreeMap;
 
 use super::{FileAccessor, FileLocation};
-use bip39::{Language, Mnemonic};
-use clarinet_utils::get_bip39_seed_from_mnemonic;
+use clarinet_utils::{get_bip32_keys_from_mnemonic, mnemonic_from_phrase, random_mnemonic};
 use clarity::address::AddressHashMode;
 use clarity::types::chainstate::{StacksAddress, StacksPrivateKey};
 use clarity::util::{hash::bytes_to_hex, secp256k1::Secp256k1PublicKey};
 use clarity::vm::types::QualifiedContractIdentifier;
 use lazy_static::lazy_static;
-use libsecp256k1::{PublicKey, SecretKey};
 use serde::Serialize;
-use tiny_hderive::bip32::ExtendedPrivKey;
 use toml::value::Value;
 
 pub const DEFAULT_DERIVATION_PATH: &str = "m/44'/5757'/0'/0/0";
@@ -482,24 +479,16 @@ impl NetworkManifest {
                     };
 
                     let mnemonic = match account_settings.get("mnemonic") {
-                        Some(Value::String(words)) => {
-                            match Mnemonic::parse_in_normalized(Language::English, words) {
-                                Ok(result) => result.to_string(),
-                                Err(e) => {
-                                    return Err(format!(
+                        Some(Value::String(phrase)) => match mnemonic_from_phrase(phrase) {
+                            Ok(result) => result.phrase().to_string(),
+                            Err(e) => {
+                                return Err(format!(
                                         "mnemonic (located in ./settings/{:?}.toml) for deploying address is invalid: {}",
                                         networks.1 , e
                                     ));
-                                }
                             }
-                        }
-                        _ => {
-                            let entropy = &[
-                                0x33, 0xE4, 0x6B, 0xB1, 0x3A, 0x74, 0x6E, 0xA4, 0x1C, 0xDD, 0xE4,
-                                0x5C, 0x90, 0x84, 0x6A, 0x79,
-                            ]; // TODO(lgalabru): rand
-                            Mnemonic::from_entropy(entropy).unwrap().to_string()
-                        }
+                        },
+                        _ => random_mnemonic().phrase().to_string(),
                     };
 
                     let derivation = match account_settings.get("derivation") {
@@ -1123,21 +1112,14 @@ pub fn compute_addresses(
     derivation_path: &str,
     networks: &(BitcoinNetwork, StacksNetwork),
 ) -> (String, String, String) {
-    let bip39_seed = match get_bip39_seed_from_mnemonic(mnemonic, "") {
-        Ok(bip39_seed) => bip39_seed,
-        Err(_) => panic!(),
-    };
-
-    let ext = ExtendedPrivKey::derive(&bip39_seed[..], derivation_path).unwrap();
-
-    let secret_key = SecretKey::parse_slice(&ext.secret()).unwrap();
+    let (secret_bytes, public_key) =
+        get_bip32_keys_from_mnemonic(mnemonic, "", derivation_path).unwrap();
 
     // Enforce a 33 bytes secret key format, expected by Stacks
-    let mut secret_key_bytes = secret_key.serialize().to_vec();
+    let mut secret_key_bytes = secret_bytes.clone();
     secret_key_bytes.push(1);
     let miner_secret_key_hex = bytes_to_hex(&secret_key_bytes);
 
-    let public_key = PublicKey::from_secret_key(&secret_key);
     let pub_key = Secp256k1PublicKey::from_slice(&public_key.serialize_compressed()).unwrap();
     let version = if matches!(networks.1, StacksNetwork::Mainnet) {
         clarity::address::C32_ADDRESS_VERSION_MAINNET_SINGLESIG
@@ -1159,7 +1141,7 @@ pub fn compute_addresses(
 }
 
 #[cfg(not(feature = "wasm"))]
-fn compute_btc_address(public_key: &PublicKey, network: &BitcoinNetwork) -> String {
+fn compute_btc_address(public_key: &libsecp256k1::PublicKey, network: &BitcoinNetwork) -> String {
     let public_key = bitcoin::PublicKey::from_slice(&public_key.serialize_compressed())
         .expect("Unable to recreate public key");
     let btc_address = bitcoin::Address::p2pkh(

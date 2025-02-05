@@ -8,12 +8,10 @@ license = "GPL-3.0"
 [dependencies]
 serde = "1"
 serde_derive = "1"
-bip39 = { version = "1.0.1", default-features = false }
-libsecp256k1 = "0.7.0"
 toml = { version = "0.5.6", features = ["preserve_order"] }
 url = { version = "2.2.2", features = ["serde"] }
-tiny-hderive = "0.3.0"
 bitcoin = { version = "0.31.2", optional = true }
+libsecp256k1 = { version = "0.7.0", optional = true }
 lazy_static = { workspace = true}
 
 clarity = { workspace = true }
@@ -32,7 +30,11 @@ web-sys = { workspace = true, features = ["console"], optional = true }
 
 [features]
 default = ["cli"]
-cli = ["bitcoin", "clarity-repl/sdk"]
+cli = [
+  "bitcoin",
+  "clarity-repl/sdk",
+  "libsecp256k1"
+]
 wasm = [
   "js-sys",
   "web-sys",

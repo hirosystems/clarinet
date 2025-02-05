@@ -3,7 +3,6 @@ extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 
-pub extern crate bip39;
 pub extern crate url;
 
 mod network_manifest;

@@ -23,7 +23,6 @@ bitcoincore-rpc = { version = "0.18.0", optional = true }
 bitcoincore-rpc-json = { version = "0.18.0", optional = true }
 base58 = { version = "0.2.0", optional = true }
 base64 = "0.21.3"
-tiny-hderive = { version = "0.3.0", optional = true }
 libsecp256k1 = { version = "0.7.0", optional = true }
 
 clarity = { workspace = true }
@@ -38,7 +37,6 @@ onchain = [
     "bitcoincore-rpc",
     "bitcoincore-rpc-json",
     "base58",
-    "tiny-hderive",
     "libsecp256k1",
     "clarinet-utils",
 ]

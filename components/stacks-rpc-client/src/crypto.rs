@@ -1,5 +1,6 @@
 use std::str::FromStr;
 
+use clarinet_utils::get_bip32_keys_from_mnemonic;
 use stacks_codec::codec::*;
 
 use clarity::address::{
@@ -10,11 +11,7 @@ use clarity::types::chainstate::StacksAddress;
 use clarity::util::secp256k1::{MessageSignature, Secp256k1PrivateKey, Secp256k1PublicKey};
 use clarity::vm::types::{PrincipalData, QualifiedContractIdentifier};
 use clarity::vm::{ClarityName, ClarityVersion, ContractName, Value as ClarityValue};
-use hmac::Hmac;
-use libsecp256k1::{PublicKey, SecretKey};
-use pbkdf2::pbkdf2;
-use sha2::Sha512;
-use tiny_hderive::bip32::ExtendedPrivKey;
+use libsecp256k1::PublicKey;
 
 #[derive(Clone, Debug)]
 pub struct Wallet {
@@ -52,14 +49,9 @@ pub fn compute_stacks_address(public_key: &PublicKey, mainnet: bool) -> StacksAd
 }
 
 pub fn compute_keypair(wallet: &Wallet) -> Keypair {
-    let bip39_seed = match get_bip39_seed_from_mnemonic(&wallet.mnemonic, "") {
-        Ok(bip39_seed) => bip39_seed,
-        Err(_) => panic!(),
-    };
-    let ext = ExtendedPrivKey::derive(&bip39_seed[..], wallet.derivation.as_str()).unwrap();
-    let wrapped_secret_key = Secp256k1PrivateKey::from_slice(&ext.secret()).unwrap();
-    let secret_key = SecretKey::parse_slice(&ext.secret()).unwrap();
-    let public_key = PublicKey::from_secret_key(&secret_key);
+    let (secret_bytes, public_key) =
+        get_bip32_keys_from_mnemonic(&wallet.mnemonic, "", &wallet.derivation).unwrap();
+    let wrapped_secret_key = Secp256k1PrivateKey::from_slice(&secret_bytes).unwrap();
     Keypair {
         secret_key: wrapped_secret_key,
         public_key,
@@ -170,20 +162,4 @@ pub fn encode_contract_publish(
         tx_fee,
         anchor_mode,
     )
-}
-
-pub fn get_bip39_seed_from_mnemonic(mnemonic: &str, password: &str) -> Result<Vec<u8>, String> {
-    const PBKDF2_ROUNDS: u32 = 2048;
-    const PBKDF2_BYTES: usize = 64;
-    let salt = format!("mnemonic{}", password);
-    let mut seed = vec![0u8; PBKDF2_BYTES];
-
-    pbkdf2::<Hmac<Sha512>>(
-        mnemonic.as_bytes(),
-        salt.as_bytes(),
-        PBKDF2_ROUNDS,
-        &mut seed,
-    )
-    .map_err(|e| e.to_string())?;
-    Ok(seed)
 }

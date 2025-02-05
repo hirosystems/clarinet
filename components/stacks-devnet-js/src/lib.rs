@@ -5,11 +5,11 @@ extern crate error_chain;
 mod serde;
 
 use clarinet_deployments::{get_default_deployment_path, load_deployment};
-use clarinet_files::bip39::{Language, Mnemonic};
 use clarinet_files::{
     compute_addresses, AccountConfig, DevnetConfigFile, FileLocation, PoxStackingOrder,
     ProjectManifest, StacksNetwork, DEFAULT_DERIVATION_PATH,
 };
+use clarinet_utils::mnemonic_from_phrase;
 use hiro_system_kit::{o, slog, slog_async, slog_term, Drain};
 use neon::context::Context as NeonContext;
 use stacks_network::chainhook_sdk::types::{
@@ -397,14 +397,12 @@ impl StacksDevnet {
                 .downcast_or_throw::<JsString, _>(&mut cx)?
                 .value(&mut cx);
 
-            let words = account_settings
+            let phrase = account_settings
                 .get(&mut cx, "mnemonic")?
                 .downcast_or_throw::<JsString, _>(&mut cx)?
                 .value(&mut cx);
 
-            let mnemonic = Mnemonic::parse_in_normalized(Language::English, &words)
-                .unwrap()
-                .to_string();
+            let mnemonic = mnemonic_from_phrase(&phrase).unwrap().phrase().to_string();
 
             let balance = match account_settings
                 .get(&mut cx, "balance")?

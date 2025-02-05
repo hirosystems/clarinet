@@ -1,19 +1,27 @@
-use hmac::Hmac;
-use pbkdf2::pbkdf2;
-use sha2::Sha512;
+use bip32::{secp256k1::elliptic_curve::rand_core::OsRng, Language, Mnemonic, XPrv};
+use libsecp256k1::{PublicKey, SecretKey};
 
-pub fn get_bip39_seed_from_mnemonic(mnemonic: &str, password: &str) -> Result<Vec<u8>, String> {
-    const PBKDF2_ROUNDS: u32 = 2048;
-    const PBKDF2_BYTES: usize = 64;
-    let salt = format!("mnemonic{}", password);
-    let mut seed = vec![0u8; PBKDF2_BYTES];
+pub fn mnemonic_from_phrase(phrase: &str) -> Result<Mnemonic, String> {
+    Mnemonic::new(phrase, bip32::Language::English).map_err(|e| e.to_string())
+}
 
-    pbkdf2::<Hmac<Sha512>>(
-        mnemonic.as_bytes(),
-        salt.as_bytes(),
-        PBKDF2_ROUNDS,
-        &mut seed,
-    )
-    .map_err(|e| e.to_string())?;
-    Ok(seed)
+pub fn random_mnemonic() -> Mnemonic {
+    Mnemonic::random(OsRng, Language::English)
+}
+
+pub fn get_bip32_keys_from_mnemonic(
+    phrase: &str,
+    password: &str,
+    derivation: &str,
+) -> Result<(Vec<u8>, PublicKey), String> {
+    let mnemonic = Mnemonic::new(phrase, bip32::Language::English).map_err(|e| e.to_string())?;
+    let xprv: XPrv =
+        XPrv::derive_from_path(mnemonic.to_seed(password), &derivation.parse().unwrap())
+            .map_err(|e| e.to_string())?;
+    let secret_bytes = xprv.private_key().to_bytes();
+
+    let secret_key = SecretKey::parse_slice(&secret_bytes).unwrap();
+    let public_key = PublicKey::from_secret_key(&secret_key);
+
+    Ok((secret_bytes.to_vec(), public_key))
 }
