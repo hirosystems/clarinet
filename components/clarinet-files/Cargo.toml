@@ -11,7 +11,7 @@ serde_derive = "1"
 toml = { version = "0.5.6", features = ["preserve_order"] }
 url = { version = "2.2.2", features = ["serde"] }
 bitcoin = { version = "0.31.2", optional = true }
-libsecp256k1 = { version = "0.7.0", optional = true }
+libsecp256k1 = "0.7.0"
 lazy_static = { workspace = true}
 
 clarity = { workspace = true }
@@ -30,11 +30,7 @@ web-sys = { workspace = true, features = ["console"], optional = true }
 
 [features]
 default = ["cli"]
-cli = [
-  "bitcoin",
-  "clarity-repl/sdk",
-  "libsecp256k1"
-]
+cli = ["bitcoin", "clarity-repl/sdk"]
 wasm = [
   "js-sys",
   "web-sys",

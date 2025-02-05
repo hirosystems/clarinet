@@ -1,14 +1,16 @@
 use std::collections::BTreeMap;
 
-use super::{FileAccessor, FileLocation};
 use clarinet_utils::{get_bip32_keys_from_mnemonic, mnemonic_from_phrase, random_mnemonic};
 use clarity::address::AddressHashMode;
 use clarity::types::chainstate::{StacksAddress, StacksPrivateKey};
 use clarity::util::{hash::bytes_to_hex, secp256k1::Secp256k1PublicKey};
 use clarity::vm::types::QualifiedContractIdentifier;
 use lazy_static::lazy_static;
+use libsecp256k1::PublicKey;
 use serde::Serialize;
 use toml::value::Value;
+
+use super::{FileAccessor, FileLocation};
 
 pub const DEFAULT_DERIVATION_PATH: &str = "m/44'/5757'/0'/0/0";
 
@@ -1141,7 +1143,7 @@ pub fn compute_addresses(
 }
 
 #[cfg(not(feature = "wasm"))]
-fn compute_btc_address(public_key: &libsecp256k1::PublicKey, network: &BitcoinNetwork) -> String {
+fn compute_btc_address(public_key: &PublicKey, network: &BitcoinNetwork) -> String {
     let public_key = bitcoin::PublicKey::from_slice(&public_key.serialize_compressed())
         .expect("Unable to recreate public key");
     let btc_address = bitcoin::Address::p2pkh(
