@@ -78,7 +78,8 @@ name = "simnet"
 harness = false
 
 [features]
-default = ["cli", "dap"]
+default = ["cli", "dap", "remote-data-fetching"]
+remote-data-fetching = []
 sdk = [
     "clarity/canonical",
     "clarity/developer-mode",
