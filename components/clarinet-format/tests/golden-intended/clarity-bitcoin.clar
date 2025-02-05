@@ -994,11 +994,9 @@
 ;; as per BIP-0141 (https://github.com/bitcoin/bips/blob/master/bip-0141.mediawiki#commitment-structure)
 (define-read-only (get-commitment-scriptPubKey
 		(outs (list 8 {
-					value: uint,
-					scriptPubKey: (buff 128)
-				}
-			)
-		)
+			value: uint,
+			scriptPubKey: (buff 128)
+		}))
 	)
 	(fold inner-get-commitment-scriptPubKey outs 0x)
 )

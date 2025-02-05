@@ -224,7 +224,7 @@ fn format_constant(settings: &Settings, exprs: &[PreSymbolicExpression]) -> Stri
         }
 
         acc.push('\n');
-        acc.to_owned()
+        acc
     } else {
         panic!("Expected a valid constant definition with (name value)")
     }
@@ -259,7 +259,7 @@ fn format_map(
         }
 
         acc.push_str(&format!("\n{})\n", previous_indentation));
-        acc.to_owned()
+        acc
     } else {
         panic!("define-map without a name is invalid")
     }
@@ -269,12 +269,6 @@ fn is_same_line(expr1: &PreSymbolicExpression, expr2: &PreSymbolicExpression) ->
     expr1.span().start_line == expr2.span().start_line
 }
 
-fn width(exprs: &[PreSymbolicExpression]) -> usize {
-    match exprs.last() {
-        Some(expr) => expr.span().end_column as usize,
-        None => 0,
-    }
-}
 // *begin* never on one line
 fn format_begin(
     settings: &Settings,
@@ -303,7 +297,7 @@ fn format_begin(
         }
     }
     acc.push_str(&format!("\n{})\n", previous_indentation));
-    acc.to_owned()
+    acc
 }
 
 fn is_comment(pse: &PreSymbolicExpression) -> bool {
@@ -366,7 +360,7 @@ fn format_booleans(
         acc.push_str(&format!("\n{}", previous_indentation));
     }
     acc.push(')');
-    acc.to_owned()
+    acc
 }
 
 fn format_if(
@@ -452,7 +446,7 @@ fn format_let(
         ))
     }
     acc.push_str(&format!("\n{})", previous_indentation));
-    acc.to_owned()
+    acc
 }
 
 // * match *
@@ -488,7 +482,7 @@ fn format_match(
         }
     }
     acc.push_str(&format!("\n{})", previous_indentation));
-    acc.to_owned()
+    acc
 }
 
 fn format_list(
@@ -560,7 +554,7 @@ fn format_key_value_sugar(
     }
 
     acc.push('}');
-    acc.to_string()
+    acc
 }
 
 // used for (tuple (n1  1)) syntax
@@ -597,7 +591,7 @@ fn format_key_value(
             .unwrap();
         let fkey = display_pse(settings, key, previous_indentation);
         let ending = if multiline {
-            if index < exprs.len() - 1 {
+            if index < without_comments_len(exprs) - 1 {
                 ","
             } else {
                 "\n"
@@ -618,7 +612,7 @@ fn format_key_value(
     }
     acc.push_str(previous_indentation);
     acc.push('}');
-    acc.to_string()
+    acc
 }
 
 // This should panic on most things besides atoms and values. Added this to help
@@ -715,7 +709,7 @@ fn format_function(settings: &Settings, exprs: &[PreSymbolicExpression]) -> Stri
         ))
     }
     acc.push_str("\n)\n\n");
-    acc.to_owned()
+    acc
 }
 
 // This code handles the line width wrapping and happens near the bottom of the
@@ -741,7 +735,7 @@ fn to_inner_content(
 
         if !first_on_line {
             // For subexpressions that would exceed line length, add newline with increased indent
-            if current_line_width + expr_width + 1 > 80 {
+            if current_line_width + expr_width + 1 > settings.max_line_length {
                 result.push('\n');
                 result.push_str(&base_indent);
                 current_line_width = base_indent.len() + settings.indentation.to_string().len();

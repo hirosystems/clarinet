@@ -116,7 +116,7 @@ struct Formatter {
     /// indentation size, e.g. 2
     pub indentation: Option<usize>,
     #[clap(long = "tabs", short = 't', conflicts_with = "indentation", action = clap::ArgAction::SetTrue)]
-    /// indentation size, e.g. 2
+    /// use tabs instead of spaces
     pub use_tabs: bool,
     #[clap(long = "dry-run", conflicts_with = "in_place")]
     pub dry_run: bool,
