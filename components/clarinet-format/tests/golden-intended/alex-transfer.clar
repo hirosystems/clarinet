@@ -62,12 +62,12 @@
                     (if (is-eq no-to-treasury u0)
                             (var-get available-ids)
                             (unwrap-panic
-                            (as-max-len?
-                                (concat (var-get available-ids) ids-to-treasury)
-                                u10000
+                                (as-max-len?
+                                    (concat (var-get available-ids) ids-to-treasury)
+                                    u10000
+                                )
                             )
-                        )
-                        )
+                    )
                 )
                 (ids-to-recipient
                     (if (is-eq no-to-recipient u0)

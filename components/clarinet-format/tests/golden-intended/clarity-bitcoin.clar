@@ -182,17 +182,17 @@
 			)
 				(if (is-eq byte u253)
 					(let (
-					;; next two bytes is the varint
-					(parsed-u16
-						(try!
-							(read-uint16 {
-									txbuff: tx,
-									index: (+ u1 ptr)
-								}
+						;; next two bytes is the varint
+						(parsed-u16
+							(try!
+								(read-uint16 {
+										txbuff: tx,
+										index: (+ u1 ptr)
+									}
+								)
 							)
 						)
 					)
-				)
 					(ok
 						{
 							varint: (get uint16 parsed-u16),
@@ -429,14 +429,14 @@
 		(if (> num-txins u8)
 				(err ERR-TOO-MANY-TXINS)
 				(fold read-next-txin (bool-list-of-len num-txins)
-				(ok
-					{
-						ctx: new-ctx,
-						remaining: num-txins,
-						txins: (list)
-					}
+					(ok
+						{
+							ctx: new-ctx,
+							remaining: num-txins,
+							txins: (list)
+						}
+					)
 				)
-			)
 			)
 	)
 )

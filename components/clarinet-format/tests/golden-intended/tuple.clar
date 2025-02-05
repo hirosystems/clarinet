@@ -8,7 +8,8 @@
         origination-fee: uint,
         stable-borrow-rate: uint,
         last-updated-block: uint, ;; comment
-        use-as-collateral: bool,      }
+        use-as-collateral: bool
+      }
     )
   )
   (begin

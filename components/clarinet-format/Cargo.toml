@@ -4,7 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-# clarity-repl = { path = "../clarity-repl" }
 clarity = { workspace = true}
 
 [dev-dependencies]

@@ -1181,6 +1181,22 @@ mod tests_formatter {
     }
 
     #[test]
+    fn old_tuple() {
+        let src = r#"(tuple
+  (a uint)
+  (b uint) ;; comment
+  (c bool)
+)"#;
+        let result = format_with_default(src);
+        let expected = r#"{
+  a: uint,
+  b: uint, ;; comment
+  c: bool
+}"#;
+        assert_eq!(result, expected);
+    }
+
+    #[test]
     fn test_irl_contracts() {
         let golden_dir = "./tests/golden";
         let intended_dir = "./tests/golden-intended";
