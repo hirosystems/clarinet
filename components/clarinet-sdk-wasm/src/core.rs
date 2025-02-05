@@ -21,6 +21,7 @@ use clarity_repl::clarity::{
 };
 use clarity_repl::repl::clarity_values::{uint8_to_string, uint8_to_value};
 use clarity_repl::repl::session::{CostsReport, BOOT_CONTRACTS_DATA};
+use clarity_repl::repl::settings::RemoteDataSettings;
 use clarity_repl::repl::{
     clarity_values, ClarityCodeSource, ClarityContract, ContractDeployer, Session, SessionSettings,
     DEFAULT_CLARITY_VERSION, DEFAULT_EPOCH,
@@ -96,7 +97,7 @@ impl CallFnArgs {
         Self {
             contract,
             method,
-            args: args.iter().map(|a| a.to_vec()).collect(),
+            args: args.into_iter().map(|a| a.to_vec()).collect(),
             sender,
         }
     }
@@ -106,27 +107,24 @@ impl CallFnArgs {
       Because it's JSON, the Uint8Array arguments are passed as Map<index, value> instead of Vec<u8>.
       This method transform the Map back into a Vec.
     */
-    fn from_json_args(
-        CallContractArgsJSON {
-            contract,
-            method,
-            args_maps,
-            sender,
-        }: CallContractArgsJSON,
-    ) -> Self {
-        let mut args: Vec<Vec<u8>> = vec![];
-        for arg in args_maps {
-            let mut parsed_arg: Vec<u8> = vec![0; arg.len()];
-            for (i, v) in arg.iter() {
-                parsed_arg[*i] = *v;
-            }
-            args.push(parsed_arg);
-        }
+    fn from_json_args(json_args: CallContractArgsJSON) -> Self {
+        let args = json_args
+            .args_maps
+            .into_iter()
+            .map(|arg| {
+                let mut parsed_arg = vec![0; arg.len()];
+                for (i, v) in arg {
+                    parsed_arg[i] = v;
+                }
+                parsed_arg
+            })
+            .collect();
+
         Self {
-            contract,
-            method,
+            contract: json_args.contract,
+            method: json_args.method,
             args,
-            sender,
+            sender: json_args.sender,
         }
     }
 }
@@ -166,7 +164,6 @@ pub struct DeployContractArgs {
     options: ContractOptions,
     sender: String,
 }
-
 #[wasm_bindgen]
 impl DeployContractArgs {
     #[wasm_bindgen(constructor)]
@@ -300,7 +297,7 @@ impl SDK {
     pub fn new(fs_request: JsFunction, options: Option<SDKOptions>) -> Self {
         panic::set_hook(Box::new(console_error_panic_hook::hook));
 
-        let fs = Box::new(WASMFileSystemAccessor::new(fs_request));
+        let file_accessor = Box::new(WASMFileSystemAccessor::new(fs_request));
 
         let track_coverage = options.as_ref().map_or(false, |o| o.track_coverage);
         let track_costs = options.as_ref().map_or(false, |o| o.track_costs);
@@ -312,7 +309,7 @@ impl SDK {
             contracts_interfaces: HashMap::new(),
             contracts_locations: HashMap::new(),
             session: None,
-            file_accessor: fs,
+            file_accessor,
             options: SDKOptions {
                 track_coverage,
                 track_costs,
@@ -342,16 +339,27 @@ impl SDK {
     #[wasm_bindgen(js_name=getDefaultClarityVersionForCurrentEpoch)]
     pub fn default_clarity_version_for_current_epoch(&self) -> ClarityVersionString {
         let session = self.get_session();
+        let current_epoch = session.interpreter.datastore.get_current_epoch();
         ClarityVersionString {
-            obj: ClarityVersion::default_for_epoch(session.current_epoch)
+            obj: ClarityVersion::default_for_epoch(current_epoch)
                 .to_string()
                 .into(),
         }
     }
 
     #[wasm_bindgen(js_name=initEmptySession)]
-    pub async fn init_empty_session(&mut self) -> Result<(), String> {
-        let session = Session::new(SessionSettings::default());
+    pub async fn init_empty_session(
+        &mut self,
+        remote_data_settings: JsValue,
+    ) -> Result<(), String> {
+        let config: Option<RemoteDataSettings> =
+            serde_wasm_bindgen::from_value(remote_data_settings)
+                .map_err(|e| format!("Failed to parse remote data settings: {}", e))?;
+
+        let mut settings = SessionSettings::default();
+        settings.repl_settings.remote_data = config.unwrap_or_default();
+        let session = Session::new(settings);
+
         self.session = Some(session);
         Ok(())
     }
@@ -600,11 +608,16 @@ impl SDK {
     #[wasm_bindgen(getter, js_name=currentEpoch)]
     pub fn current_epoch(&mut self) -> String {
         let session = self.get_session_mut();
-        session.current_epoch.to_string()
+        session
+            .interpreter
+            .datastore
+            .get_current_epoch()
+            .to_string()
     }
 
     #[wasm_bindgen(js_name=setEpoch)]
     pub fn set_epoch(&mut self, epoch: EpochString) {
+        // @todo: unwrap to default epoch?? DEFAULT_EPOCH.to_string()
         let epoch = epoch.as_string().unwrap_or("2.4".into());
         let epoch = match epoch.as_str() {
             "2.0" => StacksEpochId::Epoch20,
@@ -676,6 +689,7 @@ impl SDK {
             .get_data_var(&contract_id, var_name)
             .ok_or("value not found".into())
     }
+
     #[wasm_bindgen(js_name=getBlockTime)]
     pub fn get_block_time(&mut self) -> u64 {
         self.get_session_mut().interpreter.get_block_time()
@@ -780,9 +794,10 @@ impl SDK {
 
     #[wasm_bindgen(js_name=callReadOnlyFn)]
     pub fn call_read_only_fn(&mut self, args: &CallFnArgs) -> Result<TransactionRes, String> {
-        let interface = self.get_function_interface(&args.contract, &args.method)?;
-        if interface.access != ContractInterfaceFunctionAccess::read_only {
-            return Err(format!("{} is not a read-only function", &args.method));
+        if let Ok(interface) = self.get_function_interface(&args.contract, &args.method) {
+            if interface.access != ContractInterfaceFunctionAccess::read_only {
+                return Err(format!("{} is not a read-only function", &args.method));
+            }
         }
         self.call_contract_fn(args, false)
     }
@@ -792,9 +807,10 @@ impl SDK {
         args: &CallFnArgs,
         advance_chain_tip: bool,
     ) -> Result<TransactionRes, String> {
-        let interface = self.get_function_interface(&args.contract, &args.method)?;
-        if interface.access != ContractInterfaceFunctionAccess::public {
-            return Err(format!("{} is not a public function", &args.method));
+        if let Ok(interface) = self.get_function_interface(&args.contract, &args.method) {
+            if interface.access != ContractInterfaceFunctionAccess::public {
+                return Err(format!("{} is not a public function", &args.method));
+            }
         }
 
         if advance_chain_tip {
@@ -809,9 +825,10 @@ impl SDK {
         args: &CallFnArgs,
         advance_chain_tip: bool,
     ) -> Result<TransactionRes, String> {
-        let interface = self.get_function_interface(&args.contract, &args.method)?;
-        if interface.access != ContractInterfaceFunctionAccess::private {
-            return Err(format!("{} is not a private function", &args.method));
+        if let Ok(interface) = self.get_function_interface(&args.contract, &args.method) {
+            if interface.access != ContractInterfaceFunctionAccess::private {
+                return Err(format!("{} is not a private function", &args.method));
+            }
         }
         if advance_chain_tip {
             let session = self.get_session_mut();
@@ -857,13 +874,14 @@ impl SDK {
             if advance_chain_tip {
                 session.advance_chain_tip(1);
             }
+            let current_epoch = session.interpreter.datastore.get_current_epoch();
 
             let contract = ClarityContract {
                 code_source: ClarityCodeSource::ContractInMemory(args.content.clone()),
                 name: args.name.clone(),
                 deployer: ContractDeployer::Address(args.sender.to_string()),
                 clarity_version: args.options.clarity_version,
-                epoch: session.current_epoch,
+                epoch: current_epoch,
             };
 
             match session.deploy_contract(&contract, false, None) {
@@ -1023,6 +1041,19 @@ impl SDK {
             return "error: command must start with ::".to_string();
         }
         session.handle_command(&snippet)
+    }
+
+    #[wasm_bindgen(js_name=setLocalAccounts)]
+    pub fn set_local_accounts(&mut self, addresses: Vec<String>) {
+        let principals = addresses
+            .into_iter()
+            .map(|a| StandardPrincipalData::from(StacksAddress::from_string(&a).unwrap()))
+            .collect();
+        let session = self.get_session_mut();
+        session
+            .interpreter
+            .clarity_datastore
+            .save_local_account(principals);
     }
 
     #[wasm_bindgen(js_name=mintSTX)]

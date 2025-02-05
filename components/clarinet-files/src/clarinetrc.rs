@@ -1,40 +1,30 @@
-use std::fs::{self};
-
 use std::env;
 
-#[derive(Serialize, Deserialize, Default)]
-pub struct GlobalSettings {
+#[derive(Serialize, Deserialize, Default, Debug)]
+pub struct ClarinetRC {
     pub enable_hints: Option<bool>,
     pub enable_telemetry: Option<bool>,
 }
 
-impl GlobalSettings {
+impl ClarinetRC {
     pub fn get_settings_file_path() -> &'static str {
         "~/.clarinet/clarinetrc.toml"
     }
 
-    pub fn from_global_file() -> Self {
+    pub fn from_rc_file() -> Self {
         let home_dir = dirs::home_dir();
 
         if let Some(path) = home_dir.map(|home_dir| home_dir.join(".clarinet/clarinetrc.toml")) {
             if path.exists() {
-                match fs::read_to_string(path) {
-                    Ok(content) => match toml::from_str::<GlobalSettings>(&content) {
+                match std::fs::read_to_string(path) {
+                    Ok(content) => match toml::from_str::<ClarinetRC>(&content) {
                         Ok(res) => return res,
                         Err(_) => {
-                            println!(
-                                "{} {}",
-                                format_warn!("unable to parse"),
-                                Self::get_settings_file_path()
-                            );
+                            println!("unable to parse {}", Self::get_settings_file_path());
                         }
                     },
                     Err(_) => {
-                        println!(
-                            "{} {}",
-                            format_warn!("unable to read file"),
-                            Self::get_settings_file_path()
-                        );
+                        println!("unable to read file {}", Self::get_settings_file_path());
                     }
                 }
             }

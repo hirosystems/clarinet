@@ -22,6 +22,16 @@ BigInt.prototype.toJSON = function () {
   return this.toString();
 };
 
+type Options = { trackCosts: boolean; trackCoverage: boolean };
+
+export async function getSDK(options?: Options): Promise<Simnet> {
+  const module = await wasmModule;
+  let sdkOptions = new SDKOptions(!!options?.trackCosts, !!options?.trackCoverage);
+
+  const simnet = new Proxy(new module.SDK(vfs, sdkOptions), getSessionProxy()) as unknown as Simnet;
+  return simnet;
+}
+
 // load wasm only once and memoize it
 function memoizedInit() {
   let simnet: Simnet | null = null;
@@ -32,9 +42,7 @@ function memoizedInit() {
     options?: { trackCosts: boolean; trackCoverage: boolean },
   ) => {
     if (noCache || !simnet) {
-      const module = await wasmModule;
-      let sdkOptions = new SDKOptions(!!options?.trackCosts, !!options?.trackCoverage);
-      simnet = new Proxy(new module.SDK(vfs, sdkOptions), getSessionProxy()) as unknown as Simnet;
+      simnet = await getSDK(options);
     }
 
     // start a new simnet session
