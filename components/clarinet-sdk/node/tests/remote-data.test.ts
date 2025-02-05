@@ -59,12 +59,19 @@ describe("simnet remote interactions", async () => {
       api_url: "https://api.testnet.hiro.so",
       initial_height: 57000,
     });
-    const { result } = simnet.callReadOnlyFn(
+    const { result: resultAt56230 } = simnet.callReadOnlyFn(
       counterAddress,
       "get-count-at-block",
       [Cl.uint(56230)],
       sender,
     );
-    expect(result).toStrictEqual(Cl.ok(Cl.uint(0)));
+    expect(resultAt56230).toStrictEqual(Cl.ok(Cl.uint(0)));
+    const { result: resultAt56300 } = simnet.callReadOnlyFn(
+      counterAddress,
+      "get-count-at-block",
+      [Cl.uint(56300)],
+      sender,
+    );
+    expect(resultAt56300).toStrictEqual(Cl.ok(Cl.uint(1)));
   });
 });

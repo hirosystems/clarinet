@@ -328,9 +328,13 @@ impl ClarityDatastore {
     }
 
     fn fetch_clarity_marf_value(&mut self, key: &str) -> Result<Option<String>> {
-        let key_hash = TrieHash::from_key(key);
+        let key_hash = TrieHash::from_key(dbg!(key));
         let tip = self.get_remote_chaintip();
-        let url = format!("/v2/clarity/marf/{}?tip={}&proof=false", key_hash, tip);
+        let url = format!(
+            "/v2/clarity/marf/{}?tip={}&proof=false",
+            dbg!(key_hash),
+            tip
+        );
         self.client.fetch_clarity_data(&url)
     }
 
@@ -990,10 +994,8 @@ impl BurnStateDB for Datastore {
 
     fn get_tip_burn_block_height(&self) -> Option<u32> {
         let current_chain_tip = self.current_chain_tip.borrow();
-        let height = self.get_burn_block_height_for_block(&current_chain_tip);
-
-        if height.is_some() {
-            return height;
+        if let Some(height) = self.get_burn_block_height_for_block(&current_chain_tip) {
+            return Some(height);
         }
 
         return self

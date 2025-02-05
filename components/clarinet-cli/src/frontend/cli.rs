@@ -356,7 +356,7 @@ struct Console {
     /// Enable remote data fetching from mainnet or a testnet
     #[clap(long = "enable-remote-data", short = 'r')]
     pub enable_remote_data: bool,
-    /// Set a custom Hiro API URL for remote data fetching
+    /// Set a custom Stacks Blockchain API URL for remote data fetching
     #[clap(long = "remote-data-api-url", short = 'a')]
     pub remote_data_api_url: Option<ApiUrl>,
     /// Initial remote Stacks block height
