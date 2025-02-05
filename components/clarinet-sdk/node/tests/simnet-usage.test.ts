@@ -50,6 +50,7 @@ describe("basic simnet interactions", () => {
     simnet.mineEmptyBlocks(4);
     expect(simnet.blockHeight).toBe(blockHeight + 5);
   });
+
   it("can not mine empty stacks block in pre-3.0", () => {
     expect(() => simnet.mineEmptyStacksBlock()).toThrowError(
       "use mineEmptyBurnBlock in epoch lower than 3.0",
@@ -237,13 +238,13 @@ describe("simnet can call contracts function", () => {
   it("can not call a public function with callPrivateFn", () => {
     expect(() => {
       simnet.callPrivateFn("counter", "increment", [], address1);
-    }).toThrow("increment is not a private function");
+    }).toThrow(/^increment is not a private function$/);
   });
 
   it("can not call a private function with callPublicFn", () => {
     expect(() => {
       simnet.callPublicFn("counter", "inner-increment", [], address1);
-    }).toThrow("increment is not a public function");
+    }).toThrow(/^inner-increment is not a public function$/);
   });
 
   it("can get updated assets map", () => {

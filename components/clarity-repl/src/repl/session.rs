@@ -96,7 +96,6 @@ pub struct CostsReport {
 #[derive(Clone, Debug)]
 pub struct Session {
     pub settings: SessionSettings,
-    pub current_epoch: StacksEpochId,
     pub contracts: BTreeMap<QualifiedContractIdentifier, ParsedContract>,
     pub interpreter: ClarityInterpreter,
     api_reference: HashMap<String, String>,
@@ -120,7 +119,6 @@ impl Session {
 
         Self {
             interpreter: ClarityInterpreter::new(tx_sender, settings.repl_settings.clone()),
-            current_epoch: settings.epoch_id.unwrap_or(StacksEpochId::Epoch2_05),
             contracts: BTreeMap::new(),
             api_reference: build_api_reference(),
             show_costs: false,
@@ -551,12 +549,13 @@ impl Session {
         cost_track: bool,
         ast: Option<&ContractAST>,
     ) -> Result<ExecutionResult, Vec<Diagnostic>> {
-        if contract.epoch != self.current_epoch {
+        let current_epoch = self.interpreter.datastore.get_current_epoch();
+        if contract.epoch != current_epoch {
             let diagnostic = Diagnostic {
                 level: Level::Error,
                 message: format!(
                     "contract epoch ({}) does not match current epoch ({})",
-                    contract.epoch, self.current_epoch
+                    contract.epoch, current_epoch
                 ),
                 spans: vec![],
                 suggestion: None,
@@ -620,12 +619,13 @@ impl Session {
             hooks.push(coverage_hook);
         }
 
+        let current_epoch = self.interpreter.datastore.get_current_epoch();
         let execution = match self.interpreter.call_contract_fn(
             &QualifiedContractIdentifier::parse(&contract_id_str).unwrap(),
             method,
             args,
-            self.current_epoch,
-            ClarityVersion::default_for_epoch(self.current_epoch),
+            current_epoch,
+            ClarityVersion::default_for_epoch(current_epoch),
             track_costs,
             allow_private,
             hooks,
@@ -651,12 +651,13 @@ impl Session {
         snippet: String,
         cost_track: bool,
     ) -> Result<ExecutionResult, Vec<Diagnostic>> {
+        let current_epoch = self.interpreter.datastore.get_current_epoch();
         let contract = ClarityContract {
             code_source: ClarityCodeSource::ContractInMemory(snippet),
             name: format!("contract-{}", self.contracts.len()),
             deployer: ContractDeployer::DefaultDeployer,
-            clarity_version: ClarityVersion::default_for_epoch(self.current_epoch),
-            epoch: self.current_epoch,
+            clarity_version: ClarityVersion::default_for_epoch(current_epoch),
+            epoch: current_epoch,
         };
         let contract_identifier =
             contract.expect_resolved_contract_identifier(Some(&self.interpreter.get_tx_sender()));
@@ -690,12 +691,13 @@ impl Session {
         eval_hooks: Option<Vec<&mut dyn EvalHook>>,
         cost_track: bool,
     ) -> Result<ExecutionResult, Vec<Diagnostic>> {
+        let current_epoch = self.interpreter.datastore.get_current_epoch();
         let contract = ClarityContract {
             code_source: ClarityCodeSource::ContractInMemory(snippet),
             name: format!("contract-{}", self.contracts.len()),
             deployer: ContractDeployer::DefaultDeployer,
-            clarity_version: ClarityVersion::default_for_epoch(self.current_epoch),
-            epoch: self.current_epoch,
+            clarity_version: ClarityVersion::default_for_epoch(current_epoch),
+            epoch: current_epoch,
         };
         let contract_identifier =
             contract.expect_resolved_contract_identifier(Some(&self.interpreter.get_tx_sender()));
@@ -999,7 +1001,8 @@ impl Session {
     }
 
     pub fn get_epoch(&mut self) -> String {
-        format!("Current epoch: {}", self.current_epoch)
+        let current_epoch = self.interpreter.datastore.get_current_epoch();
+        format!("Current epoch: {}", current_epoch)
     }
 
     pub fn set_epoch(&mut self, cmd: &str) -> String {
@@ -1024,7 +1027,6 @@ impl Session {
     }
 
     pub fn update_epoch(&mut self, epoch: StacksEpochId) {
-        self.current_epoch = epoch;
         self.interpreter.set_current_epoch(epoch);
         if epoch >= StacksEpochId::Epoch30 {
             self.interpreter.set_tenure_height();
@@ -1660,6 +1662,10 @@ mod tests {
                 .1[0],
             "u1".green().to_string()
         );
+
+        assert_eq!(session.process_console_input("(at-block (unwrap-panic (get-block-info? id-header-hash u0)) burn-block-height)").1[0], "u0".green().to_string());
+        assert_eq!(session.process_console_input("(at-block (unwrap-panic (get-block-info? id-header-hash u5000)) burn-block-height)").1[0], "u4999".green().to_string());
+
         assert_eq!(session.process_console_input("(at-block (unwrap-panic (get-block-info? id-header-hash u0)) (contract-call? .contract get-x))").1[0], "u0".green().to_string());
         assert_eq!(session.process_console_input("(at-block (unwrap-panic (get-block-info? id-header-hash u5000)) (contract-call? .contract get-x))").1[0], "u0".green().to_string());
 
@@ -1682,6 +1688,13 @@ mod tests {
             "u2".green().to_string()
         );
         assert_eq!(session.process_console_input("(at-block (unwrap-panic (get-block-info? id-header-hash u10000)) (contract-call? .contract get-x))").1[0], "u1".green().to_string());
+
+        session.handle_command("::set_epoch 3.1");
+
+        let _ = session.advance_burn_chain_tip(10000);
+
+        assert_eq!(session.process_console_input("(at-block (unwrap-panic (get-stacks-block-info? id-header-hash u19000)) burn-block-height)").1[0], "u18999".green().to_string());
+        assert_eq!(session.process_console_input("(at-block (unwrap-panic (get-stacks-block-info? id-header-hash u20000)) burn-block-height)").1[0], "u19999".green().to_string());
     }
 
     #[test]
@@ -1743,8 +1756,6 @@ mod tests {
         // deploy default contract
         let contract = ClarityContractBuilder::default().build();
         let _ = session.deploy_contract(&contract, false, None);
-
-        dbg!(&contract);
 
         let result = session.call_contract_fn(
             "contract",

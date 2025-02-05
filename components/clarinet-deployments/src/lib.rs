@@ -106,6 +106,9 @@ fn update_session_with_genesis_accounts(
     deployment: &DeploymentSpecification,
 ) {
     if let Some(ref spec) = deployment.genesis {
+        let addresses: Vec<_> = spec.wallets.iter().map(|w| w.address.clone()).collect();
+        session.interpreter.save_genesis_accounts(addresses);
+
         for wallet in spec.wallets.iter() {
             let _ = session.interpreter.mint_stx_balance(
                 wallet.address.clone().into(),
@@ -126,14 +129,16 @@ pub fn update_session_with_deployment_plan(
 ) -> UpdateSessionExecutionResult {
     update_session_with_genesis_accounts(session, deployment);
 
-    let boot_contracts_data = BOOT_CONTRACTS_DATA.clone();
-
     let mut boot_contracts = BTreeMap::new();
-    for (contract_id, (boot_contract, ast)) in boot_contracts_data {
-        let result = session
-            .interpreter
-            .run(&boot_contract, Some(&ast), false, None);
-        boot_contracts.insert(contract_id, result);
+    if !session.settings.repl_settings.remote_data.enabled {
+        let boot_contracts_data = BOOT_CONTRACTS_DATA.clone();
+
+        for (contract_id, (boot_contract, ast)) in boot_contracts_data {
+            let result = session
+                .interpreter
+                .run(&boot_contract, Some(&ast), false, None);
+            boot_contracts.insert(contract_id, result);
+        }
     }
 
     let mut contracts = BTreeMap::new();
@@ -339,21 +344,28 @@ pub async fn generate_default_deployment(
     let mut requirements_data = BTreeMap::new();
     let mut requirements_deps = BTreeMap::new();
 
+    let mut repl_settings = manifest.repl_settings.clone();
+    repl_settings.remote_data.enabled = false;
     let settings = SessionSettings {
-        repl_settings: manifest.repl_settings.clone(),
+        repl_settings,
         ..Default::default()
     };
-
     let session = Session::new(settings.clone());
 
-    let boot_contracts_data = BOOT_CONTRACTS_DATA.clone();
+    let simnet_remote_data =
+        matches!(network, StacksNetwork::Simnet) && manifest.repl_settings.remote_data.enabled;
+
     let mut boot_contracts_ids = BTreeSet::new();
-    let mut boot_contracts_asts = BTreeMap::new();
-    for (id, (contract, ast)) in boot_contracts_data {
-        boot_contracts_ids.insert(id.clone());
-        boot_contracts_asts.insert(id, (contract.clarity_version, ast));
+
+    if !simnet_remote_data {
+        let boot_contracts_data = BOOT_CONTRACTS_DATA.clone();
+        let mut boot_contracts_asts = BTreeMap::new();
+        for (id, (contract, ast)) in boot_contracts_data {
+            boot_contracts_ids.insert(id.clone());
+            boot_contracts_asts.insert(id, (contract.clarity_version, ast));
+        }
+        requirements_data.append(&mut boot_contracts_asts);
     }
-    requirements_data.append(&mut boot_contracts_asts);
 
     let mut queue = VecDeque::new();
 
@@ -422,14 +434,17 @@ pub async fn generate_default_deployment(
 
                     // Build the struct representing the requirement in the deployment
                     if matches!(network, StacksNetwork::Simnet) {
-                        let data = EmulatedContractPublishSpecification {
-                            contract_name: contract_id.name.clone(),
-                            emulated_sender: contract_id.issuer.clone(),
-                            source: source.clone(),
-                            location: contract_location,
-                            clarity_version,
-                        };
-                        emulated_contracts_publish.insert(contract_id.clone(), data);
+                        if !simnet_remote_data {
+                            let data = EmulatedContractPublishSpecification {
+                                contract_name: contract_id.name.clone(),
+                                emulated_sender: contract_id.issuer.clone(),
+                                source: source.clone(),
+                                location: contract_location,
+                                clarity_version,
+                            };
+
+                            emulated_contracts_publish.insert(contract_id.clone(), data);
+                        }
                     } else if matches!(network, StacksNetwork::Devnet | StacksNetwork::Testnet) {
                         let mut remap_principals = BTreeMap::new();
                         remap_principals
@@ -533,7 +548,7 @@ pub async fn generate_default_deployment(
         }
 
         // Avoid listing requirements as deployment transactions to the deployment specification on Mainnet
-        if !matches!(network, StacksNetwork::Mainnet) {
+        if !matches!(network, StacksNetwork::Mainnet) && !simnet_remote_data {
             let mut ordered_contracts_ids = match ASTDependencyDetector::order_contracts(
                 &requirements_deps,
                 &contract_epochs,

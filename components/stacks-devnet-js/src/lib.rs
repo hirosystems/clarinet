@@ -4,6 +4,7 @@ extern crate error_chain;
 
 mod serde;
 
+use bip39::{Language, Mnemonic};
 use clarinet_deployments::{get_default_deployment_path, load_deployment};
 use clarinet_files::{
     compute_addresses, AccountConfig, DevnetConfigFile, FileLocation, PoxStackingOrder,

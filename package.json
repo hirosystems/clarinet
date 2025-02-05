@@ -5,6 +5,7 @@
   "author": "hirosystems",
   "license": "GPL-3.0",
   "workspaces": [
+    "components/clarity-repl/js",
     "components/clarinet-sdk-wasm/pkg-node",
     "components/clarinet-sdk-wasm/pkg-browser",
     "components/clarinet-sdk/common",
@@ -19,7 +20,7 @@
     "publish:sdk": "npm publish -w components/clarinet-sdk/node -w components/clarinet-sdk/browser --tag beta"
   },
   "devDependencies": {
-    "@types/node": "^20.4.5",
+    "@types/node": "22.12.0",
     "@types/prompts": "^2.4.5",
     "@types/yargs": "^17.0.24",
     "prettier": "^3.3.3",

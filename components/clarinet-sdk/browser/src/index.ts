@@ -23,7 +23,6 @@ export { defaultVfs, defaultFileStore } from "./defaultVfs.js";
 
 export const initSimnet = async (virtualFileSystem?: Function) => {
   await init();
-
   const vfs = virtualFileSystem ? virtualFileSystem : defaultVfs;
   return new Proxy(new SDK(vfs), getSessionProxy()) as unknown as Simnet;
 };
