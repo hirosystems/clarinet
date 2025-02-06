@@ -792,12 +792,14 @@ pub async fn generate_default_deployment(
     let mut batch_count = 0;
     for (epoch, epoch_transactions) in transactions {
         for txs in epoch_transactions.chunks(tx_chain_limit) {
-            batches.push(TransactionsBatchSpecification {
-                id: batch_count,
-                transactions: txs.to_vec(),
-                epoch: Some(epoch),
-            });
-            batch_count += 1;
+            if !txs.is_empty() {
+                batches.push(TransactionsBatchSpecification {
+                    id: batch_count,
+                    transactions: txs.to_vec(),
+                    epoch: Some(epoch),
+                });
+                batch_count += 1;
+            }
         }
     }
 
