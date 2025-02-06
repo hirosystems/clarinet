@@ -8,11 +8,11 @@ use clarity::vm::errors::InterpreterResult;
 use serde::de::Error as SerdeError;
 use serde::{de::DeserializeOwned, Deserialize, Deserializer};
 
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_arch = "wasm32", feature = "remote-data-fetching"))]
 use js_sys::JsString;
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_arch = "wasm32", feature = "remote-data-fetching"))]
 use wasm_bindgen::prelude::*;
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_arch = "wasm32", feature = "remote-data-fetching"))]
 #[wasm_bindgen]
 #[derive(Deserialize)]
 struct JsHttpClientResponse {
@@ -20,7 +20,7 @@ struct JsHttpClientResponse {
     body: Vec<u8>,
 }
 
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_arch = "wasm32", feature = "remote-data-fetching"))]
 #[wasm_bindgen(module = "/js/index.mjs")]
 extern "C" {
     #[wasm_bindgen(js_name = httpClient)]
@@ -236,7 +236,7 @@ impl HttpClient {
         response.json::<T>().map_err(|e| e.to_string())
     }
 
-    #[cfg(target_arch = "wasm32")]
+    #[cfg(all(target_arch = "wasm32", feature = "remote-data-fetching"))]
     fn get<T: DeserializeOwned>(&self, path: &str) -> Result<T, String> {
         let url = JsString::from(format!("{}{}", self.url, path));
         let raw_response = http_client(&JsString::from("GET"), &url);
@@ -250,6 +250,11 @@ impl HttpClient {
             ));
         }
         serde_json::from_str::<T>(body).map_err(|e| e.to_string())
+    }
+
+    #[cfg(all(target_arch = "wasm32", not(feature = "remote-data-fetching")))]
+    fn get<T: DeserializeOwned>(&self, _path: &str) -> Result<T, String> {
+        unreachable!()
     }
 
     pub fn fetch_info(&self) -> Info {

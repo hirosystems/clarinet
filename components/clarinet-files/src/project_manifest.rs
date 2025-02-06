@@ -182,6 +182,7 @@ pub struct RequirementConfig {
 impl ProjectManifest {
     pub async fn from_file_accessor(
         location: &FileLocation,
+        allow_remote_data_fetching: bool,
         file_accessor: &dyn FileAccessor,
     ) -> Result<ProjectManifest, String> {
         let content = file_accessor.read_file(location.to_string()).await?;
@@ -193,10 +194,17 @@ impl ProjectManifest {
                 return Err(format!("Clarinet.toml file malformatted {:?}", e));
             }
         };
-        ProjectManifest::from_project_manifest_file(project_manifest_file, location)
+        ProjectManifest::from_project_manifest_file(
+            project_manifest_file,
+            location,
+            allow_remote_data_fetching,
+        )
     }
 
-    pub fn from_location(location: &FileLocation) -> Result<ProjectManifest, String> {
+    pub fn from_location(
+        location: &FileLocation,
+        allow_remote_data_fetching: bool,
+    ) -> Result<ProjectManifest, String> {
         let project_manifest_file_content = location.read_content()?;
         let project_manifest_file: ProjectManifestFile =
             match toml::from_slice(&project_manifest_file_content[..]) {
@@ -206,18 +214,28 @@ impl ProjectManifest {
                 }
             };
 
-        ProjectManifest::from_project_manifest_file(project_manifest_file, location)
+        ProjectManifest::from_project_manifest_file(
+            project_manifest_file,
+            location,
+            allow_remote_data_fetching,
+        )
     }
 
     pub fn from_project_manifest_file(
         project_manifest_file: ProjectManifestFile,
         manifest_location: &FileLocation,
+        allow_remote_data_fetching: bool,
     ) -> Result<ProjectManifest, String> {
         let mut repl_settings = if let Some(repl_settings) = project_manifest_file.repl {
             repl::Settings::from(repl_settings)
         } else {
             repl::Settings::default()
         };
+
+        // when performing static analysis, we never want to enable remote data fetching
+        if !allow_remote_data_fetching {
+            repl_settings.remote_data.enabled = false;
+        }
 
         // Check for deprecated settings
         if let Some(passes) = project_manifest_file.project.analysis {
@@ -393,54 +411,83 @@ fn get_epoch_and_clarity_version(
     Ok((epoch, clarity_version))
 }
 
-#[test]
-fn test_get_epoch_and_clarity_version() {
-    use ClarityVersion::*;
-    use StacksEpochId::*;
+#[cfg(test)]
+mod tests {
+    use toml::toml;
 
-    // no epoch, no version
-    let result = get_epoch_and_clarity_version(None, None);
-    assert_eq!(result, Ok((Epoch2_05, Clarity1)));
+    use super::*;
 
-    // epoch 2.0, no version
-    let result = get_epoch_and_clarity_version(Some("2.0"), None);
-    assert_eq!(result, Ok((Epoch20, Clarity1)));
+    #[test]
+    fn test_allow_remote_data_fetching() {
+        let manifest_toml = toml! {
+            [project]
+            name = "pyth-client"
+            telemetry = false
+            [repl.remote_data]
+            enabled = true
+        };
+        let manifest_file: ProjectManifestFile = manifest_toml.clone().try_into().unwrap();
+        let location = FileLocation::from_path("/tmp/clarinet.toml".into());
 
-    // epoch 2.05, no version
-    let result = get_epoch_and_clarity_version(Some("2.05"), None);
-    assert_eq!(result, Ok((Epoch2_05, Clarity1)));
+        let manifest =
+            ProjectManifest::from_project_manifest_file(manifest_file, &location, true).unwrap();
+        assert!(manifest.repl_settings.remote_data.enabled);
 
-    // epoch 2.1, no version
-    let result = get_epoch_and_clarity_version(Some("2.1"), None);
-    assert_eq!(result, Ok((Epoch21, Clarity2)));
+        let manifest_file: ProjectManifestFile = manifest_toml.clone().try_into().unwrap();
+        let manifest =
+            ProjectManifest::from_project_manifest_file(manifest_file, &location, false).unwrap();
+        assert!(!manifest.repl_settings.remote_data.enabled);
+    }
 
-    // epoch 3.0, no version
-    let result = get_epoch_and_clarity_version(Some("3.0"), None);
-    assert_eq!(result, Ok((Epoch30, Clarity3)));
+    #[test]
+    fn test_get_epoch_and_clarity_version() {
+        use clarity::types::StacksEpochId::*;
+        use clarity::vm::ClarityVersion::*;
 
-    // no epoch
-    // no epoch, version 1
-    let result = get_epoch_and_clarity_version(None, Some("1"));
-    assert_eq!(result, Ok((Epoch2_05, Clarity1)));
+        // no epoch, no version
+        let result = get_epoch_and_clarity_version(None, None);
+        assert_eq!(result, Ok((Epoch2_05, Clarity1)));
 
-    // no epoch, version 2 -> error, must specify epoch
-    let result = get_epoch_and_clarity_version(None, Some("2"));
-    assert_eq!(result, Err("Clarity 2 can not be used with 2.05".into()));
+        // epoch 2.0, no version
+        let result = get_epoch_and_clarity_version(Some("2.0"), None);
+        assert_eq!(result, Ok((Epoch20, Clarity1)));
 
-    // epoch and clarity version
-    // no epoch 2.05, version 1
-    let result = get_epoch_and_clarity_version(Some("2.05"), Some("1"));
-    assert_eq!(result, Ok((Epoch2_05, Clarity1)));
+        // epoch 2.05, no version
+        let result = get_epoch_and_clarity_version(Some("2.05"), None);
+        assert_eq!(result, Ok((Epoch2_05, Clarity1)));
 
-    // no epoch 2.05, version 2 -> error
-    let result = get_epoch_and_clarity_version(Some("2.05"), Some("2"));
-    assert_eq!(result, Err("Clarity 2 can not be used with 2.05".into()));
+        // epoch 2.1, no version
+        let result = get_epoch_and_clarity_version(Some("2.1"), None);
+        assert_eq!(result, Ok((Epoch21, Clarity2)));
 
-    // no epoch 2.05, version 1
-    let result = get_epoch_and_clarity_version(Some("2.1"), Some("1"));
-    assert_eq!(result, Ok((Epoch21, Clarity1)));
+        // epoch 3.0, no version
+        let result = get_epoch_and_clarity_version(Some("3.0"), None);
+        assert_eq!(result, Ok((Epoch30, Clarity3)));
 
-    // no epoch 2.05, version 2 -> error
-    let result = get_epoch_and_clarity_version(Some("2.1"), Some("2"));
-    assert_eq!(result, Ok((Epoch21, Clarity2)));
+        // no epoch
+        // no epoch, version 1
+        let result = get_epoch_and_clarity_version(None, Some("1"));
+        assert_eq!(result, Ok((Epoch2_05, Clarity1)));
+
+        // no epoch, version 2 -> error, must specify epoch
+        let result = get_epoch_and_clarity_version(None, Some("2"));
+        assert_eq!(result, Err("Clarity 2 can not be used with 2.05".into()));
+
+        // epoch and clarity version
+        // no epoch 2.05, version 1
+        let result = get_epoch_and_clarity_version(Some("2.05"), Some("1"));
+        assert_eq!(result, Ok((Epoch2_05, Clarity1)));
+
+        // no epoch 2.05, version 2 -> error
+        let result = get_epoch_and_clarity_version(Some("2.05"), Some("2"));
+        assert_eq!(result, Err("Clarity 2 can not be used with 2.05".into()));
+
+        // no epoch 2.05, version 1
+        let result = get_epoch_and_clarity_version(Some("2.1"), Some("1"));
+        assert_eq!(result, Ok((Epoch21, Clarity1)));
+
+        // no epoch 2.05, version 2 -> error
+        let result = get_epoch_and_clarity_version(Some("2.1"), Some("2"));
+        assert_eq!(result, Ok((Epoch21, Clarity2)));
+    }
 }

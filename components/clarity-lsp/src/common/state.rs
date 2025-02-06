@@ -634,9 +634,9 @@ pub async fn build_state(
     // A on-disk deployment could quickly lead to an outdated
     // view of the repo.
     let manifest = match file_accessor {
-        None => ProjectManifest::from_location(manifest_location)?,
+        None => ProjectManifest::from_location(manifest_location, false)?,
         Some(file_accessor) => {
-            ProjectManifest::from_file_accessor(manifest_location, file_accessor).await?
+            ProjectManifest::from_file_accessor(manifest_location, false, file_accessor).await?
         }
     };
 
