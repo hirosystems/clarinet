@@ -1,7 +1,7 @@
 use bitcoincore_rpc::{Auth, Client};
 use clarinet_files::StacksNetwork;
 use clarinet_files::{AccountConfig, NetworkManifest};
-use clarinet_utils::get_bip39_seed_from_mnemonic;
+use clarinet_utils::get_bip32_keys_from_mnemonic;
 use clarity_repl::clarity::chainstate::StacksAddress;
 use clarity_repl::clarity::codec::StacksMessageCodec;
 use clarity_repl::clarity::util::secp256k1::{
@@ -29,45 +29,28 @@ use stacks_rpc_client::StacksRpc;
 use std::collections::{BTreeMap, HashSet, VecDeque};
 use std::str::FromStr;
 use std::sync::mpsc::{Receiver, Sender};
-use tiny_hderive::bip32::ExtendedPrivKey;
 
 use clarity_repl::clarity::address::{
     AddressHashMode, C32_ADDRESS_VERSION_MAINNET_SINGLESIG, C32_ADDRESS_VERSION_TESTNET_SINGLESIG,
 };
-use libsecp256k1::{PublicKey, SecretKey};
+use libsecp256k1::PublicKey;
 
 mod bitcoin_deployment;
 
 use crate::types::{DeploymentSpecification, EpochSpec, TransactionSpecification};
 
-fn get_btc_keypair(
-    account: &AccountConfig,
-) -> (
-    bitcoincore_rpc::bitcoin::secp256k1::SecretKey,
-    bitcoincore_rpc::bitcoin::secp256k1::PublicKey,
-) {
-    use bitcoincore_rpc::bitcoin::secp256k1::{PublicKey, Secp256k1, SecretKey};
-    let bip39_seed = match get_bip39_seed_from_mnemonic(&account.mnemonic, "") {
-        Ok(bip39_seed) => bip39_seed,
-        Err(_) => panic!(),
-    };
-    let secp = Secp256k1::new();
-    let ext = ExtendedPrivKey::derive(&bip39_seed[..], account.derivation.as_str()).unwrap();
-    let secret_key = SecretKey::from_slice(&ext.secret()).unwrap();
-    let public_key = PublicKey::from_secret_key(&secp, &secret_key);
-    (secret_key, public_key)
+fn get_btc_secret_key(account: &AccountConfig) -> bitcoincore_rpc::bitcoin::secp256k1::SecretKey {
+    use bitcoincore_rpc::bitcoin::secp256k1::SecretKey;
+    let (secret_bytes, _) =
+        get_bip32_keys_from_mnemonic(&account.mnemonic, "", &account.derivation).unwrap();
+    SecretKey::from_slice(&secret_bytes).unwrap()
 }
 
-fn get_keypair(account: &AccountConfig) -> (ExtendedPrivKey, Secp256k1PrivateKey, PublicKey) {
-    let bip39_seed = match get_bip39_seed_from_mnemonic(&account.mnemonic, "") {
-        Ok(bip39_seed) => bip39_seed,
-        Err(_) => panic!(),
-    };
-    let ext = ExtendedPrivKey::derive(&bip39_seed[..], account.derivation.as_str()).unwrap();
-    let wrapped_secret_key = Secp256k1PrivateKey::from_slice(&ext.secret()).unwrap();
-    let secret_key = SecretKey::parse_slice(&ext.secret()).unwrap();
-    let public_key = PublicKey::from_secret_key(&secret_key);
-    (ext, wrapped_secret_key, public_key)
+fn get_keypair(account: &AccountConfig) -> (Secp256k1PrivateKey, PublicKey) {
+    let (secret_bytes, public_key) =
+        get_bip32_keys_from_mnemonic(&account.mnemonic, "", &account.derivation).unwrap();
+    let wrapped_secret_key = Secp256k1PrivateKey::from_slice(&secret_bytes).unwrap();
+    (wrapped_secret_key, public_key)
 }
 
 fn get_stacks_address(public_key: &PublicKey, network: &StacksNetwork) -> StacksAddress {
@@ -94,7 +77,7 @@ fn sign_transaction_payload(
     anchor_mode: TransactionAnchorMode,
     network: &StacksNetwork,
 ) -> Result<StacksTransaction, String> {
-    let (_, secret_key, public_key) = get_keypair(account);
+    let (secret_key, public_key) = get_keypair(account);
     let signer_addr = get_stacks_address(&public_key, network);
 
     let spending_condition = TransactionSpendingCondition::Singlesig(SinglesigSpendingCondition {
@@ -484,7 +467,7 @@ pub fn apply_on_chain_deployment(
                         Client::new(&bitcoin_node_wallet_rpc_url, auth).unwrap();
 
                     let account = btc_accounts_lookup.get(&tx.expected_sender).unwrap();
-                    let (secret_key, _public_key) = get_btc_keypair(account);
+                    let secret_key = get_btc_secret_key(account);
                     let _ = bitcoin_deployment::send_transaction_spec(
                         &bitcoin_rpc,
                         &bitcoin_node_wallet_rpc,

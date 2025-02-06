@@ -1,5 +1,3 @@
-use std::fs::File;
-use std::io::prelude::*;
 use std::io::Cursor;
 
 use clarity::codec::StacksMessageCodec;
