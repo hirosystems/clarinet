@@ -128,9 +128,6 @@ impl FileLocation {
                 path.extend(&path_to_append);
             }
             FileLocation::Url { url } => {
-                #[cfg(target_arch = "wasm32")]
-                web_sys::console::log_1(&format!("url: {}", url).into());
-
                 let mut paths_segments = url
                     .path_segments_mut()
                     .map_err(|_| "unable to mutate url")?;
@@ -266,9 +263,6 @@ impl FileLocation {
                 path.pop();
             }
             FileLocation::Url { url } => {
-                #[cfg(target_arch = "wasm32")]
-                web_sys::console::log_1(&format!("url: {}", url).into());
-
                 let mut segments = url
                     .path_segments_mut()
                     .map_err(|_| "unable to mutate url".to_string())?;
