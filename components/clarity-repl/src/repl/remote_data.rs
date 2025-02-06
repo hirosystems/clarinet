@@ -252,7 +252,7 @@ impl HttpClient {
         serde_json::from_str::<T>(body).map_err(|e| e.to_string())
     }
 
-    #[cfg(not(feature = "remote-data-fetching"))]
+    #[cfg(all(target_arch = "wasm32", not(feature = "remote-data-fetching")))]
     fn get<T: DeserializeOwned>(&self, _path: &str) -> Result<T, String> {
         unreachable!()
     }

@@ -109,7 +109,7 @@ impl StacksDevnet {
         let channel = cx.channel();
 
         let manifest_location = get_manifest_location_or_exit(Some(manifest_location));
-        let manifest = ProjectManifest::from_location(&manifest_location)
+        let manifest = ProjectManifest::from_location(&manifest_location, false)
             .expect("Syntax error in Clarinet.toml.");
         let (deployment, _) =
             read_deployment_or_generate_default(&manifest, &StacksNetwork::Devnet)

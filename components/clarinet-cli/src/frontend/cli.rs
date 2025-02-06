@@ -443,7 +443,7 @@ pub fn main() {
         Ok(opts) => opts,
         Err(e) => {
             if e.kind() == clap::error::ErrorKind::UnknownArgument {
-                let manifest = load_manifest_or_exit(None);
+                let manifest = load_manifest_or_exit(None, false);
                 if manifest.project.telemetry {
                     #[cfg(feature = "telemetry")]
                     telemetry_report_event(DeveloperUsageEvent::UnknownCommand(
@@ -603,7 +603,7 @@ pub fn main() {
         }
         Command::Deployments(subcommand) => match subcommand {
             Deployments::CheckDeployments(cmd) => {
-                let manifest = load_manifest_or_exit(cmd.manifest_path);
+                let manifest = load_manifest_or_exit(cmd.manifest_path, true);
                 // Ensure that all the deployments can correctly be deserialized.
                 println!("Checking deployments");
                 let res = check_deployments(&manifest);
@@ -613,7 +613,7 @@ pub fn main() {
                 }
             }
             Deployments::GenerateDeployment(cmd) => {
-                let manifest = load_manifest_or_exit(cmd.manifest_path);
+                let manifest = load_manifest_or_exit(cmd.manifest_path, true);
 
                 let network = if cmd.devnet {
                     StacksNetwork::Devnet
@@ -691,7 +691,7 @@ pub fn main() {
                 }
             }
             Deployments::ApplyDeployment(cmd) => {
-                let manifest = load_manifest_or_exit(cmd.manifest_path);
+                let manifest = load_manifest_or_exit(cmd.manifest_path, true);
 
                 let network = if cmd.devnet {
                     Some(StacksNetwork::Devnet)
@@ -873,7 +873,7 @@ pub fn main() {
         }
         Command::Contracts(subcommand) => match subcommand {
             Contracts::NewContract(cmd) => {
-                let manifest = load_manifest_or_exit(cmd.manifest_path);
+                let manifest = load_manifest_or_exit(cmd.manifest_path, true);
 
                 let changes = match generate::get_changes_for_new_contract(
                     &manifest.location,
@@ -896,7 +896,7 @@ pub fn main() {
                 }
             }
             Contracts::RemoveContract(cmd) => {
-                let manifest = load_manifest_or_exit(cmd.manifest_path);
+                let manifest = load_manifest_or_exit(cmd.manifest_path, true);
                 let contract_name = cmd.name.clone();
                 let changes =
                     match generate::get_changes_for_rm_contract(&manifest.location, cmd.name) {
@@ -929,7 +929,7 @@ pub fn main() {
         },
         Command::Requirements(subcommand) => match subcommand {
             Requirements::AddRequirement(cmd) => {
-                let manifest = load_manifest_or_exit(cmd.manifest_path);
+                let manifest = load_manifest_or_exit(cmd.manifest_path, true);
 
                 let change = TOMLEdition {
                     comment: format!(
@@ -1123,8 +1123,7 @@ pub fn main() {
             }
         }
         Command::Check(cmd) => {
-            let mut manifest = load_manifest_or_exit(cmd.manifest_path);
-            manifest.repl_settings.remote_data.enabled = false;
+            let manifest = load_manifest_or_exit(cmd.manifest_path, false);
             let (deployment, _, artifacts) = load_deployment_and_artifacts_or_exit(
                 &manifest,
                 &cmd.deployment_plan_path,
@@ -1202,7 +1201,7 @@ pub fn main() {
         },
         Command::Devnet(subcommand) => match subcommand {
             Devnet::Package(cmd) => {
-                let manifest = load_manifest_or_exit(cmd.manifest_path);
+                let manifest = load_manifest_or_exit(cmd.manifest_path, false);
                 if let Err(e) = Package::pack(cmd.package_file_name, manifest) {
                     eprintln!("Could not execute the package command. {}", format_err!(e));
                     process::exit(1);
@@ -1236,9 +1235,12 @@ fn get_manifest_location_or_warn(path: Option<String>) -> Option<FileLocation> {
     }
 }
 
-fn load_manifest_or_exit(path: Option<String>) -> ProjectManifest {
+fn load_manifest_or_exit(
+    path: Option<String>,
+    allow_remote_data_fetching: bool,
+) -> ProjectManifest {
     let manifest_location = get_manifest_location_or_exit(path);
-    match ProjectManifest::from_location(&manifest_location) {
+    match ProjectManifest::from_location(&manifest_location, allow_remote_data_fetching) {
         Ok(manifest) => manifest,
         Err(message) => {
             eprintln!(
@@ -1253,7 +1255,7 @@ fn load_manifest_or_exit(path: Option<String>) -> ProjectManifest {
 
 fn load_manifest_or_warn(path: Option<String>) -> Option<ProjectManifest> {
     if let Some(manifest_location) = get_manifest_location_or_warn(path) {
-        let manifest = match ProjectManifest::from_location(&manifest_location) {
+        let manifest = match ProjectManifest::from_location(&manifest_location, true) {
             Ok(manifest) => manifest,
             Err(message) => {
                 eprintln!(
@@ -1612,6 +1614,7 @@ fn execute_changes(changes: Vec<Changes>) -> bool {
                         match ProjectManifest::from_project_manifest_file(
                             project_manifest_file,
                             &manifest_location,
+                            true,
                         ) {
                             Ok(content) => content,
                             Err(message) => {
@@ -1807,7 +1810,7 @@ fn display_deploy_hint() {
 }
 
 fn devnet_start(cmd: DevnetStart, clarinetrc: ClarinetRC) {
-    let manifest = load_manifest_or_exit(cmd.manifest_path);
+    let manifest = load_manifest_or_exit(cmd.manifest_path, false);
     println!("Computing deployment plan");
     let result = match cmd.deployment_plan_path {
         None => {

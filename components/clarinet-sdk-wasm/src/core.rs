@@ -396,7 +396,8 @@ impl SDK {
         manifest_location: &FileLocation,
     ) -> Result<ProjectCache, String> {
         let manifest =
-            ProjectManifest::from_file_accessor(manifest_location, &*self.file_accessor).await?;
+            ProjectManifest::from_file_accessor(manifest_location, true, &*self.file_accessor)
+                .await?;
         let project_root = manifest_location.get_parent_location()?;
         let deployment_plan_location =
             FileLocation::try_parse("deployments/default.simnet-plan.yaml", Some(&project_root))

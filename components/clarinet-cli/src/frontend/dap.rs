@@ -13,7 +13,7 @@ pub fn run_dap() -> Result<(), String> {
     match dap.init() {
         Ok((manifest_location_str, expression)) => {
             let manifest_location = FileLocation::from_path_string(&manifest_location_str)?;
-            let project_manifest = ProjectManifest::from_location(&manifest_location)?;
+            let project_manifest = ProjectManifest::from_location(&manifest_location, false)?;
             let (deployment, artifacts) =
                 generate_default_deployment(&project_manifest, &StacksNetwork::Simnet, false)?;
             let mut session = setup_session_with_deployment(

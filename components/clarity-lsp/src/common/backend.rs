@@ -145,10 +145,11 @@ pub async fn process_notification(
                     Some((clarity_version, _)) => clarity_version,
                     None => {
                         match file_accessor {
-                            None => ProjectManifest::from_location(&manifest_location),
+                            None => ProjectManifest::from_location(&manifest_location, false),
                             Some(file_accessor) => {
                                 ProjectManifest::from_file_accessor(
                                     &manifest_location,
+                                    false,
                                     file_accessor,
                                 )
                                 .await
