@@ -1813,4 +1813,116 @@ mod tests {
 
         assert!(time_block_2 - time_block_1 == 600);
     }
+
+    #[test]
+    fn burn_block_height_behavior_epoch2_5() {
+        let settings = SessionSettings::default();
+        let mut session = Session::new(settings);
+        session.start().expect("session could not start");
+        session.update_epoch(StacksEpochId::Epoch25);
+
+        let snippet = [
+            "(define-read-only (get-burn (height uint))",
+            "  (let ((id (unwrap-panic (get-block-info? id-header-hash height))))",
+            "    (at-block id burn-block-height)))",
+        ]
+        .join("\n");
+
+        let contract = ClarityContractBuilder::new()
+            .code_source(snippet)
+            .clarity_version(ClarityVersion::Clarity2)
+            .epoch(StacksEpochId::Epoch25)
+            .build();
+
+        session.deploy_contract(&contract, false, None).unwrap();
+        session.advance_burn_chain_tip(10);
+
+        let result = run_session_snippet(&mut session, "block-height");
+        assert_eq!(result, Value::UInt(10));
+        let result = run_session_snippet(&mut session, "burn-block-height");
+        assert_eq!(result, Value::UInt(9));
+        let result = run_session_snippet(
+            &mut session,
+            format!("(contract-call? .{} get-burn u6)", contract.name).as_str(),
+        );
+        assert_eq!(result, Value::UInt(5));
+    }
+
+    #[test]
+    fn burn_block_height_behavior_epoch3_0() {
+        // test that clarinet preserves the 3.0 and 3.1 special behavior of burn-block-height
+        // https://github.com/stacks-network/stacks-core/pull/5524
+        let settings = SessionSettings::default();
+        let mut session = Session::new(settings);
+        session.start().expect("session could not start");
+        session.update_epoch(StacksEpochId::Epoch30);
+
+        let snippet = [
+            "(define-read-only (get-burn (height uint))",
+            "  (let ((id (unwrap-panic (get-stacks-block-info? id-header-hash height))))",
+            "    (at-block id burn-block-height)))",
+        ]
+        .join("\n");
+
+        let contract = ClarityContractBuilder::new()
+            .code_source(snippet)
+            .clarity_version(ClarityVersion::Clarity3)
+            .epoch(StacksEpochId::Epoch30)
+            .build();
+
+        session.deploy_contract(&contract, false, None).unwrap();
+        session.advance_burn_chain_tip(10);
+
+        let result = run_session_snippet(&mut session, "stacks-block-height");
+        assert_eq!(result, Value::UInt(11));
+        let result = run_session_snippet(&mut session, "burn-block-height");
+        assert_eq!(result, Value::UInt(11));
+        let result = run_session_snippet(
+            &mut session,
+            format!("(contract-call? .{} get-burn u8)", contract.name).as_str(),
+        );
+        assert_eq!(result, Value::UInt(11));
+    }
+
+    #[test]
+    fn burn_block_height_behavior_epoch3_0_edge() {
+        let settings = SessionSettings::default();
+        let mut session = Session::new(settings);
+        session.start().expect("session could not start");
+        session.update_epoch(StacksEpochId::Epoch25);
+
+        let snippet = [
+            "(define-read-only (get-burn (height uint))",
+            "  (let ((id (unwrap-panic (get-block-info? id-header-hash height))))",
+            "    (at-block id burn-block-height)))",
+        ]
+        .join("\n");
+
+        let contract = ClarityContractBuilder::new()
+            .code_source(snippet)
+            .clarity_version(ClarityVersion::Clarity2)
+            .epoch(StacksEpochId::Epoch25)
+            .build();
+
+        session.deploy_contract(&contract, false, None).unwrap();
+        session.advance_burn_chain_tip(10);
+
+        session.update_epoch(StacksEpochId::Epoch30);
+
+        session.advance_burn_chain_tip(10);
+
+        // calling a 2.5 contract in epoch 3.0 has the same behavior as epoch 2.5
+
+        let result = run_session_snippet(
+            &mut session,
+            format!("(contract-call? .{} get-burn u8)", contract.name).as_str(),
+        );
+        assert_eq!(result, Value::UInt(7));
+
+        let result = run_session_snippet(
+            &mut session,
+            format!("(contract-call? .{} get-burn u18)", contract.name).as_str(),
+        );
+        assert_eq!(result, Value::UInt(17));
+    }
 }

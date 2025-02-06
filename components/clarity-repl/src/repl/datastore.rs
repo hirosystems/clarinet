@@ -989,6 +989,15 @@ impl BurnStateDB for Datastore {
     }
 
     fn get_tip_burn_block_height(&self) -> Option<u32> {
+        // preserve the 3.0 and 3.1 special behavior of burn-block-height
+        // https://github.com/stacks-network/stacks-core/pull/5524
+        if matches!(
+            self.current_epoch,
+            StacksEpochId::Epoch30 | StacksEpochId::Epoch31
+        ) {
+            return Some(self.burn_chain_height);
+        }
+
         let current_chain_tip = self.current_chain_tip.borrow();
         if let Some(height) = self.get_burn_block_height_for_block(&current_chain_tip) {
             return Some(height);
