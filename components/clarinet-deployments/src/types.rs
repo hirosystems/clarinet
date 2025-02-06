@@ -1083,11 +1083,13 @@ impl DeploymentSpecification {
                             };
                             transactions.push(transaction);
                         }
-                        batches.push(TransactionsBatchSpecification {
-                            id: batch.id,
-                            transactions,
-                            epoch: batch.epoch,
-                        });
+                        if !transactions.is_empty() {
+                            batches.push(TransactionsBatchSpecification {
+                                id: batch.id,
+                                transactions,
+                                epoch: batch.epoch,
+                            });
+                        }
                     }
                 }
                 if let Some(ref genesis_specs) = specs.genesis {
@@ -1134,11 +1136,13 @@ impl DeploymentSpecification {
                             };
                             transactions.push(transaction);
                         }
-                        batches.push(TransactionsBatchSpecification {
-                            id: batch.id,
-                            transactions,
-                            epoch: batch.epoch,
-                        });
+                        if !transactions.is_empty() {
+                            batches.push(TransactionsBatchSpecification {
+                                id: batch.id,
+                                transactions,
+                                epoch: batch.epoch,
+                            });
+                        }
                     }
                 }
                 (TransactionPlanSpecification { batches }, None)
@@ -1235,7 +1239,7 @@ impl DeploymentSpecification {
                 .find(|b| b.id == custom_batch.id && b.epoch == custom_batch.epoch)
             {
                 batch.transactions.extend(custom_batch.transactions);
-            } else {
+            } else if !custom_batch.transactions.is_empty() {
                 self.plan.batches.push(custom_batch);
             }
         }
