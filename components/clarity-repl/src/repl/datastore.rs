@@ -805,6 +805,7 @@ impl Datastore {
         if epoch == self.current_epoch {
             return;
         }
+        clarity_datastore.put("vm-epoch::epoch-version", &format!("{:08x}", epoch as u32));
         self.current_epoch = epoch;
         self.current_epoch_start_height = self.stacks_chain_height;
         if epoch >= StacksEpochId::Epoch30 {

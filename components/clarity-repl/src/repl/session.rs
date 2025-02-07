@@ -1885,7 +1885,7 @@ mod tests {
     }
 
     #[test]
-    fn burn_block_height_behavior_epoch3_0_edge() {
+    fn burn_block_height_behavior_epoch3_0_contract_in_2_5() {
         let settings = SessionSettings::default();
         let mut session = Session::new(settings);
         session.start().expect("session could not start");
@@ -1899,7 +1899,8 @@ mod tests {
         .join("\n");
 
         let contract = ClarityContractBuilder::new()
-            .code_source(snippet)
+            .name("contract-2-5")
+            .code_source(snippet.clone())
             .clarity_version(ClarityVersion::Clarity2)
             .epoch(StacksEpochId::Epoch25)
             .build();
@@ -1910,6 +1911,9 @@ mod tests {
         session.update_epoch(StacksEpochId::Epoch30);
 
         session.advance_burn_chain_tip(10);
+
+        let result = run_session_snippet(&mut session, "stacks-block-height");
+        assert_eq!(result, Value::UInt(21));
 
         // calling a 2.5 contract in epoch 3.0 has the same behavior as epoch 2.5
 
@@ -1923,6 +1927,6 @@ mod tests {
             &mut session,
             format!("(contract-call? .{} get-burn u18)", contract.name).as_str(),
         );
-        assert_eq!(result, Value::UInt(17));
+        assert_eq!(result, Value::UInt(21));
     }
 }
