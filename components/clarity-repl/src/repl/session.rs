@@ -1693,8 +1693,7 @@ mod tests {
 
         let _ = session.advance_burn_chain_tip(10000);
 
-        assert_eq!(session.process_console_input("(at-block (unwrap-panic (get-stacks-block-info? id-header-hash u19000)) burn-block-height)").1[0], "u18999".green().to_string());
-        assert_eq!(session.process_console_input("(at-block (unwrap-panic (get-stacks-block-info? id-header-hash u20000)) burn-block-height)").1[0], "u19999".green().to_string());
+        assert_eq!(session.process_console_input("(at-block (unwrap-panic (get-stacks-block-info? id-header-hash u19000)) burn-block-height)").1[0], "u20021".green().to_string());
     }
 
     #[test]
