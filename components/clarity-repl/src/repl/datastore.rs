@@ -989,25 +989,23 @@ impl BurnStateDB for Datastore {
     }
 
     fn get_tip_burn_block_height(&self) -> Option<u32> {
-        // preserve the 3.0 and 3.1 special behavior of burn-block-height
-        // https://github.com/stacks-network/stacks-core/pull/5524
-        if matches!(
-            self.current_epoch,
-            StacksEpochId::Epoch30 | StacksEpochId::Epoch31
-        ) {
-            return Some(self.burn_chain_height);
-        }
+        use StacksEpochId::*;
+        match self.current_epoch {
+            Epoch10 | Epoch20 | Epoch2_05 | Epoch21 | Epoch22 | Epoch23 | Epoch24 | Epoch25 => {
+                let current_chain_tip = self.current_chain_tip.borrow();
+                if let Some(height) = self.get_burn_block_height_for_block(&current_chain_tip) {
+                    return Some(height);
+                }
 
-        let current_chain_tip = self.current_chain_tip.borrow();
-        if let Some(height) = self.get_burn_block_height_for_block(&current_chain_tip) {
-            return Some(height);
+                self.remote_block_info_cache
+                    .borrow()
+                    .get(&current_chain_tip)
+                    .map(|block| block.burn_block_height)
+            }
+            // preserve the 3.0 and 3.1 special behavior of burn-block-height
+            // https://github.com/stacks-network/stacks-core/pull/5524
+            Epoch30 | Epoch31 => Some(self.burn_chain_height),
         }
-
-        return self
-            .remote_block_info_cache
-            .borrow()
-            .get(&current_chain_tip)
-            .map(|block| block.burn_block_height);
     }
 
     fn get_tip_sortition_id(&self) -> Option<SortitionId> {
