@@ -5,17 +5,18 @@ use std::iter::Peekable;
 use clarity::vm::functions::{define::DefineFunctions, NativeFunctions};
 use clarity::vm::representations::{PreSymbolicExpression, PreSymbolicExpressionType};
 use helpers::{name_and_args, t};
+use std::fmt;
 
 pub enum Indentation {
     Space(usize),
     Tab,
 }
 
-impl ToString for Indentation {
-    fn to_string(&self) -> String {
+impl fmt::Display for Indentation {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Indentation::Space(count) => " ".repeat(*count),
-            Indentation::Tab => "\t".to_string(),
+            Indentation::Space(count) => write!(f, "{}", " ".repeat(*count)),
+            Indentation::Tab => write!(f, "\t"),
         }
     }
 }
@@ -296,7 +297,7 @@ fn format_begin(
             acc.push_str(&display_pse(settings, comment, previous_indentation));
         }
     }
-    acc.push_str(&format!("\n{})\n", previous_indentation));
+    acc.push_str(&format!("\n{})", previous_indentation));
     acc
 }
 
@@ -377,20 +378,11 @@ fn format_if(
     let mut iter = exprs[1..].iter().peekable();
     let mut index = 0;
 
-    // if the 'if' statement doesn't start at the current indentation level, we
-    // add an extra indent to the body.
-    // Note: we add 2 to the previous indent comparison to account for spans starting
-    // at 1 and the leading '('
-    let is_nested = opening.span().start_column as usize != previous_indentation.len() + 2;
-
     while let Some(expr) = iter.next() {
         let trailing = get_trailing_comment(expr, &mut iter);
         if index > 0 {
             acc.push('\n');
             acc.push_str(&space);
-            if is_nested {
-                acc.push_str(indentation);
-            }
         }
         acc.push_str(&format_source_exprs(settings, &[expr.clone()], &space));
         if let Some(comment) = trailing {
@@ -401,10 +393,6 @@ fn format_if(
     }
     acc.push('\n');
     acc.push_str(previous_indentation);
-    if is_nested {
-        acc.push_str(indentation);
-    }
-
     acc.push(')');
 
     acc
@@ -518,7 +506,7 @@ fn format_key_value_sugar(
     if over_2_kvs {
         acc.push('\n');
         let mut counter = 1;
-        for (i, expr) in exprs.iter().enumerate() {
+        for expr in exprs.iter() {
             if is_comment(expr) {
                 acc.push_str(&format!(
                     "{}{}\n",
@@ -526,12 +514,11 @@ fn format_key_value_sugar(
                     format_source_exprs(settings, &[expr.clone()], previous_indentation)
                 ))
             } else {
-                let last = i == exprs.len() - 1;
                 // if counter is even we're on the value
                 if counter % 2 == 0 {
                     // Pass the current indentation level to nested formatting
                     let value_str = format_source_exprs(settings, &[expr.clone()], &space);
-                    acc.push_str(&format!(": {}{}\n", value_str, if last { "" } else { "," }));
+                    acc.push_str(&format!(": {},\n", value_str));
                 } else {
                     // if counter is odd we're on the key
                     acc.push_str(&format!(
@@ -940,7 +927,7 @@ mod tests_formatter {
         let result = format_with_default(&String::from(src));
         assert_eq!(
             result,
-            "(define-map something\n  {\n    name: (buff 48),\n    a: uint\n  }\n  uint\n)\n"
+            "(define-map something\n  {\n    name: (buff 48),\n    a: uint,\n  }\n  uint\n)\n"
         );
     }
 
@@ -984,7 +971,7 @@ mod tests_formatter {
         assert_eq!(result, "{ name: (buff 48) }");
         let src = "{ name: (buff 48), a: uint }";
         let result = format_with_default(&String::from(src));
-        assert_eq!(result, "{\n  name: (buff 48),\n  a: uint\n}");
+        assert_eq!(result, "{\n  name: (buff 48),\n  a: uint,\n}");
     }
 
     #[test]
@@ -1029,7 +1016,7 @@ mod tests_formatter {
         let src = r#"{
   name: (buff 48),
   ;; comment
-  owner: send-to
+  owner: send-to,
 }"#;
         let result = format_with_default(&String::from(src));
         assert_eq!(src, result);
@@ -1150,8 +1137,8 @@ mod tests_formatter {
     a: b,
     ctx: {
       a: b,
-      c: d
-    }
+      c: d,
+    },
   }
 )"#;
         assert_eq!(result, expected);

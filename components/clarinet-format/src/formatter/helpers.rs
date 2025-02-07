@@ -1,4 +1,4 @@
-use clarity::vm::representations::{PreSymbolicExpression, PreSymbolicExpressionType};
+use clarity::vm::representations::PreSymbolicExpression;
 
 /// trim but leaves newlines preserved
 pub fn t(input: &str) -> &str {
