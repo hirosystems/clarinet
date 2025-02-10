@@ -299,8 +299,8 @@ impl SDK {
 
         let file_accessor = Box::new(WASMFileSystemAccessor::new(fs_request));
 
-        let track_coverage = options.as_ref().map_or(false, |o| o.track_coverage);
-        let track_costs = options.as_ref().map_or(false, |o| o.track_costs);
+        let track_coverage = options.as_ref().is_some_and(|o| o.track_coverage);
+        let track_costs = options.as_ref().is_some_and(|o| o.track_costs);
 
         Self {
             deployer: String::new(),

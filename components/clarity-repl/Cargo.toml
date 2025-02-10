@@ -24,14 +24,13 @@ categories = [
 [dependencies]
 ansi_term = "0.12.1" # to be replaced with colored in the future
 chrono = "0.4.31"
-colored = "2.1.0"
+colored = { workspace = true }
 lazy_static = { workspace = true }
 regex = "1.7"
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1.0.47", features = ["unbounded_depth"] }
 sha2 = "0.10"
 serde_derive = "1.0"
-getrandom = { version = "0.2.3", features = ["js"] }
 atty = "0.2.14"
 clarity = { workspace = true }
 clar2wasm = { git = "https://github.com/stacks-network/clarity-wasm.git", branch = "main", optional = true }
@@ -41,8 +40,9 @@ prettytable-rs = { version = "0.10.0" }
 # wasm
 wasm-bindgen = { workspace = true, optional = true }
 serde-wasm-bindgen = { version = "0.6.4", optional = true }
-web-sys = { workspace = true, optional = true, features = ["XmlHttpRequest"]}
+web-sys = { workspace = true, optional = true }
 js-sys = { version = "0.3", optional = true }
+getrandom = { version = "0.2.3", optional = true, features = ["js"] }
 
 # DAP Debugger
 tokio = { version = "1.35.1", features = ["full"], optional = true}
@@ -63,7 +63,7 @@ reqwest = { workspace = true, features = ["blocking"] }
 [dev-dependencies]
 test-case = "*"
 divan = "0.1"
-mockito = "1.6"
+mockito = { version = "1.6", default-features = false }
 
 [lib]
 name = "clarity_repl"
@@ -113,4 +113,8 @@ wasm = [
     "serde-wasm-bindgen",
     "web-sys",
     "js-sys",
+    "getrandom",
 ]
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(wasm_bindgen_unstable_test_coverage)'] }

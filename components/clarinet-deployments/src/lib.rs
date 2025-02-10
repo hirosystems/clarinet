@@ -703,8 +703,7 @@ pub async fn generate_default_deployment(
                 contract_name,
                 expected_sender: sender,
                 location: contract_location,
-                cost: deployment_fee_rate
-                    .saturating_mul(source.as_bytes().len().try_into().unwrap()),
+                cost: deployment_fee_rate.saturating_mul(source.len().try_into().unwrap()),
                 source,
                 anchor_block_only: true,
                 clarity_version: contract_config.clarity_version,

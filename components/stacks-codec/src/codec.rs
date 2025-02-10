@@ -4292,7 +4292,7 @@ impl StacksMessageCodec for PeerInfo {
         write_next(fd, self.stacks_tip_consensus_hash.as_bytes())?;
         write_next(fd, &self.stacks_tip)?;
         write_next(fd, &self.stacks_tip_height)?;
-        write_next(fd, &(self.server_version.as_bytes().len() as u8))?;
+        write_next(fd, &(self.server_version.len() as u8))?;
         fd.write_all(self.server_version.as_bytes())
             .map_err(CodecError::WriteError)?;
         write_next(fd, &self.pox_consensus)?;
