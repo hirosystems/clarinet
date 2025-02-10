@@ -384,7 +384,7 @@ impl ClarityInterpreter {
         let is_mainnet = self
             .remote_network_info
             .as_ref()
-            .map_or(false, |data| data.is_mainnet);
+            .is_some_and(|data| data.is_mainnet);
         let chain_id = if is_mainnet {
             CHAIN_ID_MAINNET
         } else {

@@ -91,3 +91,6 @@ wasm-opt = ['-g', '-O']
 debug-js-glue = false
 demangle-name-section = true
 dwarf-debug-info = false
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(wasm_bindgen_unstable_test_coverage)'] }

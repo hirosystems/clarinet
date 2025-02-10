@@ -26,3 +26,6 @@ features = ["napi-4", "channel-api", "event-queue-api", "try-catch-api"]
 [dependencies.num]
 version = "0.2"
 default-features = false
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(has_error_description_deprecated)'] }

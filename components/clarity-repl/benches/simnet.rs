@@ -1,11 +1,8 @@
 use std::hint::black_box;
 
-use clarity::{
-    types::StacksEpochId,
-    vm::{
-        types::QualifiedContractIdentifier, EvaluationResult, ExecutionResult, SymbolicExpression,
-        Value as ClarityValue,
-    },
+use clarity::vm::{
+    types::QualifiedContractIdentifier, EvaluationResult, ExecutionResult, SymbolicExpression,
+    Value as ClarityValue,
 };
 use clarity_repl::repl::{
     ClarityCodeSource, ClarityContract, ContractDeployer, Session, SessionSettings,
@@ -15,7 +12,7 @@ use divan::Bencher;
 
 fn init_session() -> Session {
     let mut session = Session::new(SessionSettings::default());
-    session.update_epoch(StacksEpochId::Epoch30);
+    session.update_epoch(DEFAULT_EPOCH);
     session.advance_burn_chain_tip(1);
     assert_eq!(session.interpreter.get_block_height(), 2);
 
