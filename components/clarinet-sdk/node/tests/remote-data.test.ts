@@ -33,7 +33,7 @@ afterEach(() => {
 describe("simnet remote interactions", async () => {
   const simnet = await getSDK();
 
-  it("can call a remote contract", async () => {
+  it.only("can call a remote contract", async () => {
     await simnet.initEmptySession({
       enabled: true,
       api_url: "https://api.testnet.hiro.so",

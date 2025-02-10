@@ -28,8 +28,8 @@ reqwest = { version = "0.12", default-features = false, features = [
     "rustls-tls",
 ] }
 colored = { version = "3.0.0" }
-wasm-bindgen = { version = "0.2.100" }
-web-sys = { version = "0.3.77" }
+wasm-bindgen = { version = "=0.2.99" }
+web-sys = { version = "=0.3.76" }
 
 [patch.crates-io]
 chainhook-sdk = { git = "https://github.com/hirosystems/chainhook.git" }
