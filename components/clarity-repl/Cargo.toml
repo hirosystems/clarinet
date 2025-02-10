@@ -24,7 +24,7 @@ categories = [
 [dependencies]
 ansi_term = "0.12.1" # to be replaced with colored in the future
 chrono = "0.4.31"
-colored = "2.1.0"
+colored = { workspace = true }
 lazy_static = { workspace = true }
 regex = "1.7"
 serde = { version = "1", features = ["derive"] }
@@ -63,7 +63,7 @@ reqwest = { workspace = true, features = ["blocking"] }
 [dev-dependencies]
 test-case = "*"
 divan = "0.1"
-mockito = "1.6"
+mockito = { version = "1.6", default-features = false }
 
 [lib]
 name = "clarity_repl"
@@ -113,7 +113,7 @@ wasm = [
     "serde-wasm-bindgen",
     "web-sys",
     "js-sys",
-    "getrandom"
+    "getrandom",
 ]
 
 [lints.rust]
