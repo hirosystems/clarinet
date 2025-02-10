@@ -159,9 +159,10 @@ pub fn format_source_exprs(
                         DefineFunctions::PublicFunction
                         | DefineFunctions::ReadOnlyFunction
                         | DefineFunctions::PrivateFunction => format_function(settings, list),
-                        DefineFunctions::Constant | DefineFunctions::PersistedVariable => {
-                            format_constant(settings, list)
-                        }
+                        DefineFunctions::Constant
+                        | DefineFunctions::PersistedVariable
+                        | DefineFunctions::NonFungibleToken
+                        | DefineFunctions::FungibleToken => format_constant(settings, list),
                         DefineFunctions::Map => format_map(settings, list, previous_indentation),
                         DefineFunctions::UseTrait | DefineFunctions::ImplTrait => {
                             // these are the same as the following but need a trailing newline
@@ -282,8 +283,6 @@ fn format_begin(
 
     let mut iter = exprs.get(1..).unwrap_or_default().iter().peekable();
     while let Some(expr) = iter.next() {
-        // cloned() here because of the second mutable borrow on iter.next()
-
         let trailing = get_trailing_comment(expr, &mut iter);
 
         // begin body
@@ -410,7 +409,6 @@ fn format_let(
     if let Some(args) = exprs[1].match_list() {
         let mut iter = args.iter().peekable();
         while let Some(arg) = iter.next() {
-            // cloned() here because of the second mutable borrow on iter.next()
             let trailing = get_trailing_comment(arg, &mut iter);
             acc.push_str(&format!(
                 "\n{}{}",
@@ -570,7 +568,6 @@ fn format_key_value(
     let mut index = 0;
     let mut iter = exprs.iter().peekable();
     while let Some(arg) = iter.next() {
-        // cloned() here because of the second mutable borrow on iter.next()
         let trailing = get_trailing_comment(arg, &mut iter);
         let (key, value) = arg
             .match_list()
