@@ -29,6 +29,7 @@ reqwest = { version = "0.12", default-features = false, features = [
 ] }
 colored = { version = "3.0.0" }
 wasm-bindgen = { version = "=0.2.99" }
+wasm-bindgen-futures = { version = "=0.4.49" }
 web-sys = { version = "=0.3.76" }
 
 [patch.crates-io]
