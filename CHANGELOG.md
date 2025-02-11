@@ -1,3 +1,23 @@
+# [2.13.0](https://github.com/hirosystems/clarinet/compare/v2.12.2...v2.13.0) (2025-02-11)
+
+##### New Features
+
+*  Mainnet execution simulation (#1622) (232c77fa)
+
+##### Bug Fixes
+
+*  Burn-block-height in at-block at epoch 3.x (#1668) (e9b078cc)
+*  Avoid empty deployment batches (#1667) (b2f34152)
+*  New testnet epoch heights (#1639) (bb7aad56)
+
+##### Continuous Integration
+
+*  Run sdk tests on multiple platforms (#1652) (cea5dd0e)
+
+##### Chores
+
+*  Update dependencies and maintenance work (#1670) (55491e45)
+
 # [2.12.0](https://github.com/hirosystems/clarinet/compare/v2.11.2...v2.12.0) (2024-12-18)
 
 ##### New Features
