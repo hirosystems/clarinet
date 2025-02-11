@@ -745,6 +745,14 @@ where
 mod tests_formatter {
     use super::{ClarityFormatter, Settings};
     use crate::formatter::Indentation;
+    #[allow(unused_imports)]
+    use std::assert_eq;
+    #[macro_export]
+    macro_rules! assert_eq {
+        ($($arg:tt)*) => {
+            pretty_assertions::assert_eq!($($arg)*)
+        }
+    }
     use std::collections::HashMap;
     use std::fs;
     use std::path::Path;
@@ -981,8 +989,7 @@ mod tests_formatter {
   )
     (ok true)
   )
-)
-"#;
+)"#;
         assert_eq!(result, expected);
     }
     #[test]
@@ -994,8 +1001,7 @@ mod tests_formatter {
   )
     (ok true)
   )
-)
-"#;
+)"#;
         let result = format_with_default(&String::from(src));
         assert_eq!(src, result);
     }
@@ -1038,21 +1044,21 @@ mod tests_formatter {
     fn test_begin_never_one_line() {
         let src = "(begin (ok true))";
         let result = format_with_default(&String::from(src));
-        assert_eq!(result, "(begin\n  (ok true)\n)\n");
+        assert_eq!(result, "(begin\n  (ok true)\n)");
     }
 
     #[test]
     fn test_begin() {
         let src = "(begin (+ 1 1) ;; a\n (ok true))";
         let result = format_with_default(&String::from(src));
-        assert_eq!(result, "(begin\n  (+ 1 1) ;; a\n  (ok true)\n)\n");
+        assert_eq!(result, "(begin\n  (+ 1 1) ;; a\n  (ok true)\n)");
     }
 
     #[test]
     fn test_custom_tab_setting() {
         let src = "(begin (ok true))";
         let result = format_with(&String::from(src), Settings::new(Indentation::Space(4), 80));
-        assert_eq!(result, "(begin\n    (ok true)\n)\n");
+        assert_eq!(result, "(begin\n    (ok true)\n)");
     }
 
     #[test]
@@ -1063,7 +1069,6 @@ mod tests_formatter {
         assert_eq!(result, expected);
     }
     #[test]
-    #[ignore]
     fn test_ignore_formatting() {
         let src = ";; @format-ignore\n(    begin ( ok true))";
         let result = format_with(&String::from(src), Settings::new(Indentation::Space(4), 80));
@@ -1104,10 +1109,21 @@ mod tests_formatter {
         let src = "(something (if (true) (list) (list 1 2 3)))";
         let result = format_with_default(src);
         let expected = r#"(something (if (true)
-      (list)
-      (list 1 2 3)
-    )
+    (list)
+    (list 1 2 3)
+  )
 )"#;
+        assert_eq!(expected, result);
+    }
+
+    #[test]
+    fn ok_map() {
+        let src = "(ok { a: b, c: d })";
+        let result = format_with_default(src);
+        let expected = r#"(ok {
+  a: b,
+  c: d
+})"#;
         assert_eq!(expected, result);
     }
 
@@ -1116,10 +1132,9 @@ mod tests_formatter {
         let src = r#"(if (true)
   (let (
     (a (if (true)
-          (list)
-          (list)
-        )
-    )
+        (list)
+        (list)
+    ))
   )
     (list)
   )
@@ -1166,13 +1181,7 @@ mod tests_formatter {
   (if (is-eq no-to-treasury u0)
     (var-get available-ids)
     (unwrap-panic
-      (as-max-len? (concat (var-get available-ids) ids-to-treasury)
-        u10000
-          (as-max-len?
-            (concat (var-get available-ids) ids-to-treasury)
-              u10000
-            )
-      )
+      (as-max-len? (concat (var-get available-ids) ids-to-treasury) u10000)
     )
   )
 )"#;
