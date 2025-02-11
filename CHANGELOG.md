@@ -1,4 +1,4 @@
-# [2.13.0](https://github.com/hirosystems/clarinet/compare/v2.12.2...v2.13.0) (2025-02-11)
+# [2.13.0](https://github.com/hirosystems/clarinet/compare/v2.12.0...v2.13.0) (2025-02-11)
 
 ##### New Features
 
