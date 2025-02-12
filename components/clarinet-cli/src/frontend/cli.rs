@@ -28,7 +28,7 @@ use clarinet_files::{
     get_manifest_location, FileLocation, NetworkManifest, ProjectManifest, ProjectManifestFile,
     RequirementConfig,
 };
-use clarinet_format::formatter::{ClarityFormatter, Settings};
+use clarinet_format::formatter::{self, ClarityFormatter};
 use clarity_repl::analysis::call_checker::ContractAnalysis;
 use clarity_repl::clarity::vm::analysis::AnalysisDatabase;
 use clarity_repl::clarity::vm::costs::LimitedCostTracker;
@@ -1226,19 +1226,19 @@ pub fn main() {
         },
         Command::Formatter(cmd) => {
             let sources = get_sources_to_format(cmd.manifest_path, cmd.file);
-            let mut settings = Settings::default();
+            let mut settings = formatter::Settings::default();
 
             if let Some(max_line_length) = cmd.max_line_length {
                 settings.max_line_length = max_line_length;
             }
 
             if let Some(indentation) = cmd.indentation {
-                settings.indentation = clarinet_format::formatter::Indentation::Space(indentation);
+                settings.indentation = formatter::Indentation::Space(indentation);
             }
             if cmd.use_tabs {
-                settings.indentation = clarinet_format::formatter::Indentation::Tab;
+                settings.indentation = formatter::Indentation::Tab;
             }
-            let mut formatter = ClarityFormatter::new(settings);
+            let formatter = ClarityFormatter::new(settings);
 
             for (file_path, source) in &sources {
                 let output = formatter.format(source);
@@ -1282,20 +1282,11 @@ fn from_code_source(src: ClarityCodeSource) -> String {
 // look for files at the default code path (./contracts/) if
 // cmd.manifest_path is not specified OR if cmd.file is not specified
 fn get_sources_from_manifest(manifest_path: Option<String>) -> Vec<String> {
-    let manifest = load_manifest_or_warn(manifest_path);
-    match manifest {
-        Some(manifest_path) => {
-            let contracts = manifest_path.contracts.values().cloned();
-            contracts.map(|c| from_code_source(c.code_source)).collect()
-        }
-        None => {
-            // TODO this should probably just panic or fail gracefully because
-            // if the manifest isn't specified or found at the default location
-            // we can't do much
-            vec![]
-        }
-    }
+    let manifest = load_manifest_or_exit(manifest_path, true);
+    let contracts = manifest.contracts.values().cloned();
+    contracts.map(|c| from_code_source(c.code_source)).collect()
 }
+
 fn get_sources_to_format(
     manifest_path: Option<String>,
     file: Option<String>,

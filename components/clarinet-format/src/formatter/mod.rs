@@ -79,6 +79,9 @@ impl ClarityFormatter {
     /// for range formatting within editors
     pub fn format_section(&self, source: &str) -> String {
         let pse = clarity::vm::ast::parser::v2::parse(source).unwrap();
+        // TODO: range formatting should specify to the aggregator that we're
+        // starting mid-source and thus should pre-populate
+        // `previous_indentation` for format_source_exprs
         let agg = Aggregator::new(&self.settings, &pse, source);
         agg.generate()
     }
@@ -142,6 +145,7 @@ impl<'a> Aggregator<'a> {
                             NativeFunctions::And | NativeFunctions::Or => {
                                 self.format_booleans(list, previous_indentation)
                             }
+                            // This would ideally not be wildcarded, but the list of "everything else" is huge
                             _ => {
                                 let inner_content =
                                     self.to_inner_content(list, previous_indentation);
@@ -173,8 +177,7 @@ impl<'a> Aggregator<'a> {
                             | DefineFunctions::PrivateFunction => self.format_function(list),
                             DefineFunctions::Constant
                             | DefineFunctions::PersistedVariable
-                            | DefineFunctions::NonFungibleToken
-                            | DefineFunctions::FungibleToken => self.format_constant(list),
+                            | DefineFunctions::NonFungibleToken => self.format_constant(list),
                             DefineFunctions::Map => self.format_map(list, previous_indentation),
                             DefineFunctions::UseTrait | DefineFunctions::ImplTrait => {
                                 // these are the same as the following but need a trailing newline
@@ -183,11 +186,12 @@ impl<'a> Aggregator<'a> {
                                     self.format_source_exprs(list, previous_indentation)
                                 )
                             }
-                            // DefineFunctions::Trait => format_trait(settings, list),
-                            // DefineFunctions::PersistedVariable
-                            // DefineFunctions::FungibleToken
-                            // DefineFunctions::NonFungibleToken
-                            _ => self.format_source_exprs(&[expr.clone()], previous_indentation),
+                            DefineFunctions::FungibleToken => {
+                                self.format_fungible_token(list, previous_indentation)
+                            }
+                            DefineFunctions::Trait => {
+                                self.format_source_exprs(&[expr.clone()], previous_indentation)
+                            }
                         }
                     } else {
                         self.to_inner_content(list, previous_indentation)
@@ -212,6 +216,27 @@ impl<'a> Aggregator<'a> {
         result
     }
 
+    fn format_fungible_token(
+        &self,
+        exprs: &[PreSymbolicExpression],
+        previous_indentation: &str,
+    ) -> String {
+        let mut acc = "(define-fungible-token ".to_string();
+        let mut iter = exprs[1..].iter().peekable();
+        while let Some(expr) = iter.next() {
+            let trailing = get_trailing_comment(expr, &mut iter);
+            acc.push_str(&self.format_source_exprs(&[expr.clone()], previous_indentation));
+            if iter.peek().is_some() {
+                acc.push(' ');
+            }
+            if let Some(comment) = trailing {
+                acc.push(' ');
+                acc.push_str(&self.display_pse(comment, previous_indentation));
+            }
+        }
+        acc.push(')');
+        acc
+    }
     fn format_constant(&self, exprs: &[PreSymbolicExpression]) -> String {
         let func_type = self.display_pse(exprs.first().unwrap(), "");
         let indentation = &self.settings.indentation.to_string();
@@ -467,32 +492,27 @@ impl<'a> Aggregator<'a> {
 
         if over_2_kvs {
             acc.push('\n');
-            let mut counter = 1;
-            for expr in exprs.iter() {
-                if is_comment(expr) {
-                    acc.push_str(&format!(
-                        "{}{}\n",
-                        space,
-                        self.format_source_exprs(&[expr.clone()], previous_indentation)
-                    ))
-                } else {
-                    // if counter is even we're on the value
-                    if counter % 2 == 0 {
-                        // Pass the current indentation level to nested formatting
-                        let value_str = self.format_source_exprs(&[expr.clone()], &space);
-                        acc.push_str(&format!(": {},\n", value_str));
-                    } else {
-                        // if counter is odd we're on the key
-                        acc.push_str(&format!(
-                            "{}{}",
-                            space,
-                            self.format_source_exprs(&[expr.clone()], previous_indentation)
-                        ));
-                    }
-                    counter += 1
+            let mut iter = exprs.iter().peekable();
+            while let Some(key) = iter.next() {
+                if is_comment(key) {
+                    acc.push_str(&space);
+                    acc.push_str(&self.display_pse(key, previous_indentation));
+                    acc.push('\n');
+                    continue;
                 }
+                let value = iter.next().unwrap();
+                let trailing = get_trailing_comment(value, &mut iter);
+                // Pass the current indentation level to nested formatting
+                let key_str = self.format_source_exprs(&[key.clone()], &space);
+                let value_str = self.format_source_exprs(&[value.clone()], indentation);
+                acc.push_str(&format!("{}{}: {},", indentation, key_str, value_str));
+
+                if let Some(comment) = trailing {
+                    acc.push(' ');
+                    acc.push_str(&self.display_pse(comment, previous_indentation));
+                }
+                acc.push('\n');
             }
-            acc.push_str(previous_indentation);
         } else {
             // for cases where we keep it on the same line with 1 k/v pair
             let fkey = self.display_pse(&exprs[0], previous_indentation);
@@ -502,6 +522,7 @@ impl<'a> Aggregator<'a> {
             ));
         }
 
+        acc.push_str(previous_indentation);
         acc.push('}');
         acc
     }
@@ -674,7 +695,7 @@ impl<'a> Aggregator<'a> {
             let expr_width = trimmed.len();
 
             if !first_on_line {
-                // For subexpressions that would exceed line length, add newline with increased indent
+                // For subexpressions over max line length, add newline with increased indent
                 if current_line_width + expr_width + 1 > self.settings.max_line_length {
                     result.push('\n');
                     result.push_str(&base_indent);
@@ -692,17 +713,26 @@ impl<'a> Aggregator<'a> {
             first_on_line = false;
         }
 
-        // TODO need closing newline handling here
-
         let multi_line = result.contains('\n');
         let b = format!("\n{})", previous_indentation);
         format!("({}{}", result, if multi_line { &b } else { ")" })
+        // if multi_line {
+        //     // Check if last character is closing brace
+        //     if result.trim_end().ends_with('}') {
+        //         format!("({})", result)
+        //     } else {
+        //         format!("({}\n{})", result, previous_indentation)
+        //     }
+        // } else {
+        //     format!("({})", result)
+        // }
     }
 }
 
 fn is_comment(pse: &PreSymbolicExpression) -> bool {
     matches!(pse.pre_expr, PreSymbolicExpressionType::Comment(_))
 }
+
 fn without_comments_len(exprs: &[PreSymbolicExpression]) -> usize {
     exprs.iter().filter(|expr| !is_comment(expr)).count()
 }
@@ -812,6 +842,17 @@ mod tests_formatter {
     fn test_simplest_formatter() {
         let result = format_with_default(&String::from("(  ok    true )"));
         assert_eq!(result, "(ok true)");
+    }
+
+    #[test]
+    fn test_fungible_token() {
+        let src = "(define-fungible-token hello)";
+        let result = format_with_default(&String::from(src));
+        assert_eq!(result, src);
+
+        let src = "(define-fungible-token hello u100)";
+        let result = format_with_default(&String::from(src));
+        assert_eq!(result, src);
     }
 
     #[test]
@@ -977,6 +1018,36 @@ mod tests_formatter {
     }
 
     #[test]
+    fn map_in_map() {
+        let src = "(ok { a: b, ctx: { a: b, c: d }})";
+        let result = format_with_default(src);
+        let expected = r#"(ok {
+  a: b,
+  ctx: {
+    a: b,
+    c: d,
+  },
+})"#;
+        std::assert_eq!(expected, result);
+    }
+
+    #[test]
+    fn old_tuple() {
+        let src = r#"(tuple
+  (a uint)
+  (b uint) ;; comment
+  (c bool)
+)"#;
+        let result = format_with_default(src);
+        let expected = r#"{
+  a: uint,
+  b: uint, ;; comment
+  c: bool
+}"#;
+        assert_eq!(result, expected);
+    }
+
+    #[test]
     fn test_indentation_levels() {
         let src = "(begin (let ((a 1) (b 2)) (ok true)))";
         let result = format_with_default(&String::from(src));
@@ -1016,7 +1087,7 @@ mod tests_formatter {
         let src = r#"{
   name: (buff 48),
   ;; comment
-  owner: send-to,
+  owner: send-to, ;; trailing
 }"#;
         let result = format_with_default(&String::from(src));
         assert_eq!(src, result);
@@ -1120,7 +1191,7 @@ mod tests_formatter {
         let result = format_with_default(src);
         let expected = r#"(ok {
   a: b,
-  c: d
+  c: d,
 })"#;
         assert_eq!(expected, result);
     }
@@ -1140,37 +1211,6 @@ mod tests_formatter {
 )"#;
         let result = format_with_default(src);
         assert_eq!(src, result);
-    }
-
-    #[test]
-    fn map_in_map() {
-        let src = "(ok { a: b, ctx: { a: b, c: d }})";
-        let result = format_with_default(src);
-        let expected = r#"(ok {
-    a: b,
-    ctx: {
-      a: b,
-      c: d,
-    },
-  }
-)"#;
-        assert_eq!(result, expected);
-    }
-
-    #[test]
-    fn old_tuple() {
-        let src = r#"(tuple
-  (a uint)
-  (b uint) ;; comment
-  (c bool)
-)"#;
-        let result = format_with_default(src);
-        let expected = r#"{
-  a: uint,
-  b: uint, ;; comment
-  c: bool
-}"#;
-        assert_eq!(result, expected);
     }
 
     #[test]
