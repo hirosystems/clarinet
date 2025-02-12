@@ -66,7 +66,7 @@ impl ClarityFormatter {
     /// formatting for files to ensure a newline at the end
     pub fn format_file(&self, source: &str) -> String {
         let pse = clarity::vm::ast::parser::v2::parse(source).unwrap();
-        let agg = Aggregator::new(&self.settings, &pse, &source);
+        let agg = Aggregator::new(&self.settings, &pse, source);
         let result = agg.generate();
 
         // make sure the file ends with a newline
@@ -79,10 +79,12 @@ impl ClarityFormatter {
     /// for range formatting within editors
     pub fn format_section(&self, source: &str) -> String {
         let pse = clarity::vm::ast::parser::v2::parse(source).unwrap();
-        let agg = Aggregator::new(&self.settings, &pse, &source);
+        let agg = Aggregator::new(&self.settings, &pse, source);
         agg.generate()
     }
 }
+/// Aggregator does the heavy lifting and generates the final output string.
+/// all the formatting methods live within this struct.
 pub struct Aggregator<'a> {
     settings: &'a Settings,
     pse: &'a [PreSymbolicExpression],
@@ -664,11 +666,7 @@ impl<'a> Aggregator<'a> {
         let mut result = String::new();
         let mut current_line_width = previous_indentation.len();
         let mut first_on_line = true;
-        let base_indent = format!(
-            "{}{}",
-            previous_indentation,
-            self.settings.indentation.to_string()
-        );
+        let base_indent = format!("{}{}", previous_indentation, self.settings.indentation);
 
         for expr in list.iter() {
             let formatted = self.format_source_exprs(&[expr.clone()], &base_indent);

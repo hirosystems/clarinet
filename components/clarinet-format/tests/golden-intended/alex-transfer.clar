@@ -60,25 +60,25 @@
                 )
                 (new-available-ids
                     (if (is-eq no-to-treasury u0)
-                            (var-get available-ids)
-                            (unwrap-panic
-                                (as-max-len?
-                                    (concat (var-get available-ids) ids-to-treasury)
-                                    u10000
-                                )
+                        (var-get available-ids)
+                        (unwrap-panic
+                            (as-max-len?
+                                (concat (var-get available-ids) ids-to-treasury)
+                                u10000
                             )
+                        )
                     )
                 )
                 (ids-to-recipient
                     (if (is-eq no-to-recipient u0)
-                            (list)
-                            (unwrap-panic
+                        (list)
+                        (unwrap-panic
                             (slice? new-available-ids
                                 (- (len new-available-ids) no-to-recipient)
                                 (len new-available-ids)
                             )
                         )
-                        )
+                    )
                 )
             )
                 (var-set sender-temp sender)
@@ -97,34 +97,34 @@
                 ))
                 (map-set owned sender
                     (if (is-eq no-to-treasury u0)
-                            owned-by-sender
-                            (unwrap-panic
+                        owned-by-sender
+                        (unwrap-panic
                             (slice? owned-by-sender u0
                                 (- (len owned-by-sender) no-to-treasury)
                             )
                         )
-                        )
+                    )
                 )
                 (map-set owned recipient
                     (if (is-eq no-to-recipient u0)
                             owned-by-recipient
                             (unwrap-panic
-                            (as-max-len?
-                                (concat owned-by-recipient ids-to-recipient)
-                                u10000
+                                (as-max-len?
+                                    (concat owned-by-recipient ids-to-recipient)
+                                    u10000
+                                )
                             )
-                        )
                         )
                 )
                 (var-set available-ids
                     (if (is-eq no-to-recipient u0)
-                            new-available-ids
-                            (unwrap-panic
+                        new-available-ids
+                        (unwrap-panic
                             (slice? new-available-ids u0
                                 (- (len new-available-ids) no-to-recipient)
                             )
                         )
-                        )
+                    )
                 )
                 (ok true)
             )
