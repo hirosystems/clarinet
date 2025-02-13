@@ -5,9 +5,9 @@ use clarinet_files::{FileAccessor, FileLocation, ProjectManifest};
 use clarity_repl::clarity::diagnostic::Diagnostic;
 use clarity_repl::repl::ContractDeployer;
 use lsp_types::{
-    CompletionItem, CompletionParams, DocumentSymbol, DocumentSymbolParams, GotoDefinitionParams,
-    Hover, HoverParams, InitializeParams, InitializeResult, Location, SignatureHelp,
-    SignatureHelpParams,
+    CompletionItem, CompletionParams, DocumentFormattingParams, DocumentSymbol,
+    DocumentSymbolParams, GotoDefinitionParams, Hover, HoverParams, InitializeParams,
+    InitializeResult, Location, SignatureHelp, SignatureHelpParams, TextEdit,
 };
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, RwLock};
@@ -259,6 +259,7 @@ pub enum LspRequest {
     Definition(GotoDefinitionParams),
     Hover(HoverParams),
     DocumentSymbol(DocumentSymbolParams),
+    DocumentFormatting(DocumentFormattingParams),
     Initialize(Box<InitializeParams>),
 }
 
@@ -267,8 +268,9 @@ pub enum LspRequestResponse {
     CompletionItems(Vec<CompletionItem>),
     SignatureHelp(Option<SignatureHelp>),
     Definition(Option<Location>),
-    DocumentSymbol(Vec<DocumentSymbol>),
     Hover(Option<Hover>),
+    DocumentSymbol(Vec<DocumentSymbol>),
+    DocumentFormatting(Option<Vec<TextEdit>>),
     Initialize(Box<InitializeResult>),
 }
 
@@ -344,6 +346,28 @@ pub fn process_request(
             Ok(LspRequestResponse::DocumentSymbol(document_symbols))
         }
 
+        LspRequest::DocumentFormatting(param) => {
+            let file_url = param.text_document.uri;
+            let contract_location = match get_contract_location(&file_url) {
+                Some(contract_location) => contract_location,
+                None => return Ok(LspRequestResponse::DocumentFormatting(None)),
+            };
+
+            // todo: handling formatting options, should reconciliate `param.options` and `editor_state.settings.<formatting_options>`
+            // i saw that formatting_options accepts arbitrary custom props `[key: string]: boolean | integer | string;`
+            let formatted_file = editor_state
+                .try_read(|es| es.format_contract(&contract_location))
+                .unwrap_or_default();
+            println!("file formatted!");
+
+            match formatted_file {
+                Some(formatted_file) => Ok(LspRequestResponse::DocumentFormatting(Some(vec![
+                    formatted_file,
+                ]))),
+                None => Ok(LspRequestResponse::DocumentFormatting(None)),
+            }
+        }
+
         LspRequest::Hover(params) => {
             let file_url = params.text_document_position_params.text_document.uri;
             let contract_location = match get_contract_location(&file_url) {
@@ -356,6 +380,7 @@ pub fn process_request(
                 .unwrap_or_default();
             Ok(LspRequestResponse::Hover(hover_data))
         }
+
         _ => Err(format!("Unexpected command: {:?}", &command)),
     }
 }
