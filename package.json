@@ -5,7 +5,6 @@
   "author": "hirosystems",
   "license": "GPL-3.0",
   "workspaces": [
-    "components/clarity-repl/js",
     "components/clarinet-sdk-wasm/pkg-node",
     "components/clarinet-sdk-wasm/pkg-browser",
     "components/clarinet-sdk/common",

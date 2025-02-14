@@ -29,32 +29,31 @@ jobs:
           rustup toolchain install stable --profile minimal --component rustfmt
           rustup target add wasm32-unknown-unknown
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-
       - name: Setup cache keys
-        run: |
-          echo "RUST_VERSION_HASH=$(rustc --version | sha256sum | awk '{print $1}')" >> $GITHUB_ENV
-          echo "NODE_VERSION_HASH=$(node --version | sha256sum | awk '{print $1}')" >> $GITHUB_ENV
+        run: echo "RUST_VERSION_HASH=$(rustc --version | sha256sum | awk '{print $1}')" >> $GITHUB_ENV
 
       - name: Cache cargo
         uses: actions/cache@v4
         with:
           path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
             target/release/build/
+            target/release/deps/
+            target/release/.fingerprint/
             target/wasm32-unknown-unknown/
           key: clarinet-sdk-cargo-${{ runner.os }}-${{ env.RUST_VERSION_HASH }}-${{ hashFiles('./Cargo.lock') }}
+          restore-keys: |
+            clarinet-sdk-cargo-${{ runner.os }}-${{ env.RUST_VERSION_HASH }}-
+            clarinet-sdk-cargo-${{ runner.os }}-
 
       - name: Install wasm-pack
-        run: npm install -g wasm-pack
+        run: cargo install wasm-pack
 
       - name: Build Wasm packages
         run: npm run build:sdk-wasm
-
-      - name: Install npm dependencies
-        run: npm ci
 
       - name: Run wasm-bindgen-test
         run: wasm-pack test --node components/clarinet-sdk-wasm
