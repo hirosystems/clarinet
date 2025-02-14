@@ -36,6 +36,8 @@ async function build_wasm_sdk() {
       "pkg-browser",
       "--target",
       "web",
+      "--features",
+      "web",
     ]),
   ]);
 

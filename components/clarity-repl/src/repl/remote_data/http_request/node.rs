@@ -48,8 +48,6 @@ pub fn http_request<T: DeserializeOwned>(url: &str) -> Result<T, String> {
     curl_command.push(format!("\"{}\"", url));
     let command = curl_command.join(" ");
 
-    uprint!("command: {:?}", command);
-
     let result = std::panic::catch_unwind(|| {
         let output = exec_sync(&command);
         let body = String::from_utf8_lossy(&output).into_owned();

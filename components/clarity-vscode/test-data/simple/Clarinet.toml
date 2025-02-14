@@ -28,3 +28,7 @@ strict = false
 trusted_sender = false
 trusted_caller = false
 callee_filter = false
+
+
+[repl.remote_data]
+enable = true
