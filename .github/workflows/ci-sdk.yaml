@@ -29,6 +29,11 @@ jobs:
           rustup toolchain install stable --profile minimal --component rustfmt
           rustup target add wasm32-unknown-unknown
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
       - name: Setup cache keys
         run: echo "RUST_VERSION_HASH=$(rustc --version | sha256sum | awk '{print $1}')" >> $GITHUB_ENV
 
@@ -54,6 +59,9 @@ jobs:
           if ! command -v wasm-pack &> /dev/null; then
             cargo install wasm-pack
           fi
+
+      - name: Build Wasm packages
+        run: npm run build:sdk-wasm
 
       - name: Run wasm-bindgen-test
         run: wasm-pack test --node components/clarinet-sdk-wasm
