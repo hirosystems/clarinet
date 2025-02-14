@@ -49,8 +49,11 @@ jobs:
             clarinet-sdk-cargo-${{ runner.os }}-${{ env.RUST_VERSION_HASH }}-
             clarinet-sdk-cargo-${{ runner.os }}-
 
-      - name: Install wasm-pack
-        run: cargo install wasm-pack
+      - name: Install wasm-pack if not available
+        run: |
+          if ! command -v wasm-pack &> /dev/null; then
+            cargo install wasm-pack
+          fi
 
       - name: Run wasm-bindgen-test
         run: wasm-pack test --node components/clarinet-sdk-wasm
