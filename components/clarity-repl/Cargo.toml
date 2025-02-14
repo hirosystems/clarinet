@@ -113,8 +113,6 @@ wasm = [
     "web-sys",
     "js-sys",
     "getrandom",
-    "web-sys/XmlHttpRequest",
-    "web-sys/Event",
 ]
 web = [
     "web-sys/XmlHttpRequest",
