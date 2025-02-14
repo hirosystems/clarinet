@@ -9,8 +9,6 @@ use js_sys::Function as JsFunction;
 use wasm_bindgen::JsValue;
 use wasm_bindgen_test::*;
 
-wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
-
 async fn init_sdk() -> SDK {
     let js_noop = JsFunction::new_no_args("return");
     let mut sdk = SDK::new(js_noop, None);
