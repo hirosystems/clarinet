@@ -43,6 +43,11 @@ describe("basic simnet interactions", () => {
     expect(simnet.blockHeight).toBe(1);
   });
 
+  it("can run command", () => {
+    const r = simnet.executeCommand("::set_epoch 3.1");
+    expect(r).toBe("Epoch updated to: 3.1");
+  });
+
   it("can mine empty blocks", () => {
     const blockHeight = simnet.blockHeight;
     simnet.mineEmptyBlock();

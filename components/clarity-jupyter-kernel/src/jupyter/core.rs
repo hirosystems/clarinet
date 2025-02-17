@@ -5,7 +5,7 @@ use super::control_file;
 use super::jupyter_message::JupyterMessage;
 use super::CommandContext;
 
-use colored::*;
+use colored::Colorize;
 use failure::Error;
 use json;
 use json::JsonValue;

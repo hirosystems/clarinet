@@ -26,7 +26,7 @@ reqwest = { version = "0.12", default-features = false, features = [
     "json",
     "rustls-tls",
 ] }
-colored = { version = "3.0.0" }
+colored = { version = "3" }
 wasm-bindgen = { version = "=0.2.100" }
 wasm-bindgen-futures = { version = "=0.4.50" }
 web-sys = { version = "=0.3.77" }
@@ -35,6 +35,7 @@ web-sys = { version = "=0.3.77" }
 chainhook-sdk = { git = "https://github.com/hirosystems/chainhook.git" }
 chainhook-types = { git = "https://github.com/hirosystems/chainhook.git" }
 stacks-codec = { path = "./components/stacks-codec" }
+hiro-system-kit = { path = "./components/hiro-system-kit" }
 
 # [patch.'https://github.com/stacks-network/stacks-core.git']
 # clarity = { path = "../stacks-core/clarity" }
