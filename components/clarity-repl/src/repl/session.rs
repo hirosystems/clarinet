@@ -5,7 +5,8 @@ use super::diagnostic::output_diagnostic;
 use super::{ClarityCodeSource, ClarityContract, ClarityInterpreter, ContractDeployer};
 use crate::analysis::coverage::CoverageHook;
 use crate::repl::clarity_values::value_to_string;
-use crate::utils;
+use crate::utils::serialize_event;
+
 use clarity::codec::StacksMessageCodec;
 use clarity::types::chainstate::StacksAddress;
 use clarity::types::StacksEpochId;
@@ -20,8 +21,9 @@ use clarity::vm::{
     ClarityVersion, CostSynthesis, EvalHook, EvaluationResult, ExecutionResult, ParsedContract,
     SymbolicExpression,
 };
-use colored::*;
+use colored::Colorize;
 use prettytable::{Cell, Row, Table};
+
 use std::collections::{BTreeMap, HashMap};
 use std::fmt;
 use std::num::ParseIntError;
@@ -349,7 +351,7 @@ impl Session {
                 if !result.events.is_empty() {
                     output.push(black!("Events emitted"));
                     for event in result.events.iter() {
-                        output.push(black!(format!("{}", utils::serialize_event(event))));
+                        output.push(black!(format!("{}", serialize_event(event))));
                     }
                 }
                 match &result.result {
@@ -1477,7 +1479,7 @@ mod tests {
             result.split('\n').next().unwrap(),
             format!(
                 "encode:1:1: {} use of unresolved function 'foo'",
-                "error:".bold().red()
+                "error:".red().bold()
             )
         );
     }

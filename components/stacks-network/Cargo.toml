@@ -6,8 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-atty = "0.2.14"
-ansi_term = "0.12.1"
+colored = { workspace = true }
 bollard = "0.17"
 bitcoincore-rpc = "0.18.0"
 serde = { version = "1", features = ["derive"] }

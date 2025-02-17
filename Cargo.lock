@@ -69,15 +69,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ansi_term"
-version = "0.12.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d52a9bb7ec0cf484c551830a7ce27bd20d67eac647e1befb56b0be4ee39a55d2"
-dependencies = [
- "winapi 0.3.9",
-]
-
-[[package]]
 name = "anstream"
 version = "0.6.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -222,17 +213,6 @@ name = "atomic-waker"
 version = "1.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1505bd5d3d116872e7271a6d4e16d81d0c8570876c8de68093a09ac269d8aac0"
-
-[[package]]
-name = "atty"
-version = "0.2.14"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d9b39be18770d11421cdb1b9947a45dd3f37e93092cbf377614828a319d5fee8"
-dependencies = [
- "hermit-abi 0.1.19",
- "libc",
- "winapi 0.3.9",
-]
 
 [[package]]
 name = "auto_impl"
@@ -589,7 +569,7 @@ dependencies = [
  "futures",
  "fxhash",
  "hex",
- "hiro-system-kit 0.3.4",
+ "hiro-system-kit",
  "hyper 0.14.27",
  "lazy_static",
  "miniscript",
@@ -708,18 +688,17 @@ dependencies = [
 name = "clarinet-cli"
 version = "2.13.0"
 dependencies = [
- "ansi_term",
- "atty",
  "clap",
  "clap_complete",
  "clarinet-deployments",
  "clarinet-files",
  "clarity-lsp",
  "clarity-repl",
+ "colored",
  "crossbeam-channel",
  "crossterm",
  "fwdansi",
- "hiro-system-kit 0.1.0",
+ "hiro-system-kit",
  "mac_address",
  "nix 0.24.2",
  "ratatui",
@@ -789,7 +768,6 @@ dependencies = [
  "clarinet-files",
  "clarity",
  "clarity-repl",
- "colored",
  "console_error_panic_hook",
  "gloo-utils",
  "js-sys",
@@ -869,8 +847,6 @@ dependencies = [
 name = "clarity-repl"
 version = "2.13.0"
 dependencies = [
- "ansi_term",
- "atty",
  "bytes",
  "chrono",
  "clar2wasm",
@@ -880,7 +856,7 @@ dependencies = [
  "divan",
  "futures",
  "getrandom 0.2.8",
- "hiro-system-kit 0.1.0",
+ "hiro-system-kit",
  "httparse",
  "js-sys",
  "log",
@@ -2111,15 +2087,6 @@ checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
 
 [[package]]
 name = "hermit-abi"
-version = "0.1.19"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "62b467343b94ba476dcb2500d242dadbb39557df889310ac77c5d99100aaac33"
-dependencies = [
- "libc",
-]
-
-[[package]]
-name = "hermit-abi"
 version = "0.3.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d231dfb89cfffdbc30e7fc41579ed6066ad03abda9e567ccafae602b97ec5024"
@@ -2144,29 +2111,9 @@ checksum = "3011d1213f159867b13cfd6ac92d2cd5f1345762c63be3554e84092d85a50bbd"
 
 [[package]]
 name = "hiro-system-kit"
-version = "0.1.0"
+version = "0.3.5"
 dependencies = [
- "ansi_term",
- "atty",
- "slog",
- "slog-async",
- "slog-atomic",
- "slog-json",
- "slog-scope",
- "slog-term",
- "time",
- "tokio",
-]
-
-[[package]]
-name = "hiro-system-kit"
-version = "0.3.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4d3bf5cf007a9973ef9b7dffe8d63fa5228e9bb1aa012e89da2b9f1e7119ce6e"
-dependencies = [
- "ansi_term",
- "atty",
- "lazy_static",
+ "colored",
  "slog",
  "slog-async",
  "slog-atomic",
@@ -2623,7 +2570,7 @@ version = "0.4.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f23ff5ef2b80d608d61efee834934d862cd92461afc0560dedf493e4c033738b"
 dependencies = [
- "hermit-abi 0.3.9",
+ "hermit-abi",
  "libc",
  "windows-sys 0.52.0",
 ]
@@ -3121,7 +3068,7 @@ version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "80e04d1dcff3aae0704555fe5fee3bcfaf3d1fdf8a7e521d5b9d2b42acb52cec"
 dependencies = [
- "hermit-abi 0.3.9",
+ "hermit-abi",
  "libc",
  "wasi 0.11.0+wasi-snapshot-preview1",
  "windows-sys 0.52.0",
@@ -3372,16 +3319,7 @@ version = "1.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4161fcb6d602d4d2081af7c3a45852d875a03dd337a6bfdd6e06407b61342a43"
 dependencies = [
- "hermit-abi 0.3.9",
- "libc",
-]
-
-[[package]]
-name = "num_threads"
-version = "0.1.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2819ce041d2ee131036f4fc9d6ae7ae125a3a40e97ba64d04fe799ad9dabbb44"
-dependencies = [
+ "hermit-abi",
  "libc",
 ]
 
@@ -4769,11 +4707,11 @@ dependencies = [
 
 [[package]]
 name = "slog-term"
-version = "2.9.0"
+version = "2.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "87d29185c55b7b258b4f120eab00f48557d4d9bc814f41713f449d35b0f8977c"
+checksum = "b6e022d0b998abfe5c3782c1f03551a596269450ccd677ea51c56f8b214610e8"
 dependencies = [
- "atty",
+ "is-terminal",
  "slog",
  "term",
  "thread_local",
@@ -4923,7 +4861,7 @@ dependencies = [
  "clarinet-files",
  "clarinet-utils",
  "error-chain",
- "hiro-system-kit 0.1.0",
+ "hiro-system-kit",
  "neon",
  "num",
  "serde",
@@ -4934,8 +4872,6 @@ dependencies = [
 name = "stacks-network"
 version = "2.13.0"
 dependencies = [
- "ansi_term",
- "atty",
  "base58",
  "bitcoincore-rpc",
  "bollard",
@@ -4946,12 +4882,13 @@ dependencies = [
  "clarinet-deployments",
  "clarinet-files",
  "clarity",
+ "colored",
  "crossbeam-channel",
  "crossterm",
  "ctrlc",
  "dirs",
  "futures",
- "hiro-system-kit 0.1.0",
+ "hiro-system-kit",
  "ratatui",
  "reqwest",
  "serde",
@@ -5311,9 +5248,7 @@ checksum = "5dfd88e563464686c916c7e46e623e520ddc6d79fa6641390f2e3fa86e83e885"
 dependencies = [
  "deranged",
  "itoa",
- "libc",
  "num-conv",
- "num_threads",
  "powerfmt",
  "serde",
  "time-core",

@@ -21,7 +21,6 @@ serde-wasm-bindgen = { version = "0.6.4", optional = true }
 wasm-bindgen = { workspace = true, optional = true }
 wasm-bindgen-futures = { workspace = true, optional = true }
 web-sys = { workspace = true, features = ["console"], optional = true }
-colored = { workspace = true }
 
 clarinet-files = { path = "../clarinet-files", default-features = false }
 clarity-repl = { path = "../clarity-repl", default-features = false, optional = true }

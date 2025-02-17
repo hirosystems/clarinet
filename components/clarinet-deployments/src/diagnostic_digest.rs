@@ -7,7 +7,7 @@ use clarity_repl::{
     },
     repl::diagnostic::output_code,
 };
-use colored::*;
+use colored::Colorize;
 
 use crate::types::DeploymentSpecification;
 
