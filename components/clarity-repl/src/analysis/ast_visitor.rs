@@ -17,6 +17,9 @@ pub struct TypedVar<'a> {
     pub decl_span: Span,
 }
 
+// Since the AST Visitor may be used before other checks have been performed,
+// we may need a default value for some expressions. This can be used for a
+// missing `ClarityName`.
 pub static DEFAULT_NAME: LazyLock<ClarityName> =
     LazyLock::new(|| ClarityName::from("placeholder__"));
 pub static DEFAULT_EXPR: LazyLock<SymbolicExpression> =

@@ -135,7 +135,6 @@ pub static BOOT_CONTRACTS_DATA: LazyLock<
     let mut result = BTreeMap::new();
     let deploy: [(&StandardPrincipalData, [(&str, &str); 13]); 2] = [
         (&*BOOT_TESTNET_PRINCIPAL, *BOOT_CODE_TESTNET),
-        // merge BOOT_CODE_COMMON with STACKS_BOOT_CODE_MAINNET
         (&*BOOT_MAINNET_PRINCIPAL, *BOOT_CODE_MAINNET),
     ];
 
