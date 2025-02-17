@@ -8,14 +8,6 @@ import path from "node:path";
 const rootDir = new URL(".", import.meta.url).pathname;
 
 /**
- * build sdk js script
- */
-async function build_wasm_js_scripts() {
-  const dir = path.join(rootDir, "../clarity-repl/js");
-  await execCommand("npm", ["install"], dir);
-}
-
-/**
  * build clarinet-sdk-wasm
  */
 async function build_wasm_sdk() {
@@ -44,12 +36,12 @@ async function build_wasm_sdk() {
       "pkg-browser",
       "--target",
       "web",
+      "--features",
+      "web",
     ]),
   ]);
 
   await updatePackageName();
-  await updatePackageJson("pkg-node/package.json");
-  await updatePackageJson("pkg-browser/package.json");
 }
 
 /**
@@ -111,24 +103,7 @@ async function updatePackageName() {
   console.log("✅ pkg-browser/package.json name updated");
 }
 
-/**
- * updatePackagesIncludedFiles
- * Include snippets/ files and add the sync-request dependency
- * @param {string} path
- */
-async function updatePackageJson(file) {
-  const filePath = path.join(rootDir, file);
-
-  const fileData = JSON.parse(await fs.readFile(filePath, "utf-8"));
-  fileData.files.push("snippets/");
-
-  fileData.dependencies = { "sync-request": "6.1.0" };
-  await fs.writeFile(filePath, JSON.stringify(fileData, null, 2), "utf-8");
-  console.log(`✅ ${file} updated`);
-}
-
 try {
-  await build_wasm_js_scripts();
   await build_wasm_sdk();
   console.log("\n✅ Project successfully built.\n🚀 Ready to publish.");
   console.log("Run the following commands to publish");

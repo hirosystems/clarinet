@@ -1,3 +1,4 @@
+use crate::repl::settings::ApiUrl;
 use clarity::types::{
     chainstate::{
         BlockHeaderHash, BurnchainHeaderHash, ConsensusHash, SortitionId, StacksBlockId, VRFSeed,
@@ -8,27 +9,7 @@ use clarity::vm::errors::InterpreterResult;
 use serde::de::Error as SerdeError;
 use serde::{de::DeserializeOwned, Deserialize, Deserializer};
 
-#[cfg(all(target_arch = "wasm32", feature = "remote-data-fetching"))]
-use js_sys::JsString;
-#[cfg(all(target_arch = "wasm32", feature = "remote-data-fetching"))]
-use wasm_bindgen::prelude::*;
-#[cfg(all(target_arch = "wasm32", feature = "remote-data-fetching"))]
-#[wasm_bindgen]
-#[derive(Deserialize)]
-struct JsHttpClientResponse {
-    status: u16,
-    body: Vec<u8>,
-}
-
-#[cfg(all(target_arch = "wasm32", feature = "remote-data-fetching"))]
-#[wasm_bindgen(module = "/js/index.mjs")]
-extern "C" {
-    #[wasm_bindgen(js_name = httpClient)]
-    fn http_client(method: &JsString, path: &JsString) -> JsValue;
-}
-
-use crate::repl::settings::ApiUrl;
-
+mod http_request;
 pub const MAINNET_20_START_HEIGHT: u32 = 1;
 pub const MAINNET_2_05_START_HEIGHT: u32 = 40_607;
 pub const MAINNET_21_START_HEIGHT: u32 = 99_113;
@@ -203,58 +184,16 @@ pub struct Block {
 #[derive(Clone, Debug)]
 pub struct HttpClient {
     url: ApiUrl,
-    #[allow(dead_code)]
-    api_key: Option<String>,
 }
 
 impl HttpClient {
     pub fn new(url: ApiUrl) -> Self {
-        #[cfg(not(target_arch = "wasm32"))]
-        let api_key = std::env::var("HIRO_API_KEY").ok();
-        #[cfg(target_arch = "wasm32")]
-        let api_key = None;
-
-        HttpClient { url, api_key }
+        HttpClient { url }
     }
 
-    #[cfg(not(target_arch = "wasm32"))]
     fn get<T: DeserializeOwned>(&self, path: &str) -> Result<T, String> {
         let url = format!("{}{}", self.url, path);
-        let client = reqwest::blocking::Client::new();
-        let mut request = client.get(&url).header("x-hiro-product", "clarinet-cli");
-        if let Some(ref api_key) = self.api_key {
-            request = request.header("x-api-key", api_key);
-        }
-        let response = request.send().map_err(|e| e.to_string())?;
-        if response.status() != 200 {
-            return Err(format!(
-                "http error - status: {} - message: {}",
-                response.status(),
-                response.text().unwrap()
-            ));
-        }
-        response.json::<T>().map_err(|e| e.to_string())
-    }
-
-    #[cfg(all(target_arch = "wasm32", feature = "remote-data-fetching"))]
-    fn get<T: DeserializeOwned>(&self, path: &str) -> Result<T, String> {
-        let url = JsString::from(format!("{}{}", self.url, path));
-        let raw_response = http_client(&JsString::from("GET"), &url);
-        let response: JsHttpClientResponse =
-            serde_wasm_bindgen::from_value(raw_response).map_err(|e| e.to_string())?;
-        let body = std::str::from_utf8(&response.body).unwrap();
-        if response.status != 200 {
-            return Err(format!(
-                "http error - status: {} - message: {}",
-                response.status, body
-            ));
-        }
-        serde_json::from_str::<T>(body).map_err(|e| e.to_string())
-    }
-
-    #[cfg(all(target_arch = "wasm32", not(feature = "remote-data-fetching")))]
-    fn get<T: DeserializeOwned>(&self, _path: &str) -> Result<T, String> {
-        unreachable!()
+        http_request::http_request(url.as_str())
     }
 
     pub fn fetch_info(&self) -> Info {

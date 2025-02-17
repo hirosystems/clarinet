@@ -78,8 +78,7 @@ name = "simnet"
 harness = false
 
 [features]
-default = ["cli", "dap", "remote-data-fetching"]
-remote-data-fetching = []
+default = ["cli", "dap"]
 sdk = [
     "clarity/canonical",
     "clarity/developer-mode",
@@ -114,6 +113,10 @@ wasm = [
     "web-sys",
     "js-sys",
     "getrandom",
+]
+web = [
+    "web-sys/XmlHttpRequest",
+    "web-sys/Event",
 ]
 
 [lints.rust]

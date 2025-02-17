@@ -38,6 +38,7 @@ wasm = [
   "console_error_panic_hook",
   "clarinet-deployments/wasm",
   "clarity-repl/wasm",
+  "clarity-repl/web",
   "clarinet-files/wasm",
 ]
 
