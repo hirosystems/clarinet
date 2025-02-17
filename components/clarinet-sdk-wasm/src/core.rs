@@ -20,7 +20,7 @@ use clarity_repl::clarity::{
     Address, ClarityVersion, EvaluationResult, ExecutionResult, StacksEpochId, SymbolicExpression,
 };
 use clarity_repl::repl::clarity_values::{uint8_to_string, uint8_to_value};
-use clarity_repl::repl::session::{CostsReport, BOOT_CONTRACTS_DATA};
+use clarity_repl::repl::session::CostsReport;
 use clarity_repl::repl::settings::RemoteDataSettings;
 use clarity_repl::repl::{
     clarity_values, ClarityCodeSource, ClarityContract, ContractDeployer, Session, SessionSettings,
@@ -1084,6 +1084,8 @@ impl SDK {
         include_boot_contracts: bool,
         boot_contracts_path: String,
     ) -> Result<SessionReport, String> {
+        use clarity_repl::repl::boot::BOOT_CONTRACTS_DATA;
+
         let contracts_locations = self.contracts_locations.clone();
         let session = self.get_session_mut();
 

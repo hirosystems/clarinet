@@ -8,6 +8,7 @@ use clarity::vm::representations::{Span, TraitDefinition};
 use clarity::vm::types::{PrincipalData, QualifiedContractIdentifier, TraitIdentifier, Value};
 use clarity::vm::{ClarityName, ClarityVersion, SymbolicExpression, SymbolicExpressionType};
 use std::collections::HashMap;
+use std::sync::LazyLock;
 
 #[derive(Clone)]
 pub struct TypedVar<'a> {
@@ -16,13 +17,10 @@ pub struct TypedVar<'a> {
     pub decl_span: Span,
 }
 
-lazy_static! {
-    // Since the AST Visitor may be used before other checks have been performed,
-    // we may need a default value for some expressions. This can be used for a
-    // missing `ClarityName`.
-    static ref DEFAULT_NAME: ClarityName = ClarityName::from("placeholder__");
-    static ref DEFAULT_EXPR: SymbolicExpression = SymbolicExpression::atom(DEFAULT_NAME.clone());
-}
+pub static DEFAULT_NAME: LazyLock<ClarityName> =
+    LazyLock::new(|| ClarityName::from("placeholder__"));
+pub static DEFAULT_EXPR: LazyLock<SymbolicExpression> =
+    LazyLock::new(|| SymbolicExpression::atom(DEFAULT_NAME.clone()));
 
 pub trait ASTVisitor<'a> {
     fn traverse_expr(&mut self, expr: &'a SymbolicExpression) -> bool {

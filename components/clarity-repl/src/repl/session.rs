@@ -1,9 +1,10 @@
-use super::boot::{STACKS_BOOT_CODE_MAINNET, STACKS_BOOT_CODE_TESTNET};
+use super::boot::{
+    BOOT_CODE_MAINNET, BOOT_CODE_TESTNET, BOOT_MAINNET_PRINCIPAL, BOOT_TESTNET_PRINCIPAL,
+};
 use super::diagnostic::output_diagnostic;
 use super::{ClarityCodeSource, ClarityContract, ClarityInterpreter, ContractDeployer};
 use crate::analysis::coverage::CoverageHook;
 use crate::repl::clarity_values::value_to_string;
-use crate::repl::Settings;
 use crate::utils;
 use clarity::codec::StacksMessageCodec;
 use clarity::types::chainstate::StacksAddress;
@@ -13,9 +14,7 @@ use clarity::vm::diagnostic::{Diagnostic, Level};
 use clarity::vm::docs::{make_api_reference, make_define_reference, make_keyword_reference};
 use clarity::vm::functions::define::DefineFunctions;
 use clarity::vm::functions::NativeFunctions;
-use clarity::vm::types::{
-    PrincipalData, QualifiedContractIdentifier, StandardPrincipalData, Value,
-};
+use clarity::vm::types::{PrincipalData, QualifiedContractIdentifier, Value};
 use clarity::vm::variables::NativeVariables;
 use clarity::vm::{
     ClarityVersion, CostSynthesis, EvalHook, EvaluationResult, ExecutionResult, ParsedContract,
@@ -31,58 +30,6 @@ use std::num::ParseIntError;
 use clarity::vm::analysis::ContractAnalysis;
 
 use super::SessionSettings;
-
-pub static BOOT_TESTNET_ADDRESS: &str = "ST000000000000000000002AMW42H";
-pub static BOOT_MAINNET_ADDRESS: &str = "SP000000000000000000002Q6VF78";
-
-pub static V1_BOOT_CONTRACTS: &[&str] = &["bns"];
-pub static V2_BOOT_CONTRACTS: &[&str] = &["pox-2", "costs-3"];
-pub static V3_BOOT_CONTRACTS: &[&str] = &["pox-3"];
-pub static V4_BOOT_CONTRACTS: &[&str] = &["pox-4"];
-
-lazy_static! {
-    static ref BOOT_TESTNET_PRINCIPAL: StandardPrincipalData =
-        PrincipalData::parse_standard_principal(BOOT_TESTNET_ADDRESS).unwrap();
-    static ref BOOT_MAINNET_PRINCIPAL: StandardPrincipalData =
-        PrincipalData::parse_standard_principal(BOOT_MAINNET_ADDRESS).unwrap();
-    pub static ref BOOT_CONTRACTS_DATA: BTreeMap<QualifiedContractIdentifier, (ClarityContract, ContractAST)> = {
-        let mut result = BTreeMap::new();
-        let deploy: [(&StandardPrincipalData, [(&str, &str); 13]); 2] = [
-            (&*BOOT_TESTNET_PRINCIPAL, *STACKS_BOOT_CODE_TESTNET),
-            (&*BOOT_MAINNET_PRINCIPAL, *STACKS_BOOT_CODE_MAINNET),
-        ];
-
-        let interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
-        for (deployer, boot_code) in deploy.iter() {
-            for (name, code) in boot_code.iter() {
-                let (epoch, clarity_version) = match *name {
-                    "pox-4" | "signers" | "signers-voting" => {
-                        (StacksEpochId::Epoch25, ClarityVersion::Clarity2)
-                    }
-                    "pox-3" => (StacksEpochId::Epoch24, ClarityVersion::Clarity2),
-                    "pox-2" | "costs-3" => (StacksEpochId::Epoch21, ClarityVersion::Clarity2),
-                    "cost-2" => (StacksEpochId::Epoch2_05, ClarityVersion::Clarity1),
-                    _ => (StacksEpochId::Epoch20, ClarityVersion::Clarity1),
-                };
-
-                let boot_contract = ClarityContract {
-                    code_source: ClarityCodeSource::ContractInMemory(code.to_string()),
-                    deployer: ContractDeployer::Address(deployer.to_address()),
-                    name: name.to_string(),
-                    epoch,
-                    clarity_version,
-                };
-                let (ast, _, _) = interpreter.build_ast(&boot_contract);
-                result.insert(
-                    boot_contract.expect_resolved_contract_identifier(None),
-                    (boot_contract, ast),
-                );
-            }
-        }
-        result
-    };
-}
 
 #[derive(Clone, Debug, Serialize)]
 pub struct CostsReport {
@@ -169,9 +116,9 @@ impl Session {
 
     fn deploy_boot_contracts(&mut self, mainnet: bool) {
         let boot_code = if mainnet {
-            *STACKS_BOOT_CODE_MAINNET
+            *BOOT_CODE_MAINNET
         } else {
-            *STACKS_BOOT_CODE_TESTNET
+            *BOOT_CODE_TESTNET
         };
 
         let tx_sender = self.interpreter.get_tx_sender();
@@ -1144,6 +1091,8 @@ impl Session {
 
     #[cfg(feature = "cli")]
     pub fn get_contracts(&self) -> Option<String> {
+        use super::boot::{BOOT_MAINNET_ADDRESS, BOOT_TESTNET_ADDRESS};
+
         if self.contracts.is_empty() {
             return None;
         }
@@ -1346,7 +1295,11 @@ mod tests {
 
     use super::*;
     use crate::{
-        repl::{settings::Account, DEFAULT_EPOCH},
+        repl::{
+            boot::{BOOT_MAINNET_ADDRESS, BOOT_TESTNET_ADDRESS},
+            settings::Account,
+            DEFAULT_EPOCH,
+        },
         test_fixtures::clarity_contract::ClarityContractBuilder,
     };
 

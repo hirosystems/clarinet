@@ -25,7 +25,6 @@ categories = [
 ansi_term = "0.12.1" # to be replaced with colored in the future
 chrono = "0.4.31"
 colored = { workspace = true }
-lazy_static = { workspace = true }
 regex = "1.7"
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1.0.47", features = ["unbounded_depth"] }

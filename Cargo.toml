@@ -22,7 +22,6 @@ version = "2.13.0"
 
 [workspace.dependencies]
 clarity = { git = "https://github.com/stacks-network/stacks-core.git", branch="feat/clarity-wasm-develop", package = "clarity", default-features = false }
-lazy_static = { version = "1.5.0" }
 reqwest = { version = "0.12", default-features = false, features = [
     "json",
     "rustls-tls",

@@ -1192,11 +1192,9 @@ impl ClarityInterpreter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::analysis::Settings as AnalysisSettings;
     use crate::repl::settings::RemoteDataSettings;
-    use crate::{
-        repl::session::BOOT_CONTRACTS_DATA, test_fixtures::clarity_contract::ClarityContractBuilder,
-    };
+    use crate::test_fixtures::clarity_contract::ClarityContractBuilder;
+    use crate::{analysis::Settings as AnalysisSettings, repl::boot::BOOT_CONTRACTS_DATA};
     use clarity::{
         types::{chainstate::StacksAddress, Address},
         vm::{self, types::TupleData, ClarityVersion},
