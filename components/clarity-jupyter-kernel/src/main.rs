@@ -8,8 +8,6 @@
 // todo(ludo): would love to eliminate these directives at some point.
 
 #[macro_use]
-extern crate lazy_static;
-#[macro_use]
 extern crate json;
 #[macro_use]
 extern crate failure;

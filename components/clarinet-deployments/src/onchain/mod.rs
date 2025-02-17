@@ -12,7 +12,7 @@ use clarity_repl::clarity::vm::types::{
 };
 use clarity_repl::clarity::vm::{ClarityName, Value};
 use clarity_repl::clarity::{ClarityVersion, ContractName, EvaluationResult};
-use clarity_repl::repl::session::{
+use clarity_repl::repl::boot::{
     BOOT_MAINNET_ADDRESS, BOOT_TESTNET_ADDRESS, V1_BOOT_CONTRACTS, V2_BOOT_CONTRACTS,
     V3_BOOT_CONTRACTS,
 };

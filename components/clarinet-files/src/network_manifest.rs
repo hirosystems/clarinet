@@ -1,11 +1,11 @@
 use std::collections::BTreeMap;
+use std::sync::LazyLock;
 
 use clarinet_utils::{get_bip32_keys_from_mnemonic, mnemonic_from_phrase, random_mnemonic};
 use clarity::address::AddressHashMode;
 use clarity::types::chainstate::{StacksAddress, StacksPrivateKey};
 use clarity::util::{hash::bytes_to_hex, secp256k1::Secp256k1PublicKey};
 use clarity::vm::types::QualifiedContractIdentifier;
-use lazy_static::lazy_static;
 use libsecp256k1::PublicKey;
 use serde::Serialize;
 use toml::value::Value;
@@ -55,12 +55,12 @@ pub const DEFAULT_POX_PREPARE_LENGTH: u64 = 4;
 pub const DEFAULT_POX_REWARD_LENGTH: u64 = 10;
 pub const DEFAULT_FIRST_BURN_HEADER_HEIGHT: u64 = 100;
 
-lazy_static! {
-    pub static ref DEFAULT_PRIVATE_KEYS: [StacksPrivateKey; 1] = [StacksPrivateKey::from_hex(
+pub static DEFAULT_PRIVATE_KEYS: LazyLock<[StacksPrivateKey; 1]> = LazyLock::new(|| {
+    [StacksPrivateKey::from_hex(
         "7287ba251d44a4d3fd9276c88ce34c5c52a038955511cccaf77e61068649c17801",
     )
-    .unwrap()];
-}
+    .unwrap()]
+});
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]

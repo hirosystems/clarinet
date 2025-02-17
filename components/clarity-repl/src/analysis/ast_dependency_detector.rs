@@ -16,12 +16,11 @@ use clarity::vm::{ClarityName, ClarityVersion, SymbolicExpressionType};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::iter::FromIterator;
 use std::ops::{Deref, DerefMut};
+use std::sync::LazyLock;
 
 use super::ast_visitor::TypedVar;
 
-lazy_static! {
-    pub static ref DEFAULT_NAME: ClarityName = ClarityName::from("placeholder");
-}
+pub static DEFAULT_NAME: LazyLock<ClarityName> = LazyLock::new(|| ClarityName::from("placeholder"));
 
 pub struct ASTDependencyDetector<'a> {
     dependencies: BTreeMap<QualifiedContractIdentifier, DependencySet>,

@@ -6,8 +6,6 @@ extern crate serde_json;
 #[macro_use]
 extern crate hiro_system_kit;
 
-extern crate lazy_static;
-
 pub extern crate clarity_repl;
 
 pub mod deployments;

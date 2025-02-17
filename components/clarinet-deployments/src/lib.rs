@@ -1,5 +1,6 @@
 use clarity_repl::clarity::vm::SymbolicExpression;
 use clarity_repl::clarity::StacksEpochId;
+use clarity_repl::repl::boot::BOOT_CONTRACTS_DATA;
 use clarity_repl::repl::{ClarityCodeSource, ClarityContract, ContractDeployer};
 use clarity_repl::repl::{DEFAULT_CLARITY_VERSION, DEFAULT_EPOCH};
 
@@ -32,7 +33,6 @@ use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
 use clarity_repl::clarity::vm::ContractName;
 use clarity_repl::clarity::vm::EvaluationResult;
 use clarity_repl::clarity::vm::ExecutionResult;
-use clarity_repl::repl::session::BOOT_CONTRACTS_DATA;
 use clarity_repl::repl::Session;
 use clarity_repl::repl::SessionSettings;
 use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
