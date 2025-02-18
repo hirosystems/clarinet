@@ -37,6 +37,7 @@ clarity-repl = { package = "clarity-repl", path = "../clarity-repl", features = 
 ] }
 clarinet-files = { path = "../clarinet-files", features = ["cli"] }
 clarity-lsp = { path = "../clarity-lsp", features = ["cli"] }
+clarinet-format = { path = "../clarinet-format" }
 clarinet-deployments = { path = "../clarinet-deployments", features = ["cli"] }
 hiro-system-kit = { path = "../hiro-system-kit" }
 stacks-network = { path = "../stacks-network" }
