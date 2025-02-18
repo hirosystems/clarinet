@@ -1,3 +1,19 @@
+# [2.14.0](https://github.com/hirosystems/clarinet/compare/v2.13.0...v2.14.0) (2025-02-18)
+
+##### New Features
+
+*  Clarinet format (#1609) (4ef87d45)
+
+##### Continuous Integration
+
+*  Run sdk tests in node 20 and 22 (#1678) (1d8ab5d1)
+
+##### Refactors
+
+*  Use colored (#1680) (8f022371)
+*  Remove lazy-static (#1679) (e31bb109)
+*  Remove sync-request from sdk (#1675) (f76c7c30)
+
 # [2.13.0](https://github.com/hirosystems/clarinet/compare/v2.12.0...v2.13.0) (2025-02-11)
 
 ##### New Features
@@ -543,7 +559,7 @@ While this is unlikely to be a breaking change in most places, any code that rel
 
 ### Bug Fixes
 
-*  `clarinet test` returns status code 1 when failing 
+*  `clarinet test` returns status code 1 when failing
 
 # [1.1.0]() (2022-11-17)
 
