@@ -2,7 +2,6 @@
 
 set -e
 
-
 if [ $# -ne 1 ]; then
     echo "Usage: $0 <new-version>"
     echo "Example: $0 1.2.3"
@@ -11,6 +10,12 @@ fi
 
 NEW_VERSION=$1
 ROOT_DIR=$(pwd)
+
+get_package_version() {
+    local file=$1
+    local version=$(grep '"version":' "$file" | cut -d'"' -f4)
+    echo "$version"
+}
 
 # Function to update version in package.json
 update_package_json() {
@@ -69,13 +74,15 @@ update_package_json "package.json" "$NEW_VERSION"
 npm i
 cd "$ROOT_DIR"
 
-# XXX This will only work if we sync the versions. Currently it's different
-# Update clarity-vscode
-# echo "Updating clarity-vscode..."
-# cd components/clarity-vscode
-# update_package_json "package.json" "$NEW_VERSION"
-# npm i
-# cd "$ROOT_DIR"
+# Handle clarity-vscode version separately
+echo "Updating clarity-vscode..."
+cd components/clarity-vscode
+CURRENT_VERSION=$(get_package_version "package.json")
+echo "The current version is $CURRENT_VERSION"
+read -p "What would you like to update it to? " VSCODE_VERSION
+update_package_json "package.json" "$VSCODE_VERSION"
+npm i
+cd "$ROOT_DIR"
 
 echo "All updates completed successfully!"
 
