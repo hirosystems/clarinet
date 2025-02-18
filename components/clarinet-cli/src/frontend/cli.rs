@@ -1225,6 +1225,10 @@ pub fn main() {
             }
         },
         Command::Formatter(cmd) => {
+            eprintln!(
+                "{}",
+                format_warn!("This command is in beta. Feedback is welcome!"),
+            );
             let sources = get_sources_to_format(cmd.manifest_path, cmd.file);
             let mut settings = formatter::Settings::default();
 

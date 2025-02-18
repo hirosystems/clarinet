@@ -809,6 +809,7 @@ impl<'a> Aggregator<'a> {
         let indentation = self.settings.indentation.to_string();
         let base_indent = format!("{}{}", previous_indentation, indentation);
 
+        // TODO: this should ignore comment length
         for expr in list.iter() {
             let indented = if first_on_line {
                 &base_indent
@@ -833,6 +834,7 @@ impl<'a> Aggregator<'a> {
             }
 
             if broken_up {
+                // reformat with increased indent in the case we broke up the code on max width
                 let formatted = self.format_source_exprs(&[expr.clone()], &base_indent);
                 let trimmed = t(&formatted);
                 result.push_str(trimmed);
