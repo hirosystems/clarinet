@@ -29,7 +29,13 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             target/
-          key: ${{ runner.os }}-cargo-audit-${{ env.RUST_VERSION_HASH }}-${{ hashFiles('./Cargo.lock') }}
+            ~/.cargo/config
+            Cargo.lock
+          key: ${{ runner.os }}-cargo-audit-${{ env.RUST_VERSION_HASH }}-${{ hashFiles('**/Cargo.lock') }}-${{ hashFiles('**/*.rs') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-audit-${{ env.RUST_VERSION_HASH }}-
+            ${{ runner.os }}-cargo-audit-
+            ${{ runner.os }}-
 
       - name: Run audit
         run: |
