@@ -17,21 +17,14 @@ on:
 
   workflow_dispatch:
 
-jobs:
-  pre_run:
-    name: Cancel previous runs
-    runs-on: ubuntu-latest
-    steps:
-      - name: Cancel Previous Runs
-        uses: styfle/cancel-workflow-action@ad6cb1b847ffb509a69b745b6ee2f1d14dfe14b8
-        with:
-          access_token: ${{ github.token }}
-          persist-credentials: false
+concurrency:
+  group: "${{ github.workflow }} @ ${{ github.event.pull_request.head.label || github.head_ref || github.ref }}"
+  cancel-in-progress: true
 
+jobs:
   get_release_info:
     name: Get Release Info
     runs-on: ubuntu-latest
-    needs: pre_run
     outputs:
       tag: ${{ steps.new_release_tag.outputs.TAG }}
     steps:
@@ -97,7 +90,6 @@ jobs:
   dist_clarinet:
     name: Build Clarinet Distributions
     runs-on: ${{ matrix.os }}
-    needs: pre_run
 
     strategy:
       fail-fast: false
@@ -293,7 +285,6 @@ jobs:
     name: Build Stacks Devnet JS Distributions
     runs-on: ${{ matrix.os }}
     needs:
-      - pre_run
       - get_release_info
 
     strategy:
@@ -433,7 +424,6 @@ jobs:
   dist_clarity_repl:
     name: Build Clarity REPL Distribution
     runs-on: ubuntu-latest
-    needs: pre_run
     defaults:
       run:
         working-directory: components/clarity-repl
@@ -475,7 +465,7 @@ jobs:
 
       - name: Publish clarity-repl to crates.io
         if: startsWith(github.ref, 'refs/heads/main') && needs.get_release_info.outputs.tag != ''
-        run: 4
+        run: |
           cargo login ${{ secrets.CARGO_CRATES_IO_API_KEY }}
           cargo publish
 
