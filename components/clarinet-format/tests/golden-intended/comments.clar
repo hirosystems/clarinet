@@ -11,16 +11,15 @@
 )
 
 ;; top comment
-;; @ignore-formatting
-(define-constant something
-  (+ 1 1)
-)
+;; @format-ignore
+(define-constant something (list
+   1     2  3 ;; comment
+   4 5 ))
 (define-read-only (something-else)
   (begin
     (+ 1 1)
     (ok true)
   )
-
 )
 
 (define-public (something-else
@@ -30,5 +29,4 @@
     (+ 1 1)
     (ok true)
   )
-
 )

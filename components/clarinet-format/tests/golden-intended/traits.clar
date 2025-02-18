@@ -6,5 +6,4 @@
   (begin
     (ok (contract-of contract)) ;; returns the principal of the contract implementing <token-a-trait>
   )
-
 )

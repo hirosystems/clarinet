@@ -9,9 +9,8 @@
         recipient: principal,
         burn-hash: (buff 32),
         burn-height: uint,
-        sweep-txid: (buff 32)
-      }
-    )
+        sweep-txid: (buff 32),
+      })
     (helper-response (response uint uint))
   )
   (match helper-response
@@ -25,11 +24,9 @@
             (get sweep-txid deposit)
           )
           (err (+ ERR_DEPOSIT_INDEX_PREFIX (+ u10 index)))
-        )
-      )
+        ))
       (ok (+ index u1))
     )
-
     err-response
     (err err-response) ;; something
   )

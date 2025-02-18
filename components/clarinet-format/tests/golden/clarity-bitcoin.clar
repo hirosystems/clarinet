@@ -1,4 +1,4 @@
-;; max_line_length: 80, indentation: tab
+;; max_line_length: 80, indentation: 2
 ;; source: https://github.com/hirosystems/clarity-examples/blob/main/examples/clarity-bitcoin/contracts/clarity-bitcoin.clar
 
 ;; @contract stateless contract to verify bitcoin transaction

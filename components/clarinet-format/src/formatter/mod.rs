@@ -401,12 +401,12 @@ impl<'a> Aggregator<'a> {
                     PreSymbolicExpressionType::Tuple(list) => acc.push_str(&format!(
                         "\n{}{}",
                         space,
-                        self.format_key_value_sugar(&list.to_vec(), indentation)
+                        self.format_key_value_sugar(&list.to_vec(), &space)
                     )),
                     _ => acc.push_str(&format!(
                         "\n{}{}",
                         space,
-                        self.format_source_exprs(&[arg.clone()], indentation)
+                        self.format_source_exprs(&[arg.clone()], &space)
                     )),
                 }
             }
@@ -450,7 +450,7 @@ impl<'a> Aggregator<'a> {
         exprs: &[PreSymbolicExpression],
         previous_indentation: &str,
     ) -> String {
-        let func_type = self.display_pse(exprs.first().unwrap(), "");
+        let func_type = self.display_pse(exprs.first().unwrap(), previous_indentation);
         let mut acc = format!("({func_type}");
         let indentation = &self.settings.indentation.to_string();
         let space = format!("{}{}", previous_indentation, indentation);
@@ -463,7 +463,7 @@ impl<'a> Aggregator<'a> {
                 acc.push_str(&format!(
                     "\n{}{}",
                     space,
-                    self.format_source_exprs(&[expr.clone()], previous_indentation)
+                    self.format_source_exprs(&[expr.clone()], &space)
                 ));
                 if let Some(comment) = trailing {
                     acc.push(' ');
@@ -492,7 +492,7 @@ impl<'a> Aggregator<'a> {
 
     fn format_if(&self, exprs: &[PreSymbolicExpression], previous_indentation: &str) -> String {
         let opening = exprs.first().unwrap();
-        let func_type = self.display_pse(opening, "");
+        let func_type = self.display_pse(opening, previous_indentation);
         let indentation = &self.settings.indentation.to_string();
         let space = format!("{}{}", indentation, previous_indentation);
 
@@ -509,7 +509,7 @@ impl<'a> Aggregator<'a> {
             acc.push_str(&self.format_source_exprs(&[expr.clone()], &space));
             if let Some(comment) = trailing {
                 acc.push(' ');
-                acc.push_str(&self.display_pse(comment, ""));
+                acc.push_str(&self.display_pse(comment, previous_indentation));
             }
             index += 1;
         }
@@ -622,8 +622,8 @@ impl<'a> Aggregator<'a> {
                 let trailing = get_trailing_comment(value, &mut iter);
                 // Pass the current indentation level to nested formatting
                 let key_str = self.format_source_exprs(&[key.clone()], &space);
-                let value_str = self.format_source_exprs(&[value.clone()], indentation);
-                acc.push_str(&format!("{}{}: {},", indentation, key_str, value_str));
+                let value_str = self.format_source_exprs(&[value.clone()], &space);
+                acc.push_str(&format!("{}{}: {},", space, key_str, value_str));
 
                 if let Some(comment) = trailing {
                     acc.push(' ');
@@ -640,7 +640,9 @@ impl<'a> Aggregator<'a> {
             ));
         }
 
-        acc.push_str(previous_indentation);
+        if over_2_kvs {
+            acc.push_str(previous_indentation);
+        }
         acc.push('}');
         acc
     }
@@ -662,48 +664,46 @@ impl<'a> Aggregator<'a> {
 
         // for cases where we keep it on the same line with 1 k/v pair
         let multiline = exprs.len() > 1;
-        let pre = if multiline {
-            format!("\n{}", space)
-        } else {
-            " ".to_string()
-        };
+        if multiline {
+            acc.push('\n');
+            let mut iter = exprs.iter().peekable();
+            while let Some(arg) = iter.next() {
+                let trailing = get_trailing_comment(arg, &mut iter);
+                let (key, value) = arg
+                    .match_list()
+                    .and_then(|list| list.split_first())
+                    .unwrap();
+                let fkey = self.display_pse(key, previous_indentation);
 
-        let mut index = 0;
-        let mut iter = exprs.iter().peekable();
-        while let Some(arg) = iter.next() {
-            let trailing = get_trailing_comment(arg, &mut iter);
-            let (key, value) = arg
+                acc.push_str(&format!(
+                    "{space}{fkey}: {},",
+                    self.format_source_exprs(value, previous_indentation)
+                ));
+                if let Some(comment) = trailing {
+                    acc.push(' ');
+                    acc.push_str(&self.display_pse(comment, previous_indentation));
+                }
+                acc.push('\n');
+            }
+            acc.push_str(previous_indentation);
+        } else {
+            // for cases where we keep it on the same line with 1 k/v pair
+            let (key, value) = exprs[0]
                 .match_list()
                 .and_then(|list| list.split_first())
                 .unwrap();
             let fkey = self.display_pse(key, previous_indentation);
-            let ending = if multiline {
-                if index < without_comments_len(exprs) - 1 {
-                    ","
-                } else {
-                    "\n"
-                }
-            } else {
-                " "
-            };
-
             acc.push_str(&format!(
-                "{pre}{fkey}: {}{ending}",
+                " {fkey}: {} ",
                 self.format_source_exprs(value, previous_indentation)
             ));
-            if let Some(comment) = trailing {
-                acc.push(' ');
-                acc.push_str(&self.display_pse(comment, previous_indentation));
-            }
-            index += 1;
         }
-        acc.push_str(previous_indentation);
+
         acc.push('}');
         acc
     }
 
-    // This should panic on most things besides atoms and values. Added this to help
-    // debugging in the meantime
+    // This prints leaves of the PSE tree
     fn display_pse(&self, pse: &PreSymbolicExpression, previous_indentation: &str) -> String {
         match pse.pre_expr {
             PreSymbolicExpressionType::Atom(ref value) => t(value.as_str()).to_string(),
