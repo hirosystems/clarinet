@@ -145,8 +145,110 @@ impl<'a> Aggregator<'a> {
                             NativeFunctions::And | NativeFunctions::Or => {
                                 self.format_booleans(list, previous_indentation)
                             }
-                            // This would ideally not be wildcarded, but the list of "everything else" is huge
-                            _ => {
+                            // everything else that's not special cased
+                            NativeFunctions::Add
+                            | NativeFunctions::Subtract
+                            | NativeFunctions::Multiply
+                            | NativeFunctions::Divide
+                            | NativeFunctions::CmpGeq
+                            | NativeFunctions::CmpLeq
+                            | NativeFunctions::CmpLess
+                            | NativeFunctions::CmpGreater
+                            | NativeFunctions::ToInt
+                            | NativeFunctions::ToUInt
+                            | NativeFunctions::Modulo
+                            | NativeFunctions::Power
+                            | NativeFunctions::Sqrti
+                            | NativeFunctions::Log2
+                            | NativeFunctions::BitwiseXor
+                            | NativeFunctions::Not
+                            | NativeFunctions::Equals
+                            | NativeFunctions::Map
+                            | NativeFunctions::Fold
+                            | NativeFunctions::Append
+                            | NativeFunctions::Concat
+                            | NativeFunctions::AsMaxLen
+                            | NativeFunctions::Len
+                            | NativeFunctions::ElementAt
+                            | NativeFunctions::ElementAtAlias
+                            | NativeFunctions::IndexOf
+                            | NativeFunctions::IndexOfAlias
+                            | NativeFunctions::BuffToIntLe
+                            | NativeFunctions::BuffToUIntLe
+                            | NativeFunctions::BuffToIntBe
+                            | NativeFunctions::BuffToUIntBe
+                            | NativeFunctions::IsStandard
+                            | NativeFunctions::PrincipalDestruct
+                            | NativeFunctions::PrincipalConstruct
+                            | NativeFunctions::StringToInt
+                            | NativeFunctions::StringToUInt
+                            | NativeFunctions::IntToAscii
+                            | NativeFunctions::IntToUtf8
+                            | NativeFunctions::ListCons
+                            | NativeFunctions::FetchVar
+                            | NativeFunctions::SetVar
+                            | NativeFunctions::FetchEntry
+                            | NativeFunctions::SetEntry
+                            | NativeFunctions::InsertEntry
+                            | NativeFunctions::DeleteEntry
+                            | NativeFunctions::TupleGet
+                            | NativeFunctions::TupleMerge
+                            | NativeFunctions::Hash160
+                            | NativeFunctions::Sha256
+                            | NativeFunctions::Sha512
+                            | NativeFunctions::Sha512Trunc256
+                            | NativeFunctions::Keccak256
+                            | NativeFunctions::Secp256k1Recover
+                            | NativeFunctions::Secp256k1Verify
+                            | NativeFunctions::Print
+                            | NativeFunctions::ContractCall
+                            | NativeFunctions::AsContract
+                            | NativeFunctions::ContractOf
+                            | NativeFunctions::PrincipalOf
+                            | NativeFunctions::AtBlock
+                            | NativeFunctions::GetBlockInfo
+                            | NativeFunctions::GetBurnBlockInfo
+                            | NativeFunctions::ConsError
+                            | NativeFunctions::ConsOkay
+                            | NativeFunctions::ConsSome
+                            | NativeFunctions::DefaultTo
+                            | NativeFunctions::Asserts
+                            | NativeFunctions::UnwrapRet
+                            | NativeFunctions::UnwrapErrRet
+                            | NativeFunctions::Unwrap
+                            | NativeFunctions::UnwrapErr
+                            | NativeFunctions::TryRet
+                            | NativeFunctions::IsOkay
+                            | NativeFunctions::IsNone
+                            | NativeFunctions::IsErr
+                            | NativeFunctions::IsSome
+                            | NativeFunctions::Filter
+                            | NativeFunctions::GetTokenBalance
+                            | NativeFunctions::GetAssetOwner
+                            | NativeFunctions::TransferToken
+                            | NativeFunctions::TransferAsset
+                            | NativeFunctions::MintAsset
+                            | NativeFunctions::MintToken
+                            | NativeFunctions::GetTokenSupply
+                            | NativeFunctions::BurnToken
+                            | NativeFunctions::BurnAsset
+                            | NativeFunctions::GetStxBalance
+                            | NativeFunctions::StxTransfer
+                            | NativeFunctions::StxTransferMemo
+                            | NativeFunctions::StxBurn
+                            | NativeFunctions::StxGetAccount
+                            | NativeFunctions::BitwiseAnd
+                            | NativeFunctions::BitwiseOr
+                            | NativeFunctions::BitwiseNot
+                            | NativeFunctions::BitwiseLShift
+                            | NativeFunctions::BitwiseRShift
+                            | NativeFunctions::BitwiseXor2
+                            | NativeFunctions::Slice
+                            | NativeFunctions::ToConsensusBuff
+                            | NativeFunctions::FromConsensusBuff
+                            | NativeFunctions::ReplaceAt
+                            | NativeFunctions::GetStacksBlockInfo
+                            | NativeFunctions::GetTenureInfo => {
                                 let inner_content =
                                     self.to_inner_content(list, previous_indentation);
 
@@ -174,10 +276,10 @@ impl<'a> Aggregator<'a> {
                         match define {
                             DefineFunctions::PublicFunction
                             | DefineFunctions::ReadOnlyFunction
-                            | DefineFunctions::PrivateFunction => self.format_function(list),
+                            | DefineFunctions::PrivateFunction => self.function(list),
                             DefineFunctions::Constant
                             | DefineFunctions::PersistedVariable
-                            | DefineFunctions::NonFungibleToken => self.format_constant(list),
+                            | DefineFunctions::NonFungibleToken => self.constant(list),
                             DefineFunctions::Map => self.format_map(list, previous_indentation),
                             DefineFunctions::UseTrait | DefineFunctions::ImplTrait => {
                                 // these are the same as the following but need a trailing newline
@@ -187,11 +289,9 @@ impl<'a> Aggregator<'a> {
                                 )
                             }
                             DefineFunctions::FungibleToken => {
-                                self.format_fungible_token(list, previous_indentation)
+                                self.fungible_token(list, previous_indentation)
                             }
-                            DefineFunctions::Trait => {
-                                self.format_source_exprs(&[expr.clone()], previous_indentation)
-                            }
+                            DefineFunctions::Trait => self.define_trait(list, previous_indentation),
                         }
                     } else {
                         self.to_inner_content(list, previous_indentation)
@@ -216,7 +316,25 @@ impl<'a> Aggregator<'a> {
         result
     }
 
-    fn format_fungible_token(
+    fn define_trait(&self, exprs: &[PreSymbolicExpression], previous_indentation: &str) -> String {
+        let mut acc = "(define-trait ".to_string();
+        let indentation = &self.settings.indentation.to_string();
+        acc.push_str(&self.format_source_exprs(&[exprs[1].clone()], previous_indentation));
+        let mut iter = exprs[2..].iter().peekable();
+        while let Some(expr) = iter.next() {
+            let trailing = get_trailing_comment(expr, &mut iter);
+            acc.push('\n');
+            acc.push_str(indentation);
+            acc.push_str(&self.format_source_exprs(&[expr.clone()], indentation));
+            if let Some(comment) = trailing {
+                acc.push(' ');
+                acc.push_str(&self.display_pse(comment, previous_indentation));
+            }
+        }
+        acc
+    }
+
+    fn fungible_token(
         &self,
         exprs: &[PreSymbolicExpression],
         previous_indentation: &str,
@@ -237,7 +355,7 @@ impl<'a> Aggregator<'a> {
         acc.push(')');
         acc
     }
-    fn format_constant(&self, exprs: &[PreSymbolicExpression]) -> String {
+    fn constant(&self, exprs: &[PreSymbolicExpression]) -> String {
         let func_type = self.display_pse(exprs.first().unwrap(), "");
         let indentation = &self.settings.indentation.to_string();
         let mut acc = format!("({func_type} ");
@@ -274,7 +392,7 @@ impl<'a> Aggregator<'a> {
         let space = format!("{}{}", previous_indentation, indentation);
 
         if let Some((name, args)) = name_and_args(exprs) {
-            acc.push_str(&self.display_pse(name, ""));
+            acc.push_str(&self.display_pse(name, previous_indentation));
 
             for arg in args.iter() {
                 match &arg.pre_expr {
@@ -624,7 +742,7 @@ impl<'a> Aggregator<'a> {
     // Top level define-<function> should have a line break above and after (except on first line)
     // options always on new lines
     // Functions Always on multiple lines, even if short
-    fn format_function(&self, exprs: &[PreSymbolicExpression]) -> String {
+    fn function(&self, exprs: &[PreSymbolicExpression]) -> String {
         let func_type = self.display_pse(exprs.first().unwrap(), "");
         let indentation = &self.settings.indentation.to_string();
         let args_indent = format!("{}{}", indentation, indentation);
@@ -687,10 +805,17 @@ impl<'a> Aggregator<'a> {
         let mut result = String::new();
         let mut current_line_width = previous_indentation.len();
         let mut first_on_line = true;
-        let base_indent = format!("{}{}", previous_indentation, self.settings.indentation);
+        let mut broken_up = false;
+        let indentation = self.settings.indentation.to_string();
+        let base_indent = format!("{}{}", previous_indentation, indentation);
 
         for expr in list.iter() {
-            let formatted = self.format_source_exprs(&[expr.clone()], &base_indent);
+            let indented = if first_on_line {
+                &base_indent
+            } else {
+                previous_indentation
+            };
+            let formatted = self.format_source_exprs(&[expr.clone()], indented);
             let trimmed = t(&formatted);
             let expr_width = trimmed.len();
 
@@ -699,33 +824,42 @@ impl<'a> Aggregator<'a> {
                 if current_line_width + expr_width + 1 > self.settings.max_line_length {
                     result.push('\n');
                     result.push_str(&base_indent);
-                    current_line_width =
-                        base_indent.len() + self.settings.indentation.to_string().len();
+                    current_line_width = base_indent.len() + indentation.len();
+                    broken_up = true;
                 } else {
                     result.push(' ');
                     current_line_width += 1;
                 }
             }
 
-            result.push_str(trimmed);
+            if broken_up {
+                let formatted = self.format_source_exprs(&[expr.clone()], &base_indent);
+                let trimmed = t(&formatted);
+                result.push_str(trimmed);
+            } else {
+                result.push_str(trimmed);
+            }
 
             current_line_width += expr_width;
             first_on_line = false;
+            broken_up = false;
         }
 
-        let multi_line = result.contains('\n');
-        let b = format!("\n{})", previous_indentation);
-        format!("({}{}", result, if multi_line { &b } else { ")" })
-        // if multi_line {
-        //     // Check if last character is closing brace
-        //     if result.trim_end().ends_with('}') {
-        //         format!("({})", result)
-        //     } else {
-        //         format!("({}\n{})", result, previous_indentation)
-        //     }
-        // } else {
-        //     format!("({})", result)
-        // }
+        let break_lines = result.contains('\n') && {
+            let lines: Vec<_> = result.lines().collect();
+            if let Some(last_line) = lines.last() {
+                if last_line.trim() == ")" || last_line.trim() == "}" {
+                    // Don't add a newline if we're already looking at a closing paren/bracket
+                    false
+                } else {
+                    true
+                }
+            } else {
+                true
+            }
+        };
+        let newlined = format!("\n{})", previous_indentation);
+        format!("({}{}", result, if break_lines { &newlined } else { ")" })
     }
 }
 
@@ -860,7 +994,7 @@ mod tests_formatter {
         let result = format_with_default(&String::from("(tuple (n1 1))"));
         assert_eq!(result, "{ n1: 1 }");
         let result = format_with_default(&String::from("(tuple (n1 1) (n2 2))"));
-        assert_eq!(result, "{\n  n1: 1,\n  n2: 2\n}");
+        assert_eq!(result, "{\n  n1: 1,\n  n2: 2,\n}");
     }
 
     #[test]
@@ -951,8 +1085,7 @@ mod tests_formatter {
       (get burn-height deposit) (get sweep-txid deposit)
     )
     (err (+ ERR_DEPOSIT_INDEX_PREFIX (+ u10 index)))
-  )
-)"#;
+  ))"#;
         assert_eq!(expected, result);
 
         // non-max-length sanity case
@@ -968,10 +1101,15 @@ mod tests_formatter {
         assert_eq!(result, "(define-map a\n  uint\n  { n1: (buff 20) }\n)\n");
         let src = "(define-map something { name: (buff 48), a: uint } uint)";
         let result = format_with_default(&String::from(src));
-        assert_eq!(
-            result,
-            "(define-map something\n  {\n    name: (buff 48),\n    a: uint,\n  }\n  uint\n)\n"
-        );
+        let expected = r#"(define-map something
+  {
+    name: (buff 48),
+    a: uint,
+  }
+  uint
+)
+"#;
+        assert_eq!(result, expected);
     }
 
     #[test]
@@ -1029,6 +1167,16 @@ mod tests_formatter {
   },
 })"#;
         std::assert_eq!(expected, result);
+        let src = r#"(ok
+  {
+    varslice: (unwrap! (slice? txbuff slice-start target-index) (err ERR-OUT-OF-BOUNDS)),
+    ctx: {
+      txbuff: tx,
+      index: (+ u1 ptr),
+    },
+  })"#;
+        let result = format_with_default(src);
+        assert_eq!(src, result);
     }
 
     #[test]
@@ -1042,7 +1190,7 @@ mod tests_formatter {
         let expected = r#"{
   a: uint,
   b: uint, ;; comment
-  c: bool
+  c: bool,
 }"#;
         assert_eq!(result, expected);
     }
@@ -1178,10 +1326,9 @@ mod tests_formatter {
         let src = "(something (if (true) (list) (list 1 2 3)))";
         let result = format_with_default(src);
         let expected = r#"(something (if (true)
-    (list)
-    (list 1 2 3)
-  )
-)"#;
+  (list)
+  (list 1 2 3)
+))"#;
         assert_eq!(expected, result);
     }
 
@@ -1201,8 +1348,8 @@ mod tests_formatter {
         let src = r#"(if (true)
   (let (
     (a (if (true)
-        (list)
-        (list)
+      (list)
+      (list)
     ))
   )
     (list)
@@ -1210,9 +1357,21 @@ mod tests_formatter {
   (list)
 )"#;
         let result = format_with_default(src);
-        assert_eq!(src, result);
+        std::assert_eq!(src, result);
     }
 
+    #[test]
+    #[ignore]
+    fn define_trait_test() {
+        // TODO: Not sure how this should be formatted
+        let src = r#"(define-trait token-trait
+  ((transfer? (principal principal uint) (response uint uint))
+    (get-balance (principal) (response uint uint))
+  )
+)"#;
+        let result = format_with_default(src);
+        assert_eq!(src, result);
+    }
     #[test]
     fn unwrap_wrapped_lines() {
         let src = r#"(new-available-ids
@@ -1221,8 +1380,7 @@ mod tests_formatter {
     (unwrap-panic
       (as-max-len? (concat (var-get available-ids) ids-to-treasury) u10000)
     )
-  )
-)"#;
+  ))"#;
         let result = format_with_default(src);
         assert_eq!(src, result);
     }
