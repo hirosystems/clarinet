@@ -37,10 +37,11 @@ jobs:
             ${{ runner.os }}-cargo-audit-
             ${{ runner.os }}-
 
+      - name: Install cargo-audit
+        run: cargo install cargo-audit || true
+
       - name: Run audit
-        run: |
-          cargo install cargo-audit || true
-          cargo audit --ignore RUSTSEC-2024-0344 --ignore RUSTSEC-2022-0028
+        run: cargo audit --ignore RUSTSEC-2024-0344 --ignore RUSTSEC-2022-0028
 
       - name: Run rustfmt
         run: cargo fmt --all -- --check

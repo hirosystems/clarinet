@@ -386,7 +386,7 @@ impl ClarityInterpreter {
             .as_ref()
             .is_some_and(|data| data.is_mainnet);
         let chain_id = if is_mainnet {
-            CHAIN_ID_MAINNET.clone()
+            CHAIN_ID_MAINNET
         } else {
             CHAIN_ID_TESTNET
         };
