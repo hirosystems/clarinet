@@ -71,7 +71,12 @@ jobs:
           path: |
             ~/.cargo/
             ./target/debug/build/
-          key: ${{ runner.os }}-rust-${{ env.RUST_VERSION_HASH }}-${{ hashFiles('./Cargo.lock') }}
+            ./target/debug/deps/
+            ./target/debug/.fingerprint/
+          key: ${{ runner.os }}-cargo-nextest-${{ env.RUST_VERSION_HASH }}-${{ hashFiles('./Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-nextest-${{ env.RUST_VERSION_HASH }}-
+            ${{ runner.os }}-cargo-nextest-
 
       - name: install dependencies
         uses: taiki-e/install-action@v2
@@ -141,7 +146,11 @@ jobs:
           path: |
             ~/.cargo/
             ./target/${{ matrix.target }}/release/
-          key: ${{ runner.os }}-rust-${{ env.RUST_VERSION_HASH }}-cargo-${{ hashFiles('./Cargo.lock') }}
+            ./target/${{ matrix.target }}/debug/
+          key: ${{ runner.os }}-cargo-build-${{ env.RUST_VERSION_HASH }}-${{ hashFiles('./Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-build-${{ env.RUST_VERSION_HASH }}-
+            ${{ runner.os }}-cargo-build-
 
       - name: Install wix (Windows)
         if: matrix.os == 'windows-latest' && steps.cache-cargo.outputs.cache-hit != 'true'
@@ -353,7 +362,12 @@ jobs:
           path: |
             ~/.cargo/
             ./target/${{ matrix.target }}/release/
-          key: ${{ runner.os }}-rust-${{ env.RUST_VERSION_HASH }}-cargo-${{ hashFiles('./Cargo.lock') }}
+            ./target/${{ matrix.target }}/debug/
+            ./target/${{ matrix.target }}/build/
+          key: ${{ runner.os }}-build-stacksdevnetjs-${{ env.RUST_VERSION_HASH }}-${{ hashFiles('./Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-build-stacksdevnetjs-${{ env.RUST_VERSION_HASH }}-
+            ${{ runner.os }}-build-stacksdevnetjs-
 
       # Set environment variables required from cross compiling from macos-x86_64 to macos-arm64
       - name: Configure macos-arm64 cross compile config
@@ -420,54 +434,6 @@ jobs:
           access: public
           greater-version-only: true
           token: ${{ secrets.NPM_TOKEN }}
-
-  dist_clarity_repl:
-    name: Build Clarity REPL Distribution
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: components/clarity-repl
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Install Rust toolchain
-        run: |
-          rustup toolchain install stable --profile minimal
-          echo "RUST_VERSION_HASH=$(rustc --version | sha256sum | awk '{print $1}')" >> $GITHUB_ENV
-
-      - name: Cache cargo
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/
-            ./target/x86_64-unknown-linux-gnu/release/
-          key: ${{ runner.os }}-rust-${{ env.RUST_VERSION_HASH }}-cargo-${{ hashFiles('./Cargo.lock') }}
-
-      - name: Configure artifact names
-        run: |
-          echo "SHORT_TARGET_NAME=linux-x64-glibc" >> $GITHUB_ENV
-          echo "PRE_GYP_TARGET_NAME=linux-x64-glibc" >> $GITHUB_ENV
-
-      - name: Build - Cargo
-        run: cargo build --release --locked --target x86_64-unknown-linux-gnu
-
-      - name: Compress cargo artifact
-        working-directory: "."
-        run: tar -C target/x86_64-unknown-linux-gnu/release -zcvf clarity-repl-${{ env.SHORT_TARGET_NAME }}.tar.gz clarity-repl
-
-      - name: Upload cargo artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: clarity-repl-${{ env.SHORT_TARGET_NAME }}
-          path: clarity-repl-${{ env.SHORT_TARGET_NAME }}.tar.gz
-
-      - name: Publish clarity-repl to crates.io
-        if: startsWith(github.ref, 'refs/heads/main') && needs.get_release_info.outputs.tag != ''
-        run: |
-          cargo login ${{ secrets.CARGO_CRATES_IO_API_KEY }}
-          cargo publish
 
   docker_images:
     name: Create ${{ matrix.name }} Docker Image
@@ -536,7 +502,6 @@ jobs:
       - get_release_info
       - test_coverage_cargo
       - dist_stacks_devnet_js
-      - dist_clarity_repl
       - docker_images
     permissions:
       actions: write
