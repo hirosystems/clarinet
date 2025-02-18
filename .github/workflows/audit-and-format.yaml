@@ -39,7 +39,9 @@ jobs:
 
       - name: Run audit
         run: |
-          cargo install cargo-audit
+          if ! cargo install --list | grep -q cargo-audit; then
+              cargo install cargo-audit
+          fi
           cargo audit --ignore RUSTSEC-2024-0344 --ignore RUSTSEC-2022-0028
 
       - name: Run rustfmt
