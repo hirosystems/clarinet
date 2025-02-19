@@ -5,7 +5,6 @@
   "rust-analyzer.check.workspace": false,
   "rust-analyzer.check.extraArgs": [
     "--workspace",
-    "--exclude=clarinet-sdk-wasm",
-    "--exclude=clarity-jupyter-kernel"
+    "--exclude=clarinet-sdk-wasm"
   ]
 }

@@ -1,0 +1,50 @@
+name: Audit, Format, Clippy
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: "${{ github.workflow }} @ ${{ github.event.pull_request.head.label || github.head_ref || github.ref }}"
+  cancel-in-progress: true
+
+env:
+  RUSTFLAGS: "-Dwarnings"
+
+jobs:
+  audit:
+    name: Audit, format, clippy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+            ~/.cargo/config
+            Cargo.lock
+          key: ${{ runner.os }}-cargo-audit-${{ env.RUST_VERSION_HASH }}-${{ hashFiles('**/Cargo.lock') }}-${{ hashFiles('**/*.rs') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-audit-${{ env.RUST_VERSION_HASH }}-
+            ${{ runner.os }}-cargo-audit-
+            ${{ runner.os }}-
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit || true
+
+      - name: Run audit
+        run: cargo audit --ignore RUSTSEC-2024-0344 --ignore RUSTSEC-2022-0028
+
+      - name: Run rustfmt
+        run: cargo fmt --all -- --check
+
+      - name: Run clippy
+        run: cargo clippy --workspace --exclude clarinet-sdk-wasm
