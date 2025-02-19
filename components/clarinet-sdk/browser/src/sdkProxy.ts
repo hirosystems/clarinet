@@ -1,4 +1,4 @@
-import { Cl } from "@stacks/transactions";
+import { Cl, serializeCVBytes } from "@stacks/transactions";
 import {
   CallFnArgs,
   DeployContractArgs,
@@ -66,7 +66,7 @@ export function getSessionProxy() {
             new CallFnArgs(
               contract,
               method,
-              args.map((a) => Cl.serialize(a)),
+              args.map((a) => serializeCVBytes(a)),
               sender,
             ),
           );
@@ -144,7 +144,7 @@ export function getSessionProxy() {
 
       if (prop === "getMapEntry") {
         const getMapEntry: GetMapEntry = (contract, mapName, mapKey) => {
-          const response = session.getMapEntry(contract, mapName, Cl.serialize(mapKey));
+          const response = session.getMapEntry(contract, mapName, serializeCVBytes(mapKey));
           const result = Cl.deserialize(response);
           return result;
         };

@@ -29,6 +29,6 @@
   "readme": "./README.md",
   "dependencies": {
     "@hirosystems/clarinet-sdk-wasm-browser": "2.14.0",
-    "@stacks/transactions": "^6.13.0"
+    "@stacks/transactions": "^7.0.0"
   }
 }

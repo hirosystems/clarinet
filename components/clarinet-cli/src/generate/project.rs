@@ -426,7 +426,7 @@ btc_address = "mvZtbibDAAA3WLpY7zXXFqRa3T4XSknBX7"
   "license": "ISC",
   "dependencies": {{
     "@hirosystems/clarinet-sdk": "^2.3.2",
-    "@stacks/transactions": "^6.12.0",
+    "@stacks/transactions": "^7.0.0",
     "chokidar-cli": "^3.0.0",
     "typescript": "^5.3.3",
     "vite": "^5.1.4",
