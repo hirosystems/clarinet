@@ -1,4 +1,9 @@
 #!/bin/bash
+# This script prepares the release branch for a new version
+#
+# Usage: ./prepare-release.sh <new-version>
+#
+# You'll need to edit the CHANGELOG and git push after running this.
 
 set -e
 
@@ -46,6 +51,9 @@ update_cargo_toml() {
 echo "Checking out release branch..."
 git checkout -b release/next
 
+echo "Generating changelog..."
+npx generate-changelog v$NEW_VERSION...HEAD
+
 echo "Starting version updates to $NEW_VERSION..."
 
 # Update root Cargo.toml and package.json
@@ -86,9 +94,12 @@ cd "$ROOT_DIR"
 
 echo "All updates completed successfully!"
 
-echo "Adding git changes"
-git commit -am "chore: release $NEW_VERSION"
-git push origin release/next
+echo "Next steps:"
+echo "1. Manually edit CHANGELOG."
+echo "2. Push"
+echo "  - git commit -am 'chore: release $NEW_VERSION'"
+echo "  - git push origin release/next"
+echo "3. Open PR: https://github.com/hirosystems/clarinet/pulls"
 
 # Clean up any backup files created by sed
 find . -name "*-e" -delete
