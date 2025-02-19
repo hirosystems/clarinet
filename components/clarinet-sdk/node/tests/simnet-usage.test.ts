@@ -453,7 +453,8 @@ describe("the simnet can execute commands", () => {
 
 describe("the sdk handles multiple manifests project", () => {
   it("handle invalid project", async () => {
-    const manifestPath = path.join(process.cwd(), "tests/fixtures/contracts/invalid.clar");
+    // the lsp displays paths with the unix notation, hence why we are hardcoding the contract path with `/`
+    const manifestPath = `${process.cwd()}/tests/fixtures/contracts/invalid.clar`;
     const expectedErr = `error: unexpected ')'\n--> ${manifestPath}:5:2\n)) ;; extra \`)\`\n`;
 
     await expect(async () => {
