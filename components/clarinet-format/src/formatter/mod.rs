@@ -279,7 +279,10 @@ impl<'a> Aggregator<'a> {
                             | DefineFunctions::PrivateFunction => self.function(list),
                             DefineFunctions::Constant
                             | DefineFunctions::PersistedVariable
-                            | DefineFunctions::NonFungibleToken => self.constant(list),
+                            | DefineFunctions::FungibleToken
+                            | DefineFunctions::NonFungibleToken => {
+                                self.constant(list, previous_indentation)
+                            }
                             DefineFunctions::Map => self.format_map(list, previous_indentation),
                             DefineFunctions::UseTrait | DefineFunctions::ImplTrait => {
                                 // these are the same as the following but need a trailing newline
@@ -287,9 +290,6 @@ impl<'a> Aggregator<'a> {
                                     "({})\n",
                                     self.format_source_exprs(list, previous_indentation)
                                 )
-                            }
-                            DefineFunctions::FungibleToken => {
-                                self.fungible_token(list, previous_indentation)
                             }
                             DefineFunctions::Trait => self.define_trait(list, previous_indentation),
                         }
@@ -348,12 +348,9 @@ impl<'a> Aggregator<'a> {
         acc
     }
 
-    fn fungible_token(
-        &self,
-        exprs: &[PreSymbolicExpression],
-        previous_indentation: &str,
-    ) -> String {
-        let mut acc = "(define-fungible-token ".to_string();
+    fn constant(&self, exprs: &[PreSymbolicExpression], previous_indentation: &str) -> String {
+        let func_type = self.display_pse(exprs.first().unwrap(), "");
+        let mut acc = format!("({func_type} ");
         let mut iter = exprs[1..].iter().peekable();
         while let Some(expr) = iter.next() {
             let trailing = get_trailing_comment(expr, &mut iter);
@@ -367,38 +364,8 @@ impl<'a> Aggregator<'a> {
             }
         }
         acc.push(')');
+        acc.push('\n');
         acc
-    }
-    fn constant(&self, exprs: &[PreSymbolicExpression]) -> String {
-        let func_type = self.display_pse(exprs.first().unwrap(), "");
-        let indentation = &self.settings.indentation.to_string();
-        let mut acc = format!("({func_type} ");
-
-        if let Some((name, args)) = name_and_args(exprs) {
-            acc.push_str(&self.display_pse(name, ""));
-
-            // Access the value from args
-            if let Some(value) = args.first() {
-                if let Some(list) = value.match_list() {
-                    acc.push_str(&format!(
-                        "\n{}({})",
-                        indentation,
-                        self.format_source_exprs(list, "")
-                    ));
-                    acc.push_str("\n)");
-                } else {
-                    // Handle non-list values (e.g., literals or simple expressions)
-                    acc.push(' ');
-                    acc.push_str(&self.display_pse(value, ""));
-                    acc.push(')');
-                }
-            }
-
-            acc.push('\n');
-            acc
-        } else {
-            panic!("Expected a valid constant definition with (name value)")
-        }
     }
     fn format_map(&self, exprs: &[PreSymbolicExpression], previous_indentation: &str) -> String {
         let mut acc = "(define-map ".to_string();
@@ -721,7 +688,13 @@ impl<'a> Aggregator<'a> {
     fn display_pse(&self, pse: &PreSymbolicExpression, previous_indentation: &str) -> String {
         match pse.pre_expr {
             PreSymbolicExpressionType::Atom(ref value) => t(value.as_str()).to_string(),
-            PreSymbolicExpressionType::AtomValue(ref value) => value.to_string(),
+            PreSymbolicExpressionType::AtomValue(ref value) => match value {
+                clarity::vm::types::Value::Principal(c) => {
+                    format!("'{}", c.to_string())
+                }
+                // Fill in these explicitly
+                _ => value.to_string(),
+            },
             PreSymbolicExpressionType::List(ref items) => {
                 self.format_list(items, previous_indentation)
             }
@@ -950,11 +923,11 @@ mod tests_formatter {
 
     #[test]
     fn test_fungible_token() {
-        let src = "(define-fungible-token hello)";
+        let src = "(define-fungible-token hello)\n";
         let result = format_with_default(&String::from(src));
         assert_eq!(result, src);
 
-        let src = "(define-fungible-token hello u100)";
+        let src = "(define-fungible-token hello u100)\n";
         let result = format_with_default(&String::from(src));
         assert_eq!(result, src);
     }
@@ -1219,12 +1192,9 @@ mod tests_formatter {
     }
     #[test]
     fn test_constant() {
-        let src = "(define-constant something 1)\n";
+        let src = "(define-constant minter 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.minter)\n";
         let result = format_with_default(&String::from(src));
-        assert_eq!(result, "(define-constant something 1)\n");
-        let src2 = "(define-constant something (1 2))\n";
-        let result2 = format_with_default(&String::from(src2));
-        assert_eq!(result2, "(define-constant something\n  (1 2)\n)\n");
+        assert_eq!(result, src);
     }
 
     #[test]
@@ -1330,6 +1300,12 @@ mod tests_formatter {
         assert_eq!(src, result);
     }
 
+    #[test]
+    fn define_data_var_test() {
+        let src = "(define-data-var my-data-var principal tx-sender)\n";
+        let result = format_with_default(src);
+        assert_eq!(src, result);
+    }
     #[test]
     fn define_trait_test() {
         let src = r#"(define-trait token-trait
