@@ -109,6 +109,13 @@ pub struct FeeEstimation {
     pub fee: u64,
 }
 
+#[derive(Deserialize, Debug)]
+pub struct BurnBlock {
+    pub burn_block_time: u64,
+    pub burn_block_hash: String,
+    pub burn_block_height: u32,
+}
+
 impl StacksRpc {
     pub fn new(url: &str) -> Self {
         Self {
@@ -276,5 +283,31 @@ impl StacksRpc {
         } else {
             Err(RpcError::Generic)
         }
+    }
+
+    pub fn get_burn_block(&self, height: u32) -> Result<BurnBlock, RpcError> {
+        let request_url = format!("{}/extended/v2/burn-blocks/{}", self.url, height);
+        self.client
+            .get(request_url)
+            .send()
+            .map_err(|e| RpcError::Message(e.to_string()))?
+            .json()
+            .map_err(|e| RpcError::Message(e.to_string()))
+    }
+
+    pub fn call_with_retry<T, F>(&self, mut func: F, retries: usize) -> Result<T, RpcError>
+    where
+        F: FnMut(&Self) -> Result<T, RpcError>,
+    {
+        for attempt in 0..=retries {
+            match func(self) {
+                Ok(result) => return Ok(result),
+                Err(_err) if attempt < retries => {
+                    std::thread::sleep(std::time::Duration::from_secs((attempt + 1) as u64));
+                }
+                Err(err) => return Err(err),
+            }
+        }
+        Err(RpcError::Generic)
     }
 }

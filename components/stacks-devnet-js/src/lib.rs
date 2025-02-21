@@ -412,6 +412,14 @@ impl StacksDevnet {
                 _ => 0.0,
             };
 
+            let sbtc_balance = match account_settings
+                .get(&mut cx, "sbtc_balance")?
+                .downcast::<JsNumber, _>(&mut cx)
+            {
+                Ok(res) => res.value(&mut cx),
+                _ => 1000000000.0, // 10 sBTC by default
+            };
+
             let is_mainnet = match account_settings
                 .get(&mut cx, "is_mainnet")?
                 .downcast::<JsBoolean, _>(&mut cx)
@@ -442,6 +450,7 @@ impl StacksDevnet {
                 derivation,
                 is_mainnet,
                 balance: balance as u64,
+                sbtc_balance: sbtc_balance as u64,
             };
             genesis_accounts.insert(label, account);
         }

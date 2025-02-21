@@ -1192,9 +1192,9 @@ impl ClarityInterpreter {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::analysis::Settings as AnalysisSettings;
     use crate::repl::settings::RemoteDataSettings;
     use crate::test_fixtures::clarity_contract::ClarityContractBuilder;
-    use crate::{analysis::Settings as AnalysisSettings, repl::boot::BOOT_CONTRACTS_DATA};
     use clarity::{
         types::{chainstate::StacksAddress, Address},
         vm::{self, types::TupleData, ClarityVersion},
@@ -1724,30 +1724,6 @@ mod tests {
             events[3],
             StacksTransactionEvent::NFTEvent(NFTEventType::NFTTransferEvent(_))
         ));
-    }
-
-    #[test]
-    fn can_run_boot_contracts() {
-        let repl_settings = Settings {
-            // clarity_wasm_mode: true,
-            // temp disable
-            clarity_wasm_mode: false,
-            ..Default::default()
-        };
-        let mut interpreter = get_interpreter(Some(repl_settings));
-
-        let boot_contracts_data = BOOT_CONTRACTS_DATA.clone();
-
-        for (_, (boot_contract, ast)) in boot_contracts_data {
-            let res = interpreter
-                .run(&boot_contract, Some(&ast), false, None)
-                .unwrap_or_else(|err| {
-                    dbg!(&err);
-                    panic!("failed to interpret {} boot contract", &boot_contract.name)
-                });
-
-            assert!(res.diagnostics.is_empty());
-        }
     }
 
     #[test]

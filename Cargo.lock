@@ -28,9 +28,9 @@ checksum = "f26201604c87b1e01bd3d98f8d5d9a8fcbb815e8cedb41ffccbeb4bf593a35fe"
 
 [[package]]
 name = "ahash"
-version = "0.8.6"
+version = "0.8.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "91429305e9f0a25f6205c5b8e0d2db09e0708a7a6df0f42212bb56c32c8ac97a"
+checksum = "e89da841a80418a9b391ebaea17f5c112ffaaa96f621d2c285b5174da76b9011"
 dependencies = [
  "cfg-if 1.0.0",
  "once_cell",
@@ -1392,9 +1392,9 @@ dependencies = [
 
 [[package]]
 name = "devise"
-version = "0.4.1"
+version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d6eacefd3f541c66fc61433d65e54e0e46e0a029a819a7dbbc7a7b489e8a85f8"
+checksum = "f1d90b0c4c777a2cad215e3c7be59ac7c15adf45cf76317009b7d096d46f651d"
 dependencies = [
  "devise_codegen",
  "devise_core",
@@ -1402,9 +1402,9 @@ dependencies = [
 
 [[package]]
 name = "devise_codegen"
-version = "0.4.1"
+version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9c8cf4b8dd484ede80fd5c547592c46c3745a617c8af278e2b72bea86b2dfed6"
+checksum = "71b28680d8be17a570a2334922518be6adc3f58ecc880cbb404eaeb8624fd867"
 dependencies = [
  "devise_core",
  "quote",
@@ -1412,9 +1412,9 @@ dependencies = [
 
 [[package]]
 name = "devise_core"
-version = "0.4.1"
+version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "35b50dba0afdca80b187392b24f2499a88c336d5a8493e4b4ccfb608708be56a"
+checksum = "b035a542cf7abf01f2e3c4d5a7acbaebfefe120ae4efc7bde3df98186e4b8af7"
 dependencies = [
  "bitflags 2.4.0",
  "proc-macro2",
@@ -1782,9 +1782,9 @@ dependencies = [
 
 [[package]]
 name = "futures-channel"
-version = "0.3.30"
+version = "0.3.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eac8f7d7865dcb88bd4373ab671c8cf4508703796caa2b1985a9ca867b3fcb78"
+checksum = "2dff15bf788c671c1934e366d07e30c1814a8ef514e1af724a602e8a2fbe1b10"
 dependencies = [
  "futures-core",
  "futures-sink",
@@ -1792,9 +1792,9 @@ dependencies = [
 
 [[package]]
 name = "futures-core"
-version = "0.3.30"
+version = "0.3.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dfc6580bb841c5a68e9ef15c77ccc837b40a7504914d52e47b8b0e9bbda25a1d"
+checksum = "05f29059c0c2090612e8d742178b0580d2dc940c837851ad723096f87af6663e"
 
 [[package]]
 name = "futures-executor"
@@ -1809,15 +1809,15 @@ dependencies = [
 
 [[package]]
 name = "futures-io"
-version = "0.3.30"
+version = "0.3.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a44623e20b9681a318efdd71c299b6b222ed6f231972bfe2f224ebad6311f0c1"
+checksum = "9e5c1b78ca4aae1ac06c48a526a655760685149f0d465d21f37abfe57ce075c6"
 
 [[package]]
 name = "futures-macro"
-version = "0.3.30"
+version = "0.3.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "87750cf4b7a4c0625b1529e4c543c2182106e4dedc60a2a6455e00d212c489ac"
+checksum = "162ee34ebcb7c64a8abebc059ce0fee27c2262618d7b60ed8faf72fef13c3650"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1826,15 +1826,15 @@ dependencies = [
 
 [[package]]
 name = "futures-sink"
-version = "0.3.30"
+version = "0.3.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9fb8e00e87438d937621c1c6269e53f536c14d3fbd6a042bb24879e57d474fb5"
+checksum = "e575fab7d1e0dcb8d0c7bcf9a63ee213816ab51902e6d244a95819acacf1d4f7"
 
 [[package]]
 name = "futures-task"
-version = "0.3.30"
+version = "0.3.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "38d84fa142264698cdce1a9f9172cf383a0c82de1bddcf3092901442c4097004"
+checksum = "f90f7dce0722e95104fcb095585910c0977252f286e354b5e3bd38902cd99988"
 
 [[package]]
 name = "futures-timer"
@@ -1844,9 +1844,9 @@ checksum = "f288b0a4f20f9a56b5d1da57e2227c661b7b16168e2f72365f57b63326e29b24"
 
 [[package]]
 name = "futures-util"
-version = "0.3.30"
+version = "0.3.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3d6401deb83407ab3da39eba7e33987a73c3df0c82b4bb5813ee871c19c41d48"
+checksum = "9fa08315bb612088cc391249efdc3bc77536f16c91f6cf495e6fbe85b20a4a81"
 dependencies = [
  "futures-channel",
  "futures-core",
@@ -2716,9 +2716,9 @@ checksum = "884e2677b40cc8c339eaefcb701c32ef1fd2493d71118dc0ca4b6a736c93bd67"
 
 [[package]]
 name = "libc"
-version = "0.2.153"
+version = "0.2.169"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9c198f91728a82281a64e1f4f9eeb25d82cb32a5de251c6bd1b5154d63a8e7bd"
+checksum = "b5aba8db14291edd000dfcc4d620c7ebfb122c613afb886ca8803fa4e128a20a"
 
 [[package]]
 name = "libloading"
@@ -2850,7 +2850,7 @@ dependencies = [
 [[package]]
 name = "libstackerdb"
 version = "0.0.1"
-source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat%2Fclarity-wasm-develop#2ecb92e408e4ef3dc0589f49afd3bc18b582dca7"
+source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat%2Fclarity-wasm-develop#90ff09ec2fc4aef4c9fc4cb38bd4bb73a1f2b073"
 dependencies = [
  "clarity",
  "secp256k1 0.24.3",
@@ -3521,7 +3521,7 @@ checksum = "439ee305def115ba05938db6eb1644ff94165c5ab5e9420d1c1bcedbba909391"
 [[package]]
 name = "pox-locking"
 version = "2.4.0"
-source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat%2Fclarity-wasm-develop#2ecb92e408e4ef3dc0589f49afd3bc18b582dca7"
+source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat%2Fclarity-wasm-develop#90ff09ec2fc4aef4c9fc4cb38bd4bb73a1f2b073"
 dependencies = [
  "clarity",
  "slog",
@@ -4915,6 +4915,7 @@ dependencies = [
  "dirs",
  "futures",
  "hiro-system-kit",
+ "rand 0.8.5",
  "ratatui",
  "reqwest",
  "serde",
@@ -4947,7 +4948,7 @@ dependencies = [
 [[package]]
 name = "stackslib"
 version = "0.0.1"
-source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat%2Fclarity-wasm-develop#2ecb92e408e4ef3dc0589f49afd3bc18b582dca7"
+source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat%2Fclarity-wasm-develop#90ff09ec2fc4aef4c9fc4cb38bd4bb73a1f2b073"
 dependencies = [
  "chrono",
  "clar2wasm",

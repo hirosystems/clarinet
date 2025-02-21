@@ -133,10 +133,8 @@ pub fn update_session_with_deployment_plan(
     if !session.settings.repl_settings.remote_data.enabled {
         let boot_contracts_data = BOOT_CONTRACTS_DATA.clone();
 
-        for (contract_id, (boot_contract, ast)) in boot_contracts_data {
-            let result = session
-                .interpreter
-                .run(&boot_contract, Some(&ast), false, None);
+        for (contract_id, (contract, ast)) in boot_contracts_data {
+            let result = session.interpreter.run(&contract, Some(&ast), false, None);
             boot_contracts.insert(contract_id, result);
         }
     }
@@ -564,7 +562,7 @@ pub async fn generate_default_deployment(
                 for contract_id in ordered_contracts_ids.iter() {
                     let data = emulated_contracts_publish
                         .remove(contract_id)
-                        .expect("unable to retrieve contract");
+                        .unwrap_or_else(|| panic!("unable to retrieve contract: {}", contract_id));
                     let tx = TransactionSpecification::EmulatedContractPublish(data);
                     add_transaction_to_epoch(
                         &mut transactions,
@@ -576,7 +574,7 @@ pub async fn generate_default_deployment(
                 for contract_id in ordered_contracts_ids.iter() {
                     let data = requirements_publish
                         .remove(contract_id)
-                        .expect("unable to retrieve contract");
+                        .unwrap_or_else(|| panic!("unable to retrieve contract: {}", contract_id));
                     let tx = TransactionSpecification::RequirementPublish(data);
                     add_transaction_to_epoch(
                         &mut transactions,
@@ -804,17 +802,9 @@ pub async fn generate_default_deployment(
 
     let mut wallets = vec![];
     if matches!(network, StacksNetwork::Simnet) {
-        for (name, account) in network_manifest.accounts.into_iter() {
-            let address = match PrincipalData::parse_standard_principal(&account.stx_address) {
-                Ok(res) => res,
-                Err(_) => {
-                    return Err(format!(
-                        "unable to parse wallet {} in a valid Stacks address",
-                        account.stx_address
-                    ))
-                }
-            };
-
+        for (name, account) in network_manifest.accounts {
+            let address = PrincipalData::parse_standard_principal(&account.stx_address)
+                .map_err(|_| format!("unable to parse address {}", account.stx_address))?;
             wallets.push(WalletSpecification {
                 name,
                 address,

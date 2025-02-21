@@ -1084,8 +1084,6 @@ impl SDK {
         include_boot_contracts: bool,
         boot_contracts_path: String,
     ) -> Result<SessionReport, String> {
-        use clarity_repl::repl::boot::BOOT_CONTRACTS_DATA;
-
         let contracts_locations = self.contracts_locations.clone();
         let session = self.get_session_mut();
 
@@ -1100,7 +1098,7 @@ impl SDK {
         }
 
         if include_boot_contracts {
-            for (contract_id, (_, ast)) in BOOT_CONTRACTS_DATA.iter() {
+            for (contract_id, (_, ast)) in clarity_repl::repl::boot::BOOT_CONTRACTS_DATA.iter() {
                 asts.insert(contract_id.clone(), ast.clone());
                 contract_paths.insert(
                     contract_id.name.to_string(),
