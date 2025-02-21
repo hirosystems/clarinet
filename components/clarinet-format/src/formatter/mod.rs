@@ -319,18 +319,32 @@ impl<'a> Aggregator<'a> {
     fn define_trait(&self, exprs: &[PreSymbolicExpression], previous_indentation: &str) -> String {
         let mut acc = "(define-trait ".to_string();
         let indentation = &self.settings.indentation.to_string();
+        let space = format!("{}{}", indentation, previous_indentation);
         acc.push_str(&self.format_source_exprs(&[exprs[1].clone()], previous_indentation));
-        let mut iter = exprs[2..].iter().peekable();
+        acc.push('\n');
+        acc.push_str(&space);
+        acc.push('(');
+        let mut iter = exprs[2].match_list().unwrap().iter().peekable();
         while let Some(expr) = iter.next() {
-            let trailing = get_trailing_comment(expr, &mut iter);
-            acc.push('\n');
-            acc.push_str(indentation);
-            acc.push_str(&self.format_source_exprs(&[expr.clone()], indentation));
-            if let Some(comment) = trailing {
-                acc.push(' ');
-                acc.push_str(&self.display_pse(comment, previous_indentation));
+            if let Some(list) = expr.match_list() {
+                let trailing = get_trailing_comment(expr, &mut iter);
+                acc.push('\n');
+                acc.push_str(&space);
+                acc.push_str(indentation);
+                acc.push_str(&self.format_list(list, indentation));
+
+                if let Some(comment) = trailing {
+                    acc.push(' ');
+                    acc.push_str(&self.display_pse(comment, previous_indentation));
+                }
             }
         }
+        acc.push('\n');
+        acc.push_str(&space);
+        acc.push(')');
+        acc.push('\n');
+        acc.push_str(previous_indentation);
+        acc.push(')');
         acc
     }
 
@@ -1317,11 +1331,10 @@ mod tests_formatter {
     }
 
     #[test]
-    #[ignore]
     fn define_trait_test() {
-        // TODO: Not sure how this should be formatted
         let src = r#"(define-trait token-trait
-  ((transfer? (principal principal uint) (response uint uint))
+  (
+    (transfer? (principal principal uint) (response uint uint)) ;; comment
     (get-balance (principal) (response uint uint))
   )
 )"#;
