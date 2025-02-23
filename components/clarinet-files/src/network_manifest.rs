@@ -482,7 +482,7 @@ impl NetworkManifest {
                     };
                     let sbtc_balance = match account_settings.get("sbtc_balance") {
                         Some(Value::Integer(balance)) => *balance as u64,
-                        _ => 1000000000, // mint 10 sBTC by default
+                        _ => 1_000_000_000, // mint 10 sBTC by default
                     };
 
                     let mnemonic = match account_settings.get("mnemonic") {

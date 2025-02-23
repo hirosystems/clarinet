@@ -595,6 +595,7 @@ impl Session {
         Ok(execution)
     }
 
+    /// Run a snippet as a contract deployment
     pub fn eval(
         &mut self,
         snippet: String,
@@ -632,6 +633,16 @@ impl Session {
             }
             Err(res) => Err(res),
         }
+    }
+
+    /// Evaluate a Clarity snippet in order to use it as Clarity function arguments
+    pub fn eval_clarity_string(&mut self, snippet: &str) -> SymbolicExpression {
+        let eval_result = self.eval(snippet.to_string(), false);
+        let value = match eval_result.unwrap().result {
+            EvaluationResult::Contract(_) => unreachable!(),
+            EvaluationResult::Snippet(snippet_result) => snippet_result.result,
+        };
+        SymbolicExpression::atom_value(value)
     }
 
     pub fn eval_with_hooks(
@@ -1559,6 +1570,33 @@ mod tests {
         assert_eq!(
             err.first().unwrap().message,
             "contract epoch (2.5) does not match current epoch (2.4)"
+        );
+    }
+
+    #[test]
+    fn test_eval_clarity_string() {
+        let mut session = Session::new(SessionSettings::default());
+        let epoch = StacksEpochId::Epoch25;
+        session.update_epoch(epoch);
+
+        let result = session.eval_clarity_string("u1");
+        assert_eq!(result, SymbolicExpression::atom_value(Value::UInt(1)));
+
+        let result = session.eval_clarity_string("(+ 1 2)");
+        assert_eq!(result, SymbolicExpression::atom_value(Value::Int(3)));
+
+        let result = session.eval_clarity_string("(list u1 u2)");
+        assert_eq!(
+            result,
+            SymbolicExpression::atom_value(
+                Value::cons_list_unsanitized(vec![Value::UInt(1), Value::UInt(2)]).unwrap()
+            )
+        );
+
+        let result = session.eval_clarity_string("0x01");
+        assert_eq!(
+            result,
+            SymbolicExpression::atom_value(Value::buff_from_byte(0x01))
         );
     }
 

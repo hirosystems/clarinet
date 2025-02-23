@@ -1,8 +1,5 @@
-use clarity_repl::clarity::vm::SymbolicExpression;
-use clarity_repl::clarity::StacksEpochId;
-use clarity_repl::repl::boot::BOOT_CONTRACTS_DATA;
-use clarity_repl::repl::{ClarityCodeSource, ClarityContract, ContractDeployer};
-use clarity_repl::repl::{DEFAULT_CLARITY_VERSION, DEFAULT_EPOCH};
+use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
+use std::fmt::Write;
 
 extern crate serde;
 
@@ -14,9 +11,6 @@ pub mod diagnostic_digest;
 pub mod onchain;
 pub mod requirements;
 pub mod types;
-
-#[cfg(test)]
-mod deployment_plan_test;
 
 use self::types::{
     DeploymentSpecification, EmulatedContractPublishSpecification, GenesisSpecification,
@@ -33,9 +27,15 @@ use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
 use clarity_repl::clarity::vm::ContractName;
 use clarity_repl::clarity::vm::EvaluationResult;
 use clarity_repl::clarity::vm::ExecutionResult;
+use clarity_repl::clarity::vm::SymbolicExpression;
+use clarity_repl::clarity::StacksEpochId;
+use clarity_repl::repl::boot::{
+    BOOT_CONTRACTS_DATA, SBTC_DEPOSIT_MAINNET_ADDRESS, SBTC_MAINNET_ADDRESS,
+};
 use clarity_repl::repl::Session;
 use clarity_repl::repl::SessionSettings;
-use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
+use clarity_repl::repl::{ClarityCodeSource, ClarityContract, ContractDeployer};
+use clarity_repl::repl::{DEFAULT_CLARITY_VERSION, DEFAULT_EPOCH};
 use types::TransactionSpecification;
 use types::{ContractPublishSpecification, EpochSpec};
 use types::{DeploymentGenerationArtifacts, StxTransferSpecification};
@@ -121,6 +121,55 @@ fn update_session_with_genesis_accounts(
     }
 }
 
+fn fund_genesis_account_with_sbtc(session: &mut Session, deployment: &DeploymentSpecification) {
+    if let Some(ref spec) = deployment.genesis {
+        let block_height = session.interpreter.get_burn_block_height() - 1;
+        let height = session.eval_clarity_string(&format!("u{}", block_height));
+        let hash = session.eval_clarity_string(&format!(
+            "(unwrap-panic (get-burn-block-info? header-hash u{}))",
+            block_height
+        ));
+        let vout_index = session.eval_clarity_string("u1");
+
+        for wallet in spec.wallets.iter() {
+            if wallet.sbtc_balance == 0 {
+                continue;
+            }
+
+            let mut random_tx_id = String::with_capacity(64);
+            for _ in 0..32 {
+                write!(&mut random_tx_id, "{:02x}", rand::random::<u8>()).unwrap();
+            }
+            let tx_id = session.eval_clarity_string(&format!("0x{}", random_tx_id));
+            let mut random_sweep_txid = String::with_capacity(64);
+            for _ in 0..32 {
+                write!(&mut random_sweep_txid, "{:02x}", rand::random::<u8>()).unwrap();
+            }
+            let sweep_tx_id = session.eval_clarity_string(&format!("0x{}", random_sweep_txid));
+            let amount = session.eval_clarity_string(&format!("u{}", wallet.sbtc_balance));
+            let recipient = session.eval_clarity_string(&format!("'{}", wallet.address));
+
+            let args = vec![
+                tx_id,
+                vout_index.clone(),
+                amount,
+                recipient,
+                hash.clone(),
+                height.clone(),
+                sweep_tx_id,
+            ];
+            let _ = session.call_contract_fn(
+                &SBTC_DEPOSIT_MAINNET_ADDRESS.to_string(),
+                "complete-deposit-wrapper",
+                &args,
+                SBTC_MAINNET_ADDRESS,
+                false,
+                false,
+            );
+        }
+    }
+}
+
 pub fn update_session_with_deployment_plan(
     session: &mut Session,
     deployment: &DeploymentSpecification,
@@ -128,6 +177,8 @@ pub fn update_session_with_deployment_plan(
     forced_min_epoch: Option<StacksEpochId>,
 ) -> UpdateSessionExecutionResult {
     update_session_with_genesis_accounts(session, deployment);
+
+    let mut should_mint_sbtc = false;
 
     let mut boot_contracts = BTreeMap::new();
     if !session.settings.repl_settings.remote_data.enabled {
@@ -161,6 +212,9 @@ pub fn update_session_with_deployment_plan(
                         tx.emulated_sender.clone(),
                         tx.contract_name.clone(),
                     );
+                    if !should_mint_sbtc && contract_id == *SBTC_DEPOSIT_MAINNET_ADDRESS {
+                        should_mint_sbtc = true;
+                    }
                     let contract_ast = contracts_asts.as_ref().and_then(|m| m.get(&contract_id));
                     let result = handle_emulated_contract_publish(session, tx, contract_ast, epoch);
                     contracts.insert(contract_id, result);
@@ -174,6 +228,11 @@ pub fn update_session_with_deployment_plan(
             }
         }
     }
+
+    if should_mint_sbtc {
+        fund_genesis_account_with_sbtc(session, deployment);
+    }
+
     UpdateSessionExecutionResult {
         boot_contracts,
         contracts,
@@ -212,16 +271,6 @@ fn handle_emulated_contract_publish(
     result
 }
 
-/// Used to evalutate function arguments passed in deployment plans
-fn eval_clarity_string(session: &mut Session, snippet: &str) -> SymbolicExpression {
-    let eval_result = session.eval(snippet.to_string(), false);
-    let value = match eval_result.unwrap().result {
-        EvaluationResult::Contract(_) => unreachable!(),
-        EvaluationResult::Snippet(snippet_result) => snippet_result.result,
-    };
-    SymbolicExpression::atom_value(value)
-}
-
 fn handle_emulated_contract_call(
     session: &mut Session,
     tx: &EmulatedContractCallSpecification,
@@ -232,7 +281,7 @@ fn handle_emulated_contract_call(
     let params: Vec<SymbolicExpression> = tx
         .parameters
         .iter()
-        .map(|p| eval_clarity_string(session, p))
+        .map(|p| session.eval_clarity_string(p))
         .collect();
     let result = session.call_contract_fn(
         &tx.contract_id.to_string(),
@@ -809,6 +858,7 @@ pub async fn generate_default_deployment(
                 name,
                 address,
                 balance: account.balance.into(),
+                sbtc_balance: account.sbtc_balance.into(),
             });
         }
     }
@@ -923,33 +973,6 @@ mod tests {
         };
 
         handle_emulated_contract_publish(session, &emulated_publish_spec, None, epoch)
-    }
-
-    #[test]
-    fn test_eval_clarity_string() {
-        let mut session = Session::new(SessionSettings::default());
-        let epoch = StacksEpochId::Epoch25;
-        session.update_epoch(epoch);
-
-        let result = eval_clarity_string(&mut session, "u1");
-        assert_eq!(result, SymbolicExpression::atom_value(Value::UInt(1)));
-
-        let result = eval_clarity_string(&mut session, "(+ 1 2)");
-        assert_eq!(result, SymbolicExpression::atom_value(Value::Int(3)));
-
-        let result = eval_clarity_string(&mut session, "(list u1 u2)");
-        assert_eq!(
-            result,
-            SymbolicExpression::atom_value(
-                Value::cons_list_unsanitized(vec![Value::UInt(1), Value::UInt(2)]).unwrap()
-            )
-        );
-
-        let result = eval_clarity_string(&mut session, "0x01");
-        assert_eq!(
-            result,
-            SymbolicExpression::atom_value(Value::buff_from_byte(0x01))
-        );
     }
 
     #[test]

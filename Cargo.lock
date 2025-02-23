@@ -730,6 +730,7 @@ dependencies = [
  "clarity-repl",
  "colored",
  "libsecp256k1 0.7.1",
+ "rand 0.8.5",
  "reqwest",
  "serde",
  "serde_derive",

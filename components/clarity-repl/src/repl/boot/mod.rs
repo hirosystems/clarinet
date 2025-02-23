@@ -36,6 +36,19 @@ const POX_4_BODY: &str = std::include_str!("pox-4.clar");
 const BOOT_CODE_SIGNERS: &str = std::include_str!("signers.clar");
 const BOOT_CODE_SIGNERS_VOTING: &str = std::include_str!("signers-voting.clar");
 
+// sBTC contracts are not boot contracts
+// but we want to handle a similar behavior for contract addresses mapping
+pub const SBTC_CONTRACTS_NAMES: &[&str] = &["sbtc-registry", "sbtc-token", "sbtc-deposit"];
+
+pub const SBTC_TESTNET_ADDRESS: &str = "ST1F7QA2MDF17S807EPA36TSS8AMEFY4KA9TVGWXT";
+pub const SBTC_MAINNET_ADDRESS: &str = "SM3VDXK3WZZSA84XXFKAFAF15NNZX32CTSG82JFQ4";
+
+pub static SBTC_DEPOSIT_MAINNET_ADDRESS: LazyLock<QualifiedContractIdentifier> =
+    LazyLock::new(|| {
+        QualifiedContractIdentifier::parse(&format!("{}.sbtc-deposit", SBTC_MAINNET_ADDRESS))
+            .unwrap()
+    });
+
 use std::{collections::BTreeMap, sync::LazyLock};
 
 use clarity::{
@@ -115,15 +128,24 @@ pub static BOOT_CODE_TESTNET: LazyLock<[(&'static str, &'static str); 13]> = Laz
     ]
 });
 
-pub static BOOT_TESTNET_ADDRESS: &str = "ST000000000000000000002AMW42H";
-pub static BOOT_MAINNET_ADDRESS: &str = "SP000000000000000000002Q6VF78";
+pub const BOOT_TESTNET_ADDRESS: &str = "ST000000000000000000002AMW42H";
+pub const BOOT_MAINNET_ADDRESS: &str = "SP000000000000000000002Q6VF78";
 
-pub static V1_BOOT_CONTRACTS: &[&str] =
-    &["genesis", "lockup", "bns", "cost-voting", "costs", "pox"];
-pub static V2_BOOT_CONTRACTS: &[&str] = &["costs-2"];
-pub static V3_BOOT_CONTRACTS: &[&str] = &["pox-2", "costs-3"];
-pub static V4_BOOT_CONTRACTS: &[&str] = &["pox-3"];
-pub static V5_BOOT_CONTRACTS: &[&str] = &["pox-4", "signers", "signers-voting"];
+pub const BOOT_CONTRACTS_NAMES: &[&str] = &[
+    "genesis",
+    "lockup",
+    "bns",
+    "cost-voting",
+    "costs",
+    "pox",
+    "costs-2",
+    "pox-2",
+    "costs-3",
+    "pox-3",
+    "pox-4",
+    "signers",
+    "signers-voting",
+];
 
 pub static BOOT_TESTNET_PRINCIPAL: LazyLock<StandardPrincipalData> =
     LazyLock::new(|| PrincipalData::parse_standard_principal(BOOT_TESTNET_ADDRESS).unwrap());

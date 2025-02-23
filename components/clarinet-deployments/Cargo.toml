@@ -9,6 +9,7 @@ serde = "1"
 serde_json = "1.0.123"
 serde_derive = "1"
 serde_yaml = "0.8.23"
+rand = "0.8.5"
 
 clarity-repl = { path = "../clarity-repl", default-features = false, optional = true }
 clarinet-files = { path = "../clarinet-files", default-features = false }
