@@ -766,6 +766,7 @@ name = "clarinet-format"
 version = "0.1.0"
 dependencies = [
  "clarity",
+ "divan",
  "pretty_assertions",
 ]
 
