@@ -28,9 +28,7 @@
 );; Only authorized caller to flip the switch and update URI
 (define-constant DEPLOYER tx-sender)
 ;; (new) Var to store the token URI, allowing for metadata association with the NFT
-(define-data-var token-uri
-    (string-ascii 256)
-)
+(define-data-var token-uri (string-ascii 256) "ipfs://QmUQY1aZ799SPRaNBFqeCvvmZ4fTQfZvWHauRvHAukyQDB")
 (define-public (update-token-uri
         (new-token-uri (string-ascii 256))
     )
@@ -41,9 +39,7 @@
         ))
 )
 
-(define-data-var contract-uri
-    (string-ascii 256)
-)
+(define-data-var contract-uri (string-ascii 256) "ipfs://QmWKTZEMQNWngp23i7bgPzkineYC9LDvcxYkwNyVQVoH8y")
 (define-public (update-contract-uri
         (new-contract-uri (string-ascii 256))
     )
@@ -55,104 +51,42 @@
 )
 
 ;; errors
-(define-constant ERR-UNWRAP
-    (err u101)
-)
-(define-constant ERR-NOT-AUTHORIZED
-    (err u102)
-)
-(define-constant ERR-NOT-LISTED
-    (err u103)
-)
-(define-constant ERR-WRONG-COMMISSION
-    (err u104)
-)
-(define-constant ERR-LISTED
-    (err u105)
-)
-(define-constant ERR-NO-NAME
-    (err u106)
-)
-(define-constant ERR-HASH-MALFORMED
-    (err u107)
-)
-(define-constant ERR-STX-BURNT-INSUFFICIENT
-    (err u108)
-)
-(define-constant ERR-PREORDER-NOT-FOUND
-    (err u109)
-)
-(define-constant ERR-CHARSET-INVALID
-    (err u110)
-)
-(define-constant ERR-NAMESPACE-ALREADY-EXISTS
-    (err u111)
-)
-(define-constant ERR-PREORDER-CLAIMABILITY-EXPIRED
-    (err u112)
-)
-(define-constant ERR-NAMESPACE-NOT-FOUND
-    (err u113)
-)
-(define-constant ERR-OPERATION-UNAUTHORIZED
-    (err u114)
-)
-(define-constant ERR-NAMESPACE-ALREADY-LAUNCHED
-    (err u115)
-)
-(define-constant ERR-NAMESPACE-PREORDER-LAUNCHABILITY-EXPIRED
-    (err u116)
-)
-(define-constant ERR-NAMESPACE-NOT-LAUNCHED
-    (err u117)
-)
-(define-constant ERR-NAME-NOT-AVAILABLE
-    (err u118)
-)
-(define-constant ERR-NAMESPACE-BLANK
-    (err u119)
-)
-(define-constant ERR-NAME-BLANK
-    (err u120)
-)
-(define-constant ERR-NAME-PREORDERED-BEFORE-NAMESPACE-LAUNCH
-    (err u121)
-)
-(define-constant ERR-NAMESPACE-HAS-MANAGER
-    (err u122)
-)
-(define-constant ERR-OVERFLOW
-    (err u123)
-)
-(define-constant ERR-NO-NAMESPACE-MANAGER
-    (err u124)
-)
-(define-constant ERR-FAST-MINTED-BEFORE
-    (err u125)
-)
-(define-constant ERR-PREORDERED-BEFORE
-    (err u126)
-)
-(define-constant ERR-NAME-NOT-CLAIMABLE-YET
-    (err u127)
-)
-(define-constant ERR-IMPORTED-BEFORE
-    (err u128)
-)
-(define-constant ERR-LIFETIME-EQUAL-0
-    (err u129)
-)
-(define-constant ERR-MIGRATION-IN-PROGRESS
-    (err u130)
-)
-(define-constant ERR-NO-PRIMARY-NAME
-    (err u131)
-)
+(define-constant ERR-UNWRAP (err u101))
+(define-constant ERR-NOT-AUTHORIZED (err u102))
+(define-constant ERR-NOT-LISTED (err u103))
+(define-constant ERR-WRONG-COMMISSION (err u104))
+(define-constant ERR-LISTED (err u105))
+(define-constant ERR-NO-NAME (err u106))
+(define-constant ERR-HASH-MALFORMED (err u107))
+(define-constant ERR-STX-BURNT-INSUFFICIENT (err u108))
+(define-constant ERR-PREORDER-NOT-FOUND (err u109))
+(define-constant ERR-CHARSET-INVALID (err u110))
+(define-constant ERR-NAMESPACE-ALREADY-EXISTS (err u111))
+(define-constant ERR-PREORDER-CLAIMABILITY-EXPIRED (err u112))
+(define-constant ERR-NAMESPACE-NOT-FOUND (err u113))
+(define-constant ERR-OPERATION-UNAUTHORIZED (err u114))
+(define-constant ERR-NAMESPACE-ALREADY-LAUNCHED (err u115))
+(define-constant ERR-NAMESPACE-PREORDER-LAUNCHABILITY-EXPIRED (err u116))
+(define-constant ERR-NAMESPACE-NOT-LAUNCHED (err u117))
+(define-constant ERR-NAME-NOT-AVAILABLE (err u118))
+(define-constant ERR-NAMESPACE-BLANK (err u119))
+(define-constant ERR-NAME-BLANK (err u120))
+(define-constant ERR-NAME-PREORDERED-BEFORE-NAMESPACE-LAUNCH (err u121))
+(define-constant ERR-NAMESPACE-HAS-MANAGER (err u122))
+(define-constant ERR-OVERFLOW (err u123))
+(define-constant ERR-NO-NAMESPACE-MANAGER (err u124))
+(define-constant ERR-FAST-MINTED-BEFORE (err u125))
+(define-constant ERR-PREORDERED-BEFORE (err u126))
+(define-constant ERR-NAME-NOT-CLAIMABLE-YET (err u127))
+(define-constant ERR-IMPORTED-BEFORE (err u128))
+(define-constant ERR-LIFETIME-EQUAL-0 (err u129))
+(define-constant ERR-MIGRATION-IN-PROGRESS (err u130))
+(define-constant ERR-NO-PRIMARY-NAME (err u131))
 ;; variables
 ;; (new) Variable to see if migration is complete
-(define-data-var migration-complete bool)
+(define-data-var migration-complete bool false)
 ;; (new) Counter to keep track of the last minted NFT ID, ensuring unique identifiers
-(define-data-var bns-index uint)
+(define-data-var bns-index uint u0)
 ;; maps
 ;; (new) Map to track market listings, associating NFT IDs with price and commission details
 (define-map market
