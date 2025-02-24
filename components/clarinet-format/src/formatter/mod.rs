@@ -79,6 +79,7 @@ impl ClarityFormatter {
     /// for range formatting within editors
     pub fn format_section(&self, source: &str) -> String {
         let pse = clarity::vm::ast::parser::v2::parse(source).unwrap();
+
         // TODO: range formatting should specify to the aggregator that we're
         // starting mid-source and thus should pre-populate
         // `previous_indentation` for format_source_exprs
@@ -273,7 +274,7 @@ impl<'a> Aggregator<'a> {
                             }
                         }
                     } else if let Some(define) = DefineFunctions::lookup_by_name(atom_name) {
-                        match define {
+                        let formatted = match define {
                             DefineFunctions::PublicFunction
                             | DefineFunctions::ReadOnlyFunction
                             | DefineFunctions::PrivateFunction => self.function(list),
@@ -285,18 +286,27 @@ impl<'a> Aggregator<'a> {
                             }
                             DefineFunctions::Map => self.format_map(list, previous_indentation),
                             DefineFunctions::UseTrait | DefineFunctions::ImplTrait => {
-                                // these are the same as the following but need a trailing newline
                                 format!(
-                                    "({})\n",
+                                    "({})",
                                     self.format_source_exprs(list, previous_indentation)
                                 )
                             }
                             DefineFunctions::Trait => self.define_trait(list, previous_indentation),
+                        };
+                        let result = &formatted.to_string();
+                        if let Some(comment) = trailing_comment {
+                            let mut result_with_comment = result.to_string();
+                            result_with_comment.push(' ');
+                            result_with_comment
+                                .push_str(&self.display_pse(comment, previous_indentation));
+                            format!("{}\n", result_with_comment)
+                        } else {
+                            format!("{}\n", result)
                         }
                     } else {
                         self.to_inner_content(list, previous_indentation)
                     };
-                    result.push_str(t(&formatted));
+                    result.push_str(&formatted);
                     continue;
                 }
             }
@@ -364,7 +374,6 @@ impl<'a> Aggregator<'a> {
             }
         }
         acc.push(')');
-        acc.push('\n');
         acc
     }
     fn format_map(&self, exprs: &[PreSymbolicExpression], previous_indentation: &str) -> String {
@@ -392,7 +401,7 @@ impl<'a> Aggregator<'a> {
                 }
             }
 
-            acc.push_str(&format!("\n{})\n", previous_indentation));
+            acc.push_str(&format!("\n{})", previous_indentation));
             acc
         } else {
             panic!("define-map without a name is invalid")
@@ -690,7 +699,7 @@ impl<'a> Aggregator<'a> {
             PreSymbolicExpressionType::Atom(ref value) => t(value.as_str()).to_string(),
             PreSymbolicExpressionType::AtomValue(ref value) => match value {
                 clarity::vm::types::Value::Principal(c) => {
-                    format!("'{}", c.to_string())
+                    format!("'{}", c)
                 }
                 // Fill in these explicitly
                 _ => value.to_string(),
@@ -715,7 +724,7 @@ impl<'a> Aggregator<'a> {
                 if text.is_empty() {
                     ";;".to_string()
                 } else {
-                    format!(";; {}", t(text))
+                    comment_piece(text)
                 }
             }
             PreSymbolicExpressionType::Placeholder(ref placeholder) => {
@@ -778,7 +787,7 @@ impl<'a> Aggregator<'a> {
                 self.format_source_exprs(&[expr.clone()], &self.settings.indentation.to_string(),)
             ))
         }
-        acc.push_str("\n)\n\n");
+        acc.push_str("\n)\n");
         acc
     }
 
@@ -890,6 +899,13 @@ where
         }
         _ => None,
     }
+}
+
+fn comment_piece(text: &str) -> String {
+    let (comment_part, rest) = text
+        .find(|c| c != ';')
+        .map_or((text, ""), |idx| (&text[..idx], &text[idx..]));
+    format!(";;{} {}", comment_part, t(rest))
 }
 
 #[cfg(test)]
@@ -1042,7 +1058,7 @@ mod tests_formatter {
         let src = "(define-map a uint {n1: (buff 20)})";
         let result = format_with_default(&String::from(src));
         assert_eq!(result, "(define-map a\n  uint\n  { n1: (buff 20) }\n)\n");
-        let src = "(define-map something { name: (buff 48), a: uint } uint)";
+        let src = "(define-map something { name: (buff 48), a: uint } uint)\n";
         let result = format_with_default(&String::from(src));
         let expected = r#"(define-map something
   {
@@ -1177,7 +1193,7 @@ mod tests_formatter {
     fn test_key_value_sugar_comment_midrecord() {
         let src = r#"{
   name: (buff 48),
-  ;; comment
+  ;;; comment
   owner: send-to, ;; trailing
 }"#;
         let result = format_with_default(&String::from(src));
@@ -1193,6 +1209,10 @@ mod tests_formatter {
     #[test]
     fn test_constant() {
         let src = "(define-constant minter 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.minter)\n";
+        let result = format_with_default(&String::from(src));
+        assert_eq!(result, src);
+
+        let src = "(define-constant a u1) ;;; comment\n";
         let result = format_with_default(&String::from(src));
         assert_eq!(result, src);
     }
@@ -1313,7 +1333,8 @@ mod tests_formatter {
     (transfer? (principal principal uint) (response uint uint)) ;; comment
     (get-balance (principal) (response uint uint))
   )
-)"#;
+)
+"#;
         let result = format_with_default(src);
         assert_eq!(src, result);
     }
