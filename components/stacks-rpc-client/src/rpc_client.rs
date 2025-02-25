@@ -7,7 +7,7 @@ use stacks_codec::codec::{StacksTransaction, TransactionPayload};
 
 use reqwest::blocking::Client;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum RpcError {
     Generic,
     StatusCode(u16),
@@ -37,6 +37,7 @@ pub struct CallReadOnlyFnResult {
     pub result: Value,
 }
 
+#[cfg_attr(feature = "mock", derive(Serialize))]
 #[derive(Deserialize, Debug, Clone, Default)]
 pub struct NodeInfo {
     pub peer_version: u64,
@@ -53,6 +54,7 @@ pub struct NodeInfo {
     pub genesis_chainstate_hash: String,
 }
 
+#[cfg_attr(feature = "mock", derive(Serialize))]
 #[derive(Deserialize, Debug, Clone)]
 pub struct PoxInfo {
     pub contract_id: String,
@@ -69,6 +71,7 @@ pub struct PoxInfo {
     pub next_cycle: NextPoxCycle,
 }
 
+#[cfg_attr(feature = "mock", derive(Serialize))]
 #[derive(Deserialize, Debug, Clone, Default)]
 pub struct CurrentPoxCycle {
     pub id: u64,
@@ -77,6 +80,7 @@ pub struct CurrentPoxCycle {
     pub is_pox_active: bool,
 }
 
+#[cfg_attr(feature = "mock", derive(Serialize))]
 #[derive(Deserialize, Debug, Clone, Default)]
 pub struct NextPoxCycle {
     pub min_threshold_ustx: u64,
@@ -93,7 +97,7 @@ pub struct Balance {
     pub nonce_proof: String,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct Contract {
     pub source: String,
     pub publish_height: u64,
@@ -109,7 +113,7 @@ pub struct FeeEstimation {
     pub fee: u64,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct BurnBlock {
     pub burn_block_time: u64,
     pub burn_block_hash: String,

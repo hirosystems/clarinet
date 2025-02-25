@@ -40,6 +40,10 @@ clarinet-deployments = { path = "../clarinet-deployments", features = ["cli"] }
 hiro-system-kit = { path = "../hiro-system-kit", features = ["log"] }
 stacks-codec = { path = "../stacks-codec" }
 
+[dev-dependencies]
+stacks-rpc-client = { path = "../stacks-rpc-client", features = ["mock"] }
+mockito = { version = "1.6", default-features = false }
+
 [lib]
 name = "stacks_network"
 path = "src/lib.rs"

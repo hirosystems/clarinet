@@ -1106,7 +1106,8 @@ fn get_stacking_tx_method_and_args(
 }
 
 #[cfg(test)]
-mod tests {
+mod tests_stacking_orders {
+
     use super::*;
 
     fn build_pox_stacking_order(duration: u32, start_at_cycle: u32) -> PoxStackingOrder {
@@ -1153,5 +1154,89 @@ mod tests {
         assert!(should_publish_stacking_orders(&99, &pox_stacking_order));
         assert!(!should_publish_stacking_orders(&100, &pox_stacking_order));
         assert!(should_publish_stacking_orders(&101, &pox_stacking_order));
+    }
+}
+
+#[cfg(test)]
+mod test_rpc_client {
+    use clarinet_files::DEFAULT_DERIVATION_PATH;
+    use stacks_rpc_client::mock_stacks_rpc::MockStacksRpc;
+
+    use super::*;
+
+    #[test]
+    fn test_fund_genesis_account() {
+        let mut stacks_rpc = MockStacksRpc::new();
+        let burn_block_mock = stacks_rpc.get_burn_block_mock(94);
+        let nonce_mock = stacks_rpc.get_nonce_mock("ST2JHG361ZXG51QTKY2NQCVBPPRRE2KZB1HR05NNC", 0);
+        let tx_mock = stacks_rpc
+            .get_tx_mock("0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef");
+
+        let deployer = AccountConfig {
+            label: "deployer".to_string(),
+            mnemonic: "cycle puppy glare enroll cost improve round trend wrist mushroom scorpion tower claim oppose clever elephant dinosaur eight problem before frozen dune wagon high".to_string(),
+            derivation: DEFAULT_DERIVATION_PATH.to_string(),
+            balance: 10000000,
+            sbtc_balance: 100000000,
+            stx_address: "ST2JHG361ZXG51QTKY2NQCVBPPRRE2KZB1HR05NNC".to_string(),
+            btc_address: "mvZtbibDAAA3WLpY7zXXFqRa3T4XSknBX7".to_string(),
+            is_mainnet: false,
+        };
+
+        let fee_rate = 10;
+        let bitcoin_block_height = 100;
+        let (devnet_event_tx, devnet_event_rx) = channel();
+        let services_map_hosts = ServicesMapHosts {
+            stacks_api_host: stacks_rpc.url.replace("http://", ""),
+            // only stacks_node is called
+            stacks_node_host: stacks_rpc.url.clone(),
+            bitcoin_node_host: "localhost".to_string(),
+            bitcoin_explorer_host: "localhost".to_string(),
+            stacks_explorer_host: "localhost".to_string(),
+            subnet_node_host: "localhost".to_string(),
+            subnet_api_host: "localhost".to_string(),
+            postgres_host: "localhost".to_string(),
+        };
+        let accounts = vec![deployer];
+
+        let boot_completed = Arc::new(AtomicBool::new(true));
+
+        fund_genesis_account(
+            &devnet_event_tx,
+            &services_map_hosts,
+            &accounts,
+            fee_rate,
+            bitcoin_block_height,
+            &boot_completed,
+        );
+
+        let timeout = Duration::from_secs(5);
+        let start = std::time::Instant::now();
+
+        let mut received_events = Vec::new();
+        while start.elapsed() < timeout {
+            match devnet_event_rx.recv_timeout(Duration::from_millis(100)) {
+                Ok(event) => {
+                    received_events.push(event);
+                }
+                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
+                Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+                    break;
+                }
+            }
+        }
+
+        assert!(received_events.iter().any(|event| {
+            if let DevnetEvent::Log(msg) = event {
+                msg.message
+                    .contains("Funded 100000000 STX to ST2JHG361ZXG51QTKY2NQCVBPPRRE2KZB1HR05NNC")
+            } else {
+                false
+            }
+        }));
+
+        nonce_mock.assert();
+        burn_block_mock.assert();
+        tx_mock.assert();
     }
 }
