@@ -4916,7 +4916,6 @@ dependencies = [
  "dirs",
  "futures",
  "hiro-system-kit",
- "mockito",
  "rand 0.8.5",
  "ratatui",
  "reqwest",
