@@ -13,8 +13,8 @@ use clarity_repl::clarity::vm::types::{
 use clarity_repl::clarity::vm::{ClarityName, Value};
 use clarity_repl::clarity::{ClarityVersion, ContractName, EvaluationResult};
 use clarity_repl::repl::boot::{
-    BOOT_MAINNET_ADDRESS, BOOT_TESTNET_ADDRESS, V1_BOOT_CONTRACTS, V2_BOOT_CONTRACTS,
-    V3_BOOT_CONTRACTS,
+    BOOT_CONTRACTS_NAMES, BOOT_MAINNET_ADDRESS, BOOT_TESTNET_ADDRESS, SBTC_CONTRACTS_NAMES,
+    SBTC_MAINNET_ADDRESS, SBTC_TESTNET_ADDRESS,
 };
 use clarity_repl::repl::{Session, SessionSettings};
 use reqwest::Url;
@@ -371,22 +371,17 @@ pub fn apply_on_chain_deployment(
     let mut index = 0;
     let mut contracts_ids_to_remap: HashSet<(String, String)> = HashSet::new();
 
-    for contract in V1_BOOT_CONTRACTS {
+    for contract in BOOT_CONTRACTS_NAMES {
         contracts_ids_to_remap.insert((
             format!("{}:{}", BOOT_MAINNET_ADDRESS, contract),
             format!("{}:{}", BOOT_TESTNET_ADDRESS, contract),
         ));
     }
-    for contract in V2_BOOT_CONTRACTS {
+
+    for contract_name in SBTC_CONTRACTS_NAMES.iter() {
         contracts_ids_to_remap.insert((
-            format!("{}:{}", BOOT_MAINNET_ADDRESS, contract),
-            format!("{}:{}", BOOT_TESTNET_ADDRESS, contract),
-        ));
-    }
-    for contract in V3_BOOT_CONTRACTS {
-        contracts_ids_to_remap.insert((
-            format!("{}:{}", BOOT_MAINNET_ADDRESS, contract),
-            format!("{}:{}", BOOT_TESTNET_ADDRESS, contract),
+            format!("{}:{}", SBTC_MAINNET_ADDRESS, contract_name),
+            format!("{}:{}", SBTC_TESTNET_ADDRESS, contract_name),
         ));
     }
 

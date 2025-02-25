@@ -1295,6 +1295,7 @@ pub struct WalletSpecificationFile {
     pub name: String,
     pub address: String,
     pub balance: String,
+    pub sbtc_balance: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
@@ -1325,6 +1326,7 @@ impl GenesisSpecification {
                 name: wallet.name.to_string(),
                 address: wallet.address.to_string(),
                 balance: format!("{}", wallet.balance),
+                sbtc_balance: Some(format!("{}", wallet.sbtc_balance)),
             })
         }
 
@@ -1341,36 +1343,37 @@ pub struct WalletSpecification {
     #[serde(with = "standard_principal_data_serde")]
     pub address: StandardPrincipalData,
     pub balance: u128,
+    pub sbtc_balance: u128,
 }
 
 impl WalletSpecification {
     pub fn from_specifications(
         specs: &WalletSpecificationFile,
     ) -> Result<WalletSpecification, String> {
-        let address = match PrincipalData::parse_standard_principal(&specs.address) {
-            Ok(res) => res,
-            Err(_) => {
-                return Err(format!(
-                    "unable to parse {}'s principal as a valid Stacks address",
-                    specs.name
-                ))
-            }
-        };
+        let address = PrincipalData::parse_standard_principal(&specs.address).map_err(|_| {
+            format!(
+                "unable to parse {}'s principal as a valid Stacks address",
+                specs.name
+            )
+        })?;
 
-        let balance = match specs.balance.parse::<u128>() {
-            Ok(res) => res,
-            Err(_) => {
-                return Err(format!(
-                    "unable to parse {}'s balance as a u128",
-                    specs.name
-                ))
-            }
-        };
+        let balance = specs
+            .balance
+            .parse::<u128>()
+            .map_err(|_| format!("unable to parse {}'s balance as a u128", specs.name))?;
+
+        let sbtc_balance = specs
+            .sbtc_balance
+            .clone()
+            .unwrap_or("1000000000".to_string())
+            .parse::<u128>()
+            .map_err(|_| format!("unable to parse {}'s sbtc_balance as a u128", specs.name))?;
 
         Ok(WalletSpecification {
             name: specs.name.to_string(),
             address,
             balance,
+            sbtc_balance,
         })
     }
 }

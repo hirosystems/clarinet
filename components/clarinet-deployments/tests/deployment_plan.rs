@@ -1,11 +1,10 @@
 use std::collections::BTreeMap;
 
+use clarinet_deployments::types::*;
 use clarinet_files::{FileLocation, StacksNetwork};
 use clarity_repl::clarity::{
     vm::types::QualifiedContractIdentifier, ClarityName, ClarityVersion, ContractName,
 };
-
-use crate::types::*;
 
 fn get_test_txs() -> (TransactionSpecification, TransactionSpecification) {
     let contract_id =
