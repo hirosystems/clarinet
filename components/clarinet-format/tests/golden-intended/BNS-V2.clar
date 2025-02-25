@@ -895,7 +895,7 @@
     )
 )
 
-;; ;; NAMESPACES
+;;;; NAMESPACES
 ;; @desc Public function `namespace-preorder` initiates the registration process for a namespace by sending a transaction with a salted hash of the namespace.
 ;; This transaction burns the registration fee as a commitment.
 ;; @params: hashed-salted-namespace (buff 20): The hashed and salted namespace being preordered.
