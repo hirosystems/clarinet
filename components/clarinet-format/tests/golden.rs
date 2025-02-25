@@ -47,7 +47,6 @@ fn format_file_with_metadata(source: &str) -> String {
     formatter.format_file(&real_source)
 }
 #[test]
-#[ignore]
 fn test_irl_contracts() {
     let golden_dir = "./tests/golden";
     let intended_dir = "./tests/golden-intended";
