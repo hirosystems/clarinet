@@ -43,6 +43,9 @@ pub const SBTC_CONTRACTS_NAMES: &[&str] = &["sbtc-registry", "sbtc-token", "sbtc
 pub const SBTC_TESTNET_ADDRESS: &str = "ST1F7QA2MDF17S807EPA36TSS8AMEFY4KA9TVGWXT";
 pub const SBTC_MAINNET_ADDRESS: &str = "SM3VDXK3WZZSA84XXFKAFAF15NNZX32CTSG82JFQ4";
 
+pub static SBTC_TESTNET_ADDRESS_PRINCIPAL: LazyLock<StandardPrincipalData> =
+    LazyLock::new(|| PrincipalData::parse_standard_principal(SBTC_TESTNET_ADDRESS).unwrap());
+
 pub static SBTC_DEPOSIT_MAINNET_ADDRESS: LazyLock<QualifiedContractIdentifier> =
     LazyLock::new(|| {
         QualifiedContractIdentifier::parse(&format!("{}.sbtc-deposit", SBTC_MAINNET_ADDRESS))

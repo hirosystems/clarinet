@@ -1104,7 +1104,7 @@ impl Session {
 
     #[cfg(feature = "cli")]
     pub fn get_contracts(&self) -> Option<String> {
-        use super::boot::{BOOT_MAINNET_ADDRESS, BOOT_TESTNET_ADDRESS};
+        use super::boot::{BOOT_MAINNET_ADDRESS, BOOT_TESTNET_ADDRESS, SBTC_MAINNET_ADDRESS};
 
         if self.contracts.is_empty() {
             return None;
@@ -1117,6 +1117,7 @@ impl Session {
             let contract_id_str = contract_id.to_string();
             if !contract_id_str.starts_with(BOOT_TESTNET_ADDRESS)
                 && !contract_id_str.starts_with(BOOT_MAINNET_ADDRESS)
+                && !contract_id_str.starts_with(SBTC_MAINNET_ADDRESS)
             {
                 let mut formatted_methods = vec![];
                 for (method_name, method_args) in contract.function_args.iter() {

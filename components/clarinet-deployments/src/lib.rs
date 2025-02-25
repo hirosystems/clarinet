@@ -31,6 +31,7 @@ use clarity_repl::clarity::vm::SymbolicExpression;
 use clarity_repl::clarity::StacksEpochId;
 use clarity_repl::repl::boot::{
     BOOT_CONTRACTS_DATA, SBTC_DEPOSIT_MAINNET_ADDRESS, SBTC_MAINNET_ADDRESS,
+    SBTC_TESTNET_ADDRESS_PRINCIPAL,
 };
 use clarity_repl::repl::Session;
 use clarity_repl::repl::SessionSettings;
@@ -492,7 +493,7 @@ pub async fn generate_default_deployment(
 
                             emulated_contracts_publish.insert(contract_id.clone(), data);
                         }
-                    } else if matches!(network, StacksNetwork::Devnet | StacksNetwork::Testnet) {
+                    } else if matches!(network, StacksNetwork::Devnet) {
                         let mut remap_principals = BTreeMap::new();
                         remap_principals
                             .insert(contract_id.issuer.clone(), default_deployer_address.clone());
@@ -510,9 +511,35 @@ pub async fn generate_default_deployment(
                             }
                             _ => {}
                         }
+
                         let data = RequirementPublishSpecification {
                             contract_id: contract_id.clone(),
                             remap_sender: default_deployer_address.clone(),
+                            source: source.clone(),
+                            location: contract_location,
+                            cost: deployment_fee_rate * source.len() as u64,
+                            remap_principals,
+                            clarity_version,
+                        };
+                        requirements_publish.insert(contract_id.clone(), data);
+                    } else if matches!(network, StacksNetwork::Testnet) {
+                        let mut remap_sender = default_deployer_address.clone();
+                        let mut remap_principals = BTreeMap::new();
+                        remap_principals
+                            .insert(contract_id.issuer.clone(), default_deployer_address.clone());
+
+                        // Remap sBTC mainnet address to testnet address
+                        if contract_id.issuer.to_string() == SBTC_MAINNET_ADDRESS {
+                            remap_sender = SBTC_TESTNET_ADDRESS_PRINCIPAL.clone();
+                            remap_principals.insert(
+                                contract_id.issuer.clone(),
+                                SBTC_TESTNET_ADDRESS_PRINCIPAL.clone(),
+                            );
+                        }
+
+                        let data = RequirementPublishSpecification {
+                            contract_id: contract_id.clone(),
+                            remap_sender,
                             source: source.clone(),
                             location: contract_location,
                             cost: deployment_fee_rate * source.len() as u64,
