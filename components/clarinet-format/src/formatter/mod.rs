@@ -690,7 +690,7 @@ impl<'a> Aggregator<'a> {
             PreSymbolicExpressionType::Atom(ref value) => t(value.as_str()).to_string(),
             PreSymbolicExpressionType::AtomValue(ref value) => match value {
                 clarity::vm::types::Value::Principal(c) => {
-                    format!("'{}", c.to_string())
+                    format!("'{}", c)
                 }
                 // Fill in these explicitly
                 _ => value.to_string(),

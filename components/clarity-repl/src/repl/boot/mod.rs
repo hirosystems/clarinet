@@ -52,6 +52,11 @@ pub static SBTC_DEPOSIT_MAINNET_ADDRESS: LazyLock<QualifiedContractIdentifier> =
             .unwrap()
     });
 
+pub static SBTC_TOKEN_MAINNET_ADDRESS: LazyLock<QualifiedContractIdentifier> =
+    LazyLock::new(|| {
+        QualifiedContractIdentifier::parse(&format!("{}.sbtc-token", SBTC_MAINNET_ADDRESS)).unwrap()
+    });
+
 use std::{collections::BTreeMap, sync::LazyLock};
 
 use clarity::{

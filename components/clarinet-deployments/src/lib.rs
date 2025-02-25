@@ -31,7 +31,7 @@ use clarity_repl::clarity::vm::SymbolicExpression;
 use clarity_repl::clarity::StacksEpochId;
 use clarity_repl::repl::boot::{
     BOOT_CONTRACTS_DATA, SBTC_DEPOSIT_MAINNET_ADDRESS, SBTC_MAINNET_ADDRESS,
-    SBTC_TESTNET_ADDRESS_PRINCIPAL,
+    SBTC_TESTNET_ADDRESS_PRINCIPAL, SBTC_TOKEN_MAINNET_ADDRESS,
 };
 use clarity_repl::repl::Session;
 use clarity_repl::repl::SessionSettings;
@@ -439,6 +439,21 @@ pub async fn generate_default_deployment(
         let cache_location = &manifest.project.cache_location;
         let mut emulated_contracts_publish = HashMap::new();
         let mut requirements_publish = HashMap::new();
+
+        // automatically add sbtc-deposit if only sbtc-token is present
+        if requirements
+            .iter()
+            .any(|r| r.contract_id == SBTC_TOKEN_MAINNET_ADDRESS.to_string())
+            && !requirements
+                .iter()
+                .any(|r| r.contract_id == SBTC_DEPOSIT_MAINNET_ADDRESS.to_string())
+        {
+            queue.push_front((
+                QualifiedContractIdentifier::parse(&SBTC_DEPOSIT_MAINNET_ADDRESS.to_string())
+                    .unwrap(),
+                None,
+            ));
+        }
 
         // Load all the requirements
         // Some requirements are explicitly listed, some are discovered as we compute the ASTs.
