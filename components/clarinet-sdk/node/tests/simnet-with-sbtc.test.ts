@@ -48,7 +48,6 @@ describe("sbtc funding", () => {
 
   it("automatically funded the test wallets", () => {
     const balances = simnet.getAssetsMap();
-
     expect(balances.size).toBe(2);
     const stxBalance = balances.get("STX")!;
     expect(stxBalance.size).toBe(4);

@@ -1,3 +1,19 @@
+# [2.15.0](https://github.com/hirosystems/clarinet/compare/v2.14.0...v2.15.0) (2025-02-26)
+
+##### New Features
+
+*  Mock sbtc support (#1693) (75535819)
+
+##### Chores
+
+*  Bench test formatter (#1690) (ee7f70e1)
+*  Fix define-trait format w/ test (#1691) (c5c2a2a3)
+*  Update project template npm dependencies (#1687) (4c7b4678)
+
+##### Tests
+
+*  Move golden tests alongside relevant data (#1683) (9a8fdfd4)
+
 # [2.14.0](https://github.com/hirosystems/clarinet/compare/v2.13.0...v2.14.0) (2025-02-18)
 
 ##### New Features

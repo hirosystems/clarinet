@@ -5,6 +5,7 @@ deployment_fee_rate = 10
 [accounts.deployer]
 mnemonic = "twice kind fence tip hidden tilt action fragile skin nothing glory cousin green tomorrow spring wrist shed math olympic multiply hip blue scout claw"
 balance = 100_000_000_000_000
+sbtc_balance = 100_000_000_000_000
 # secret_key: 753b7cc01a1a2e86221266a154af739463fce51219d97e4f856cd7200c3bd2a601
 # stx_address: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM
 # btc_address: mqVnk6NPRdhntvfm4hh9vvjiRkFDUuSYsH
