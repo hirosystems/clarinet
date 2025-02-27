@@ -7,7 +7,15 @@ use clarity::vm::functions::{define::DefineFunctions, NativeFunctions};
 use clarity::vm::representations::{PreSymbolicExpression, PreSymbolicExpressionType};
 use helpers::{name_and_args, t};
 use ignored::ignored_exprs;
-use std::fmt;
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::{fmt, slice};
+
+// A thread-local cache to avoid RefCell borrowing issues
+thread_local! {
+    static EXPR_CACHE: RefCell<HashMap<(usize, String), String>> = RefCell::new(HashMap::new());
+    static LIST_CACHE: RefCell<HashMap<(usize, String), String>> = RefCell::new(HashMap::new());
+}
 
 pub enum Indentation {
     Space(usize),
@@ -106,11 +114,24 @@ impl<'a> Aggregator<'a> {
     pub fn generate(&self) -> String {
         self.format_source_exprs(self.pse, "")
     }
+
     fn format_source_exprs(
         &self,
         expressions: &[PreSymbolicExpression],
         previous_indentation: &str,
     ) -> String {
+        // Create a key based on the slice pointer and length for the whole array
+        let key = (
+            expressions.as_ptr() as usize,
+            previous_indentation.to_string(),
+        );
+
+        // Check if we have a cached result
+        let cached = LIST_CACHE.with(|cache| cache.borrow().get(&key).cloned());
+
+        if let Some(result) = cached {
+            return result;
+        }
         // use peekable to handle trailing comments nicely
         let mut iter = expressions.iter().peekable();
         let mut result = "".to_owned(); // Accumulate results here
@@ -323,6 +344,10 @@ impl<'a> Aggregator<'a> {
 
             result.push_str(&format!("{current}{between}"));
         }
+        // Cache the result
+        LIST_CACHE.with(|cache| {
+            cache.borrow_mut().insert(key, result.clone());
+        });
         result
     }
 
@@ -364,7 +389,7 @@ impl<'a> Aggregator<'a> {
         let mut iter = exprs[1..].iter().peekable();
         while let Some(expr) = iter.next() {
             let trailing = get_trailing_comment(expr, &mut iter);
-            acc.push_str(&self.format_source_exprs(&[expr.clone()], previous_indentation));
+            acc.push_str(&self.format_source_exprs(slice::from_ref(expr), previous_indentation));
             if iter.peek().is_some() {
                 acc.push(' ');
             }
@@ -396,7 +421,7 @@ impl<'a> Aggregator<'a> {
                     _ => acc.push_str(&format!(
                         "\n{}{}",
                         space,
-                        self.format_source_exprs(&[arg.clone()], &space)
+                        self.format_source_exprs(slice::from_ref(arg), &space)
                     )),
                 }
             }
@@ -422,7 +447,7 @@ impl<'a> Aggregator<'a> {
             acc.push_str(&format!(
                 "\n{}{}",
                 space,
-                self.format_source_exprs(&[expr.clone()], &space)
+                self.format_source_exprs(slice::from_ref(expr), &space)
             ));
             if let Some(comment) = trailing {
                 acc.push(' ');
@@ -453,7 +478,7 @@ impl<'a> Aggregator<'a> {
                 acc.push_str(&format!(
                     "\n{}{}",
                     space,
-                    self.format_source_exprs(&[expr.clone()], &space)
+                    self.format_source_exprs(slice::from_ref(expr), &space)
                 ));
                 if let Some(comment) = trailing {
                     acc.push(' ');
@@ -464,7 +489,9 @@ impl<'a> Aggregator<'a> {
             while let Some(expr) = iter.next() {
                 let trailing = get_trailing_comment(expr, &mut iter);
                 acc.push(' ');
-                acc.push_str(&self.format_source_exprs(&[expr.clone()], previous_indentation));
+                acc.push_str(
+                    &self.format_source_exprs(slice::from_ref(expr), previous_indentation),
+                );
                 if let Some(comment) = trailing {
                     acc.push(' ');
                     acc.push_str(&self.display_pse(comment, previous_indentation));
@@ -496,7 +523,7 @@ impl<'a> Aggregator<'a> {
                 acc.push('\n');
                 acc.push_str(&space);
             }
-            acc.push_str(&self.format_source_exprs(&[expr.clone()], &space));
+            acc.push_str(&self.format_source_exprs(slice::from_ref(expr), &space));
             if let Some(comment) = trailing {
                 acc.push(' ');
                 acc.push_str(&self.display_pse(comment, previous_indentation));
@@ -522,7 +549,7 @@ impl<'a> Aggregator<'a> {
                 acc.push_str(&format!(
                     "\n{}{}",
                     space,
-                    self.format_source_exprs(&[arg.clone()], &space)
+                    self.format_source_exprs(slice::from_ref(arg), &space)
                 ));
                 if let Some(comment) = trailing {
                     acc.push(' ');
@@ -537,7 +564,7 @@ impl<'a> Aggregator<'a> {
             acc.push_str(&format!(
                 "\n{}{}",
                 space,
-                self.format_source_exprs(&[e.clone()], &space)
+                self.format_source_exprs(slice::from_ref(e), &space)
             ))
         }
         acc.push_str(&format!("\n{})", previous_indentation));
@@ -561,7 +588,7 @@ impl<'a> Aggregator<'a> {
             acc.push_str(&format!(
                 "\n{}{}",
                 space,
-                self.format_source_exprs(&[branch.clone()], &space)
+                self.format_source_exprs(slice::from_ref(branch), &space)
             ));
             if let Some(comment) = trailing {
                 acc.push(' ');
@@ -575,7 +602,7 @@ impl<'a> Aggregator<'a> {
     fn format_list(&self, exprs: &[PreSymbolicExpression], previous_indentation: &str) -> String {
         let mut acc = "(".to_string();
         for (i, expr) in exprs[0..].iter().enumerate() {
-            let value = self.format_source_exprs(&[expr.clone()], previous_indentation);
+            let value = self.format_source_exprs(slice::from_ref(expr), previous_indentation);
             if i < exprs.len() - 1 {
                 acc.push_str(&value.to_string());
                 acc.push(' ');
@@ -611,8 +638,8 @@ impl<'a> Aggregator<'a> {
                 let value = iter.next().unwrap();
                 let trailing = get_trailing_comment(value, &mut iter);
                 // Pass the current indentation level to nested formatting
-                let key_str = self.format_source_exprs(&[key.clone()], &space);
-                let value_str = self.format_source_exprs(&[value.clone()], &space);
+                let key_str = self.format_source_exprs(slice::from_ref(key), &space);
+                let value_str = self.format_source_exprs(slice::from_ref(value), &space);
                 acc.push_str(&format!("{}{}: {},", space, key_str, value_str));
 
                 if let Some(comment) = trailing {
@@ -784,7 +811,10 @@ impl<'a> Aggregator<'a> {
             acc.push_str(&format!(
                 "\n{}{}",
                 indentation,
-                self.format_source_exprs(&[expr.clone()], &self.settings.indentation.to_string(),)
+                self.format_source_exprs(
+                    slice::from_ref(expr),
+                    &self.settings.indentation.to_string(),
+                )
             ))
         }
         acc.push_str("\n)\n");
@@ -812,8 +842,9 @@ impl<'a> Aggregator<'a> {
             } else {
                 previous_indentation
             };
-            let formatted = self.format_source_exprs(&[expr.clone()], indented);
+            let formatted = self.format_source_exprs(slice::from_ref(expr), indented);
             let trimmed = t(&formatted);
+
             let expr_width = trimmed.len();
 
             if !first_on_line {
@@ -831,7 +862,7 @@ impl<'a> Aggregator<'a> {
 
             if broken_up {
                 // reformat with increased indent in the case we broke up the code on max width
-                let formatted = self.format_source_exprs(&[expr.clone()], &base_indent);
+                let formatted = self.format_source_exprs(slice::from_ref(expr), &base_indent);
                 let trimmed = t(&formatted);
                 result.push_str(trimmed);
             } else {
@@ -843,18 +874,16 @@ impl<'a> Aggregator<'a> {
             broken_up = false;
         }
 
-        let break_lines = result.contains('\n') && {
-            let lines: Vec<_> = result.lines().collect();
-            if let Some(last_line) = lines.last() {
-                if last_line.trim() == ")" || last_line.trim() == "}" {
-                    // Don't add a newline if we're already looking at a closing paren/bracket
-                    false
-                } else {
-                    true
-                }
-            } else {
-                true
-            }
+        let break_lines = if !result.contains('\n') {
+            false
+        } else {
+            // Find the last line without collecting all lines into a vector
+            let last_line = result
+                .rfind('\n')
+                .map(|pos| &result[pos + 1..])
+                .unwrap_or(&result);
+            let trimmed = last_line.trim();
+            !(trimmed == ")" || trimmed == "}")
         };
         let newlined = format!("\n{})", previous_indentation);
         format!("({}{}", result, if break_lines { &newlined } else { ")" })
