@@ -41,7 +41,7 @@ pub fn http_request<T: DeserializeOwned>(url: &str) -> Result<T, String> {
     let mut curl_command = vec![format!("{} -s -X GET", *CURL_COMMAND)];
 
     curl_command.push("-H \"Accept: application/json\"".to_string());
-    curl_command.push("-H \"x-hiro-product: clarity-repl\"".to_string());
+    curl_command.push("-H \"x-hiro-product: clarinet-sdk\"".to_string());
     if let Some(api_key) = &*HIRO_API_KEY {
         curl_command.push(format!("-H \"-api-key: {}\"", api_key));
     }

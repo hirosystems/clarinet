@@ -307,7 +307,7 @@ impl StacksRpc {
             match func(self) {
                 Ok(result) => return Ok(result),
                 Err(_err) if attempt < retries => {
-                    std::thread::sleep(std::time::Duration::from_secs((attempt + 1) as u64));
+                    std::thread::sleep(std::time::Duration::from_secs(1));
                 }
                 Err(err) => return Err(err),
             }

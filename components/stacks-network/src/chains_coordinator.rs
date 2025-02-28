@@ -440,7 +440,6 @@ pub async fn start_chains_coordinator(
                                         &config.services_map_hosts,
                                         &config.accounts,
                                         config.deployment_fee_rate,
-                                        current_burn_height as u32,
                                         &boot_completed,
                                     );
                                 }
@@ -796,7 +795,6 @@ fn fund_genesis_account(
     services_map_hosts: &ServicesMapHosts,
     accounts: &[AccountConfig],
     fee_rate: u64,
-    bitcoin_block_height: u32,
     boot_completed: &Arc<AtomicBool>,
 ) {
     let deployer = accounts
@@ -817,14 +815,23 @@ fn fund_genesis_account(
 
     let _ = hiro_system_kit::thread_named("sBTC funding handler").spawn(move || {
         while !boot_completed_moved.load(Ordering::SeqCst) {
-            std::thread::sleep(std::time::Duration::from_secs(1));
+            std::thread::sleep(std::time::Duration::from_secs(3));
         }
         let node_rpc_url = format!("http://{}", &stacks_api_host_moved);
         let stacks_rpc = StacksRpc::new(&node_rpc_url);
-        let _ =
-            devnet_event_tx_moved.send(DevnetEvent::info(format!("rpc url: {}", stacks_rpc.url)));
 
-        let burn_height_number = bitcoin_block_height - 6;
+        let info = match stacks_rpc.call_with_retry(|client| client.get_info(), 5) {
+            Ok(info) => info,
+            Err(e) => {
+                let _ = devnet_event_tx_moved.send(DevnetEvent::error(format!(
+                    "Failed to retrieve info: {}",
+                    e
+                )));
+                return;
+            }
+        };
+
+        let burn_height_number = info.burn_block_height as u32;
         let burn_height = ClarityValue::UInt(burn_height_number.into());
 
         let burn_block = match stacks_rpc
@@ -858,6 +865,7 @@ fn fund_genesis_account(
         .unwrap();
 
         let contract_id = format!("{}.sbtc-deposit", deployer.stx_address);
+        let mut nb_of_founded_accounts = 0;
 
         for account in accounts_moved {
             if account.sbtc_balance == 0 {
@@ -892,12 +900,7 @@ fn fund_genesis_account(
             deployer_nonce += 1;
 
             match funding_result {
-                Ok(_) => {
-                    let _ = devnet_event_tx_moved.send(DevnetEvent::success(format!(
-                        "Funded {} STX to {}",
-                        account.sbtc_balance, account.stx_address
-                    )));
-                }
+                Ok(_) => nb_of_founded_accounts += 1,
                 Err(e) => {
                     let _ = devnet_event_tx_moved.send(DevnetEvent::error(format!(
                         "Unable to fund {}: {}",
@@ -906,6 +909,10 @@ fn fund_genesis_account(
                 }
             }
         }
+        let _ = devnet_event_tx_moved.send(DevnetEvent::info(format!(
+            "Funded {} accounts with sBTC",
+            nb_of_founded_accounts
+        )));
     });
 }
 
@@ -1160,14 +1167,30 @@ mod tests_stacking_orders {
 #[cfg(test)]
 mod test_rpc_client {
     use clarinet_files::DEFAULT_DERIVATION_PATH;
-    use stacks_rpc_client::mock_stacks_rpc::MockStacksRpc;
+    use stacks_rpc_client::{mock_stacks_rpc::MockStacksRpc, rpc_client::NodeInfo};
 
     use super::*;
 
     #[test]
     fn test_fund_genesis_account() {
         let mut stacks_rpc = MockStacksRpc::new();
-        let burn_block_mock = stacks_rpc.get_burn_block_mock(94);
+        let info_mock = stacks_rpc.get_info_mock(NodeInfo {
+            peer_version: 4207599116,
+            pox_consensus: "4f4de3d4ab3246299c039084a12c801c9dc70323".to_string(),
+            burn_block_height: 100,
+            stable_pox_consensus: "a2c4972bf818f554809e25fa637b780c77c20b62".to_string(),
+            stable_burn_block_height: 99,
+            server_version: "stacks-node 0.0.1".to_string(),
+            network_id: 2147483648,
+            parent_network_id: 3669344250,
+            stacks_tip_height: 47,
+            stacks_tip: "6bb0e4706fdfb9624a23d9144f2161c61d5c58816643b48ffdb735887bdbf5fa"
+                .to_string(),
+            stacks_tip_consensus_hash: "4f4de3d4ab3246299c039084a12c801c9dc70323".to_string(),
+            genesis_chainstate_hash:
+                "74237aa39aa50a83de11a4f53e9d3bb7d43461d1de9873f402e5453ae60bc59b".to_string(),
+        });
+        let burn_block_mock = stacks_rpc.get_burn_block_mock(100);
         let nonce_mock = stacks_rpc.get_nonce_mock("ST2JHG361ZXG51QTKY2NQCVBPPRRE2KZB1HR05NNC", 0);
         let tx_mock = stacks_rpc
             .get_tx_mock("0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef");
@@ -1184,7 +1207,6 @@ mod test_rpc_client {
         };
 
         let fee_rate = 10;
-        let bitcoin_block_height = 100;
         let (devnet_event_tx, devnet_event_rx) = channel();
         let services_map_hosts = ServicesMapHosts {
             stacks_api_host: stacks_rpc.url.replace("http://", ""),
@@ -1206,11 +1228,10 @@ mod test_rpc_client {
             &services_map_hosts,
             &accounts,
             fee_rate,
-            bitcoin_block_height,
             &boot_completed,
         );
 
-        let timeout = Duration::from_secs(5);
+        let timeout = Duration::from_secs(3);
         let start = std::time::Instant::now();
 
         let mut received_events = Vec::new();
@@ -1226,15 +1247,16 @@ mod test_rpc_client {
             }
         }
 
+        assert_eq!(received_events.len(), 1);
         assert!(received_events.iter().any(|event| {
             if let DevnetEvent::Log(msg) = event {
-                msg.message
-                    .contains("Funded 100000000 STX to ST2JHG361ZXG51QTKY2NQCVBPPRRE2KZB1HR05NNC")
+                msg.message.contains("Funded 1 accounts with sBTC")
             } else {
                 false
             }
         }));
 
+        info_mock.assert();
         nonce_mock.assert();
         burn_block_mock.assert();
         tx_mock.assert();

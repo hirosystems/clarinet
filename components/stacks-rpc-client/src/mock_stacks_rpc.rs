@@ -1,5 +1,7 @@
 use mockito::{Mock, ServerGuard};
 
+use crate::rpc_client::NodeInfo;
+
 pub struct MockStacksRpc {
     pub url: String,
     client: ServerGuard,
@@ -16,6 +18,15 @@ impl MockStacksRpc {
         let client = mockito::Server::new();
         let url = client.url().to_string();
         Self { client, url }
+    }
+
+    pub fn get_info_mock(&mut self, info: NodeInfo) -> Mock {
+        self.client
+            .mock("GET", "/v2/info")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(json!(info).to_string())
+            .create()
     }
 
     pub fn get_nonce_mock(&mut self, address: &str, nonce: u64) -> Mock {
