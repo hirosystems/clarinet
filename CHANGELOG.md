@@ -1,3 +1,9 @@
+# [2.15.1](https://github.com/hirosystems/clarinet/compare/v2.15.0...v2.15.1) (2025-02-28)
+
+##### Bug Fixes
+
+*  Make sbtc funding on Devnet more robust (#1702) (675119a8)
+
 # [2.15.0](https://github.com/hirosystems/clarinet/compare/v2.14.0...v2.15.0) (2025-02-26)
 
 ##### New Features
