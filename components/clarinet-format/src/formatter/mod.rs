@@ -55,6 +55,7 @@ impl Settings {
         }
     }
 }
+
 impl Default for Settings {
     fn default() -> Settings {
         Settings {
@@ -112,6 +113,7 @@ impl<'a> Aggregator<'a> {
         }
     }
     pub fn generate(&self) -> String {
+        self.clear_cache();
         self.format_source_exprs(self.pse, "")
     }
 
@@ -274,10 +276,6 @@ impl<'a> Aggregator<'a> {
                                 let inner_content =
                                     self.to_inner_content(list, previous_indentation);
 
-                                // There's an annoying thing happening here
-                                // Since we do expr.match_list() up above we only have the contents
-                                // We should ideally be able to format!("{}", format_source_exprs(.., &[expr.clone()]))
-                                // but that stack overflows so we manually print out the inner contents
                                 format!(
                                     "{}{}",
                                     inner_content,
@@ -302,16 +300,12 @@ impl<'a> Aggregator<'a> {
                             DefineFunctions::Constant
                             | DefineFunctions::PersistedVariable
                             | DefineFunctions::FungibleToken
+                            | DefineFunctions::ImplTrait
+                            | DefineFunctions::UseTrait
                             | DefineFunctions::NonFungibleToken => {
                                 self.constant(list, previous_indentation)
                             }
                             DefineFunctions::Map => self.format_map(list, previous_indentation),
-                            DefineFunctions::UseTrait | DefineFunctions::ImplTrait => {
-                                format!(
-                                    "({})",
-                                    self.format_source_exprs(list, previous_indentation)
-                                )
-                            }
                             DefineFunctions::Trait => self.define_trait(list, previous_indentation),
                         };
                         let result = &formatted.to_string();
@@ -722,7 +716,18 @@ impl<'a> Aggregator<'a> {
 
     // This prints leaves of the PSE tree
     fn display_pse(&self, pse: &PreSymbolicExpression, previous_indentation: &str) -> String {
-        match pse.pre_expr {
+        let key = (
+            pse as *const PreSymbolicExpression as usize,
+            previous_indentation.to_string(),
+        );
+
+        // Check the cache
+        let cached = EXPR_CACHE.with(|cache| cache.borrow().get(&key).cloned());
+
+        if let Some(result) = cached {
+            return result;
+        }
+        let result = match pse.pre_expr {
             PreSymbolicExpressionType::Atom(ref value) => t(value.as_str()).to_string(),
             PreSymbolicExpressionType::AtomValue(ref value) => match value {
                 clarity::vm::types::Value::Principal(c) => {
@@ -757,7 +762,12 @@ impl<'a> Aggregator<'a> {
             PreSymbolicExpressionType::Placeholder(ref placeholder) => {
                 placeholder.to_string() // Placeholder is for if parsing fails
             }
-        }
+        };
+        EXPR_CACHE.with(|cache| {
+            cache.borrow_mut().insert(key, result.clone());
+        });
+
+        result
     }
 
     // * functions
@@ -785,11 +795,11 @@ impl<'a> Aggregator<'a> {
                         acc.push_str(&format!(
                             "\n{}{}",
                             args_indent,
-                            self.format_source_exprs(&[arg.clone()], &args_indent)
+                            self.format_source_exprs(slice::from_ref(arg), &args_indent)
                         ))
                     } else {
                         // atom args
-                        acc.push_str(&self.format_source_exprs(&[arg.clone()], &args_indent))
+                        acc.push_str(&self.format_source_exprs(slice::from_ref(arg), &args_indent))
                     }
                     if let Some(comment) = trailing {
                         acc.push(' ');
@@ -887,6 +897,14 @@ impl<'a> Aggregator<'a> {
         };
         let newlined = format!("\n{})", previous_indentation);
         format!("({}{}", result, if break_lines { &newlined } else { ")" })
+    }
+    fn clear_cache(&self) {
+        EXPR_CACHE.with(|cache| {
+            cache.borrow_mut().clear();
+        });
+        LIST_CACHE.with(|cache| {
+            cache.borrow_mut().clear();
+        });
     }
 }
 
@@ -1296,6 +1314,13 @@ mod tests_formatter {
         let src = "(use-trait token-a-trait 'SPAXYA5XS51713FDTQ8H94EJ4V579CXMTRNBZKSF.token-a.token-trait)\n";
         let result = format_with(&String::from(src), Settings::new(Indentation::Space(4), 80));
         assert_eq!(src, result);
+
+        let src = "(impl-trait 'SPAXYA5XS51713FDTQ8H94EJ4V579CXMTRNBZKSF.token-a.token-trait)\n";
+        let result = format_with(&String::from(src), Settings::new(Indentation::Space(4), 80));
+        assert_eq!(src, result);
+    }
+    #[test]
+    fn test_as_contract() {
         let src = "(as-contract (contract-call? .tokens mint! u19))";
         let result = format_with(&String::from(src), Settings::new(Indentation::Space(4), 80));
         assert_eq!(src, result);
