@@ -865,6 +865,7 @@ fn fund_genesis_account(
         .unwrap();
 
         let contract_id = format!("{}.sbtc-deposit", deployer.stx_address);
+        let mut nb_of_founded_accounts = 0;
 
         for account in accounts_moved {
             if account.sbtc_balance == 0 {
@@ -898,7 +899,6 @@ fn fund_genesis_account(
             let funding_result = stacks_rpc.post_transaction(&tx);
             deployer_nonce += 1;
 
-            let mut nb_of_founded_accounts = 0;
             match funding_result {
                 Ok(_) => nb_of_founded_accounts += 1,
                 Err(e) => {
@@ -908,11 +908,11 @@ fn fund_genesis_account(
                     )));
                 }
             }
-            let _ = devnet_event_tx_moved.send(DevnetEvent::info(format!(
-                "Funded {} accounts with sBTC",
-                nb_of_founded_accounts
-            )));
         }
+        let _ = devnet_event_tx_moved.send(DevnetEvent::info(format!(
+            "Funded {} accounts with sBTC",
+            nb_of_founded_accounts
+        )));
     });
 }
 
