@@ -669,7 +669,7 @@ checksum = "4b82cf0babdbd58558212896d1a4272303a57bdb245c2bf1147185fb45640e70"
 [[package]]
 name = "clar2wasm"
 version = "0.1.0"
-source = "git+https://github.com/stacks-network/clarity-wasm.git?branch=main#41079f35fa5fcd606c304db9a258b9ac625a7b70"
+source = "git+https://github.com/stacks-network/clarity-wasm.git?branch=main#c4528e1d09d4a5598ebf3c55db2c730a9923176d"
 dependencies = [
  "chrono",
  "clap",
@@ -802,10 +802,10 @@ dependencies = [
 [[package]]
 name = "clarity"
 version = "2.3.0"
-source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat%2Fclarity-wasm-develop#90ff09ec2fc4aef4c9fc4cb38bd4bb73a1f2b073"
+source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat%2Fclarity-wasm-develop#86f41a47f8216e6e0b5d138a9780756305e21b49"
 dependencies = [
  "getrandom 0.2.8",
- "hashbrown 0.14.3",
+ "hashbrown 0.15.2",
  "integer-sqrt",
  "lazy_static",
  "rand 0.8.5",
@@ -1742,6 +1742,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3f9eec918d3f24069decb9af1554cad7c880e2da24a9afd88aca000531ab82c1"
 
 [[package]]
+name = "foldhash"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a0d2fde1f7b3d48b8395d5f2de76c18a528bd6a9cdde438df747bfcba3e05d6f"
+
+[[package]]
 name = "form_urlencoded"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2069,6 +2075,17 @@ checksum = "290f1a1d9242c78d09ce40a5e87e7554ee637af1351968159f4952f028f75604"
 dependencies = [
  "ahash",
  "allocator-api2",
+]
+
+[[package]]
+name = "hashbrown"
+version = "0.15.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bf151400ff0baff5465007dd2f3e717f3fe502074ca563069ce3a6629d07b289"
+dependencies = [
+ "allocator-api2",
+ "equivalent",
+ "foldhash",
  "serde",
 ]
 
@@ -2851,7 +2868,7 @@ dependencies = [
 [[package]]
 name = "libstackerdb"
 version = "0.0.1"
-source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat%2Fclarity-wasm-develop#90ff09ec2fc4aef4c9fc4cb38bd4bb73a1f2b073"
+source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat%2Fclarity-wasm-develop#86f41a47f8216e6e0b5d138a9780756305e21b49"
 dependencies = [
  "clarity",
  "secp256k1 0.24.3",
@@ -3522,7 +3539,7 @@ checksum = "439ee305def115ba05938db6eb1644ff94165c5ab5e9420d1c1bcedbba909391"
 [[package]]
 name = "pox-locking"
 version = "2.4.0"
-source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat%2Fclarity-wasm-develop#90ff09ec2fc4aef4c9fc4cb38bd4bb73a1f2b073"
+source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat%2Fclarity-wasm-develop#86f41a47f8216e6e0b5d138a9780756305e21b49"
 dependencies = [
  "clarity",
  "slog",
@@ -4851,13 +4868,13 @@ dependencies = [
 [[package]]
 name = "stacks-common"
 version = "0.0.2"
-source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat%2Fclarity-wasm-develop#90ff09ec2fc4aef4c9fc4cb38bd4bb73a1f2b073"
+source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat%2Fclarity-wasm-develop#86f41a47f8216e6e0b5d138a9780756305e21b49"
 dependencies = [
  "chrono",
  "curve25519-dalek 2.0.0",
  "ed25519-dalek",
  "getrandom 0.2.8",
- "hashbrown 0.14.3",
+ "hashbrown 0.15.2",
  "lazy_static",
  "libc",
  "libsecp256k1 0.5.0",
@@ -4876,6 +4893,7 @@ dependencies = [
  "slog-json",
  "slog-term",
  "time",
+ "toml 0.5.11",
  "winapi 0.3.9",
 ]
 
@@ -4950,14 +4968,14 @@ dependencies = [
 [[package]]
 name = "stackslib"
 version = "0.0.1"
-source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat%2Fclarity-wasm-develop#90ff09ec2fc4aef4c9fc4cb38bd4bb73a1f2b073"
+source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat%2Fclarity-wasm-develop#86f41a47f8216e6e0b5d138a9780756305e21b49"
 dependencies = [
  "chrono",
  "clar2wasm",
  "clarity",
  "curve25519-dalek 2.0.0",
  "ed25519-dalek",
- "hashbrown 0.14.3",
+ "hashbrown 0.15.2",
  "integer-sqrt",
  "lazy_static",
  "libc",
