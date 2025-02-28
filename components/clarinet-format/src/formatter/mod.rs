@@ -349,7 +349,7 @@ impl<'a> Aggregator<'a> {
         let mut acc = "(define-trait ".to_string();
         let indentation = &self.settings.indentation.to_string();
         let space = format!("{}{}", indentation, previous_indentation);
-        acc.push_str(&self.format_source_exprs(&[exprs[1].clone()], previous_indentation));
+        acc.push_str(&self.format_source_exprs(slice::from_ref(&exprs[1]), previous_indentation));
         acc.push('\n');
         acc.push_str(&space);
         acc.push('(');
@@ -395,36 +395,58 @@ impl<'a> Aggregator<'a> {
         acc.push(')');
         acc
     }
+
     fn format_map(&self, exprs: &[PreSymbolicExpression], previous_indentation: &str) -> String {
-        let mut acc = "(define-map ".to_string();
+        let func_type = self.display_pse(exprs.first().unwrap(), "");
+        let mut acc = format!("({func_type} ");
         let indentation = &self.settings.indentation.to_string();
-        let space = format!("{}{}", previous_indentation, indentation);
+        let space = format!("{}{}", indentation, previous_indentation);
+        acc.push_str(&self.format_source_exprs(slice::from_ref(&exprs[1]), previous_indentation));
+        let mut iter = exprs[2..].iter().peekable();
+        while let Some(expr) = iter.next() {
+            let trailing = get_trailing_comment(expr, &mut iter);
 
-        if let Some((name, args)) = name_and_args(exprs) {
-            acc.push_str(&self.display_pse(name, previous_indentation));
-
-            for arg in args.iter() {
-                match &arg.pre_expr {
-                    // this is hacked in to handle situations where the contents of
-                    // map is a 'tuple'
-                    PreSymbolicExpressionType::Tuple(list) => acc.push_str(&format!(
-                        "\n{}{}",
-                        space,
-                        self.format_key_value_sugar(&list.to_vec(), &space)
-                    )),
-                    _ => acc.push_str(&format!(
-                        "\n{}{}",
-                        space,
-                        self.format_source_exprs(slice::from_ref(arg), &space)
-                    )),
-                }
+            acc.push('\n');
+            acc.push_str(&space);
+            acc.push_str(&self.format_source_exprs(slice::from_ref(expr), &space));
+            if let Some(comment) = trailing {
+                acc.push(' ');
+                acc.push_str(&self.display_pse(comment, previous_indentation));
             }
-
-            acc.push_str(&format!("\n{})", previous_indentation));
-            acc
-        } else {
-            panic!("define-map without a name is invalid")
         }
+        acc.push('\n');
+        acc.push_str(previous_indentation);
+        acc.push(')');
+        acc
+        // let mut acc = "(define-map ".to_string();
+        // let indentation = &self.settings.indentation.to_string();
+        // let space = format!("{}{}", previous_indentation, indentation);
+
+        // if let Some((name, args)) = name_and_args(exprs) {
+        //     acc.push_str(&self.display_pse(name, previous_indentation));
+
+        //     for arg in args.iter() {
+        //         match &arg.pre_expr {
+        //             // this is hacked in to handle situations where the contents of
+        //             // map is a 'tuple'
+        //             PreSymbolicExpressionType::Tuple(list) => acc.push_str(&format!(
+        //                 "\n{}{}",
+        //                 space,
+        //                 self.format_key_value_sugar(&list.to_vec(), &space)
+        //             )),
+        //             _ => acc.push_str(&format!(
+        //                 "\n{}{}",
+        //                 space,
+        //                 self.format_source_exprs(slice::from_ref(arg), &space)
+        //             )),
+        //         }
+        //     }
+
+        //     acc.push_str(&format!("\n{})", previous_indentation));
+        //     acc
+        // } else {
+        //     panic!("define-map without a name is invalid")
+        // }
     }
 
     // *begin* never on one line
@@ -573,7 +595,7 @@ impl<'a> Aggregator<'a> {
         let space = format!("{}{}", previous_indentation, indentation);
 
         // value to match on
-        acc.push_str(&self.format_source_exprs(&[exprs[1].clone()], previous_indentation));
+        acc.push_str(&self.format_source_exprs(slice::from_ref(&exprs[1]), previous_indentation));
         // branches evenly spaced
 
         let mut iter = exprs[2..].iter().peekable();
@@ -647,7 +669,7 @@ impl<'a> Aggregator<'a> {
             let fkey = self.display_pse(&exprs[0], previous_indentation);
             acc.push_str(&format!(
                 " {fkey}: {} ",
-                self.format_source_exprs(&[exprs[1].clone()], previous_indentation)
+                self.format_source_exprs(slice::from_ref(&exprs[1]), previous_indentation)
             ));
         }
 
