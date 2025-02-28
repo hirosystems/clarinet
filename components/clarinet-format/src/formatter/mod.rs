@@ -11,12 +11,6 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::{fmt, slice};
 
-// A thread-local cache to avoid RefCell borrowing issues
-thread_local! {
-    static EXPR_CACHE: RefCell<HashMap<(usize, String), String>> = RefCell::new(HashMap::new());
-    static LIST_CACHE: RefCell<HashMap<(usize, String), String>> = RefCell::new(HashMap::new());
-}
-
 pub enum Indentation {
     Space(usize),
     Tab,
@@ -102,6 +96,8 @@ pub struct Aggregator<'a> {
     settings: &'a Settings,
     pse: &'a [PreSymbolicExpression],
     source: &'a str,
+
+    cache: RefCell<HashMap<(usize, String), String>>,
 }
 
 impl<'a> Aggregator<'a> {
@@ -110,10 +106,11 @@ impl<'a> Aggregator<'a> {
             settings,
             pse,
             source,
+            cache: RefCell::new(HashMap::new()),
         }
     }
     pub fn generate(&self) -> String {
-        self.clear_cache();
+        self.cache.borrow_mut().clear();
         self.format_source_exprs(self.pse, "")
     }
 
@@ -129,10 +126,12 @@ impl<'a> Aggregator<'a> {
         );
 
         // Check if we have a cached result
-        let cached = LIST_CACHE.with(|cache| cache.borrow().get(&key).cloned());
-
-        if let Some(result) = cached {
-            return result;
+        let cached_result = {
+            let cache_ref = self.cache.borrow();
+            cache_ref.get(&key).cloned()
+        };
+        if let Some(result) = cached_result {
+            return result.clone();
         }
         // use peekable to handle trailing comments nicely
         let mut iter = expressions.iter().peekable();
@@ -339,9 +338,7 @@ impl<'a> Aggregator<'a> {
             result.push_str(&format!("{current}{between}"));
         }
         // Cache the result
-        LIST_CACHE.with(|cache| {
-            cache.borrow_mut().insert(key, result.clone());
-        });
+        self.cache.borrow_mut().insert(key, result.clone());
         result
     }
 
@@ -714,11 +711,12 @@ impl<'a> Aggregator<'a> {
             previous_indentation.to_string(),
         );
 
-        // Check the cache
-        let cached = EXPR_CACHE.with(|cache| cache.borrow().get(&key).cloned());
-
-        if let Some(result) = cached {
-            return result;
+        let cached_result = {
+            let cache_ref = self.cache.borrow();
+            cache_ref.get(&key).cloned()
+        };
+        if let Some(result) = cached_result {
+            return result.clone();
         }
         let result = match pse.pre_expr {
             PreSymbolicExpressionType::Atom(ref value) => t(value.as_str()).to_string(),
@@ -756,9 +754,7 @@ impl<'a> Aggregator<'a> {
                 placeholder.to_string() // Placeholder is for if parsing fails
             }
         };
-        EXPR_CACHE.with(|cache| {
-            cache.borrow_mut().insert(key, result.clone());
-        });
+        self.cache.borrow_mut().insert(key, result.clone());
 
         result
     }
@@ -890,14 +886,6 @@ impl<'a> Aggregator<'a> {
         };
         let newlined = format!("\n{})", previous_indentation);
         format!("({}{}", result, if break_lines { &newlined } else { ")" })
-    }
-    fn clear_cache(&self) {
-        EXPR_CACHE.with(|cache| {
-            cache.borrow_mut().clear();
-        });
-        LIST_CACHE.with(|cache| {
-            cache.borrow_mut().clear();
-        });
     }
 }
 

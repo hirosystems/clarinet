@@ -46,25 +46,6 @@ mod format_benches {
 
         bencher.bench_local(|| black_box(formatter.format(black_box(&source))));
     }
-
-    #[divan::bench(sample_count = 1)]
-    fn format_heavy_section(bencher: Bencher) {
-        let formatter = ClarityFormatter::new(Settings::default());
-        let source = r#"(define-read-only (parse-wtx (tx (buff 4096)) (calculate-txid bool))
-	(begin
-		(ok {
-			txid: (if calculate-txid
-				(some (reverse-buff32 (sha256 (sha256
-					(concat
-						(unwrap-panic (slice? tx u0 u4))
-					(concat
-						(unwrap-panic (slice? tx (get index (get ctx parsed-segwit-version)) (get index (get ctx parsed-txouts))))
-						(unwrap-panic (slice? tx (get index (get ctx parsed-witnesses)) (len tx)))))))))
-				none)
-		})
-	))"#;
-        bencher.bench_local(|| black_box(formatter.format(black_box(source))));
-    }
 }
 
 fn main() {
