@@ -815,7 +815,7 @@ fn fund_genesis_account(
 
     let _ = hiro_system_kit::thread_named("sBTC funding handler").spawn(move || {
         while !boot_completed_moved.load(Ordering::SeqCst) {
-            std::thread::sleep(std::time::Duration::from_secs(2));
+            std::thread::sleep(std::time::Duration::from_secs(1));
         }
         let node_rpc_url = format!("http://{}", &stacks_api_host_moved);
         let stacks_rpc = StacksRpc::new(&node_rpc_url);
