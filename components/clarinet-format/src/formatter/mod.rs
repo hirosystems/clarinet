@@ -5,7 +5,7 @@ use std::iter::Peekable;
 
 use clarity::vm::functions::{define::DefineFunctions, NativeFunctions};
 use clarity::vm::representations::{PreSymbolicExpression, PreSymbolicExpressionType};
-use helpers::{name_and_args, t};
+use helpers::t;
 use ignored::ignored_exprs;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -418,35 +418,6 @@ impl<'a> Aggregator<'a> {
         acc.push_str(previous_indentation);
         acc.push(')');
         acc
-        // let mut acc = "(define-map ".to_string();
-        // let indentation = &self.settings.indentation.to_string();
-        // let space = format!("{}{}", previous_indentation, indentation);
-
-        // if let Some((name, args)) = name_and_args(exprs) {
-        //     acc.push_str(&self.display_pse(name, previous_indentation));
-
-        //     for arg in args.iter() {
-        //         match &arg.pre_expr {
-        //             // this is hacked in to handle situations where the contents of
-        //             // map is a 'tuple'
-        //             PreSymbolicExpressionType::Tuple(list) => acc.push_str(&format!(
-        //                 "\n{}{}",
-        //                 space,
-        //                 self.format_key_value_sugar(&list.to_vec(), &space)
-        //             )),
-        //             _ => acc.push_str(&format!(
-        //                 "\n{}{}",
-        //                 space,
-        //                 self.format_source_exprs(slice::from_ref(arg), &space)
-        //             )),
-        //         }
-        //     }
-
-        //     acc.push_str(&format!("\n{})", previous_indentation));
-        //     acc
-        // } else {
-        //     panic!("define-map without a name is invalid")
-        // }
     }
 
     // *begin* never on one line
