@@ -898,12 +898,20 @@ fn fund_genesis_account(
             let funding_result = stacks_rpc.post_transaction(&tx);
             deployer_nonce += 1;
 
-            if let Err(e) = funding_result {
-                let _ = devnet_event_tx_moved.send(DevnetEvent::error(format!(
-                    "Unable to fund {}: {}",
-                    account.stx_address, e
-                )));
+            let mut nb_of_founded_accounts = 0;
+            match funding_result {
+                Ok(_) => nb_of_founded_accounts += 1,
+                Err(e) => {
+                    let _ = devnet_event_tx_moved.send(DevnetEvent::error(format!(
+                        "Unable to fund {}: {}",
+                        account.stx_address, e
+                    )));
+                }
             }
+            let _ = devnet_event_tx_moved.send(DevnetEvent::info(format!(
+                "Funded {} accounts with sBTC",
+                nb_of_founded_accounts
+            )));
         }
     });
 }
@@ -1223,7 +1231,7 @@ mod test_rpc_client {
             &boot_completed,
         );
 
-        let timeout = Duration::from_secs(5);
+        let timeout = Duration::from_secs(3);
         let start = std::time::Instant::now();
 
         let mut received_events = Vec::new();
@@ -1239,10 +1247,10 @@ mod test_rpc_client {
             }
         }
 
+        assert_eq!(received_events.len(), 1);
         assert!(received_events.iter().any(|event| {
             if let DevnetEvent::Log(msg) = event {
-                msg.message
-                    .contains("Funded 100000000 STX to ST2JHG361ZXG51QTKY2NQCVBPPRRE2KZB1HR05NNC")
+                msg.message.contains("Funded 1 accounts with sBTC")
             } else {
                 false
             }
