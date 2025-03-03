@@ -81,7 +81,7 @@ fn sign_transaction_payload(
     let signer_addr = get_stacks_address(&public_key, network);
 
     let spending_condition = TransactionSpendingCondition::Singlesig(SinglesigSpendingCondition {
-        signer: signer_addr.bytes,
+        signer: *signer_addr.bytes(),
         nonce,
         tx_fee,
         hash_mode: SinglesigHashMode::P2PKH,
