@@ -28,7 +28,7 @@ use std::collections::{BTreeMap, HashMap};
 use std::fmt;
 use std::num::ParseIntError;
 
-#[cfg(feature = "cli")]
+#[cfg(not(target_arch = "wasm32"))]
 use clarity::vm::analysis::ContractAnalysis;
 
 use super::SessionSettings;
@@ -158,7 +158,7 @@ impl Session {
         }
     }
 
-    #[cfg(feature = "cli")]
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn process_console_input(
         &mut self,
         command: &str,
@@ -171,15 +171,15 @@ impl Session {
 
         let mut reload = false;
         match command {
-            #[cfg(feature = "cli")]
+            #[cfg(not(target_arch = "wasm32"))]
             cmd if cmd.starts_with("::reload") => reload = true,
-            #[cfg(feature = "cli")]
+            #[cfg(not(target_arch = "wasm32"))]
             cmd if cmd.starts_with("::read") => self.read(&mut output, cmd),
-            #[cfg(feature = "cli")]
+            #[cfg(not(target_arch = "wasm32"))]
             cmd if cmd.starts_with("::debug") => self.debug(&mut output, cmd),
-            #[cfg(feature = "cli")]
+            #[cfg(not(target_arch = "wasm32"))]
             cmd if cmd.starts_with("::trace") => self.trace(&mut output, cmd),
-            #[cfg(feature = "cli")]
+            #[cfg(not(target_arch = "wasm32"))]
             cmd if cmd.starts_with("::get_costs") => self.get_costs(&mut output, cmd),
 
             cmd if cmd.starts_with("::") => {
@@ -199,15 +199,15 @@ impl Session {
         match command {
             "::help" => self.display_help(),
 
-            #[cfg(feature = "cli")]
+            #[cfg(not(target_arch = "wasm32"))]
             cmd if cmd.starts_with("::functions") => self.display_functions(),
-            #[cfg(feature = "cli")]
+            #[cfg(not(target_arch = "wasm32"))]
             cmd if cmd.starts_with("::keywords") => self.keywords(),
-            #[cfg(feature = "cli")]
+            #[cfg(not(target_arch = "wasm32"))]
             cmd if cmd.starts_with("::describe") => self.display_doc(cmd),
-            #[cfg(feature = "cli")]
+            #[cfg(not(target_arch = "wasm32"))]
             cmd if cmd.starts_with("::toggle_costs") => self.toggle_costs(),
-            #[cfg(feature = "cli")]
+            #[cfg(not(target_arch = "wasm32"))]
             cmd if cmd.starts_with("::toggle_timings") => self.toggle_timings(),
 
             cmd if cmd.starts_with("::mint_stx") => self.mint_stx(cmd),
@@ -237,7 +237,7 @@ impl Session {
         }
     }
 
-    #[cfg(feature = "cli")]
+    #[cfg(not(target_arch = "wasm32"))]
     fn run_snippet(
         &mut self,
         output: &mut Vec<String>,
@@ -320,7 +320,7 @@ impl Session {
         execution_result
     }
 
-    #[cfg(feature = "cli")]
+    #[cfg(not(target_arch = "wasm32"))]
     fn get_costs_percentage(consumed: &u64, limit: &u64) -> String {
         let calc = (*consumed as f64 / *limit as f64) * 100_f64;
 
@@ -375,7 +375,7 @@ impl Session {
         }
     }
 
-    #[cfg(feature = "cli")]
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn debug(&mut self, output: &mut Vec<String>, cmd: &str) {
         use crate::repl::debug::cli::CLIDebugger;
 
@@ -404,7 +404,7 @@ impl Session {
         output.append(&mut result);
     }
 
-    #[cfg(feature = "cli")]
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn trace(&mut self, output: &mut Vec<String>, cmd: &str) {
         use super::tracer::Tracer;
 
@@ -427,7 +427,7 @@ impl Session {
         };
     }
 
-    #[cfg(feature = "cli")]
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn start(&mut self) -> Result<(String, Vec<(ContractAnalysis, String, String)>), String> {
         let mut output_err = Vec::<String>::new();
         let output = Vec::<String>::new();
@@ -464,7 +464,7 @@ impl Session {
         }
     }
 
-    #[cfg(feature = "cli")]
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn read(&mut self, output: &mut Vec<String>, cmd: &str) {
         let filename = match cmd.split_once(' ') {
             Some((_, filename)) => filename,
@@ -711,27 +711,27 @@ impl Session {
     fn display_help(&self) -> String {
         let mut output: Vec<String> = vec![];
 
-        #[cfg(feature = "cli")]
+        #[cfg(not(target_arch = "wasm32"))]
         output.push(format!(
             "{}",
             "::functions\t\t\t\tDisplay all the native functions available in clarity".yellow()
         ));
-        #[cfg(feature = "cli")]
+        #[cfg(not(target_arch = "wasm32"))]
         output.push(format!(
             "{}",
             "::keywords\t\t\t\tDisplay all the native keywords available in clarity".yellow()
         ));
-        #[cfg(feature = "cli")]
+        #[cfg(not(target_arch = "wasm32"))]
         output.push(format!(
             "{}",
                 "::describe <function> | <keyword>\tDisplay documentation for a given native function or keyword".yellow()
         ));
-        #[cfg(feature = "cli")]
+        #[cfg(not(target_arch = "wasm32"))]
         output.push(format!(
             "{}",
             "::toggle_costs\t\t\t\tDisplay cost analysis after every expression".yellow()
         ));
-        #[cfg(feature = "cli")]
+        #[cfg(not(target_arch = "wasm32"))]
         output.push(format!(
             "{}",
             "::toggle_timings\t\t\tDisplay the execution duration".yellow()
@@ -779,27 +779,27 @@ impl Session {
             "::get_epoch\t\t\t\tGet current epoch".yellow()
         ));
 
-        #[cfg(feature = "cli")]
+        #[cfg(not(target_arch = "wasm32"))]
         output.push(format!(
             "{}",
             "::debug <expr>\t\t\t\tStart an interactive debug session executing <expr>".yellow()
         ));
-        #[cfg(feature = "cli")]
+        #[cfg(not(target_arch = "wasm32"))]
         output.push(format!(
             "{}",
             "::trace <expr>\t\t\t\tGenerate an execution trace for <expr>".yellow()
         ));
-        #[cfg(feature = "cli")]
+        #[cfg(not(target_arch = "wasm32"))]
         output.push(format!(
             "{}",
             "::get_costs <expr>\t\t\tDisplay the cost analysis".yellow()
         ));
-        #[cfg(feature = "cli")]
+        #[cfg(not(target_arch = "wasm32"))]
         output.push(format!(
             "{}",
             "::reload \t\t\t\tReload the existing contract(s) in the session".yellow()
         ));
-        #[cfg(feature = "cli")]
+        #[cfg(not(target_arch = "wasm32"))]
         output.push(format!(
             "{}",
             "::read <filename>\t\t\tRead expressions from a file".yellow()
@@ -1052,7 +1052,7 @@ impl Session {
         format!("{}", value_to_string(&value).green())
     }
 
-    #[cfg(feature = "cli")]
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn get_costs(&mut self, output: &mut Vec<String>, cmd: &str) {
         let expr = match cmd.split_once(' ') {
             Some((_, expr)) => expr,
@@ -1102,7 +1102,7 @@ impl Session {
         Some(format!("{}", table))
     }
 
-    #[cfg(feature = "cli")]
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn get_contracts(&self) -> Option<String> {
         use super::boot::{BOOT_MAINNET_ADDRESS, BOOT_TESTNET_ADDRESS, SBTC_MAINNET_ADDRESS};
 
@@ -1140,7 +1140,7 @@ impl Session {
         Some(format!("{}", table))
     }
 
-    #[cfg(not(feature = "cli"))]
+    #[cfg(target_arch = "wasm32")]
     fn get_contracts(&self) -> Option<String> {
         if self.contracts.is_empty() {
             return None;
@@ -1179,13 +1179,13 @@ impl Session {
         }
     }
 
-    #[cfg(feature = "cli")]
+    #[cfg(not(target_arch = "wasm32"))]
     fn display_functions(&self) -> String {
         let api_reference_index = self.get_api_reference_index();
         format!("{}", api_reference_index.join("\n").yellow())
     }
 
-    #[cfg(feature = "cli")]
+    #[cfg(not(target_arch = "wasm32"))]
     fn display_doc(&self, command: &str) -> String {
         let keyword = {
             let mut s = command.to_string();
@@ -1203,7 +1203,7 @@ impl Session {
         }
     }
 
-    #[cfg(feature = "cli")]
+    #[cfg(not(target_arch = "wasm32"))]
     fn keywords(&self) -> String {
         let keywords = self.get_clarity_keywords();
         format!("{}", keywords.join("\n").yellow())

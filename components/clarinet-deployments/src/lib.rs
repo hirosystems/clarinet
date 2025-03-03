@@ -7,7 +7,7 @@ extern crate serde;
 extern crate serde_derive;
 
 pub mod diagnostic_digest;
-#[cfg(feature = "onchain")]
+#[cfg(not(target_arch = "wasm32"))]
 pub mod onchain;
 pub mod requirements;
 pub mod types;

@@ -8,7 +8,7 @@ pub mod session;
 pub mod settings;
 pub mod tracer;
 
-#[cfg(any(feature = "cli", feature = "dap"))]
+#[cfg(any(not(target_arch = "wasm32"), feature = "dap"))]
 pub mod debug;
 
 use serde::ser::{Serialize, SerializeMap, Serializer};
