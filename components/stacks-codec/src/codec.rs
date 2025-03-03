@@ -578,17 +578,11 @@ impl MultisigSpendingCondition {
     }
 
     pub fn address_mainnet(&self) -> StacksAddress {
-        StacksAddress {
-            version: C32_ADDRESS_VERSION_MAINNET_MULTISIG,
-            bytes: self.signer,
-        }
+        StacksAddress::new(C32_ADDRESS_VERSION_MAINNET_MULTISIG, self.signer).unwrap()
     }
 
     pub fn address_testnet(&self) -> StacksAddress {
-        StacksAddress {
-            version: C32_ADDRESS_VERSION_TESTNET_MULTISIG,
-            bytes: self.signer,
-        }
+        StacksAddress::new(C32_ADDRESS_VERSION_TESTNET_MULTISIG, self.signer).unwrap()
     }
 
     /// Authenticate a spending condition against an initial sighash.
@@ -653,7 +647,7 @@ impl MultisigSpendingCondition {
             self.signatures_required as usize,
             &pubkeys,
         ) {
-            Some(a) => a.bytes,
+            Some(a) => *a.bytes(),
             None => {
                 return Err(CodecError::SigningError(
                     "Failed to generate address from public keys".to_string(),
@@ -703,10 +697,7 @@ impl SinglesigSpendingCondition {
             SinglesigHashMode::P2PKH => C32_ADDRESS_VERSION_MAINNET_SINGLESIG,
             SinglesigHashMode::P2WPKH => C32_ADDRESS_VERSION_MAINNET_MULTISIG,
         };
-        StacksAddress {
-            version,
-            bytes: self.signer,
-        }
+        StacksAddress::new(version, self.signer).unwrap()
     }
 
     pub fn address_testnet(&self) -> StacksAddress {
@@ -714,10 +705,7 @@ impl SinglesigSpendingCondition {
             SinglesigHashMode::P2PKH => C32_ADDRESS_VERSION_TESTNET_SINGLESIG,
             SinglesigHashMode::P2WPKH => C32_ADDRESS_VERSION_TESTNET_MULTISIG,
         };
-        StacksAddress {
-            version,
-            bytes: self.signer,
-        }
+        StacksAddress::new(version, self.signer).unwrap()
     }
 
     /// Authenticate a spending condition against an initial sighash.
@@ -743,7 +731,7 @@ impl SinglesigSpendingCondition {
             1,
             &vec![pubkey],
         ) {
-            Some(a) => a.bytes,
+            Some(a) => *a.bytes(),
             None => {
                 return Err(CodecError::SigningError(
                     "Failed to generate address from public key".to_string(),
@@ -792,17 +780,11 @@ impl OrderIndependentMultisigSpendingCondition {
     }
 
     pub fn address_mainnet(&self) -> StacksAddress {
-        StacksAddress {
-            version: C32_ADDRESS_VERSION_MAINNET_MULTISIG,
-            bytes: self.signer,
-        }
+        StacksAddress::new(C32_ADDRESS_VERSION_MAINNET_MULTISIG, self.signer).unwrap()
     }
 
     pub fn address_testnet(&self) -> StacksAddress {
-        StacksAddress {
-            version: C32_ADDRESS_VERSION_TESTNET_MULTISIG,
-            bytes: self.signer,
-        }
+        StacksAddress::new(C32_ADDRESS_VERSION_TESTNET_MULTISIG, self.signer).unwrap()
     }
 
     /// Authenticate a spending condition against an initial sighash.
@@ -865,7 +847,7 @@ impl OrderIndependentMultisigSpendingCondition {
             self.signatures_required as usize,
             &pubkeys,
         ) {
-            Some(a) => a.bytes,
+            Some(a) => *a.bytes(),
             None => {
                 return Err(CodecError::SigningError(
                     "Failed to generate address from public keys".to_string(),
@@ -903,7 +885,7 @@ impl TransactionSpendingCondition {
 
         Some(TransactionSpendingCondition::Singlesig(
             SinglesigSpendingCondition {
-                signer: signer_addr.bytes,
+                signer: *signer_addr.bytes(),
                 nonce: 0,
                 tx_fee: 0,
                 hash_mode: SinglesigHashMode::P2PKH,
@@ -923,7 +905,7 @@ impl TransactionSpendingCondition {
 
         Some(TransactionSpendingCondition::Singlesig(
             SinglesigSpendingCondition {
-                signer: signer_addr.bytes,
+                signer: *signer_addr.bytes(),
                 nonce: 0,
                 tx_fee: 0,
                 hash_mode: SinglesigHashMode::P2WPKH,
@@ -946,7 +928,7 @@ impl TransactionSpendingCondition {
 
         Some(TransactionSpendingCondition::Multisig(
             MultisigSpendingCondition {
-                signer: signer_addr.bytes,
+                signer: *signer_addr.bytes(),
                 nonce: 0,
                 tx_fee: 0,
                 hash_mode: MultisigHashMode::P2SH,
@@ -969,7 +951,7 @@ impl TransactionSpendingCondition {
 
         Some(TransactionSpendingCondition::OrderIndependentMultisig(
             OrderIndependentMultisigSpendingCondition {
-                signer: signer_addr.bytes,
+                signer: *signer_addr.bytes(),
                 nonce: 0,
                 tx_fee: 0,
                 hash_mode: OrderIndependentMultisigHashMode::P2SH,
@@ -992,7 +974,7 @@ impl TransactionSpendingCondition {
 
         Some(TransactionSpendingCondition::OrderIndependentMultisig(
             OrderIndependentMultisigSpendingCondition {
-                signer: signer_addr.bytes,
+                signer: *signer_addr.bytes(),
                 nonce: 0,
                 tx_fee: 0,
                 hash_mode: OrderIndependentMultisigHashMode::P2WSH,
@@ -1015,7 +997,7 @@ impl TransactionSpendingCondition {
 
         Some(TransactionSpendingCondition::Multisig(
             MultisigSpendingCondition {
-                signer: signer_addr.bytes,
+                signer: *signer_addr.bytes(),
                 nonce: 0,
                 tx_fee: 0,
                 hash_mode: MultisigHashMode::P2WSH,
@@ -3022,7 +3004,7 @@ pub fn build_contract_call_transaction(
             .unwrap();
 
     let spending_condition = TransactionSpendingCondition::Singlesig(SinglesigSpendingCondition {
-        signer: signer_addr.bytes,
+        signer: *signer_addr.bytes(),
         nonce,
         tx_fee: fee,
         hash_mode: SinglesigHashMode::P2PKH,
