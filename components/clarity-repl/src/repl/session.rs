@@ -252,7 +252,7 @@ impl Session {
         ) {
             Ok((mut output, result)) => {
                 if let EvaluationResult::Contract(contract_result) = result.result.clone() {
-                    let snippet = format!("→ .{} contract successfully stored. Use (contract-call? ...) for invoking the public functions:", contract_result.contract.contract_identifier.clone());
+                    let snippet = format!("→ .{} contract successfully stored. Use (contract-call? ...) for invoking the public functions:", contract_result.contract.contract_identifier);
                     output.push(green!(snippet));
                 };
                 (output, result.cost.clone(), Ok(result))
@@ -394,7 +394,7 @@ impl Session {
         ) {
             Ok((mut output, result)) => {
                 if let EvaluationResult::Contract(contract_result) = result.result {
-                    let snippet = format!("→ .{} contract successfully stored. Use (contract-call? ...) for invoking the public functions:", contract_result.contract.contract_identifier.clone());
+                    let snippet = format!("→ .{} contract successfully stored. Use (contract-call? ...) for invoking the public functions:", contract_result.contract.contract_identifier);
                     output.push(snippet.green().to_string());
                 };
                 output
@@ -488,8 +488,8 @@ impl Session {
         amount: u64,
         recipient: &str,
     ) -> Result<ExecutionResult, Vec<Diagnostic>> {
-        let snippet = format!("(stx-transfer? u{} tx-sender '{})", amount, recipient);
-        self.eval(snippet.clone(), false)
+        let snippet = format!("(stx-transfer? u{amount} tx-sender '{recipient})");
+        self.eval(snippet, false)
     }
 
     pub fn deploy_contract(
@@ -619,15 +619,13 @@ impl Session {
 
         let result = self
             .interpreter
-            .run(&contract.clone(), None, cost_track, Some(hooks));
+            .run(&contract, None, cost_track, Some(hooks));
 
         match result {
             Ok(result) => {
                 if let EvaluationResult::Contract(contract_result) = &result.result {
-                    self.contracts.insert(
-                        contract_identifier.clone(),
-                        contract_result.contract.clone(),
-                    );
+                    self.contracts
+                        .insert(contract_identifier, contract_result.contract.clone());
                 };
                 Ok(result)
             }
@@ -664,15 +662,13 @@ impl Session {
 
         let result = self
             .interpreter
-            .run(&contract.clone(), None, cost_track, eval_hooks);
+            .run(&contract, None, cost_track, eval_hooks);
 
         match result {
             Ok(result) => {
                 if let EvaluationResult::Contract(contract_result) = &result.result {
-                    self.contracts.insert(
-                        contract_identifier.clone(),
-                        contract_result.contract.clone(),
-                    );
+                    self.contracts
+                        .insert(contract_identifier, contract_result.contract.clone());
                 };
                 Ok(result)
             }
@@ -692,7 +688,7 @@ impl Session {
         let mut keys = self
             .api_reference
             .keys()
-            .map(|k| k.to_string())
+            .map(String::from)
             .collect::<Vec<String>>();
         keys.sort();
         keys
@@ -702,7 +698,7 @@ impl Session {
         let mut keys = self
             .keywords_reference
             .keys()
-            .map(|k| k.to_string())
+            .map(String::from)
             .collect::<Vec<String>>();
         keys.sort();
         keys

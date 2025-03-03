@@ -2,9 +2,9 @@ use clarity::vm::diagnostic::{Diagnostic, Level};
 
 fn level_to_string(level: &Level) -> String {
     match level {
-        Level::Note => blue!("note:").to_string(),
-        Level::Warning => yellow!("warning:").to_string(),
-        Level::Error => red!("error:").to_string(),
+        Level::Note => blue!("note:"),
+        Level::Warning => yellow!("warning:"),
+        Level::Error => red!("error:"),
     }
 }
 

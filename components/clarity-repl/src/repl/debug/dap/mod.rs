@@ -1004,8 +1004,8 @@ impl EvalHook for DAPDebugger {
             } else {
                 let stack_frame = StackFrame {
                     id: (stack_trace.len() as i32 + 1),
-                    name: current_function.to_string().clone(),
-                    source: Some(source.clone()),
+                    name: current_function.to_string(),
+                    source: Some(source),
                     line: expr.span.start_line,
                     column: expr.span.start_column,
                     end_line: Some(expr.span.end_line),
