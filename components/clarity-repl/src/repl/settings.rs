@@ -171,8 +171,4 @@ impl RemoteDataSettings {
             is_mainnet: info.network_id == 1,
         })
     }
-
-    pub fn is_disabled(&self) -> bool {
-        !self.enabled
-    }
 }
