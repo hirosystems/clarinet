@@ -79,7 +79,6 @@ impl fmt::Display for ApiUrl {
 #[derive(Debug, Default, Clone, Deserialize, Serialize)]
 pub struct Settings {
     pub analysis: analysis::Settings,
-    #[serde(skip_serializing_if = "RemoteDataSettings::is_disabled")]
     pub remote_data: RemoteDataSettings,
     #[serde(skip_serializing, skip_deserializing)]
     pub clarity_wasm_mode: bool,
@@ -171,9 +170,5 @@ impl RemoteDataSettings {
             stacks_tip_height: info.stacks_tip_height,
             is_mainnet: info.network_id == 1,
         })
-    }
-
-    pub fn is_disabled(&self) -> bool {
-        !self.enabled
     }
 }
