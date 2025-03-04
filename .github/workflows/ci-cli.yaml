@@ -93,7 +93,7 @@ jobs:
           echo "RUST_VERSION_HASH=$(rustc --version | sha256sum | awk '{print $1}')" >> $GITHUB_ENV
 
       - name: Cache cargo
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/
@@ -168,7 +168,7 @@ jobs:
         run: echo "RUST_VERSION_HASH=$(rustc --version | sha256sum | awk '{print $1}')" >> $GITHUB_ENV
 
       - name: Cache cargo
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/
@@ -275,7 +275,7 @@ jobs:
         # can't easily run mac-arm64 tests in GH without native runners for that arch
         # and we already ran tests on x86_64-unknown-linux-gnu in the Code Coverage job, so skip
         if: matrix.target != 'aarch64-apple-darwin' && matrix.target != 'x86_64-unknown-linux-gnu'
-        run: cargo test --workspace --release --locked --exclude clarinet-sdk-wasm --exclude clarity-jupyter-kernel --target ${{ matrix.target }}
+        run: cargo test --workspace --release --locked --exclude clarinet-sdk-wasm --target ${{ matrix.target }}
 
   docker_images:
     name: Create Clarinet Docker Image
