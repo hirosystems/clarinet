@@ -79,7 +79,6 @@ impl fmt::Display for ApiUrl {
 #[derive(Debug, Default, Clone, Deserialize, Serialize)]
 pub struct Settings {
     pub analysis: analysis::Settings,
-    #[serde(skip_serializing_if = "RemoteDataSettings::is_disabled")]
     pub remote_data: RemoteDataSettings,
     #[serde(skip_serializing, skip_deserializing)]
     pub clarity_wasm_mode: bool,
