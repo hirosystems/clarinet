@@ -116,6 +116,8 @@ jobs:
           tool: cargo-llvm-cov,nextest
 
       - name: Run unit test with coverage
+        env:
+          HIRO_API_KEY: ${{ secrets.HIRO_KONG_API_KEY }}
         run: cargo cov
 
       - name: Upload coverage data to codecov
