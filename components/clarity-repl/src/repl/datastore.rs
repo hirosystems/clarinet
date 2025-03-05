@@ -530,7 +530,7 @@ impl ClarityBackingStore for ClarityDatastore {
         Some(&handle_contract_call_special_cases)
     }
 
-    #[cfg(feature = "sdk")]
+    #[cfg(not(target_arch = "wasm32"))]
     fn get_side_store(&mut self) -> &::clarity::rusqlite::Connection {
         panic!("Datastore cannot get_side_store")
     }

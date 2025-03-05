@@ -14,7 +14,7 @@ use clarity::vm::types::{QualifiedContractIdentifier, StandardPrincipalData, Val
 use clarity::vm::{eval, ClarityVersion};
 use clarity::vm::{ContractName, SymbolicExpressionType};
 
-#[cfg(feature = "cli")]
+#[cfg(not(target_arch = "wasm32"))]
 pub mod cli;
 #[cfg(feature = "dap")]
 pub mod dap;

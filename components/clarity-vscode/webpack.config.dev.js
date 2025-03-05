@@ -23,7 +23,7 @@ serverBrowserConfig.plugins = [
   }),
   new WasmPackPlugin({
     crateDirectory: path.resolve(__dirname, "../clarity-lsp"),
-    extraArgs: "--release --target=web --no-default-features --features=wasm",
+    extraArgs: "--release --target=web",
     outDir: path.resolve(__dirname, "server/src/clarity-lsp-browser"),
     outName: "lsp-browser",
   }),

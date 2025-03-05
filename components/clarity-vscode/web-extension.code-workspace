@@ -9,14 +9,12 @@
   ],
   "settings": {
     "rust-analyzer.cargo.noDefaultFeatures": true,
-    "rust-analyzer.cargo.features": ["clarity-lsp/wasm"],
     "rust-analyzer.check.overrideCommand": [
       "cargo",
       "clippy",
       "--target=wasm32-unknown-unknown",
       "--no-default-features",
       "--package=clarity-lsp",
-      "--features=wasm",
       "--message-format=json",
     ],
   },

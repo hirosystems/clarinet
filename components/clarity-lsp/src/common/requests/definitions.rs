@@ -8,7 +8,7 @@ use clarity_repl::clarity::vm::types::{QualifiedContractIdentifier, StandardPrin
 use clarity_repl::clarity::{ClarityName, SymbolicExpression};
 use lsp_types::Range;
 
-#[cfg(feature = "wasm")]
+#[cfg(target_arch = "wasm32")]
 #[allow(unused_imports)]
 use crate::utils::log;
 

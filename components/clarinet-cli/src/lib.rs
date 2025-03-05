@@ -12,7 +12,7 @@ pub mod deployments;
 pub mod generate;
 
 pub mod devnet;
-#[cfg(feature = "cli")]
+#[cfg(not(target_arch = "wasm32"))]
 pub mod frontend;
-#[cfg(feature = "cli")]
+#[cfg(not(target_arch = "wasm32"))]
 pub mod lsp;

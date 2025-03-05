@@ -1,4 +1,4 @@
-#[cfg(feature = "cli")]
+#[cfg(not(target_arch = "wasm32"))]
 #[macro_use]
 pub extern crate prettytable;
 
@@ -26,8 +26,8 @@ pub mod utils;
 #[cfg(test)]
 pub mod test_fixtures;
 
-#[cfg(feature = "cli")]
+#[cfg(not(target_arch = "wasm32"))]
 pub mod frontend;
 
-#[cfg(feature = "cli")]
+#[cfg(not(target_arch = "wasm32"))]
 pub use frontend::Terminal;
