@@ -8,6 +8,7 @@ use crate::orchestrator::ServicesMapHosts;
 use base58::FromBase58;
 use bitcoincore_rpc::bitcoin::Address;
 use chainhook_sdk::chainhooks::types::ChainhookStore;
+use chainhook_sdk::observer::PredicatesConfig;
 use chainhook_sdk::observer::{
     start_event_observer, EventObserverConfig, ObserverCommand, ObserverEvent,
     StacksChainMempoolEvent,
@@ -147,6 +148,7 @@ impl DevnetEventObserverConfig {
             bitcoin_network: chainhook_types::BitcoinNetwork::Regtest,
             stacks_network: chainhook_types::StacksNetwork::Devnet,
             prometheus_monitoring_port: None,
+            predicates_config: PredicatesConfig::default(),
         };
 
         DevnetEventObserverConfig {
@@ -417,6 +419,9 @@ pub async fn start_chains_coordinator(
                             Some(block) => block.clone(),
                             None => unreachable!(),
                         }
+                    }
+                    StacksChainEvent::ChainUpdatedWithNonConsensusEvents(_) => {
+                        continue;
                     }
                 };
 
