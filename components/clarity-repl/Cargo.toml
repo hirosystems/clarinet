@@ -24,7 +24,6 @@ categories = [
 [dependencies]
 chrono = "0.4.31"
 colored = { workspace = true }
-comfy-table = "7.1.4"
 regex = "1.7"
 reqwest = { workspace = true, features = ["blocking"] }
 serde = { version = "1", features = ["derive"] }
@@ -33,12 +32,15 @@ serde_json = { version = "1.0.47", features = ["unbounded_depth"] }
 sha2 = "0.10"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-pico-args = { version = "0.5.0" }
-rustyline = { version = "15.0.0" }
 clarity = { workspace = true, default-features = false, features = ["canonical", "developer-mode", "devtools", "log"] }
 clar2wasm = { git = "https://github.com/stacks-network/clarity-wasm.git", branch = "main" }
 pox-locking = { workspace = true, default-features = true }
+
+comfy-table = "7.1.4"
 hiro-system-kit = { path = "../hiro-system-kit", default-features = false, features = ["tokio_helpers"] }
+pico-args = { version = "0.5.0" }
+rustyline = { version = "15.0.0" }
+
 # DAP Debugger
 tokio = { version = "1.35.1", features = ["full"], optional = true }
 tokio-util = { version = "0.7.10", features = ["codec"], optional = true }
@@ -52,12 +54,14 @@ memchr = { version = "2.4.1", optional = true }
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 clarity = { workspace = true, features = ["wasm", "developer-mode", "devtools"] }
 pox-locking = { workspace = true, default-features = false, features = ["wasm"] }
-wasm-bindgen = { workspace = true }
-serde-wasm-bindgen = { version = "0.6.4" }
-web-sys = { workspace = true }
-js-sys = { version = "0.3" }
+
+comfy-table = { version = "7.1.4", default-features = false }
 getrandom = { version = "0.2.3", features = ["js"] }
+js-sys = { version = "0.3" }
 hiro-system-kit = { path = "../hiro-system-kit", default-features = false }
+serde-wasm-bindgen = { version = "0.6.4" }
+wasm-bindgen = { workspace = true }
+web-sys = { workspace = true }
 
 [dev-dependencies]
 test-case = "*"
