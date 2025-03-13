@@ -17,7 +17,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
             ]
             .as_ref(),
         )
-        .split(f.size());
+        .split(f.area());
 
     let devnet_status_components = Layout::default()
         .direction(Direction::Horizontal)
