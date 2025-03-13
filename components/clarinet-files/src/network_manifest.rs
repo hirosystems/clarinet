@@ -947,7 +947,7 @@ impl NetworkManifest {
                     .unwrap_or(500),
                 stacks_node_next_initiative_delay: devnet_config
                     .stacks_node_next_initiative_delay
-                    .unwrap_or(4000),
+                    .unwrap_or(3000),
                 stacks_api_port: devnet_config.stacks_api_port.unwrap_or(3999),
                 stacks_api_events_port: devnet_config.stacks_api_events_port.unwrap_or(3700),
                 stacks_explorer_port: devnet_config.stacks_explorer_port.unwrap_or(8000),
