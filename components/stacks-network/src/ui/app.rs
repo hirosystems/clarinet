@@ -10,7 +10,7 @@ use hiro_system_kit::slog;
 use ratatui::prelude::*;
 
 pub enum BlockData {
-    Block(StacksBlockData),
+    Block(Box<StacksBlockData>),
     Microblock(StacksMicroblockData),
 }
 
@@ -145,7 +145,7 @@ impl<'a> App<'a> {
             },
         ));
 
-        self.blocks.push(BlockData::Block(block));
+        self.blocks.push(BlockData::Block(Box::new(block)));
 
         if self.tabs.index != 0 {
             self.tabs.index += 1;
