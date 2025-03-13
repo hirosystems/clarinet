@@ -426,31 +426,27 @@ pub async fn start_chains_coordinator(
                 };
 
                 // if the sbtc-deposit contract is detected, fund the accounts with sBTC
-                if !boot_completed.load(Ordering::SeqCst) {
-                    stacks_block_update
-                        .block
-                        .transactions
-                        .iter()
-                        .for_each(|tx| {
-                            if let StacksTransactionKind::ContractDeployment(data) =
-                                &tx.metadata.kind
+                stacks_block_update
+                    .block
+                    .transactions
+                    .iter()
+                    .for_each(|tx| {
+                        if let StacksTransactionKind::ContractDeployment(data) = &tx.metadata.kind {
+                            let contract_identifier = data.contract_identifier.clone();
+                            let deployer = config.get_deployer();
+                            if contract_identifier
+                                == format!("{}.sbtc-deposit", deployer.stx_address)
                             {
-                                let contract_identifier = data.contract_identifier.clone();
-                                let deployer = config.get_deployer();
-                                if contract_identifier
-                                    == format!("{}.sbtc-deposit", deployer.stx_address)
-                                {
-                                    fund_genesis_account(
-                                        &devnet_event_tx,
-                                        &config.services_map_hosts,
-                                        &config.accounts,
-                                        config.deployment_fee_rate,
-                                        &boot_completed,
-                                    );
-                                }
+                                fund_genesis_account(
+                                    &devnet_event_tx,
+                                    &config.services_map_hosts,
+                                    &config.accounts,
+                                    config.deployment_fee_rate,
+                                    &boot_completed,
+                                );
                             }
-                        });
-                }
+                        }
+                    });
 
                 let _ = devnet_event_tx.send(DevnetEvent::StacksChainEvent(chain_event));
 
@@ -502,10 +498,10 @@ pub async fn start_chains_coordinator(
                         .saturating_sub(current_burn_height)
                         > 6
                     {
-                        std::thread::sleep(std::time::Duration::from_secs(1));
+                        std::thread::sleep(std::time::Duration::from_millis(750));
                     } else {
                         // as epoch 3.0 gets closer, bitcoin blocks need to slow down
-                        std::thread::sleep(std::time::Duration::from_secs(5));
+                        std::thread::sleep(std::time::Duration::from_millis(4000));
                     }
                     let res = mine_bitcoin_block(
                         &config.services_map_hosts.bitcoin_node_host,
