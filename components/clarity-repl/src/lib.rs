@@ -1,7 +1,3 @@
-#[cfg(not(target_arch = "wasm32"))]
-#[macro_use]
-pub extern crate prettytable;
-
 #[macro_use]
 extern crate serde_json;
 #[macro_use]

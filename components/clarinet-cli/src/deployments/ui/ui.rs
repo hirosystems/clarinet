@@ -9,7 +9,7 @@ use ratatui::{
 };
 
 pub fn draw(f: &mut Frame, app: &mut App) {
-    draw_contracts_status(f, app, f.size());
+    draw_contracts_status(f, app, f.area());
 }
 
 fn draw_contracts_status(f: &mut Frame, app: &mut App, area: Rect) {
