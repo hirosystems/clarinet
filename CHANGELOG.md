@@ -1,3 +1,15 @@
+# [2.15.2](https://github.com/hirosystems/clarinet/compare/v2.15.1...v2.15.2) (2025-03-14)
+
+##### Bug Fixes
+
+*  Improve devnet sbtc handling (#1710) (a7415519)
+
+##### Chores
+
+*  Update dependencies (#1711) (7ac428c0)
+*  Formatter caching (#1700) (329174ed)
+
+
 # [2.15.1](https://github.com/hirosystems/clarinet/compare/v2.15.0...v2.15.1) (2025-02-28)
 
 ##### Bug Fixes
