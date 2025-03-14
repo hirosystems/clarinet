@@ -12,6 +12,7 @@ use lsp_types::{
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::sync::{Arc, RwLock};
+use wasm_bindgen::JsValue;
 
 use super::requests::capabilities::{get_capabilities, InitializationOptions};
 
@@ -352,6 +353,15 @@ pub fn process_request(
                 Some(contract_location) => contract_location,
                 None => return Ok(LspRequestResponse::DocumentFormatting(None)),
             };
+
+            let contract_data = match editor_state
+                .try_read(|es| es.active_contracts.get(&contract_location).cloned())
+            {
+                Ok(Some(data)) => data,
+                _ => return Ok(LspRequestResponse::DocumentFormatting(None)),
+            };
+            let source = &contract_data.source;
+
             // Extract formatting options
             // Size of a tab in spaces.
             // pub tab_size: u32,
@@ -375,23 +385,10 @@ pub fn process_request(
             };
 
             let formatter = clarinet_format::formatter::ClarityFormatter::new(formatting_options);
-            let file_path = match contract_location {
-                clarinet_files::FileLocation::FileSystem { path } => {
-                    path.to_str().unwrap_or_default().to_string()
-                }
-                clarinet_files::FileLocation::Url { url } => url.to_string(),
-            };
 
-            let source = match fs::read_to_string(&file_path) {
-                Ok(content) => content,
-                Err(err) => {
-                    println!("Error reading file '{}': {}", file_path, err);
-                    return Ok(LspRequestResponse::DocumentFormatting(None));
-                }
-            };
-
+            web_sys::console::log_1(&JsValue::from("Starting formatting..."));
             // Format the file and handle any formatting errors
-            let formatted_result = formatter.format_file(&source);
+            let formatted_result = formatter.format_file(source);
             let text_edit = lsp_types::TextEdit {
                 range: lsp_types::Range {
                     start: lsp_types::Position {
