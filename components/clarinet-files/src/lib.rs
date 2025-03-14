@@ -10,9 +10,9 @@ mod project_manifest;
 
 pub use network_manifest::{BitcoinNetwork, StacksNetwork};
 
-#[cfg(feature = "wasm")]
+#[cfg(target_arch = "wasm32")]
 mod wasm_fs_accessor;
-#[cfg(feature = "wasm")]
+#[cfg(target_arch = "wasm32")]
 pub use wasm_fs_accessor::WASMFileSystemAccessor;
 
 pub use network_manifest::{
@@ -103,7 +103,7 @@ impl FileLocation {
         let url = Url::from_str(url_string)
             .map_err(|e| format!("unable to parse {} as a url\n{:?}", url_string, e))?;
 
-        #[cfg(not(feature = "wasm"))]
+        #[cfg(not(target_arch = "wasm32"))]
         if url.scheme() == "file" {
             let path = url
                 .to_file_path()
@@ -317,7 +317,7 @@ impl FileLocation {
         let bytes = match &self {
             FileLocation::FileSystem { path } => FileLocation::fs_read_content(path),
             FileLocation::Url { url } => match url.scheme() {
-                #[cfg(not(feature = "wasm"))]
+                #[cfg(not(target_arch = "wasm32"))]
                 "file" => {
                     let path = url
                         .to_file_path()
@@ -351,7 +351,7 @@ impl FileLocation {
 
     pub fn to_url_string(&self) -> Result<String, String> {
         match self {
-            #[cfg(not(feature = "wasm"))]
+            #[cfg(not(target_arch = "wasm32"))]
             FileLocation::FileSystem { path } => {
                 let file_path = self.to_string();
                 let url = Url::from_file_path(file_path)

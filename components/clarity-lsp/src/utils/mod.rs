@@ -7,14 +7,14 @@ use lsp_types::Url;
 use lsp_types::{DiagnosticSeverity, Position, Range};
 
 #[allow(unused_macros)]
-#[cfg(feature = "wasm")]
+#[cfg(target_arch = "wasm32")]
 macro_rules! log {
     ( $( $t:tt )* ) => {
         web_sys::console::log_1(&format!( $( $t )* ).into());
     }
 }
 
-#[cfg(feature = "wasm")]
+#[cfg(target_arch = "wasm32")]
 pub(crate) use log;
 
 pub fn clarity_diagnostics_to_lsp_type(diagnostics: &Vec<ClarityDiagnostic>) -> Vec<LspDiagnostic> {

@@ -3,8 +3,11 @@ name = "clarinet-format"
 version = "0.1.0"
 edition = "2021"
 
-[dependencies]
-clarity = { workspace = true}
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+clarity = { workspace = true, features = ["canonical", "developer-mode", "devtools", "log"] }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+clarity = { workspace = true, features = ["wasm", "developer-mode", "devtools"] }
 
 [dev-dependencies]
 pretty_assertions = "1.3"
@@ -13,21 +16,6 @@ divan = "0.1"
 [[bench]]
 name = "formatter"
 harness = false
-
-[features]
-default = ["cli"]
-cli = [
-    "clarity/canonical",
-    "clarity/developer-mode",
-    "clarity/devtools",
-    "clarity/log",
-]
-wasm = [
-    "clarity/wasm",
-    "clarity/developer-mode",
-    "clarity/devtools",
-]
-
 
 [lib]
 name = "clarinet_format"

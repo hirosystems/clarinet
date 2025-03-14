@@ -8,39 +8,19 @@ lsp-types = "0.94.0"
 regex = "1.7"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1.0"
-clarinet-files = { path = "../clarinet-files", default-features = false }
-clarinet-format = { path = "../clarinet-format", default-features = false }
-clarity-repl = { path = "../clarity-repl", default-features = false, optional = true }
-clarinet-deployments = { path = "../clarinet-deployments", default-features = false }
+clarinet-format = { path = "../clarinet-format" }
+clarinet-files = { path = "../clarinet-files" }
+clarity-repl = { path = "../clarity-repl", default-features = false }
+clarinet-deployments = { path = "../clarinet-deployments" }
 
-# WASM
-console_error_panic_hook = { version = "0.1", optional = true }
-js-sys = { version = "0.3", optional = true }
-serde-wasm-bindgen = { version = "0.6.4", optional = true }
-wasm-bindgen = { workspace = true, optional = true }
-wasm-bindgen-futures = { workspace = true, optional = true }
-web-sys = { workspace = true, features = ["console"], optional = true }
-
-[features]
-default = ["cli"]
-cli = [
-  "clarinet-deployments/cli",
-  "clarinet-deployments/cli",
-  "clarity-repl/cli",
-  "clarinet-files/cli",
-]
-wasm = [
-  "wasm-bindgen",
-  "wasm-bindgen-futures",
-  "serde-wasm-bindgen",
-  "js-sys",
-  "web-sys",
-  "console_error_panic_hook",
-  "clarinet-deployments/wasm",
-  "clarity-repl/wasm",
-  "clarity-repl/web",
-  "clarinet-files/wasm",
-]
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+console_error_panic_hook = { version = "0.1" }
+js-sys = { version = "0.3" }
+serde-wasm-bindgen = { version = "0.6.4" }
+wasm-bindgen = { workspace = true }
+wasm-bindgen-futures = { workspace = true }
+web-sys = { workspace = true, features = ["console"] }
+clarity-repl = { path = "../clarity-repl", default-features = false, features = ["web"] }
 
 [lib]
 crate-type = ["cdylib", "rlib"]

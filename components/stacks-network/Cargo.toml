@@ -35,8 +35,8 @@ chainhook-sdk = { version = "0.12" }
 chainhook-types = { version = "1.3.7" }
 
 stacks-rpc-client = { path = "../stacks-rpc-client" }
-clarinet-files = { path = "../clarinet-files", features = ["cli"] }
-clarinet-deployments = { path = "../clarinet-deployments", features = ["cli"] }
+clarinet-files = { path = "../clarinet-files" }
+clarinet-deployments = { path = "../clarinet-deployments" }
 hiro-system-kit = { path = "../hiro-system-kit", features = ["log"] }
 stacks-codec = { path = "../stacks-codec" }
 

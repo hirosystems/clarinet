@@ -9,7 +9,7 @@ use clarity::consts::{CHAIN_ID_MAINNET, CHAIN_ID_TESTNET};
 use clarity::types::StacksEpochId;
 use clarity::vm::analysis::ContractAnalysis;
 use clarity::vm::ast::{build_ast_with_diagnostics, ContractAST};
-#[cfg(feature = "cli")]
+#[cfg(not(target_arch = "wasm32"))]
 use clarity::vm::clarity_wasm::{call_function, initialize_contract};
 use clarity::vm::contexts::{CallStack, ContractContext, Environment, GlobalContext, LocalContext};
 use clarity::vm::contracts::Contract;
@@ -90,13 +90,13 @@ impl ClarityInterpreter {
         cost_track: bool,
         eval_hooks: Option<Vec<&mut dyn EvalHook>>,
     ) -> Result<ExecutionResult, Vec<Diagnostic>> {
-        #[cfg(feature = "cli")]
+        #[cfg(not(target_arch = "wasm32"))]
         if self.repl_settings.clarity_wasm_mode {
             self.run_wasm(contract, ast, cost_track, None)
         } else {
             self.run_interpreter(contract, ast, cost_track, eval_hooks)
         }
-        #[cfg(not(feature = "cli"))]
+        #[cfg(target_arch = "wasm32")]
         self.run_interpreter(contract, ast, cost_track, eval_hooks)
     }
 
@@ -148,7 +148,7 @@ impl ClarityInterpreter {
         Ok(result)
     }
 
-    #[cfg(feature = "cli")]
+    #[cfg(not(target_arch = "wasm32"))]
     fn run_wasm(
         &mut self,
         contract: &ClarityContract,
@@ -435,7 +435,7 @@ impl ClarityInterpreter {
         let mut contract_context =
             ContractContext::new(contract_id.clone(), contract.clarity_version);
 
-        #[cfg(not(feature = "wasm"))]
+        #[cfg(not(target_arch = "wasm32"))]
         let show_timings = self.repl_settings.show_timings;
 
         let tx_sender: PrincipalData = self.tx_sender.clone().into();
@@ -628,7 +628,7 @@ impl ClarityInterpreter {
         Ok(execution_result)
     }
 
-    #[cfg(feature = "cli")]
+    #[cfg(not(target_arch = "wasm32"))]
     fn execute_wasm(
         &mut self,
         contract: &ClarityContract,

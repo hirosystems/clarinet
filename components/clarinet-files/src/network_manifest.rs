@@ -34,7 +34,7 @@ pub const DEFAULT_SUBNET_MNEMONIC: &str = "twice kind fence tip hidden tilt acti
 pub const DEFAULT_DOCKER_SOCKET: &str = "unix:///var/run/docker.sock";
 #[cfg(windows)]
 pub const DEFAULT_DOCKER_SOCKET: &str = "npipe:////./pipe/docker_engine";
-#[cfg(target_family = "wasm")]
+#[cfg(target_arch = "wasm32")]
 pub const DEFAULT_DOCKER_SOCKET: &str = "/var/run/docker.sock";
 pub const DEFAULT_DOCKER_PLATFORM: &str = "linux/amd64";
 
@@ -947,7 +947,7 @@ impl NetworkManifest {
                     .unwrap_or(500),
                 stacks_node_next_initiative_delay: devnet_config
                     .stacks_node_next_initiative_delay
-                    .unwrap_or(4000),
+                    .unwrap_or(3000),
                 stacks_api_port: devnet_config.stacks_api_port.unwrap_or(3999),
                 stacks_api_events_port: devnet_config.stacks_api_events_port.unwrap_or(3700),
                 stacks_explorer_port: devnet_config.stacks_explorer_port.unwrap_or(8000),
@@ -1149,7 +1149,7 @@ pub fn compute_addresses(
     (stx_address.to_string(), btc_address, miner_secret_key_hex)
 }
 
-#[cfg(not(feature = "wasm"))]
+#[cfg(not(target_arch = "wasm32"))]
 fn compute_btc_address(public_key: &PublicKey, network: &BitcoinNetwork) -> String {
     let public_key = bitcoin::PublicKey::from_slice(&public_key.serialize_compressed())
         .expect("Unable to recreate public key");
@@ -1186,7 +1186,7 @@ pub fn is_in_reward_phase(
     }
 }
 
-#[cfg(feature = "wasm")]
+#[cfg(target_arch = "wasm32")]
 fn compute_btc_address(_public_key: &PublicKey, _network: &BitcoinNetwork) -> String {
     "__not_implemented__".to_string()
 }

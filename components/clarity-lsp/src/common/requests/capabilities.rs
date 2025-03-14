@@ -1,7 +1,7 @@
 use lsp_types::{
-    CompletionOptions, DocumentFormattingOptions, HoverProviderCapability, ServerCapabilities,
-    SignatureHelpOptions, TextDocumentSyncCapability, TextDocumentSyncKind,
-    TextDocumentSyncOptions, TextDocumentSyncSaveOptions,
+    CompletionOptions, HoverProviderCapability, ServerCapabilities, SignatureHelpOptions,
+    TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
+    TextDocumentSyncSaveOptions,
 };
 use serde::{Deserialize, Serialize};
 
