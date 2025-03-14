@@ -1,6 +1,6 @@
 {
   "name": "@hirosystems/clarinet-sdk-browser",
-  "version": "2.15.1",
+  "version": "2.15.2",
   "description": "A SDK to interact with Clarity Smart Contracts in the browser",
   "homepage": "https://www.hiro.so/clarinet",
   "repository": {
