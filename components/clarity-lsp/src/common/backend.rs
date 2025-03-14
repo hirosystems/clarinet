@@ -354,6 +354,7 @@ pub fn process_request(
                 None => return Ok(LspRequestResponse::DocumentFormatting(None)),
             };
 
+            // get the source
             let contract_data = match editor_state
                 .try_read(|es| es.active_contracts.get(&contract_location).cloned())
             {
@@ -375,13 +376,24 @@ pub fn process_request(
             let tab_size = param.options.tab_size as usize;
             let prefer_space = param.options.insert_spaces;
             let props = param.options.properties;
+            let max_line_length = props
+                .get("maxLineLength")
+                .and_then(|value| {
+                    // FormattingProperty can be boolean, number, or string
+                    match value {
+                        lsp_types::FormattingProperty::Number(num) => Some(*num as usize),
+                        lsp_types::FormattingProperty::String(s) => s.parse::<usize>().ok(),
+                        _ => None,
+                    }
+                })
+                .unwrap_or(80); // Default to 80 if not specified
             let formatting_options = clarinet_format::formatter::Settings {
                 indentation: if !prefer_space {
                     clarinet_format::formatter::Indentation::Tab
                 } else {
                     clarinet_format::formatter::Indentation::Space(tab_size)
                 },
-                max_line_length: 80, // TODO
+                max_line_length,
             };
 
             let formatter = clarinet_format::formatter::ClarityFormatter::new(formatting_options);
@@ -412,7 +424,7 @@ pub fn process_request(
                 None => return Ok(LspRequestResponse::DocumentRangeFormatting(None)),
             };
 
-            // Get the in-memory content
+            // Get the source
             let contract_data = match editor_state
                 .try_read(|es| es.active_contracts.get(&contract_location).cloned())
             {
@@ -422,8 +434,20 @@ pub fn process_request(
 
             let source = &contract_data.source;
 
-            // Set up formatter with the same options
             let tab_size = param.options.tab_size as usize;
+            let max_line_length = param
+                .options
+                .properties
+                .get("maxLineLength")
+                .and_then(|value| {
+                    // FormattingProperty can be boolean, number, or string
+                    match value {
+                        lsp_types::FormattingProperty::Number(num) => Some(*num as usize),
+                        lsp_types::FormattingProperty::String(s) => s.parse::<usize>().ok(),
+                        _ => None,
+                    }
+                })
+                .unwrap_or(80); // Default to 80 if not specified
             let prefer_space = param.options.insert_spaces;
             let formatting_options = clarinet_format::formatter::Settings {
                 indentation: if !prefer_space {
@@ -431,7 +455,7 @@ pub fn process_request(
                 } else {
                     clarinet_format::formatter::Indentation::Space(tab_size)
                 },
-                max_line_length: 80, // TODO: get from settings
+                max_line_length,
             };
 
             // We need to extract the text of just this range to format it
@@ -480,7 +504,6 @@ pub fn process_request(
             let formatter = clarinet_format::formatter::ClarityFormatter::new(formatting_options);
             let formatted_result = formatter.format_section(&range_text);
 
-            // Create the text edit
             let text_edit = lsp_types::TextEdit {
                 range: param.range,
                 new_text: formatted_result,
