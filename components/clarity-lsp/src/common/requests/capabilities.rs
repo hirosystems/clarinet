@@ -1,7 +1,7 @@
 use lsp_types::{
-    CompletionOptions, HoverProviderCapability, ServerCapabilities, SignatureHelpOptions,
-    TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
-    TextDocumentSyncSaveOptions,
+    CompletionOptions, DocumentFormattingOptions, HoverProviderCapability, ServerCapabilities,
+    SignatureHelpOptions, TextDocumentSyncCapability, TextDocumentSyncKind,
+    TextDocumentSyncOptions, TextDocumentSyncSaveOptions,
 };
 use serde::{Deserialize, Serialize};
 
@@ -12,6 +12,7 @@ pub struct InitializationOptions {
     pub completion_smart_parenthesis_wrap: bool,
     pub completion_include_native_placeholders: bool,
     document_symbols: bool,
+    formatting: bool,
     go_to_definition: bool,
     hover: bool,
     signature_help: bool,
@@ -24,6 +25,7 @@ impl InitializationOptions {
             completion_smart_parenthesis_wrap: true,
             completion_include_native_placeholders: true,
             document_symbols: false,
+            formatting: true,
             go_to_definition: true,
             hover: true,
             signature_help: true,
@@ -51,6 +53,14 @@ pub fn get_capabilities(initialization_options: &InitializationOptions) -> Serve
             false => None,
         },
         document_symbol_provider: match initialization_options.document_symbols {
+            true => Some(lsp_types::OneOf::Left(true)),
+            false => None,
+        },
+        document_formatting_provider: match initialization_options.formatting {
+            true => Some(lsp_types::OneOf::Left(true)),
+            false => None,
+        },
+        document_range_formatting_provider: match initialization_options.formatting {
             true => Some(lsp_types::OneOf::Left(true)),
             false => None,
         },

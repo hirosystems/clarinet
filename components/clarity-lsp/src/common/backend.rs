@@ -5,11 +5,12 @@ use clarinet_files::{FileAccessor, FileLocation, ProjectManifest};
 use clarity_repl::clarity::diagnostic::Diagnostic;
 use clarity_repl::repl::ContractDeployer;
 use lsp_types::{
-    CompletionItem, CompletionParams, DocumentSymbol, DocumentSymbolParams, GotoDefinitionParams,
-    Hover, HoverParams, InitializeParams, InitializeResult, Location, SignatureHelp,
-    SignatureHelpParams,
+    CompletionItem, CompletionParams, DocumentFormattingParams, DocumentSymbol,
+    DocumentSymbolParams, GotoDefinitionParams, Hover, HoverParams, InitializeParams,
+    InitializeResult, Location, SignatureHelp, SignatureHelpParams, TextEdit,
 };
 use serde::{Deserialize, Serialize};
+use std::fs;
 use std::sync::{Arc, RwLock};
 
 use super::requests::capabilities::{get_capabilities, InitializationOptions};
@@ -259,6 +260,7 @@ pub enum LspRequest {
     Definition(GotoDefinitionParams),
     Hover(HoverParams),
     DocumentSymbol(DocumentSymbolParams),
+    DocumentFormatting(DocumentFormattingParams),
     Initialize(Box<InitializeParams>),
 }
 
@@ -268,6 +270,7 @@ pub enum LspRequestResponse {
     SignatureHelp(Option<SignatureHelp>),
     Definition(Option<Location>),
     DocumentSymbol(Vec<DocumentSymbol>),
+    DocumentFormatting(Option<Vec<TextEdit>>),
     Hover(Option<Hover>),
     Initialize(Box<InitializeResult>),
 }
@@ -342,6 +345,69 @@ pub fn process_request(
                 .try_read(|es| es.get_document_symbols_for_contract(&contract_location))
                 .unwrap_or_default();
             Ok(LspRequestResponse::DocumentSymbol(document_symbols))
+        }
+        LspRequest::DocumentFormatting(param) => {
+            let file_url = param.text_document.uri;
+            let contract_location = match get_contract_location(&file_url) {
+                Some(contract_location) => contract_location,
+                None => return Ok(LspRequestResponse::DocumentFormatting(None)),
+            };
+            // Extract formatting options
+            // Size of a tab in spaces.
+            // pub tab_size: u32,
+
+            // Prefer spaces over tabs.
+            // pub insert_spaces: bool,
+            // TODO: handle formatting options
+            // `param.options` and `editor_state.settings.<formatting_options>`
+            // formatting_options accepts arbitrary custom props
+            // `[key: string]: boolean | integer | string;`
+            let tab_size = param.options.tab_size as usize;
+            let prefer_space = param.options.insert_spaces;
+            let props = param.options.properties;
+            let formatting_options = clarinet_format::formatter::Settings {
+                indentation: if !prefer_space {
+                    clarinet_format::formatter::Indentation::Tab
+                } else {
+                    clarinet_format::formatter::Indentation::Space(tab_size)
+                },
+                max_line_length: 80, // TODO
+            };
+
+            let formatter = clarinet_format::formatter::ClarityFormatter::new(formatting_options);
+            let file_path = match contract_location {
+                clarinet_files::FileLocation::FileSystem { path } => {
+                    path.to_str().unwrap_or_default().to_string()
+                }
+                clarinet_files::FileLocation::Url { url } => url.to_string(),
+            };
+
+            let source = match fs::read_to_string(&file_path) {
+                Ok(content) => content,
+                Err(err) => {
+                    println!("Error reading file '{}': {}", file_path, err);
+                    return Ok(LspRequestResponse::DocumentFormatting(None));
+                }
+            };
+
+            // Format the file and handle any formatting errors
+            let formatted_result = formatter.format_file(&source);
+            let text_edit = lsp_types::TextEdit {
+                range: lsp_types::Range {
+                    start: lsp_types::Position {
+                        line: 0,
+                        character: 0,
+                    },
+                    end: lsp_types::Position {
+                        line: source.lines().count() as u32,
+                        character: 0,
+                    },
+                },
+                new_text: formatted_result,
+            };
+            Ok(LspRequestResponse::DocumentFormatting(Some(vec![
+                text_edit,
+            ])))
         }
 
         LspRequest::Hover(params) => {
