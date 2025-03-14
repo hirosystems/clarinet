@@ -5,14 +5,12 @@ use clarinet_files::{FileAccessor, FileLocation, ProjectManifest};
 use clarity_repl::clarity::diagnostic::Diagnostic;
 use clarity_repl::repl::ContractDeployer;
 use lsp_types::{
-    CompletionItem, CompletionParams, DocumentFormattingParams, DocumentSymbol,
-    DocumentSymbolParams, GotoDefinitionParams, Hover, HoverParams, InitializeParams,
-    InitializeResult, Location, SignatureHelp, SignatureHelpParams, TextEdit,
+    CompletionItem, CompletionParams, DocumentFormattingParams, DocumentRangeFormattingParams,
+    DocumentSymbol, DocumentSymbolParams, GotoDefinitionParams, Hover, HoverParams,
+    InitializeParams, InitializeResult, Location, SignatureHelp, SignatureHelpParams, TextEdit,
 };
 use serde::{Deserialize, Serialize};
-use std::fs;
 use std::sync::{Arc, RwLock};
-use wasm_bindgen::JsValue;
 
 use super::requests::capabilities::{get_capabilities, InitializationOptions};
 
@@ -262,6 +260,7 @@ pub enum LspRequest {
     Hover(HoverParams),
     DocumentSymbol(DocumentSymbolParams),
     DocumentFormatting(DocumentFormattingParams),
+    DocumentRangeFormatting(DocumentRangeFormattingParams),
     Initialize(Box<InitializeParams>),
 }
 
@@ -272,6 +271,7 @@ pub enum LspRequestResponse {
     Definition(Option<Location>),
     DocumentSymbol(Vec<DocumentSymbol>),
     DocumentFormatting(Option<Vec<TextEdit>>),
+    DocumentRangeFormatting(Option<Vec<TextEdit>>),
     Hover(Option<Hover>),
     Initialize(Box<InitializeResult>),
 }
@@ -386,7 +386,6 @@ pub fn process_request(
 
             let formatter = clarinet_format::formatter::ClarityFormatter::new(formatting_options);
 
-            web_sys::console::log_1(&JsValue::from("Starting formatting..."));
             // Format the file and handle any formatting errors
             let formatted_result = formatter.format_file(source);
             let text_edit = lsp_types::TextEdit {
@@ -403,6 +402,91 @@ pub fn process_request(
                 new_text: formatted_result,
             };
             Ok(LspRequestResponse::DocumentFormatting(Some(vec![
+                text_edit,
+            ])))
+        }
+        LspRequest::DocumentRangeFormatting(param) => {
+            let file_url = param.text_document.uri;
+            let contract_location = match get_contract_location(&file_url) {
+                Some(contract_location) => contract_location,
+                None => return Ok(LspRequestResponse::DocumentRangeFormatting(None)),
+            };
+
+            // Get the in-memory content
+            let contract_data = match editor_state
+                .try_read(|es| es.active_contracts.get(&contract_location).cloned())
+            {
+                Ok(Some(data)) => data,
+                _ => return Ok(LspRequestResponse::DocumentRangeFormatting(None)),
+            };
+
+            let source = &contract_data.source;
+
+            // Set up formatter with the same options
+            let tab_size = param.options.tab_size as usize;
+            let prefer_space = param.options.insert_spaces;
+            let formatting_options = clarinet_format::formatter::Settings {
+                indentation: if !prefer_space {
+                    clarinet_format::formatter::Indentation::Tab
+                } else {
+                    clarinet_format::formatter::Indentation::Space(tab_size)
+                },
+                max_line_length: 80, // TODO: get from settings
+            };
+
+            // We need to extract the text of just this range to format it
+            let lines: Vec<&str> = source.lines().collect();
+            let start_line = param.range.start.line as usize;
+            let end_line = param.range.end.line as usize;
+
+            // Get the substring representing just the selected range
+            let range_text = if start_line == end_line {
+                // Single line selection
+                let line = lines.get(start_line).unwrap_or(&"");
+                let start_char = param.range.start.character as usize;
+                let end_char = param.range.end.character as usize;
+                let start_char = start_char.min(line.len());
+                let end_char = end_char.min(line.len());
+                line[start_char..end_char].to_string()
+            } else {
+                // Multiline selection
+                let mut result = String::new();
+
+                // First line (might be partial)
+                if let Some(first_line) = lines.get(start_line) {
+                    let start_char = (param.range.start.character as usize).min(first_line.len());
+                    result.push_str(&first_line[start_char..]);
+                    result.push('\n');
+                }
+
+                // Middle lines (complete lines)
+                for line_idx in (start_line + 1)..end_line {
+                    if let Some(line) = lines.get(line_idx) {
+                        result.push_str(line);
+                        result.push('\n');
+                    }
+                }
+
+                // Last line (might be partial)
+                if let Some(last_line) = lines.get(end_line) {
+                    let end_char = (param.range.end.character as usize).min(last_line.len());
+                    result.push_str(&last_line[..end_char]);
+                }
+
+                result
+            };
+
+            // Format just the selected text
+            let formatter = clarinet_format::formatter::ClarityFormatter::new(formatting_options);
+            let formatted_result = formatter.format_section(&range_text);
+
+            // Create the text edit
+            let text_edit = lsp_types::TextEdit {
+                range: param.range,
+                new_text: formatted_result,
+            };
+
+            Ok(LspRequestResponse::DocumentRangeFormatting(Some(vec![
                 text_edit,
             ])))
         }

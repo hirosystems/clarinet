@@ -13,7 +13,7 @@ use lsp_types::notification::{
 };
 use lsp_types::request::{
     Completion, DocumentSymbolRequest, Formatting, GotoDefinition, HoverRequest, Initialize,
-    Request, SignatureHelpRequest,
+    RangeFormatting, Request, SignatureHelpRequest,
 };
 use lsp_types::{
     DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
@@ -245,6 +245,16 @@ impl LspVscodeBridge {
                     &EditorStateInput::RwLock(self.editor_state_lock.clone()),
                 );
                 if let Ok(LspRequestResponse::DocumentSymbol(response)) = lsp_response {
+                    return response.serialize(&serializer).map_err(|_| JsValue::NULL);
+                }
+            }
+
+            RangeFormatting::METHOD => {
+                let lsp_response = process_request(
+                    LspRequest::DocumentRangeFormatting(decode_from_js(js_params)?),
+                    &EditorStateInput::RwLock(self.editor_state_lock.clone()),
+                );
+                if let Ok(LspRequestResponse::DocumentRangeFormatting(response)) = lsp_response {
                     return response.serialize(&serializer).map_err(|_| JsValue::NULL);
                 }
             }
