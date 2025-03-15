@@ -93,6 +93,12 @@
             "order": 0,
             "description": "If set to true, the auto-completion of native functions will include placeholders for the arguments."
           },
+          "clarity-lsp.format": {
+            "type": "boolean",
+            "default": true,
+            "order": 0,
+            "description": "If set to true, clarity files will be formatted on save"
+          },
           "clarity-lsp.hover": {
             "type": "boolean",
             "default": true,
