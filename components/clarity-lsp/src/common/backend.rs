@@ -354,7 +354,6 @@ pub fn process_request(
                 None => return Ok(LspRequestResponse::DocumentFormatting(None)),
             };
 
-            // get the source
             let contract_data = match editor_state
                 .try_read(|es| es.active_contracts.get(&contract_location).cloned())
             {
@@ -363,16 +362,6 @@ pub fn process_request(
             };
             let source = &contract_data.source;
 
-            // Extract formatting options
-            // Size of a tab in spaces.
-            // pub tab_size: u32,
-
-            // Prefer spaces over tabs.
-            // pub insert_spaces: bool,
-            // TODO: handle formatting options
-            // `param.options` and `editor_state.settings.<formatting_options>`
-            // formatting_options accepts arbitrary custom props
-            // `[key: string]: boolean | integer | string;`
             let tab_size = param.options.tab_size as usize;
             let prefer_space = param.options.insert_spaces;
             let props = param.options.properties;
@@ -386,7 +375,7 @@ pub fn process_request(
                         _ => None,
                     }
                 })
-                .unwrap_or(80); // Default to 80 if not specified
+                .unwrap_or(80);
             let formatting_options = clarinet_format::formatter::Settings {
                 indentation: if !prefer_space {
                     clarinet_format::formatter::Indentation::Tab
@@ -397,8 +386,6 @@ pub fn process_request(
             };
 
             let formatter = clarinet_format::formatter::ClarityFormatter::new(formatting_options);
-
-            // Format the file and handle any formatting errors
             let formatted_result = formatter.format_file(source);
             let text_edit = lsp_types::TextEdit {
                 range: lsp_types::Range {
@@ -424,7 +411,6 @@ pub fn process_request(
                 None => return Ok(LspRequestResponse::DocumentRangeFormatting(None)),
             };
 
-            // Get the source
             let contract_data = match editor_state
                 .try_read(|es| es.active_contracts.get(&contract_location).cloned())
             {
@@ -447,7 +433,7 @@ pub fn process_request(
                         _ => None,
                     }
                 })
-                .unwrap_or(80); // Default to 80 if not specified
+                .unwrap_or(80);
             let prefer_space = param.options.insert_spaces;
             let formatting_options = clarinet_format::formatter::Settings {
                 indentation: if !prefer_space {
@@ -480,14 +466,12 @@ pub fn process_request(
                 if let Some(first_line) = lines.get(start_line) {
                     let start_char = (param.range.start.character as usize).min(first_line.len());
                     result.push_str(&first_line[start_char..]);
-                    result.push('\n');
                 }
 
                 // Middle lines (complete lines)
                 for line_idx in (start_line + 1)..end_line {
                     if let Some(line) = lines.get(line_idx) {
                         result.push_str(line);
-                        result.push('\n');
                     }
                 }
 
@@ -500,9 +484,21 @@ pub fn process_request(
                 result
             };
 
+            // Count the number of trailing newlines in the original selection
+            let mut trailing_newlines = 0;
+            let mut temp_text = range_text.clone();
+            while temp_text.ends_with('\n') {
+                trailing_newlines += 1;
+                temp_text.pop();
+            }
             // Format just the selected text
             let formatter = clarinet_format::formatter::ClarityFormatter::new(formatting_options);
-            let formatted_result = formatter.format_section(&range_text);
+            let mut formatted_result = formatter.format_section(&range_text).trim_end().to_string();
+
+            // Add back exactly the same number of trailing newlines that were in the original
+            for _ in 0..trailing_newlines {
+                formatted_result.push('\n');
+            }
 
             let text_edit = lsp_types::TextEdit {
                 range: param.range,
