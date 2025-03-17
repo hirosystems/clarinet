@@ -1094,14 +1094,13 @@ mod tests_formatter {
     fn long_line_unwrapping() {
         let src = "(try! (unwrap! (complete-deposit-wrapper (get txid deposit) (get vout-index deposit) (get amount deposit) (get recipient deposit) (get burn-hash deposit) (get burn-height deposit) (get sweep-txid deposit)) (err (+ ERR_DEPOSIT_INDEX_PREFIX (+ u10 index)))))";
         let result = format_with_default(&String::from(src));
-        let expected = r#"(try!
-  (unwrap!
-    (complete-deposit-wrapper (get txid deposit) (get vout-index deposit)
-      (get amount deposit) (get recipient deposit) (get burn-hash deposit)
-      (get burn-height deposit) (get sweep-txid deposit)
-    )
-    (err (+ ERR_DEPOSIT_INDEX_PREFIX (+ u10 index)))
-  ))"#;
+        let expected = r#"(try! (unwrap!
+  (complete-deposit-wrapper (get txid deposit) (get vout-index deposit)
+    (get amount deposit) (get recipient deposit) (get burn-hash deposit)
+    (get burn-height deposit) (get sweep-txid deposit)
+  )
+  (err (+ ERR_DEPOSIT_INDEX_PREFIX (+ u10 index)))
+))"#;
         assert_eq!(expected, result);
 
         // non-max-length sanity case
@@ -1183,14 +1182,13 @@ mod tests_formatter {
   },
 })"#;
         assert_eq!(expected, result);
-        let src = r#"(ok
-  {
-    varslice: (unwrap! (slice? txbuff slice-start target-index) (err ERR-OUT-OF-BOUNDS)),
-    ctx: {
-      txbuff: tx,
-      index: (+ u1 ptr),
-    },
-  })"#;
+        let src = r#"(ok {
+  varslice: (unwrap! (slice? txbuff slice-start target-index) (err ERR-OUT-OF-BOUNDS)),
+  ctx: {
+    txbuff: tx,
+    index: (+ u1 ptr),
+  },
+})"#;
         let result = format_with_default(src);
         assert_eq!(src, result);
     }
@@ -1414,13 +1412,10 @@ mod tests_formatter {
     }
     #[test]
     fn unwrap_wrapped_lines() {
-        let src = r#"(new-available-ids
-  (if (is-eq no-to-treasury u0)
-    (var-get available-ids)
-    (unwrap-panic
-      (as-max-len? (concat (var-get available-ids) ids-to-treasury) u10000)
-    )
-  ))"#;
+        let src = r#"(new-available-ids (if (is-eq no-to-treasury u0)
+  (var-get available-ids)
+  (unwrap-panic (as-max-len? (concat (var-get available-ids) ids-to-treasury) u10000))
+))"#;
         let result = format_with_default(src);
         assert_eq!(src, result);
     }

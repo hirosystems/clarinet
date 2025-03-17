@@ -13,19 +13,18 @@
       stx-burn: u0,
       owner: send-to,
     })
-  (print
-    {
-      topic: "new-name",
-      owner: send-to,
-      name: {
+  (print {
+    topic: "new-name",
+    owner: send-to,
+    name: {
+      name: name,
+      namespace: namespace,
+    },
+    id: id-to-be-minted,
+    properties: (map-get? name-properties
+      {
         name: name,
         namespace: namespace,
-      },
-      id: id-to-be-minted,
-      properties: (map-get? name-properties
-        {
-          name: name,
-          namespace: namespace,
-        }),
-    })
+      }),
+  })
 )
