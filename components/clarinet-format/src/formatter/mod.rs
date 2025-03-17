@@ -834,6 +834,35 @@ impl<'a> Aggregator<'a> {
         let indentation = self.settings.indentation.to_string();
         let base_indent = format!("{}{}", previous_indentation, indentation);
 
+        // Check if this is a simple wrapper expression
+        let is_simple_wrapper = list.len() == 2 && list[0].match_atom().is_some();
+
+        // Special handling for simple wrappers to avoid unnecessary line breaks
+        if is_simple_wrapper {
+            let atom_name = list[0].match_atom().unwrap();
+            let is_special_format = if let Some(native) = NativeFunctions::lookup_by_name(atom_name)
+            {
+                matches!(
+                    native,
+                    NativeFunctions::Let
+                        | NativeFunctions::Begin
+                        | NativeFunctions::Match
+                        | NativeFunctions::TupleCons
+                        | NativeFunctions::If
+                )
+            } else {
+                false
+            };
+
+            if !is_special_format {
+                // For simple wrappers like (ok ...), format compactly
+                let fn_name =
+                    self.format_source_exprs(slice::from_ref(&list[0]), previous_indentation);
+                let arg = self.format_source_exprs(slice::from_ref(&list[1]), previous_indentation);
+
+                return format!("({} {})", fn_name.trim(), arg.trim());
+            }
+        }
         // TODO: this should ignore comment length
         for expr in list.iter() {
             let indented = if first_on_line {
@@ -1304,6 +1333,16 @@ mod tests_formatter {
     fn test_as_contract() {
         let src = "(as-contract (contract-call? .tokens mint! u19))";
         let result = format_with(&String::from(src), Settings::new(Indentation::Space(4), 80));
+        assert_eq!(src, result);
+    }
+
+    #[test]
+    fn too_many_newlines() {
+        let src = r#"(ok (at-block
+  (unwrap! (get-stacks-block-info? id-header-hash block) ERR_BLOCK_NOT_FOUND)
+  (var-get count)
+))"#;
+        let result = format_with_default(&String::from(src));
         assert_eq!(src, result);
     }
 
