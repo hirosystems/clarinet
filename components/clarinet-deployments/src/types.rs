@@ -1,5 +1,5 @@
+use clarinet_files::FileLocation;
 use clarinet_files::StacksNetwork;
-use clarinet_files::{FileAccessor, FileLocation};
 use clarity_repl::clarity::util::hash::{hex_bytes, to_hex};
 use clarity_repl::clarity::vm::analysis::ContractAnalysis;
 use clarity_repl::clarity::vm::ast::ContractAST;
@@ -10,6 +10,7 @@ use clarity_repl::clarity::vm::types::{
 
 use clarity_repl::analysis::ast_dependency_detector::DependencySet;
 use clarity_repl::clarity::{ClarityName, ClarityVersion, ContractName, StacksEpochId, Value};
+use clarity_repl::repl::FileAccessor;
 use clarity_repl::repl::{Session, DEFAULT_CLARITY_VERSION};
 use serde::{Deserialize, Serialize};
 use serde_yaml;
@@ -71,7 +72,7 @@ impl From<EpochSpec> for StacksEpochId {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct DeploymentGenerationArtifacts {
     pub asts: BTreeMap<QualifiedContractIdentifier, ContractAST>,
     pub deps: BTreeMap<QualifiedContractIdentifier, DependencySet>,

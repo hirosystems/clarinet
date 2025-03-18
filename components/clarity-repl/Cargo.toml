@@ -54,7 +54,7 @@ clarity = { workspace = true, features = ["wasm", "developer-mode", "devtools"] 
 pox-locking = { workspace = true, default-features = false, features = ["wasm"] }
 wasm-bindgen = { workspace = true }
 serde-wasm-bindgen = { version = "0.6.4" }
-web-sys = { workspace = true }
+web-sys = { workspace = true, features = ["console"] }
 js-sys = { version = "0.3" }
 getrandom = { version = "0.2.3", features = ["js"] }
 hiro-system-kit = { path = "../hiro-system-kit", default-features = false }

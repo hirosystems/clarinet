@@ -11,10 +11,14 @@ pub mod tracer;
 #[cfg(any(not(target_arch = "wasm32"), feature = "dap"))]
 pub mod debug;
 
-use serde::ser::{Serialize, SerializeMap, Serializer};
+use std::collections::HashMap;
 use std::convert::TryInto;
 use std::fmt::Display;
+use std::future::Future;
 use std::path::PathBuf;
+use std::pin::Pin;
+
+use serde::ser::{Serialize, SerializeMap, Serializer};
 
 use ::clarity::vm::types::{PrincipalData, QualifiedContractIdentifier, StandardPrincipalData};
 pub use interpreter::ClarityInterpreter;
@@ -27,6 +31,18 @@ use clarity::vm::ClarityVersion;
 
 pub const DEFAULT_CLARITY_VERSION: ClarityVersion = ClarityVersion::Clarity3;
 pub const DEFAULT_EPOCH: StacksEpochId = StacksEpochId::Epoch31;
+
+pub type FileAccessorResult<T> = Pin<Box<dyn Future<Output = Result<T, String>>>>;
+
+pub trait FileAccessor {
+    fn file_exists(&self, path: String) -> FileAccessorResult<bool>;
+    fn read_file(&self, path: String) -> FileAccessorResult<String>;
+    fn read_files(
+        &self,
+        contracts_paths: Vec<String>,
+    ) -> FileAccessorResult<HashMap<String, String>>;
+    fn write_file(&self, path: String, content: &[u8]) -> FileAccessorResult<()>;
+}
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct ClarityContract {

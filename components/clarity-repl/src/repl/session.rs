@@ -42,7 +42,7 @@ pub struct CostsReport {
     pub cost_result: CostSynthesis,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Session {
     pub settings: SessionSettings,
     pub contracts: BTreeMap<QualifiedContractIdentifier, ParsedContract>,

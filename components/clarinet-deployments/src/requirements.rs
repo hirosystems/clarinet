@@ -1,10 +1,10 @@
-use clarinet_files::{FileAccessor, FileLocation};
+use clarinet_files::FileLocation;
 use clarity_repl::{
     clarity::{
         chainstate::StacksAddress, vm::types::QualifiedContractIdentifier, Address, ClarityVersion,
         StacksEpochId,
     },
-    repl::{remote_data::epoch_for_height, DEFAULT_CLARITY_VERSION, DEFAULT_EPOCH},
+    repl::{remote_data::epoch_for_height, FileAccessor, DEFAULT_CLARITY_VERSION, DEFAULT_EPOCH},
 };
 use reqwest;
 

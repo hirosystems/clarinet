@@ -40,7 +40,7 @@ pub const BLOCK_LIMIT_MAINNET: ExecutionCost = ExecutionCost {
     runtime: 5_000_000_000,
 };
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct ClarityInterpreter {
     pub clarity_datastore: ClarityDatastore,
     pub datastore: Datastore,
@@ -69,7 +69,7 @@ impl ClarityInterpreter {
             None
         };
 
-        let clarity_datastore = ClarityDatastore::new(remote_network_info.clone(), client);
+        let clarity_datastore = ClarityDatastore::new(remote_network_info.clone(), client, None);
         let datastore = Datastore::new(&clarity_datastore, StacksConstants::default());
 
         Self {

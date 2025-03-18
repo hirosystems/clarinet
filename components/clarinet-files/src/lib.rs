@@ -8,6 +8,7 @@ pub mod clarinetrc;
 mod network_manifest;
 mod project_manifest;
 
+use clarity_repl::repl::FileAccessor;
 pub use network_manifest::{BitcoinNetwork, StacksNetwork};
 
 #[cfg(target_arch = "wasm32")]
@@ -31,25 +32,10 @@ pub use project_manifest::{
     ProjectManifest, ProjectManifestFile, RequirementConfig, INVALID_CLARITY_VERSION,
 };
 use serde::ser::{Serialize, SerializeMap, Serializer};
-use std::collections::HashMap;
 use std::fmt;
-use std::future::Future;
 use std::path::Path;
-use std::pin::Pin;
 use std::{borrow::BorrowMut, path::PathBuf, str::FromStr};
 use url::Url;
-
-pub type FileAccessorResult<T> = Pin<Box<dyn Future<Output = Result<T, String>>>>;
-
-pub trait FileAccessor {
-    fn file_exists(&self, path: String) -> FileAccessorResult<bool>;
-    fn read_file(&self, path: String) -> FileAccessorResult<String>;
-    fn read_files(
-        &self,
-        contracts_paths: Vec<String>,
-    ) -> FileAccessorResult<HashMap<String, String>>;
-    fn write_file(&self, path: String, content: &[u8]) -> FileAccessorResult<()>;
-}
 
 #[derive(Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 #[serde(untagged)]

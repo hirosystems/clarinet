@@ -3,6 +3,7 @@ use std::collections::{BTreeMap, HashMap};
 use std::rc::Rc;
 
 use super::remote_data::{epoch_for_height, Block, HttpClient};
+use super::FileAccessor;
 use clarity::types::chainstate::{
     BlockHeaderHash, BurnchainHeaderHash, ConsensusHash, SortitionId, StacksAddress, StacksBlockId,
     TrieHash, VRFSeed,
@@ -19,6 +20,9 @@ use clarity::vm::types::{
 use clarity::vm::StacksEpoch;
 use pox_locking::handle_contract_call_special_cases;
 use sha2::{Digest, Sha512_256};
+
+#[cfg(target_family = "wasm")]
+use wasm_bindgen::prelude::*;
 
 use super::interpreter::BLOCK_LIMIT_MAINNET;
 use super::settings::RemoteNetworkInfo;
@@ -42,7 +46,58 @@ fn epoch_to_peer_version(epoch: StacksEpochId) -> u8 {
     }
 }
 
-#[derive(Debug)]
+#[cfg(not(target_family = "wasm"))]
+fn get_file_from_cache(name: &str) -> Option<String> {
+    let cache_dir = std::path::Path::new("./.cache/datastore");
+    let cache_path = cache_dir.join(name);
+    if cache_path.exists() {
+        Some(std::fs::read_to_string(&cache_path).unwrap())
+    } else {
+        None
+    }
+}
+
+// #[cfg(target_family = "wasm")]
+// #[wasm_bindgen(module = "fs")]
+// extern "C" {
+//     #[wasm_bindgen(js_name = readFileSync)]
+//     fn read_file_sync(path: &str) -> Vec<u8>;
+//     #[wasm_bindgen(js_name = existsSync)]
+//     fn exists_sync(path: &str) -> bool;
+//     #[wasm_bindgen(js_name = mkdirSync)]
+//     fn mkdir_sync(path: &str, options: JsValue);
+//     #[wasm_bindgen(js_name = writeFileSync)]
+//     fn write_file_sync(path: &str, data: &[u8]);
+// }
+
+// #[cfg(target_family = "wasm")]
+// fn get_file_from_cache(name: &str) -> Option<String> {
+//     let cache_dir = std::path::Path::new("./.cache/datastore");
+//     let cache_path = cache_dir.join(name);
+//     if !exists_sync(cache_path.to_str().unwrap()) {
+//         None
+//     } else {
+//         Some(String::from_utf8(read_file_sync(cache_path.to_str().unwrap())).unwrap())
+//     }
+// }
+
+// #[cfg(target_family = "wasm")]
+// fn write_file_to_cache(name: &str, data: &[u8]) {
+//     let cache_dir = std::path::Path::new("./.cache/datastore");
+//     if !exists_sync(cache_dir.to_str().unwrap()) {
+//         let options = js_sys::Object::new();
+//         js_sys::Reflect::set(
+//             &options,
+//             &JsValue::from_str("recursive"),
+//             &JsValue::from_bool(true),
+//         )
+//         .unwrap();
+//         mkdir_sync(cache_dir.to_str().unwrap(), options.into());
+//     }
+//     let cache_path = cache_dir.join(name);
+//     write_file_sync(cache_path.to_str().unwrap(), data);
+// }
+
 pub struct ClarityDatastore {
     open_chain_tip: StacksBlockId,
     current_chain_tip: Rc<RefCell<StacksBlockId>>,
@@ -56,6 +111,7 @@ pub struct ClarityDatastore {
     local_accounts: Vec<StandardPrincipalData>,
 
     client: HttpClient,
+    file_accessor: Option<Box<dyn FileAccessor>>,
 }
 
 impl Clone for ClarityDatastore {
@@ -75,6 +131,7 @@ impl Clone for ClarityDatastore {
             remote_block_info_cache: Rc::clone(&self.remote_block_info_cache),
             local_accounts: self.local_accounts.clone(),
             client: self.client.clone(),
+            file_accessor: self.file_accessor.clone(),
         }
     }
 }
@@ -175,9 +232,13 @@ impl BurnBlockHashes {
 }
 
 impl ClarityDatastore {
-    pub fn new(remote_network_info: Option<RemoteNetworkInfo>, client: HttpClient) -> Self {
+    pub fn new(
+        remote_network_info: Option<RemoteNetworkInfo>,
+        client: HttpClient,
+        file_accessor: Option<&dyn FileAccessor>,
+    ) -> Self {
         if let Some(remote_network_info) = remote_network_info {
-            return Self::new_with_remote_data(remote_network_info, client);
+            return Self::new_with_remote_data(remote_network_info, client, file_accessor);
         }
 
         let height = 0;
@@ -196,10 +257,15 @@ impl ClarityDatastore {
             local_accounts: Vec::new(),
 
             client,
+            // file_accessor: file_accessor.map(|f| Box::new(f.clone())),
         }
     }
 
-    fn new_with_remote_data(remote_network_info: RemoteNetworkInfo, client: HttpClient) -> Self {
+    fn new_with_remote_data(
+        remote_network_info: RemoteNetworkInfo,
+        client: HttpClient,
+        file_accessor: Option<&dyn FileAccessor>,
+    ) -> Self {
         let height = remote_network_info.initial_height;
         let path = format!("/extended/v2/blocks/{}", height);
         let block = client.fetch_block(&path);
@@ -220,6 +286,7 @@ impl ClarityDatastore {
             local_accounts: Vec::new(),
 
             client,
+            // file_accessor: None,
         }
     }
 
@@ -341,12 +408,25 @@ impl ClarityDatastore {
     ) -> Result<Option<String>> {
         let addr = contract.issuer.to_string();
         let contract = contract.name.to_string();
-        let tip = { self.get_remote_chaintip() };
+        let tip = self.get_remote_chaintip();
+
+        // let cache_file_name = format!("{}_{}_{}_{}", addr, contract, key, tip);
+        // if let Some(cached) = get_file_from_cache(&cache_file_name) {
+        //     return Ok(Some(cached));
+        // }
+
         let url = format!(
             "/v2/clarity/metadata/{}/{}/{}?tip={}",
             addr, contract, key, tip
         );
-        self.client.fetch_clarity_data(&url)
+        let response = self.client.fetch_clarity_data(&url)?;
+
+        // Save response to cache if successful
+        if let Some(content) = &response {
+            // write_file_to_cache(&cache_file_name, content.as_bytes());
+        }
+
+        Ok(response)
     }
 }
 
@@ -1107,7 +1187,7 @@ mod tests {
     fn get_datastores() -> (ClarityDatastore, Datastore) {
         let client = HttpClient::new(ApiUrl("https://api.tesnet.hiro.so".to_string()));
         let constants = StacksConstants::default();
-        let clarity_datastore = ClarityDatastore::new(None, client);
+        let clarity_datastore = ClarityDatastore::new(None, client, None);
         let datastore = Datastore::new(&clarity_datastore, constants);
         (clarity_datastore, datastore)
     }
@@ -1164,6 +1244,7 @@ mod tests {
                 stacks_tip_height: 10,
             }),
             client,
+            None,
         );
         let datastore = Datastore::new(&clarity_datastore, constants);
         (clarity_datastore, datastore)

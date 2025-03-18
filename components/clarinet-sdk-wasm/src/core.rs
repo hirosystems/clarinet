@@ -8,7 +8,7 @@ use clarinet_deployments::{
     update_session_with_deployment_plan,
 };
 use clarinet_files::StacksNetwork;
-use clarinet_files::{FileAccessor, FileLocation, ProjectManifest, WASMFileSystemAccessor};
+use clarinet_files::{FileLocation, ProjectManifest, WASMFileSystemAccessor};
 use clarity_repl::clarity::analysis::contract_interface_builder::{
     ContractInterface, ContractInterfaceFunction, ContractInterfaceFunctionAccess,
 };
@@ -23,8 +23,8 @@ use clarity_repl::repl::clarity_values::{uint8_to_string, uint8_to_value};
 use clarity_repl::repl::session::CostsReport;
 use clarity_repl::repl::settings::RemoteDataSettings;
 use clarity_repl::repl::{
-    clarity_values, ClarityCodeSource, ClarityContract, ContractDeployer, Session, SessionSettings,
-    DEFAULT_CLARITY_VERSION, DEFAULT_EPOCH,
+    clarity_values, ClarityCodeSource, ClarityContract, ContractDeployer, FileAccessor, Session,
+    SessionSettings, DEFAULT_CLARITY_VERSION, DEFAULT_EPOCH,
 };
 use gloo_utils::format::JsValueSerdeExt;
 use js_sys::Function as JsFunction;
