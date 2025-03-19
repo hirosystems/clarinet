@@ -168,6 +168,7 @@ impl<'a> Aggregator<'a> {
                             NativeFunctions::And | NativeFunctions::Or => {
                                 self.format_booleans(list, previous_indentation)
                             }
+
                             // everything else that's not special cased
                             NativeFunctions::Add
                             | NativeFunctions::Subtract
@@ -209,9 +210,9 @@ impl<'a> Aggregator<'a> {
                             | NativeFunctions::IntToUtf8
                             | NativeFunctions::ListCons
                             | NativeFunctions::FetchVar
+                            | NativeFunctions::FetchEntry // map-get?
+                            | NativeFunctions::SetEntry // map-set?
                             | NativeFunctions::SetVar
-                            | NativeFunctions::FetchEntry
-                            | NativeFunctions::SetEntry
                             | NativeFunctions::InsertEntry
                             | NativeFunctions::DeleteEntry
                             | NativeFunctions::TupleGet
@@ -834,6 +835,11 @@ impl<'a> Aggregator<'a> {
         let indentation = self.settings.indentation.to_string();
         let base_indent = format!("{}{}", previous_indentation, indentation);
 
+        let is_map_get = list.len() > 2
+            && list[0].match_atom().map_or(false, |atom_name| {
+                atom_name.to_string() == "map-get?" || atom_name.to_string() == "map-set?"
+            })
+            && matches!(&list[2].pre_expr, PreSymbolicExpressionType::Tuple(_));
         // Check if this is a simple wrapper expression
         let is_simple_wrapper = list.len() == 2 && list[0].match_atom().is_some();
 
@@ -864,7 +870,7 @@ impl<'a> Aggregator<'a> {
             }
         }
         // TODO: this should ignore comment length
-        for expr in list.iter() {
+        for (i, expr) in list.iter().enumerate() {
             let indented = if first_on_line {
                 &base_indent
             } else {
@@ -876,8 +882,13 @@ impl<'a> Aggregator<'a> {
             let expr_width = trimmed.len();
 
             if !first_on_line {
-                // For subexpressions over max line length, add newline with increased indent
-                if current_line_width + expr_width + 1 > self.settings.max_line_length {
+                // Don't break before an opening brace of a map
+                let is_map_opening = trimmed.starts_with("{");
+
+                // Only add line break if necessary and not breaking before a map opening
+                if !is_map_opening
+                    && (current_line_width + expr_width + 1 > self.settings.max_line_length)
+                {
                     result.push('\n');
                     result.push_str(&base_indent);
                     current_line_width = base_indent.len() + indentation.len();
