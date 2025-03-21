@@ -58,7 +58,7 @@ pub async fn start_language_server(
                         LspRequest::Initialize(_) => {
                             process_mutating_request(request, &mut editor_state)
                         }
-                        _ => process_request(request, &editor_state),
+                        _ => process_request(request, &editor_state).await,
                     };
                     if let Ok(response) = request_result {
                         let _ = response_tx.send(LspResponse::Request(response));

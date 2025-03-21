@@ -743,7 +743,9 @@ impl<'a> Aggregator<'a> {
             PreSymbolicExpressionType::FieldIdentifier(ref trait_id) => {
                 format!("'{}", trait_id)
             }
-            PreSymbolicExpressionType::TraitReference(ref name) => name.to_string(),
+            PreSymbolicExpressionType::TraitReference(ref name) => {
+                format!("<{}>", name.to_string())
+            }
             PreSymbolicExpressionType::Comment(ref text) => {
                 if text.is_empty() {
                     ";;".to_string()
@@ -1331,6 +1333,22 @@ mod tests_formatter {
 
         let src = "(impl-trait 'SPAXYA5XS51713FDTQ8H94EJ4V579CXMTRNBZKSF.token-a.token-trait)\n";
         let result = format_with(&String::from(src), Settings::new(Indentation::Space(4), 80));
+        assert_eq!(src, result);
+    }
+    #[test]
+    fn test_detailed_traits() {
+        let src = r#"(define-public (parse-and-verify-vaa
+    (core-contract <core-trait>)
+    (vaa-bytes (buff 8192))
+  )
+  (begin
+    (try! (check-active-wormhole-core-contract core-contract))
+    (contract-call? core-contract parse-and-verify-vaa vaa-bytes)
+  )
+)
+
+"#;
+        let result = format_with_default(&String::from(src));
         assert_eq!(src, result);
     }
     #[test]
