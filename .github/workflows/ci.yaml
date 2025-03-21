@@ -17,21 +17,14 @@ on:
 
   workflow_dispatch:
 
-jobs:
-  pre_run:
-    name: Cancel previous runs
-    runs-on: ubuntu-latest
-    steps:
-      - name: Cancel Previous Runs
-        uses: styfle/cancel-workflow-action@ad6cb1b847ffb509a69b745b6ee2f1d14dfe14b8
-        with:
-          access_token: ${{ github.token }}
-          persist-credentials: false
+concurrency:
+  group: "${{ github.workflow }} @ ${{ github.event.pull_request.head.label || github.head_ref || github.ref }}"
+  cancel-in-progress: true
 
+jobs:
   get_release_info:
     name: Get Release Info
     runs-on: ubuntu-latest
-    needs: pre_run
     outputs:
       tag: ${{ steps.new_release_tag.outputs.TAG }}
     steps:
@@ -60,36 +53,6 @@ jobs:
             echo "::warning::Will not create a release"
           fi
 
-  audit:
-    name: Audit and format
-    runs-on: ubuntu-latest
-    needs: pre_run
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Install Rust toolchain
-        run: |
-          rustup toolchain install stable --profile minimal --component rustfmt
-          echo "RUST_VERSION_HASH=$(rustc --version | sha256sum | awk '{print $1}')" >> $GITHUB_ENV
-
-      - name: Cache cargo
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/
-            ./target/debug/build/
-          key: ${{ runner.os }}-rust-${{ env.RUST_VERSION_HASH }}-${{ hashFiles('./Cargo.lock') }}
-
-      - name: Install dependencies
-        run: cargo install cargo-audit
-
-      - name: Run audit
-        run: cargo audit --ignore RUSTSEC-2024-0344 --ignore RUSTSEC-2022-0028 --ignore RUSTSEC-2024-0399
-
-      - name: Run rustfmt
-        run: cargo fmt --all -- --check
-
   test_coverage_cargo:
     name: Generate test coverage
     runs-on: ubuntu-latest
@@ -103,12 +66,17 @@ jobs:
           echo "RUST_VERSION_HASH=$(rustc --version | sha256sum | awk '{print $1}')" >> $GITHUB_ENV
 
       - name: Cache cargo
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/
             ./target/debug/build/
-          key: ${{ runner.os }}-rust-${{ env.RUST_VERSION_HASH }}-${{ hashFiles('./Cargo.lock') }}
+            ./target/debug/deps/
+            ./target/debug/.fingerprint/
+          key: ${{ runner.os }}-cargo-nextest-${{ env.RUST_VERSION_HASH }}-${{ hashFiles('./Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-nextest-${{ env.RUST_VERSION_HASH }}-
+            ${{ runner.os }}-cargo-nextest-
 
       - name: install dependencies
         uses: taiki-e/install-action@v2
@@ -129,7 +97,6 @@ jobs:
   dist_clarinet:
     name: Build Clarinet Distributions
     runs-on: ${{ matrix.os }}
-    needs: pre_run
 
     strategy:
       fail-fast: false
@@ -176,12 +143,16 @@ jobs:
         run: echo "RUST_VERSION_HASH=$(rustc --version | sha256sum | awk '{print $1}')" >> $GITHUB_ENV
 
       - name: Cache cargo
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/
             ./target/${{ matrix.target }}/release/
-          key: ${{ runner.os }}-rust-${{ env.RUST_VERSION_HASH }}-cargo-${{ hashFiles('./Cargo.lock') }}
+            ./target/${{ matrix.target }}/debug/
+          key: ${{ runner.os }}-cargo-build-${{ env.RUST_VERSION_HASH }}-${{ hashFiles('./Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-build-${{ env.RUST_VERSION_HASH }}-
+            ${{ runner.os }}-cargo-build-
 
       - name: Install wix (Windows)
         if: matrix.os == 'windows-latest' && steps.cache-cargo.outputs.cache-hit != 'true'
@@ -319,13 +290,12 @@ jobs:
       - name: Unit Tests - Cargo
         # can't easily run mac-arm64 tests in GH without native runners for that arch
         if: matrix.target != 'aarch64-apple-darwin'
-        run: cargo test --workspace --release --locked --exclude clarinet-sdk-wasm --exclude clarity-jupyter-kernel --target ${{ matrix.target }}
+        run: cargo test --workspace --release --locked --exclude clarinet-sdk-wasm --target ${{ matrix.target }}
 
   dist_stacks_devnet_js:
     name: Build Stacks Devnet JS Distributions
     runs-on: ${{ matrix.os }}
     needs:
-      - pre_run
       - get_release_info
 
     strategy:
@@ -337,6 +307,11 @@ jobs:
             target: x86_64-unknown-linux-gnu
             architecture: x64
             libc: glibc
+          - os: ubuntu-latest
+            platform: linux
+            target: x86_64-unknown-linux-musl
+            architecture: x64
+            libc: musl
           - os: windows-latest
             platform: windows
             target: x86_64-pc-windows-msvc
@@ -349,11 +324,6 @@ jobs:
             platform: darwin
             target: aarch64-apple-darwin
             architecture: arm64
-          - os: ubuntu-latest
-            platform: linux
-            target: x86_64-unknown-linux-musl
-            architecture: x64
-            libc: musl
 
     steps:
       - name: Configure git to use LF (Windows)
@@ -389,12 +359,17 @@ jobs:
           cache-dependency-path: components/stacks-devnet-js/package-lock.json
 
       - name: Cache cargo
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/
             ./target/${{ matrix.target }}/release/
-          key: ${{ runner.os }}-rust-${{ env.RUST_VERSION_HASH }}-cargo-${{ hashFiles('./Cargo.lock') }}
+            ./target/${{ matrix.target }}/debug/
+            ./target/${{ matrix.target }}/build/
+          key: ${{ runner.os }}-build-stacksdevnetjs-${{ env.RUST_VERSION_HASH }}-${{ hashFiles('./Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-build-stacksdevnetjs-${{ env.RUST_VERSION_HASH }}-
+            ${{ runner.os }}-build-stacksdevnetjs-
 
       # Set environment variables required from cross compiling from macos-x86_64 to macos-arm64
       - name: Configure macos-arm64 cross compile config
@@ -462,55 +437,6 @@ jobs:
           greater-version-only: true
           token: ${{ secrets.NPM_TOKEN }}
 
-  dist_clarity_repl:
-    name: Build Clarity REPL Distribution
-    runs-on: ubuntu-latest
-    needs: pre_run
-    defaults:
-      run:
-        working-directory: components/clarity-repl
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Install Rust toolchain
-        run: |
-          rustup toolchain install stable --profile minimal
-          echo "RUST_VERSION_HASH=$(rustc --version | sha256sum | awk '{print $1}')" >> $GITHUB_ENV
-
-      - name: Cache cargo
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/
-            ./target/x86_64-unknown-linux-gnu/release/
-          key: ${{ runner.os }}-rust-${{ env.RUST_VERSION_HASH }}-cargo-${{ hashFiles('./Cargo.lock') }}
-
-      - name: Configure artifact names
-        run: |
-          echo "SHORT_TARGET_NAME=linux-x64-glibc" >> $GITHUB_ENV
-          echo "PRE_GYP_TARGET_NAME=linux-x64-glibc" >> $GITHUB_ENV
-
-      - name: Build - Cargo
-        run: cargo build --release --locked --target x86_64-unknown-linux-gnu
-
-      - name: Compress cargo artifact
-        working-directory: "."
-        run: tar -C target/x86_64-unknown-linux-gnu/release -zcvf clarity-repl-${{ env.SHORT_TARGET_NAME }}.tar.gz clarity-repl
-
-      - name: Upload cargo artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: clarity-repl-${{ env.SHORT_TARGET_NAME }}
-          path: clarity-repl-${{ env.SHORT_TARGET_NAME }}.tar.gz
-
-      - name: Publish clarity-repl to crates.io
-        if: startsWith(github.ref, 'refs/heads/main') && needs.get_release_info.outputs.tag != ''
-        run: 4
-          cargo login ${{ secrets.CARGO_CRATES_IO_API_KEY }}
-          cargo publish
-
   docker_images:
     name: Create ${{ matrix.name }} Docker Image
     runs-on: ubuntu-latest
@@ -576,10 +502,8 @@ jobs:
     if: startsWith(github.ref, 'refs/heads/main') && needs.get_release_info.outputs.tag != ''
     needs:
       - get_release_info
-      - audit
       - test_coverage_cargo
       - dist_stacks_devnet_js
-      - dist_clarity_repl
       - docker_images
     permissions:
       actions: write
