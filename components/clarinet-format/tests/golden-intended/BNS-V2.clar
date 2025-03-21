@@ -538,7 +538,7 @@
 (define-public (list-in-ustx
         (id uint)
         (price uint)
-        (comm-trait commission-trait)
+        (comm-trait <commission-trait>)
     )
     (let (
         ;; Get the name and namespace of the NFT.
@@ -629,7 +629,7 @@
 ;; @param comm-trait: Address of the commission-trait.
 (define-public (buy-in-ustx
         (id uint)
-        (comm-trait commission-trait)
+        (comm-trait <commission-trait>)
     )
     (let (
         ;; Retrieves current owner and listing details
