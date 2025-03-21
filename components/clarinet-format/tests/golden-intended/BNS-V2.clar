@@ -32,22 +32,20 @@
 (define-public (update-token-uri
         (new-token-uri (string-ascii 256))
     )
-    (ok
-        (begin
-            (asserts! (is-eq contract-caller DEPLOYER) ERR-NOT-AUTHORIZED)
-            (var-set token-uri new-token-uri)
-        ))
+    (ok (begin
+        (asserts! (is-eq contract-caller DEPLOYER) ERR-NOT-AUTHORIZED)
+        (var-set token-uri new-token-uri)
+    ))
 )
 
 (define-data-var contract-uri (string-ascii 256) "ipfs://QmWKTZEMQNWngp23i7bgPzkineYC9LDvcxYkwNyVQVoH8y")
 (define-public (update-contract-uri
         (new-contract-uri (string-ascii 256))
     )
-    (ok
-        (begin
-            (asserts! (is-eq contract-caller DEPLOYER) ERR-NOT-AUTHORIZED)
-            (var-set token-uri new-contract-uri)
-        ))
+    (ok (begin
+        (asserts! (is-eq contract-caller DEPLOYER) ERR-NOT-AUTHORIZED)
+        (var-set token-uri new-contract-uri)
+    ))
 )
 
 ;; errors
@@ -202,30 +200,26 @@
     )
     (let (
         (name-namespace (unwrap! (get-bns-from-id id) ERR-NO-NAME))
-        (namespace-props
-            (unwrap! (map-get? namespaces (get namespace name-namespace))
-                ERR-NAMESPACE-NOT-FOUND
-            ))
-        (name-props
-            (unwrap! (map-get? name-properties name-namespace) ERR-NO-NAME)
-        )
+        (namespace-props (unwrap! (map-get? namespaces (get namespace name-namespace))
+            ERR-NAMESPACE-NOT-FOUND
+        ))
+        (name-props (unwrap! (map-get? name-properties name-namespace) ERR-NO-NAME))
         (renewal-height (get renewal-height name-props))
         (namespace-lifetime (get lifetime namespace-props))
     )
         ;; Check if the namespace requires renewals
         (asserts! (not (is-eq namespace-lifetime u0)) ERR-LIFETIME-EQUAL-0)
         ;; If the check passes then check the renewal-height of the name
-        (ok
-            (if (is-eq renewal-height u0)
-                ;; If it is true then it means it was imported so return the namespace launch blockheight + lifetime
-                (+
-                    (unwrap! (get launched-at namespace-props)
-                        ERR-NAMESPACE-NOT-LAUNCHED
-                    )
-                    namespace-lifetime
+        (ok (if (is-eq renewal-height u0)
+            ;; If it is true then it means it was imported so return the namespace launch blockheight + lifetime
+            (+
+                (unwrap! (get launched-at namespace-props)
+                    ERR-NAMESPACE-NOT-LAUNCHED
                 )
-                renewal-height
-            ))
+                namespace-lifetime
+            )
+            renewal-height
+        ))
     )
 )
 
@@ -235,35 +229,30 @@
     )
     (let (
         (name-id (unwrap! (get-id-from-bns name namespace) ERR-NO-NAME))
-        (namespace-props
-            (unwrap! (map-get? namespaces namespace) ERR-NAMESPACE-NOT-FOUND)
-        )
-        (name-props
-            (unwrap!
-                (map-get? name-properties
-                    {
-                        name: name,
-                        namespace: namespace,
-                    })
-                ERR-NO-NAME
-            ))
+        (namespace-props (unwrap! (map-get? namespaces namespace) ERR-NAMESPACE-NOT-FOUND))
+        (name-props (unwrap!
+            (map-get? name-properties {
+                name: name,
+                namespace: namespace,
+            })
+            ERR-NO-NAME
+        ))
         (renewal-height (get renewal-height name-props))
         (namespace-lifetime (get lifetime namespace-props))
     )
         ;; Check if the name can resolve
-        (ok
-            (if (is-eq u0 namespace-lifetime)
-                ;; If true it means that the name is in a managed namespace or the namespace does not require renewals
-                {
-                    renewal: u0,
-                    owner: (get owner name-props),
-                }
-                ;; If false then calculate renewal-height
-                {
-                    renewal: (try! (get-renewal-height name-id)),
-                    owner: (get owner name-props),
-                }
-            ))
+        (ok (if (is-eq u0 namespace-lifetime)
+            ;; If true it means that the name is in a managed namespace or the namespace does not require renewals
+            {
+                renewal: u0,
+                owner: (get owner name-props),
+            }
+            ;; If false then calculate renewal-height
+            {
+                renewal: (try! (get-renewal-height name-id)),
+                owner: (get owner name-props),
+            }
+        ))
     )
 )
 
@@ -294,10 +283,7 @@
         (namespace (buff 20))
     )
     ;; Check and return the owner of the specified NFT
-    (ok
-        (nft-get-owner? BNS-V2
-            (unwrap! (get-id-from-bns name namespace) ERR-NO-NAME)
-        ))
+    (ok (nft-get-owner? BNS-V2 (unwrap! (get-id-from-bns name namespace) ERR-NO-NAME)))
 )
 
 ;; Read-only function `get-namespace-price` calculates the registration price for a namespace based on its length.
@@ -314,11 +300,10 @@
         (asserts! (> namespace-len u0) ERR-NAMESPACE-BLANK)
         ;; Retrieve the price for the namespace based on its length from the NAMESPACE-PRICE-TIERS list.
         ;; The price tier is determined by the minimum of 7 or the namespace length minus one.
-        (ok
-            (unwrap!
-                (element-at? NAMESPACE-PRICE-TIERS (min u7 (- namespace-len u1)))
-                ERR-UNWRAP
-            ))
+        (ok (unwrap!
+            (element-at? NAMESPACE-PRICE-TIERS (min u7 (- namespace-len u1)))
+            ERR-UNWRAP
+        ))
     )
 )
 
@@ -331,9 +316,7 @@
         (name (buff 48))
     )
     (let (
-        (namespace-props
-            (unwrap! (map-get? namespaces namespace) ERR-NAMESPACE-NOT-FOUND)
-        )
+        (namespace-props (unwrap! (map-get? namespaces namespace) ERR-NAMESPACE-NOT-FOUND))
     )
         (ok (compute-name-price name (get price-function namespace-props)))
     )
@@ -357,16 +340,13 @@
     )
     (let (
         ;; Fetch the properties of the specified namespace from the `namespaces` map.
-        (namespace-props
-            (unwrap! (map-get? namespaces namespace) ERR-NAMESPACE-NOT-FOUND)
-        )
+        (namespace-props (unwrap! (map-get? namespaces namespace) ERR-NAMESPACE-NOT-FOUND))
     )
         ;; Returns the namespace along with its associated properties.
-        (ok
-            {
-                namespace: namespace,
-                properties: namespace-props,
-            })
+        (ok {
+            namespace: namespace,
+            properties: namespace-props,
+        })
     )
 )
 
@@ -375,11 +355,10 @@
         (name (buff 48))
         (namespace (buff 20))
     )
-    (map-get? name-properties
-        {
-            name: name,
-            namespace: namespace,
-        })
+    (map-get? name-properties {
+        name: name,
+        namespace: namespace,
+    })
 )
 
 ;; (new) Defines a read-only function to fetch the unique ID of a BNS name given its name and the namespace it belongs to.
@@ -388,11 +367,10 @@
         (namespace (buff 20))
     )
     ;; Attempts to retrieve the ID from the 'name-to-index' map using the provided name and namespace as the key.
-    (map-get? name-to-index
-        {
-            name: name,
-            namespace: namespace,
-        })
+    (map-get? name-to-index {
+        name: name,
+        namespace: namespace,
+    })
 )
 
 ;; (new) Defines a read-only function to fetch the BNS name and the namespace given a unique ID.
@@ -414,10 +392,7 @@
 (define-read-only (get-primary
         (owner principal)
     )
-    (ok
-        (get-bns-from-id
-            (unwrap! (map-get? primary-name owner) ERR-NO-PRIMARY-NAME)
-        ))
+    (ok (get-bns-from-id (unwrap! (map-get? primary-name owner) ERR-NO-PRIMARY-NAME)))
 )
 
 ;; public functions
@@ -436,14 +411,10 @@
         (namespace (get namespace name-and-namespace))
         (name (get name name-and-namespace))
         ;; Get namespace properties and manager.
-        (namespace-props
-            (unwrap! (map-get? namespaces namespace) ERR-NAMESPACE-NOT-FOUND)
-        )
+        (namespace-props (unwrap! (map-get? namespaces namespace) ERR-NAMESPACE-NOT-FOUND))
         (manager-transfers (get manager-transferable namespace-props))
         ;; Get name properties and owner.
-        (name-props
-            (unwrap! (map-get? name-properties name-and-namespace) ERR-NO-NAME)
-        )
+        (name-props (unwrap! (map-get? name-properties name-and-namespace) ERR-NO-NAME))
         (registered-at-value (get registered-at name-props))
         (nft-current-owner (unwrap! (nft-get-owner? BNS-V2 id) ERR-NO-NAME))
     )
@@ -486,21 +457,19 @@
         (update-primary-name-recipient id recipient)
         ;; Execute the NFT transfer.
         (try! (nft-transfer? BNS-V2 id nft-current-owner recipient))
-        (print
-            {
-                topic: "transfer-name",
-                owner: recipient,
-                name: {
-                    name: name,
-                    namespace: namespace,
-                },
-                id: id,
-                properties: (map-get? name-properties
-                    {
-                        name: name,
-                        namespace: namespace,
-                    }),
-            })
+        (print {
+            topic: "transfer-name",
+            owner: recipient,
+            name: {
+                name: name,
+                namespace: namespace,
+            },
+            id: id,
+            properties: (map-get? name-properties {
+                name: name,
+                namespace: namespace,
+            }),
+        })
         (ok true)
     )
 )
@@ -520,15 +489,11 @@
         (namespace (get namespace name-and-namespace))
         (name (get name name-and-namespace))
         ;; Get namespace properties and manager.
-        (namespace-props
-            (unwrap! (map-get? namespaces namespace) ERR-NAMESPACE-NOT-FOUND)
-        )
+        (namespace-props (unwrap! (map-get? namespaces namespace) ERR-NAMESPACE-NOT-FOUND))
         (manager-transfers (get manager-transferable namespace-props))
         (manager (get namespace-manager namespace-props))
         ;; Get name properties and owner.
-        (name-props
-            (unwrap! (map-get? name-properties name-and-namespace) ERR-NO-NAME)
-        )
+        (name-props (unwrap! (map-get? name-properties name-and-namespace) ERR-NO-NAME))
         (registered-at-value (get registered-at name-props))
         (nft-current-owner (unwrap! (nft-get-owner? BNS-V2 id) ERR-NO-NAME))
     )
@@ -573,21 +538,19 @@
         )
         ;; Execute the NFT transfer.
         (try! (nft-transfer? BNS-V2 id nft-current-owner recipient))
-        (print
-            {
-                topic: "transfer-name",
-                owner: recipient,
-                name: {
-                    name: name,
-                    namespace: namespace,
-                },
-                id: id,
-                properties: (map-get? name-properties
-                    {
-                        name: name,
-                        namespace: namespace,
-                    }),
-            })
+        (print {
+            topic: "transfer-name",
+            owner: recipient,
+            name: {
+                name: name,
+                namespace: namespace,
+            },
+            id: id,
+            properties: (map-get? name-properties {
+                name: name,
+                namespace: namespace,
+            }),
+        })
         (ok true)
     )
 )
@@ -606,21 +569,16 @@
         (name-and-namespace (unwrap! (map-get? index-to-name id) ERR-NO-NAME))
         (namespace (get namespace name-and-namespace))
         ;; Get namespace properties and manager.
-        (namespace-props
-            (unwrap! (map-get? namespaces namespace) ERR-NAMESPACE-NOT-FOUND)
-        )
+        (namespace-props (unwrap! (map-get? namespaces namespace) ERR-NAMESPACE-NOT-FOUND))
         (namespace-manager (get namespace-manager namespace-props))
         ;; Get name properties and registered-at value.
-        (name-props
-            (unwrap! (map-get? name-properties name-and-namespace) ERR-NO-NAME)
-        )
+        (name-props (unwrap! (map-get? name-properties name-and-namespace) ERR-NO-NAME))
         (registered-at-value (get registered-at name-props))
         ;; Creates a listing record with price and commission details
-        (listing
-            {
-                price: price,
-                commission: (contract-of comm-trait),
-            })
+        (listing {
+            price: price,
+            commission: (contract-of comm-trait),
+        })
     )
         ;; Checks if the name was registered
         (match registered-at-value
@@ -648,14 +606,10 @@
         ;; Updates the market map with the new listing details
         (map-set market id listing)
         ;; Prints listing details
-        (ok
-            (print
-                (merge listing
-                    {
-                        a: "list-in-ustx",
-                        id: id,
-                    })
-            ))
+        (ok (print (merge listing {
+            a: "list-in-ustx",
+            id: id,
+        })))
     )
 )
 
@@ -671,9 +625,7 @@
         ;; Verify if the NFT is listed in the market.
         (market-map (unwrap! (map-get? market id) ERR-NOT-LISTED))
         ;; Get namespace properties and manager.
-        (namespace-props
-            (unwrap! (map-get? namespaces namespace) ERR-NAMESPACE-NOT-FOUND)
-        )
+        (namespace-props (unwrap! (map-get? namespaces namespace) ERR-NAMESPACE-NOT-FOUND))
         (namespace-manager (get namespace-manager namespace-props))
     )
         ;; Check if there is a namespace manager
@@ -691,13 +643,10 @@
         ;; Deletes the listing from the market map
         (map-delete market id)
         ;; Prints unlisting details
-        (ok
-            (print
-                {
-                    a: "unlist-in-ustx",
-                    id: id,
-                })
-        )
+        (ok (print {
+            a: "unlist-in-ustx",
+            id: id,
+        }))
     )
 )
 
@@ -733,8 +682,7 @@
         (ok (print {
             a: "buy-in-ustx",
             id: id,
-        })
-        )
+        }))
     )
 )
 
@@ -804,19 +752,16 @@
         ;; Remove the name-properties.
         (map-delete name-properties name-and-namespace)
         ;; Executes the burn operation for the specified NFT.
-        (try!
-            (nft-burn? BNS-V2 id (unwrap! (nft-get-owner? BNS-V2 id) ERR-UNWRAP))
-        )
-        (print
-            {
-                topic: "burn-name",
-                owner: "",
-                name: {
-                    name: (get name name-and-namespace),
-                    namespace: (get namespace name-and-namespace),
-                },
-                id: id,
-            })
+        (try! (nft-burn? BNS-V2 id (unwrap! (nft-get-owner? BNS-V2 id) ERR-UNWRAP)))
+        (print {
+            topic: "burn-name",
+            owner: "",
+            name: {
+                name: (get name name-and-namespace),
+                namespace: (get namespace name-and-namespace),
+            },
+            id: id,
+        })
         (ok true)
     )
 )
@@ -830,9 +775,7 @@
     )
     (let (
         ;; Retrieve namespace properties and current manager.
-        (namespace-props
-            (unwrap! (map-get? namespaces namespace) ERR-NAMESPACE-NOT-FOUND)
-        )
+        (namespace-props (unwrap! (map-get? namespaces namespace) ERR-NAMESPACE-NOT-FOUND))
     )
         ;; Check if migration is complete
         (asserts! (var-get migration-complete) ERR-MIGRATION-IN-PROGRESS)
@@ -850,12 +793,11 @@
         (map-set namespaces namespace
             (merge namespace-props { namespace-manager: new-manager })
         )
-        (print
-            {
-                namespace: namespace,
-                status: "transfer-manager",
-                properties: (map-get? namespaces namespace),
-            })
+        (print {
+            namespace: namespace,
+            status: "transfer-manager",
+            properties: (map-get? namespaces namespace),
+        })
         (ok true)
     )
 )
@@ -867,9 +809,7 @@
     )
     (let (
         ;; Retrieve namespace properties and current manager.
-        (namespace-props
-            (unwrap! (map-get? namespaces namespace) ERR-NAMESPACE-NOT-FOUND)
-        )
+        (namespace-props (unwrap! (map-get? namespaces namespace) ERR-NAMESPACE-NOT-FOUND))
     )
         ;; Check if migration is complete
         (asserts! (var-get migration-complete) ERR-MIGRATION-IN-PROGRESS)
@@ -885,12 +825,11 @@
         (map-set namespaces namespace
             (merge namespace-props { manager-frozen: true })
         )
-        (print
-            {
-                namespace: namespace,
-                status: "freeze-manager",
-                properties: (map-get? namespaces namespace),
-            })
+        (print {
+            namespace: namespace,
+            status: "freeze-manager",
+            properties: (map-get? namespaces namespace),
+        })
         (ok true)
     )
 )
@@ -921,16 +860,14 @@
         ;; Execute the token burn operation.
         (try! (stx-burn? stx-to-burn contract-caller))
         ;; Record the preorder details in the `namespace-preorders` map
-        (map-set namespace-preorders
-            {
-                hashed-salted-namespace: hashed-salted-namespace,
-                buyer: contract-caller,
-            }
-            {
-                created-at: burn-block-height,
-                stx-burned: stx-to-burn,
-                claimed: false,
-            })
+        (map-set namespace-preorders {
+            hashed-salted-namespace: hashed-salted-namespace,
+            buyer: contract-caller,
+        } {
+            created-at: burn-block-height,
+            stx-burned: stx-to-burn,
+            claimed: false,
+        })
         ;; Sets the map with just the hashed-salted-namespace as the key
         (map-set namespace-single-preorder hashed-salted-namespace true)
         ;; Return the block height at which the preorder claimability expires.
@@ -980,31 +917,26 @@
     )
     (let (
         ;; Generate the hashed, salted namespace identifier to match with its preorder.
-        (hashed-salted-namespace
-            (hash160 (concat (concat namespace 0x2e) namespace-salt))
-        )
+        (hashed-salted-namespace (hash160 (concat (concat namespace 0x2e) namespace-salt)))
         ;; Define the price function based on the provided parameters.
-        (price-function
-            {
-                buckets: (list p-func-b1 p-func-b2 p-func-b3 p-func-b4 p-func-b5 p-func-b6
-                    p-func-b7 p-func-b8 p-func-b9 p-func-b10 p-func-b11
-                    p-func-b12 p-func-b13 p-func-b14 p-func-b15 p-func-b16
-                ),
-                base: p-func-base,
-                coeff: p-func-coeff,
-                nonalpha-discount: p-func-non-alpha-discount,
-                no-vowel-discount: p-func-no-vowel-discount,
-            })
+        (price-function {
+            buckets: (list p-func-b1 p-func-b2 p-func-b3 p-func-b4 p-func-b5 p-func-b6
+                p-func-b7 p-func-b8 p-func-b9 p-func-b10 p-func-b11
+                p-func-b12 p-func-b13 p-func-b14 p-func-b15 p-func-b16
+            ),
+            base: p-func-base,
+            coeff: p-func-coeff,
+            nonalpha-discount: p-func-non-alpha-discount,
+            no-vowel-discount: p-func-no-vowel-discount,
+        })
         ;; Retrieve the preorder record to ensure it exists and is valid for the revealing namespace
-        (preorder
-            (unwrap!
-                (map-get? namespace-preorders
-                    {
-                        hashed-salted-namespace: hashed-salted-namespace,
-                        buyer: contract-caller,
-                    })
-                ERR-PREORDER-NOT-FOUND
-            ))
+        (preorder (unwrap!
+            (map-get? namespace-preorders {
+                hashed-salted-namespace: hashed-salted-namespace,
+                buyer: contract-caller,
+            })
+            ERR-PREORDER-NOT-FOUND
+        ))
         ;; Calculate the namespace's registration price for validation.
         (namespace-price (try! (get-namespace-price namespace)))
     )
@@ -1040,38 +972,35 @@
         (match namespace-manager
             namespace-m
             ;; If namespace-manager is assigned, then assign everything except the lifetime, that is set to u0 sinces renewals will be made in the namespace manager contract and set the can update price function to false, since no changes will ever need to be made there.
-            (map-set namespaces namespace
-                {
-                    namespace-manager: namespace-manager,
-                    manager-transferable: manager-transfers,
-                    manager-frozen: manager-frozen,
-                    namespace-import: namespace-import,
-                    revealed-at: burn-block-height,
-                    launched-at: none,
-                    lifetime: u0,
-                    can-update-price-function: can-update-price,
-                    price-function: price-function,
-                })
+            (map-set namespaces namespace {
+                namespace-manager: namespace-manager,
+                manager-transferable: manager-transfers,
+                manager-frozen: manager-frozen,
+                namespace-import: namespace-import,
+                revealed-at: burn-block-height,
+                launched-at: none,
+                lifetime: u0,
+                can-update-price-function: can-update-price,
+                price-function: price-function,
+            })
             ;; If no manager is assigned
-            (map-set namespaces namespace
-                {
-                    namespace-manager: none,
-                    manager-transferable: manager-transfers,
-                    manager-frozen: manager-frozen,
-                    namespace-import: namespace-import,
-                    revealed-at: burn-block-height,
-                    launched-at: none,
-                    lifetime: lifetime,
-                    can-update-price-function: can-update-price,
-                    price-function: price-function,
-                })
+            (map-set namespaces namespace {
+                namespace-manager: none,
+                manager-transferable: manager-transfers,
+                manager-frozen: manager-frozen,
+                namespace-import: namespace-import,
+                revealed-at: burn-block-height,
+                launched-at: none,
+                lifetime: lifetime,
+                can-update-price-function: can-update-price,
+                price-function: price-function,
+            })
         )
         ;; Update the claimed value for the preorder
-        (map-set namespace-preorders
-            {
-                hashed-salted-namespace: hashed-salted-namespace,
-                buyer: contract-caller,
-            }
+        (map-set namespace-preorders {
+            hashed-salted-namespace: hashed-salted-namespace,
+            buyer: contract-caller,
+        }
             (merge preorder { claimed: true })
         )
         ;; Confirm successful reveal of the namespace
@@ -1086,9 +1015,7 @@
     )
     (let (
         ;; Retrieve the properties of the namespace to ensure it exists and to check its current state.
-        (namespace-props
-            (unwrap! (map-get? namespaces namespace) ERR-NAMESPACE-NOT-FOUND)
-        )
+        (namespace-props (unwrap! (map-get? namespaces namespace) ERR-NAMESPACE-NOT-FOUND))
     )
         ;; Check if migration is complete
         (asserts! (var-get migration-complete) ERR-MIGRATION-IN-PROGRESS)
@@ -1112,12 +1039,11 @@
             (merge namespace-props { launched-at: (some burn-block-height) })
         )
         ;; Emit an event to indicate the namespace is now ready and launched.
-        (print
-            {
-                namespace: namespace,
-                status: "launch",
-                properties: (map-get? namespaces namespace),
-            })
+        (print {
+            namespace: namespace,
+            status: "launch",
+            properties: (map-get? namespaces namespace),
+        })
         ;; Confirm the successful launch of the namespace.
         (ok true)
     )
@@ -1130,13 +1056,8 @@
     )
     (let (
         ;; Retrieve the properties of the namespace and manager.
-        (namespace-props
-            (unwrap! (map-get? namespaces namespace) ERR-NAMESPACE-NOT-FOUND)
-        )
-        (namespace-manager
-            (unwrap! (get namespace-manager namespace-props)
-                ERR-NO-NAMESPACE-MANAGER
-            ))
+        (namespace-props (unwrap! (map-get? namespaces namespace) ERR-NAMESPACE-NOT-FOUND))
+        (namespace-manager (unwrap! (get namespace-manager namespace-props) ERR-NO-NAMESPACE-MANAGER))
     )
         ;; Check if migration is complete
         (asserts! (var-get migration-complete) ERR-MIGRATION-IN-PROGRESS)
@@ -1146,12 +1067,11 @@
         (map-set namespaces namespace
             (merge namespace-props { manager-transferable: false })
         )
-        (print
-            {
-                namespace: namespace,
-                status: "turn-off-manager-transfers",
-                properties: (map-get? namespaces namespace),
-            })
+        (print {
+            namespace: namespace,
+            status: "turn-off-manager-transfers",
+            properties: (map-get? namespaces namespace),
+        })
         ;; Confirm successful execution.
         (ok true)
     )
@@ -1170,30 +1090,22 @@
     )
     (let (
         ;; Fetch properties of the specified namespace.
-        (namespace-props
-            (unwrap! (map-get? namespaces namespace) ERR-NAMESPACE-NOT-FOUND)
-        )
+        (namespace-props (unwrap! (map-get? namespaces namespace) ERR-NAMESPACE-NOT-FOUND))
         ;; Fetch the latest index to mint
         (current-mint (+ (var-get bns-index) u1))
-        (price
-            (if (is-none (get namespace-manager namespace-props))
-                (try!
-                    (compute-name-price name (get price-function namespace-props))
-                )
-                u0
-            ))
+        (price (if (is-none (get namespace-manager namespace-props))
+            (try! (compute-name-price name (get price-function namespace-props)))
+            u0
+        ))
     )
         ;; Check if migration is complete
         (asserts! (var-get migration-complete) ERR-MIGRATION-IN-PROGRESS)
         ;; Ensure the name is not already registered.
         (asserts!
-            (is-none
-                (map-get? name-properties
-                    {
-                        name: name,
-                        namespace: namespace,
-                    })
-            )
+            (is-none (map-get? name-properties {
+                name: name,
+                namespace: namespace,
+            }))
             ERR-NAME-NOT-AVAILABLE
         )
         ;; Verify that the name contains only valid characters.
@@ -1215,32 +1127,28 @@
             ERR-NAMESPACE-PREORDER-LAUNCHABILITY-EXPIRED
         )
         ;; Set the name properties
-        (map-set name-properties
-            {
-                name: name,
-                namespace: namespace,
-            }
-            {
-                registered-at: none,
-                imported-at: (some burn-block-height),
-                hashed-salted-fqn-preorder: none,
-                preordered-by: none,
-                renewal-height: u0,
-                stx-burn: price,
-                owner: beneficiary,
-            })
-        (map-set name-to-index
-            {
-                name: name,
-                namespace: namespace,
-            }
+        (map-set name-properties {
+            name: name,
+            namespace: namespace,
+        } {
+            registered-at: none,
+            imported-at: (some burn-block-height),
+            hashed-salted-fqn-preorder: none,
+            preordered-by: none,
+            renewal-height: u0,
+            stx-burn: price,
+            owner: beneficiary,
+        })
+        (map-set name-to-index {
+            name: name,
+            namespace: namespace,
+        }
             current-mint
         )
-        (map-set index-to-name current-mint
-            {
-                name: name,
-                namespace: namespace,
-            })
+        (map-set index-to-name current-mint {
+            name: name,
+            namespace: namespace,
+        })
         ;; Update primary name if needed for send-to
         (update-primary-name-recipient current-mint beneficiary)
         ;; Update the index of the minting
@@ -1248,21 +1156,19 @@
         ;; Mint the name to the beneficiary
         (try! (nft-mint? BNS-V2 current-mint beneficiary))
         ;; Log the new name registration
-        (print
-            {
-                topic: "new-name",
-                owner: beneficiary,
-                name: {
-                    name: name,
-                    namespace: namespace,
-                },
-                id: current-mint,
-                properties: (map-get? name-properties
-                    {
-                        name: name,
-                        namespace: namespace,
-                    }),
-            })
+        (print {
+            topic: "new-name",
+            owner: beneficiary,
+            name: {
+                name: name,
+                namespace: namespace,
+            },
+            id: current-mint,
+            properties: (map-get? name-properties {
+                name: name,
+                namespace: namespace,
+            }),
+        })
         ;; Confirm successful import of the name.
         (ok true)
     )
@@ -1300,21 +1206,18 @@
     )
     (let (
         ;; Retrieve the current properties of the namespace.
-        (namespace-props
-            (unwrap! (map-get? namespaces namespace) ERR-NAMESPACE-NOT-FOUND)
-        )
+        (namespace-props (unwrap! (map-get? namespaces namespace) ERR-NAMESPACE-NOT-FOUND))
         ;; Construct the new price function.
-        (price-function
-            {
-                buckets: (list p-func-b1 p-func-b2 p-func-b3 p-func-b4 p-func-b5 p-func-b6
-                    p-func-b7 p-func-b8 p-func-b9 p-func-b10 p-func-b11
-                    p-func-b12 p-func-b13 p-func-b14 p-func-b15 p-func-b16
-                ),
-                base: p-func-base,
-                coeff: p-func-coeff,
-                nonalpha-discount: p-func-non-alpha-discount,
-                no-vowel-discount: p-func-no-vowel-discount,
-            })
+        (price-function {
+            buckets: (list p-func-b1 p-func-b2 p-func-b3 p-func-b4 p-func-b5 p-func-b6
+                p-func-b7 p-func-b8 p-func-b9 p-func-b10 p-func-b11
+                p-func-b12 p-func-b13 p-func-b14 p-func-b15 p-func-b16
+            ),
+            base: p-func-base,
+            coeff: p-func-coeff,
+            nonalpha-discount: p-func-non-alpha-discount,
+            no-vowel-discount: p-func-no-vowel-discount,
+        })
     )
         (match (get namespace-manager namespace-props)
             manager
@@ -1336,12 +1239,11 @@
         (map-set namespaces namespace
             (merge namespace-props { price-function: price-function })
         )
-        (print
-            {
-                namespace: namespace,
-                status: "update-price-manager",
-                properties: (map-get? namespaces namespace),
-            })
+        (print {
+            namespace: namespace,
+            status: "update-price-manager",
+            properties: (map-get? namespaces namespace),
+        })
         ;; Confirm the successful update of the price function.
         (ok true)
     )
@@ -1354,9 +1256,7 @@
     )
     (let (
         ;; Retrieve the properties of the specified namespace to verify its existence and fetch its current settings.
-        (namespace-props
-            (unwrap! (map-get? namespaces namespace) ERR-NAMESPACE-NOT-FOUND)
-        )
+        (namespace-props (unwrap! (map-get? namespaces namespace) ERR-NAMESPACE-NOT-FOUND))
     )
         (match (get namespace-manager namespace-props)
             manager
@@ -1374,12 +1274,11 @@
         (map-set namespaces namespace
             (merge namespace-props { can-update-price-function: false })
         )
-        (print
-            {
-                namespace: namespace,
-                status: "freeze-price-manager",
-                properties: (map-get? namespaces namespace),
-            })
+        (print {
+            namespace: namespace,
+            status: "freeze-price-manager",
+            properties: (map-get? namespaces namespace),
+        })
         ;; Return a success confirmation.
         (ok true)
     )
@@ -1398,28 +1297,20 @@
     )
     (let (
         ;; Retrieve namespace properties.
-        (namespace-props
-            (unwrap! (map-get? namespaces namespace) ERR-NAMESPACE-NOT-FOUND)
-        )
+        (namespace-props (unwrap! (map-get? namespaces namespace) ERR-NAMESPACE-NOT-FOUND))
         (current-namespace-manager (get namespace-manager namespace-props))
         ;; Calculates the ID for the new name to be minted.
         (id-to-be-minted (+ (var-get bns-index) u1))
         ;; Check if the name already exists.
-        (name-props
-            (map-get? name-properties
-                {
-                    name: name,
-                    namespace: namespace,
-                })
-        )
+        (name-props (map-get? name-properties {
+            name: name,
+            namespace: namespace,
+        }))
         ;; new to get the price of the name
-        (name-price
-            (if (is-none current-namespace-manager)
-                (try!
-                    (compute-name-price name (get price-function namespace-props))
-                )
-                u0
-            ))
+        (name-price (if (is-none current-namespace-manager)
+            (try! (compute-name-price name (get price-function namespace-props)))
+            u0
+        ))
     )
         ;; Check if migration is complete
         (asserts! (var-get migration-complete) ERR-MIGRATION-IN-PROGRESS)
@@ -1447,56 +1338,50 @@
         ;; Update the index
         (var-set bns-index id-to-be-minted)
         ;; Sets properties for the newly registered name.
-        (map-set name-properties
-            {
-                name: name,
-                namespace: namespace,
-            }
-            {
-                registered-at: (some (+ burn-block-height u1)),
-                imported-at: none,
-                hashed-salted-fqn-preorder: none,
-                preordered-by: none,
-                ;; Updated this to actually start with the registered-at date/block, and also to be u0 if it is a managed namespace
-                renewal-height: (if (is-eq (get lifetime namespace-props) u0)
-                    u0
-                    (+ (get lifetime namespace-props) burn-block-height u1)
-                ),
-                stx-burn: name-price,
-                owner: send-to,
-            })
-        (map-set name-to-index
-            {
-                name: name,
-                namespace: namespace,
-            }
+        (map-set name-properties {
+            name: name,
+            namespace: namespace,
+        } {
+            registered-at: (some (+ burn-block-height u1)),
+            imported-at: none,
+            hashed-salted-fqn-preorder: none,
+            preordered-by: none,
+            ;; Updated this to actually start with the registered-at date/block, and also to be u0 if it is a managed namespace
+            renewal-height: (if (is-eq (get lifetime namespace-props) u0)
+                u0
+                (+ (get lifetime namespace-props) burn-block-height u1)
+            ),
+            stx-burn: name-price,
+            owner: send-to,
+        })
+        (map-set name-to-index {
+            name: name,
+            namespace: namespace,
+        }
             id-to-be-minted
         )
-        (map-set index-to-name id-to-be-minted
-            {
-                name: name,
-                namespace: namespace,
-            })
+        (map-set index-to-name id-to-be-minted {
+            name: name,
+            namespace: namespace,
+        })
         ;; Update primary name if needed for send-to
         (update-primary-name-recipient id-to-be-minted send-to)
         ;; Mints the new BNS name.
         (try! (nft-mint? BNS-V2 id-to-be-minted send-to))
         ;; Log the new name registration
-        (print
-            {
-                topic: "new-name",
-                owner: send-to,
-                name: {
-                    name: name,
-                    namespace: namespace,
-                },
-                id: id-to-be-minted,
-                properties: (map-get? name-properties
-                    {
-                        name: name,
-                        namespace: namespace,
-                    }),
-            })
+        (print {
+            topic: "new-name",
+            owner: send-to,
+            name: {
+                name: name,
+                namespace: namespace,
+            },
+            id: id-to-be-minted,
+            properties: (map-get? name-properties {
+                name: name,
+                namespace: namespace,
+            }),
+        })
         ;; Signals successful completion.
         (ok id-to-be-minted)
     )
@@ -1524,16 +1409,14 @@
         ;; Transfers the specified amount of stx to the BNS contract to burn on register
         (try! (stx-transfer? stx-to-burn contract-caller .BNS-V2))
         ;; Records the preorder in the 'name-preorders' map.
-        (map-set name-preorders
-            {
-                hashed-salted-fqn: hashed-salted-fqn,
-                buyer: contract-caller,
-            }
-            {
-                created-at: burn-block-height,
-                stx-burned: stx-to-burn,
-                claimed: false,
-            })
+        (map-set name-preorders {
+            hashed-salted-fqn: hashed-salted-fqn,
+            buyer: contract-caller,
+        } {
+            created-at: burn-block-height,
+            stx-burned: stx-to-burn,
+            claimed: false,
+        })
         ;; Sets the map with just the hashed-salted-fqn as the key
         (map-set name-single-preorder hashed-salted-fqn true)
         ;; Returns the block height at which the preorder's claimability period will expire.
@@ -1552,23 +1435,17 @@
     )
     (let (
         ;; Generate a unique identifier for the name by hashing the fully-qualified name with salt
-        (hashed-salted-fqn
-            (hash160 (concat (concat (concat name 0x2e) namespace) salt))
-        )
+        (hashed-salted-fqn (hash160 (concat (concat (concat name 0x2e) namespace) salt)))
         ;; Retrieve the preorder details for this name
-        (preorder
-            (unwrap!
-                (map-get? name-preorders
-                    {
-                        hashed-salted-fqn: hashed-salted-fqn,
-                        buyer: contract-caller,
-                    })
-                ERR-PREORDER-NOT-FOUND
-            ))
+        (preorder (unwrap!
+            (map-get? name-preorders {
+                hashed-salted-fqn: hashed-salted-fqn,
+                buyer: contract-caller,
+            })
+            ERR-PREORDER-NOT-FOUND
+        ))
         ;; Fetch the properties of the namespace
-        (namespace-props
-            (unwrap! (map-get? namespaces namespace) ERR-NAMESPACE-NOT-FOUND)
-        )
+        (namespace-props (unwrap! (map-get? namespaces namespace) ERR-NAMESPACE-NOT-FOUND))
         ;; Get the amount of burned STX
         (stx-burned (get stx-burned preorder))
     )
@@ -1605,27 +1482,24 @@
         ;; Verify that enough STX was burned during preorder to cover the name price
         (asserts!
             (is-eq stx-burned
-                (try!
-                    (compute-name-price name (get price-function namespace-props))
-                ))
+                (try! (compute-name-price name (get price-function namespace-props)))
+            )
             ERR-STX-BURNT-INSUFFICIENT
         )
         ;; Verify that the name contains only valid characters.
         (asserts! (not (has-invalid-chars name)) ERR-CHARSET-INVALID)
         ;; Mark the preorder as claimed to prevent double-spending
-        (map-set name-preorders
-            {
-                hashed-salted-fqn: hashed-salted-fqn,
-                buyer: contract-caller,
-            }
+        (map-set name-preorders {
+            hashed-salted-fqn: hashed-salted-fqn,
+            buyer: contract-caller,
+        }
             (merge preorder { claimed: true })
         )
         ;; Check if the name already exists
-        (match (map-get? name-properties
-            {
-                name: name,
-                namespace: namespace,
-            })
+        (match (map-get? name-properties {
+            name: name,
+            namespace: namespace,
+        })
             name-props-exist
             ;; If the name exists
             (handle-existing-name name-props-exist hashed-salted-fqn
@@ -1648,15 +1522,13 @@
     )
     (let (
         ;; Retrieves the preorder details.
-        (preorder
-            (unwrap!
-                (map-get? name-preorders
-                    {
-                        hashed-salted-fqn: hashed-salted-fqn,
-                        buyer: contract-caller,
-                    })
-                ERR-PREORDER-NOT-FOUND
-            ))
+        (preorder (unwrap!
+            (map-get? name-preorders {
+                hashed-salted-fqn: hashed-salted-fqn,
+                buyer: contract-caller,
+            })
+            ERR-PREORDER-NOT-FOUND
+        ))
         (claimer contract-caller)
     )
         ;; Check if migration is complete
@@ -1671,16 +1543,12 @@
         ;; Asserts that the preorder has not been claimed
         (asserts! (not (get claimed preorder)) ERR-OPERATION-UNAUTHORIZED)
         ;; Transfers back the specified amount of stx from the BNS contract to the contract-caller
-        (try!
-            (as-contract
-                (stx-transfer? (get stx-burned preorder) .BNS-V2 claimer)
-            ))
+        (try! (as-contract (stx-transfer? (get stx-burned preorder) .BNS-V2 claimer)))
         ;; Deletes the preorder in the 'name-preorders' map.
-        (map-delete name-preorders
-            {
-                hashed-salted-fqn: hashed-salted-fqn,
-                buyer: contract-caller,
-            })
+        (map-delete name-preorders {
+            hashed-salted-fqn: hashed-salted-fqn,
+            buyer: contract-caller,
+        })
         ;; Remove the entry from the name-single-preorder map
         (map-delete name-single-preorder hashed-salted-fqn)
         ;; Returns ok true
@@ -1704,16 +1572,14 @@
             ERR-PREORDERED-BEFORE
         )
         ;; Records the preorder in the 'name-preorders' map. Buyer set to contract-caller
-        (map-set name-preorders
-            {
-                hashed-salted-fqn: hashed-salted-fqn,
-                buyer: contract-caller,
-            }
-            {
-                created-at: burn-block-height,
-                stx-burned: u0,
-                claimed: false,
-            })
+        (map-set name-preorders {
+            hashed-salted-fqn: hashed-salted-fqn,
+            buyer: contract-caller,
+        } {
+            created-at: burn-block-height,
+            stx-burned: u0,
+            claimed: false,
+        })
         ;; Sets the map with just the hashed-salted-fqn as the key
         (map-set name-single-preorder hashed-salted-fqn true)
         ;; Returns the block height at which the preorder's claimability period will expire.
@@ -1735,27 +1601,18 @@
     )
     (let (
         ;; Generates the hashed, salted fully-qualified name.
-        (hashed-salted-fqn
-            (hash160 (concat (concat (concat name 0x2e) namespace) salt))
-        )
+        (hashed-salted-fqn (hash160 (concat (concat (concat name 0x2e) namespace) salt)))
         ;; Retrieves the existing properties of the namespace to confirm its existence and management details.
-        (namespace-props
-            (unwrap! (map-get? namespaces namespace) ERR-NAMESPACE-NOT-FOUND)
-        )
-        (current-namespace-manager
-            (unwrap! (get namespace-manager namespace-props)
-                ERR-NO-NAMESPACE-MANAGER
-            ))
+        (namespace-props (unwrap! (map-get? namespaces namespace) ERR-NAMESPACE-NOT-FOUND))
+        (current-namespace-manager (unwrap! (get namespace-manager namespace-props) ERR-NO-NAMESPACE-MANAGER))
         ;; Retrieves the preorder information using the hashed-salted FQN to verify the preorder exists
-        (preorder
-            (unwrap!
-                (map-get? name-preorders
-                    {
-                        hashed-salted-fqn: hashed-salted-fqn,
-                        buyer: current-namespace-manager,
-                    })
-                ERR-PREORDER-NOT-FOUND
-            ))
+        (preorder (unwrap!
+            (map-get? name-preorders {
+                hashed-salted-fqn: hashed-salted-fqn,
+                buyer: current-namespace-manager,
+            })
+            ERR-PREORDER-NOT-FOUND
+        ))
         ;; Calculates the ID for the new name to be minted.
         (id-to-be-minted (+ (var-get bns-index) u1))
     )
@@ -1765,13 +1622,10 @@
         (asserts! (not (get claimed preorder)) ERR-OPERATION-UNAUTHORIZED)
         ;; Ensure the name is not already registered
         (asserts!
-            (is-none
-                (map-get? name-properties
-                    {
-                        name: name,
-                        namespace: namespace,
-                    })
-            )
+            (is-none (map-get? name-properties {
+                name: name,
+                namespace: namespace,
+            }))
             ERR-NAME-NOT-AVAILABLE
         )
         ;; Verify that the name contains only valid characters.
@@ -1795,63 +1649,56 @@
             ERR-PREORDER-CLAIMABILITY-EXPIRED
         )
         ;; Sets properties for the newly registered name.
-        (map-set name-properties
-            {
-                name: name,
-                namespace: namespace,
-            }
-            {
-                registered-at: (some burn-block-height),
-                imported-at: none,
-                hashed-salted-fqn-preorder: (some hashed-salted-fqn),
-                preordered-by: (some send-to),
-                ;; Updated this to be u0, so that renewals are handled through the namespace manager
-                renewal-height: u0,
-                stx-burn: u0,
-                owner: send-to,
-            })
-        (map-set name-to-index
-            {
-                name: name,
-                namespace: namespace,
-            }
+        (map-set name-properties {
+            name: name,
+            namespace: namespace,
+        } {
+            registered-at: (some burn-block-height),
+            imported-at: none,
+            hashed-salted-fqn-preorder: (some hashed-salted-fqn),
+            preordered-by: (some send-to),
+            ;; Updated this to be u0, so that renewals are handled through the namespace manager
+            renewal-height: u0,
+            stx-burn: u0,
+            owner: send-to,
+        })
+        (map-set name-to-index {
+            name: name,
+            namespace: namespace,
+        }
             id-to-be-minted
         )
-        (map-set index-to-name id-to-be-minted
-            {
-                name: name,
-                namespace: namespace,
-            })
+        (map-set index-to-name id-to-be-minted {
+            name: name,
+            namespace: namespace,
+        })
         ;; Update primary name if needed for send-to
         (update-primary-name-recipient id-to-be-minted send-to)
         ;; Updates BNS-index variable to the newly minted ID.
         (var-set bns-index id-to-be-minted)
         ;; Update map to claimed for preorder, to avoid people reclaiming stx from an already registered name
-        (map-set name-preorders
-            {
-                hashed-salted-fqn: hashed-salted-fqn,
-                buyer: current-namespace-manager,
-            }
+        (map-set name-preorders {
+            hashed-salted-fqn: hashed-salted-fqn,
+            buyer: current-namespace-manager,
+        }
             (merge preorder { claimed: true })
         )
         ;; Mints the BNS name as an NFT to the send-to address, finalizing the registration.
         (try! (nft-mint? BNS-V2 id-to-be-minted send-to))
         ;; Log the new name registration
-        (print
-            {
-                topic: "new-name",
-                owner: send-to,
-                name: {
-                    name: name,
-                    namespace: namespace,
-                },
-                id: id-to-be-minted,
-                properties: (map-get? name-properties
-                    {
-                        name: name,
-                        namespace: namespace,
-                    }),
-            })
+        (print {
+            topic: "new-name",
+            owner: send-to,
+            name: {
+                name: name,
+                namespace: namespace,
+            },
+            id: id-to-be-minted,
+            properties: (map-get? name-properties {
+                name: name,
+                namespace: namespace,
+            }),
+        })
         ;; Confirms successful registration of the name.
         (ok id-to-be-minted)
     )
@@ -1869,23 +1716,19 @@
         ;; Get the unique identifier for this name
         (name-index (unwrap! (get-id-from-bns name namespace) ERR-NO-NAME))
         ;; Retrieve the properties of the namespace
-        (namespace-props
-            (unwrap! (map-get? namespaces namespace) ERR-NAMESPACE-NOT-FOUND)
-        )
+        (namespace-props (unwrap! (map-get? namespaces namespace) ERR-NAMESPACE-NOT-FOUND))
         ;; Get the manager of the namespace, if any
         (namespace-manager (get namespace-manager namespace-props))
         ;; Get the current owner of the name
         (owner (unwrap! (nft-get-owner? BNS-V2 name-index) ERR-NO-NAME))
         ;; Retrieve the properties of the name
-        (name-props
-            (unwrap!
-                (map-get? name-properties
-                    {
-                        name: name,
-                        namespace: namespace,
-                    })
-                ERR-NO-NAME
-            ))
+        (name-props (unwrap!
+            (map-get? name-properties {
+                name: name,
+                namespace: namespace,
+            })
+            ERR-NO-NAME
+        ))
         ;; Get the lifetime of names in this namespace
         (lifetime (get lifetime namespace-props))
         ;; Get the current renewal height of the name
@@ -1905,40 +1748,28 @@
         (asserts! (> lifetime u0) ERR-LIFETIME-EQUAL-0)
         ;; Handle renewal based on whether it's within the grace period or not
         (if (< burn-block-height (+ renewal-height NAME-GRACE-PERIOD-DURATION))
-            (try!
-                (handle-renewal-in-grace-period name namespace name-props owner
-                    lifetime new-renewal-height
-                ))
-            (try!
-                (handle-renewal-after-grace-period name namespace name-props
-                    owner name-index new-renewal-height
-                ))
+            (try! (handle-renewal-in-grace-period name namespace name-props owner
+                lifetime new-renewal-height
+            ))
+            (try! (handle-renewal-after-grace-period name namespace name-props owner
+                name-index new-renewal-height
+            ))
         )
         ;; Burn the specified amount of STX
-        (try!
-            (stx-burn?
-                (try!
-                    (compute-name-price name (get price-function namespace-props))
-                )
-                contract-caller
-            ))
+        (try! (stx-burn?
+            (try! (compute-name-price name (get price-function namespace-props)))
+            contract-caller
+        ))
         ;; update the new stx-burn to the one paid in renewal
-        (map-set name-properties
-            {
-                name: name,
-                namespace: namespace,
-            }
+        (map-set name-properties {
+            name: name,
+            namespace: namespace,
+        }
             (merge
-                (unwrap-panic
-                    (map-get? name-properties
-                        {
-                            name: name,
-                            namespace: namespace,
-                        })
-                )
-                { stx-burn: (try!
-                    (compute-name-price name (get price-function namespace-props))
-                ) }
+                (unwrap-panic (map-get? name-properties {
+                    name: name,
+                    namespace: namespace,
+                })) { stx-burn: (try! (compute-name-price name (get price-function namespace-props))) }
             ))
         ;; Return success
         (ok true)
@@ -1949,16 +1780,15 @@
 (define-private (handle-renewal-in-grace-period
         (name (buff 48))
         (namespace (buff 20))
-        (name-props
-            {
-                registered-at: (optional uint),
-                imported-at: (optional uint),
-                hashed-salted-fqn-preorder: (optional (buff 20)),
-                preordered-by: (optional principal),
-                renewal-height: uint,
-                stx-burn: uint,
-                owner: principal,
-            })
+        (name-props {
+            registered-at: (optional uint),
+            imported-at: (optional uint),
+            hashed-salted-fqn-preorder: (optional (buff 20)),
+            preordered-by: (optional principal),
+            renewal-height: uint,
+            stx-burn: uint,
+            owner: principal,
+        })
         (owner principal)
         (lifetime uint)
         (new-renewal-height uint)
@@ -1967,29 +1797,25 @@
         ;; Ensure only the owner can renew within the grace period
         (asserts! (is-eq contract-caller owner) ERR-NOT-AUTHORIZED)
         ;; Update the name properties with the new renewal height
-        (map-set name-properties
-            {
+        (map-set name-properties {
+            name: name,
+            namespace: namespace,
+        }
+            (merge name-props { renewal-height: ;; If still within lifetime, extend from current renewal height; otherwise, use new renewal height })
+        )
+        (print {
+            topic: "renew-name",
+            owner: owner,
+            name: {
                 name: name,
                 namespace: namespace,
-            }
-            (merge name-props
-                { renewal-height: ;; If still within lifetime, extend from current renewal height; otherwise, use new renewal height }
-            ))
-        (print
-            {
-                topic: "renew-name",
-                owner: owner,
-                name: {
-                    name: name,
-                    namespace: namespace,
-                },
-                id: (get-id-from-bns name namespace),
-                properties: (map-get? name-properties
-                    {
-                        name: name,
-                        namespace: namespace,
-                    }),
-            })
+            },
+            id: (get-id-from-bns name namespace),
+            properties: (map-get? name-properties {
+                name: name,
+                namespace: namespace,
+            }),
+        })
         (ok true)
     )
 )
@@ -1998,30 +1824,27 @@
 (define-private (handle-renewal-after-grace-period
         (name (buff 48))
         (namespace (buff 20))
-        (name-props
-            {
-                registered-at: (optional uint),
-                imported-at: (optional uint),
-                hashed-salted-fqn-preorder: (optional (buff 20)),
-                preordered-by: (optional principal),
-                renewal-height: uint,
-                stx-burn: uint,
-                owner: principal,
-            })
+        (name-props {
+            registered-at: (optional uint),
+            imported-at: (optional uint),
+            hashed-salted-fqn-preorder: (optional (buff 20)),
+            preordered-by: (optional principal),
+            renewal-height: uint,
+            stx-burn: uint,
+            owner: principal,
+        })
         (owner principal)
         (name-index uint)
         (new-renewal-height uint)
     )
     (if (is-eq contract-caller owner)
         ;; If the owner is renewing, simply update the renewal height
-        (ok
-            (map-set name-properties
-                {
-                    name: name,
-                    namespace: namespace,
-                }
-                (merge name-props { renewal-height: new-renewal-height })
-            ))
+        (ok (map-set name-properties {
+            name: name,
+            namespace: namespace,
+        }
+            (merge name-props { renewal-height: new-renewal-height })
+        ))
         ;; If someone else is renewing (taking over the name)
         (begin
             ;; Check if the name is listed on the market and remove the listing if it is
@@ -2030,11 +1853,10 @@
                 (map-delete market name-index)
                 true
             )
-            (map-set name-properties
-                {
-                    name: name,
-                    namespace: namespace,
-                }
+            (map-set name-properties {
+                name: name,
+                namespace: namespace,
+            }
                 (merge name-props { renewal-height: new-renewal-height })
             )
             ;; Update the name properties with the new renewal height and owner
@@ -2232,55 +2054,50 @@
 ;; no-vowel-discount (uint): A discount applied to names lacking vowel characters.
 (define-private (compute-name-price
         (name (buff 48))
-        (price-function
-            {
-                buckets: (list 16 uint),
-                base: uint,
-                coeff: uint,
-                nonalpha-discount: uint,
-                no-vowel-discount: uint,
-            })
+        (price-function {
+            buckets: (list 16 uint),
+            base: uint,
+            coeff: uint,
+            nonalpha-discount: uint,
+            no-vowel-discount: uint,
+        })
     )
     (let (
         ;; Determine the appropriate exponent based on the name's length.
         ;; This corresponds to a specific bucket in the pricing function.
         ;; The length of the name is used to index into the buckets list, with a maximum index of 15.
-        (exponent
-            (get-exp-at-index (get buckets price-function)
-                (min u15 (- (len name) u1))
-            ))
+        (exponent (get-exp-at-index (get buckets price-function)
+            (min u15 (- (len name) u1))
+        ))
         ;; Calculate the no-vowel discount.
         ;; If the name has no vowels, apply the no-vowel discount from the price function.
         ;; Otherwise, use 1 indicating no discount.
-        (no-vowel-discount
-            (if (not (has-vowels-chars name))
-                (get no-vowel-discount price-function)
-                u1
-            ))
+        (no-vowel-discount (if (not (has-vowels-chars name))
+            (get no-vowel-discount price-function)
+            u1
+        ))
         ;; Calculate the non-alphabetic character discount.
         ;; If the name contains non-alphabetic characters, apply the non-alpha discount from the price function.
         ;; Otherwise, use 1 indicating no discount.
-        (nonalpha-discount
-            (if (has-nonalpha-chars name)
-                (get nonalpha-discount price-function)
-                u1
-            ))
+        (nonalpha-discount (if (has-nonalpha-chars name)
+            (get nonalpha-discount price-function)
+            u1
+        ))
         (len-name (len name))
     )
         (asserts! (> len-name u0) ERR-NAME-BLANK)
         ;; Compute the final price.
         ;; The base price, adjusted by the coefficient and exponent, is divided by the greater of the two discounts (non-alpha or no-vowel).
         ;; The result is then multiplied by 10 to adjust for unit precision.
-        (ok
-            (*
-                (/
-                    (* (get coeff price-function)
-                        (pow (get base price-function) exponent)
-                    )
-                    (max nonalpha-discount no-vowel-discount)
+        (ok (*
+            (/
+                (* (get coeff price-function)
+                    (pow (get base price-function) exponent)
                 )
-                u10
-            ))
+                (max nonalpha-discount no-vowel-discount)
+            )
+            u10
+        ))
     )
 )
 
@@ -2297,9 +2114,7 @@
         ;; Attempts to retrieve the name and namespace associated with the given NFT ID.
         (name-and-namespace (unwrap! (map-get? index-to-name id) ERR-NO-NAME))
         ;; Retrieves the properties of the name within the namespace.
-        (name-props
-            (unwrap! (map-get? name-properties name-and-namespace) ERR-NO-NAME)
-        )
+        (name-props (unwrap! (map-get? name-properties name-and-namespace) ERR-NO-NAME))
     )
         ;; Check owner and recipient is not the same
         (asserts! (not (is-eq owner recipient)) ERR-OPERATION-UNAUTHORIZED)
@@ -2314,21 +2129,19 @@
         )
         ;; Executes the NFT transfer from the current owner to the recipient.
         (try! (nft-transfer? BNS-V2 id owner recipient))
-        (print
-            {
-                topic: "transfer-name",
-                owner: recipient,
-                name: {
-                    name: (get name name-and-namespace),
-                    namespace: (get namespace name-and-namespace),
-                },
-                id: id,
-                properties: (map-get? name-properties
-                    {
-                        name: (get name name-and-namespace),
-                        namespace: (get namespace name-and-namespace),
-                    }),
-            })
+        (print {
+            topic: "transfer-name",
+            owner: recipient,
+            name: {
+                name: (get name name-and-namespace),
+                namespace: (get namespace name-and-namespace),
+            },
+            id: id,
+            properties: (map-get? name-properties {
+                name: (get name name-and-namespace),
+                namespace: (get namespace name-and-namespace),
+            }),
+        })
         (ok true)
     )
 )
@@ -2364,16 +2177,15 @@
 )
 
 (define-private (handle-existing-name
-        (name-props
-            {
-                registered-at: (optional uint),
-                imported-at: (optional uint),
-                hashed-salted-fqn-preorder: (optional (buff 20)),
-                preordered-by: (optional principal),
-                renewal-height: uint,
-                stx-burn: uint,
-                owner: principal,
-            })
+        (name-props {
+            registered-at: (optional uint),
+            imported-at: (optional uint),
+            hashed-salted-fqn-preorder: (optional (buff 20)),
+            preordered-by: (optional principal),
+            renewal-height: uint,
+            stx-burn: uint,
+            owner: principal,
+        })
         (hashed-salted-fqn (buff 20))
         (contract-caller-preorder-height uint)
         (stx-burned uint)
@@ -2383,14 +2195,10 @@
     )
     (let (
         ;; Retrieve the index of the existing name
-        (name-index
-            (unwrap-panic
-                (map-get? name-to-index
-                    {
-                        name: name,
-                        namespace: namespace,
-                    })
-            ))
+        (name-index (unwrap-panic (map-get? name-to-index {
+            name: name,
+            namespace: namespace,
+        })))
     )
         ;; Straight up check if the name was imported
         (asserts! (is-none (get imported-at name-props)) ERR-IMPORTED-BEFORE)
@@ -2400,14 +2208,12 @@
             ;; Compare both preorder's height
             (asserts!
                 (>
-                    (unwrap-panic
-                        (get created-at
-                            (map-get? name-preorders
-                                {
-                                    hashed-salted-fqn: fqn,
-                                    buyer: (unwrap-panic (get preordered-by name-props)),
-                                })
-                        ))
+                    (unwrap-panic (get created-at
+                        (map-get? name-preorders {
+                            hashed-salted-fqn: fqn,
+                            buyer: (unwrap-panic (get preordered-by name-props)),
+                        })
+                    ))
                     contract-caller-preorder-height
                 )
                 ERR-PREORDERED-BEFORE
@@ -2421,47 +2227,38 @@
             )
         )
         ;; Update the name properties with the new preorder information since it is the best preorder
-        (map-set name-properties
-            {
+        (map-set name-properties {
+            name: name,
+            namespace: namespace,
+        }
+            (merge name-props {
+                hashed-salted-fqn-preorder: (some hashed-salted-fqn),
+                preordered-by: (some contract-caller),
+                registered-at: (some burn-block-height),
+                renewal-height: (if (is-eq renewal u0)
+                    u0
+                    (+ burn-block-height renewal)
+                ),
+                stx-burn: stx-burned,
+            })
+        )
+        (try! (as-contract (stx-transfer? stx-burned .BNS-V2 (get owner name-props))))
+        ;; Transfer ownership of the name to the new owner
+        (try! (purchase-transfer name-index (get owner name-props) contract-caller))
+        ;; Log the name transfer event
+        (print {
+            topic: "transfer-name",
+            owner: contract-caller,
+            name: {
                 name: name,
                 namespace: namespace,
-            }
-            (merge name-props
-                {
-                    hashed-salted-fqn-preorder: (some hashed-salted-fqn),
-                    preordered-by: (some contract-caller),
-                    registered-at: (some burn-block-height),
-                    renewal-height: (if (is-eq renewal u0)
-                        u0
-                        (+ burn-block-height renewal)
-                    ),
-                    stx-burn: stx-burned,
-                })
-        )
-        (try!
-            (as-contract
-                (stx-transfer? stx-burned .BNS-V2 (get owner name-props))
-            ))
-        ;; Transfer ownership of the name to the new owner
-        (try!
-            (purchase-transfer name-index (get owner name-props) contract-caller)
-        )
-        ;; Log the name transfer event
-        (print
-            {
-                topic: "transfer-name",
-                owner: contract-caller,
-                name: {
-                    name: name,
-                    namespace: namespace,
-                },
-                id: name-index,
-                properties: (map-get? name-properties
-                    {
-                        name: name,
-                        namespace: namespace,
-                    }),
-            })
+            },
+            id: name-index,
+            properties: (map-get? name-properties {
+                name: name,
+                namespace: namespace,
+            }),
+        })
         ;; Return the name index
         (ok name-index)
     )
@@ -2477,34 +2274,30 @@
     )
     (begin
         ;; Set the properties for the newly registered name
-        (map-set name-properties
-            {
-                name: name,
-                namespace: namespace,
-            }
-            {
-                registered-at: (some burn-block-height),
-                imported-at: none,
-                hashed-salted-fqn-preorder: (some hashed-salted-fqn),
-                preordered-by: (some contract-caller),
-                renewal-height: (if (is-eq lifetime u0)
-                    u0
-                    (+ burn-block-height lifetime)
-                ),
-                stx-burn: stx-burned,
-                owner: contract-caller,
-            })
+        (map-set name-properties {
+            name: name,
+            namespace: namespace,
+        } {
+            registered-at: (some burn-block-height),
+            imported-at: none,
+            hashed-salted-fqn-preorder: (some hashed-salted-fqn),
+            preordered-by: (some contract-caller),
+            renewal-height: (if (is-eq lifetime u0)
+                u0
+                (+ burn-block-height lifetime)
+            ),
+            stx-burn: stx-burned,
+            owner: contract-caller,
+        })
         ;; Update the index-to-name and name-to-index mappings
-        (map-set index-to-name id-to-be-minted
-            {
-                name: name,
-                namespace: namespace,
-            })
-        (map-set name-to-index
-            {
-                name: name,
-                namespace: namespace,
-            }
+        (map-set index-to-name id-to-be-minted {
+            name: name,
+            namespace: namespace,
+        })
+        (map-set name-to-index {
+            name: name,
+            namespace: namespace,
+        }
             id-to-be-minted
         )
         ;; Increment the BNS index
@@ -2516,21 +2309,19 @@
         ;; Burn the STX paid for the name registration
         (try! (as-contract (stx-burn? stx-burned .BNS-V2)))
         ;; Log the new name registration event
-        (print
-            {
-                topic: "new-name",
-                owner: contract-caller,
-                name: {
-                    name: name,
-                    namespace: namespace,
-                },
-                id: id-to-be-minted,
-                properties: (map-get? name-properties
-                    {
-                        name: name,
-                        namespace: namespace,
-                    }),
-            })
+        (print {
+            topic: "new-name",
+            owner: contract-caller,
+            name: {
+                name: name,
+                namespace: namespace,
+            },
+            id: id-to-be-minted,
+            properties: (map-get? name-properties {
+                name: name,
+                namespace: namespace,
+            }),
+        })
         ;; Return the ID of the newly minted name
         (ok id-to-be-minted)
     )
@@ -2539,14 +2330,13 @@
 ;; Migration Functions
 (define-public (namespace-airdrop
         (namespace (buff 20))
-        (pricing
-            {
-                base: uint,
-                buckets: (list 16 uint),
-                coeff: uint,
-                no-vowel-discount: uint,
-                nonalpha-discount: uint,
-            })
+        (pricing {
+            base: uint,
+            buckets: (list 16 uint),
+            coeff: uint,
+            no-vowel-discount: uint,
+            nonalpha-discount: uint,
+        })
         (lifetime uint)
         (namespace-import principal)
         (namespace-manager (optional principal))
@@ -2571,25 +2361,23 @@
             ERR-NAMESPACE-ALREADY-EXISTS
         )
         ;; Set all properties
-        (map-set namespaces namespace
-            {
-                namespace-manager: namespace-manager,
-                manager-transferable: manager-transfers,
-                manager-frozen: manager-frozen,
-                namespace-import: namespace-import,
-                revealed-at: revealed-at,
-                launched-at: (some launched-at),
-                lifetime: lifetime,
-                can-update-price-function: can-update-price,
-                price-function: pricing,
-            })
+        (map-set namespaces namespace {
+            namespace-manager: namespace-manager,
+            manager-transferable: manager-transfers,
+            manager-frozen: manager-frozen,
+            namespace-import: namespace-import,
+            revealed-at: revealed-at,
+            launched-at: (some launched-at),
+            lifetime: lifetime,
+            can-update-price-function: can-update-price,
+            price-function: pricing,
+        })
         ;; Emit an event to indicate the namespace is now ready and launched.
-        (print
-            {
-                namespace: namespace,
-                status: "launch",
-                properties: (map-get? namespaces namespace),
-            })
+        (print {
+            namespace: namespace,
+            status: "launch",
+            properties: (map-get? namespaces namespace),
+        })
         ;; Confirm successful airdrop of the namespace
         (ok namespace)
     )
@@ -2610,61 +2398,55 @@
         ;; Ensure the contract-caller is the airdrop contract.
         (asserts! (is-eq DEPLOYER tx-sender) ERR-OPERATION-UNAUTHORIZED)
         ;; Set all properties
-        (map-set name-to-index
-            {
-                name: name,
-                namespace: namespace,
-            }
+        (map-set name-to-index {
+            name: name,
+            namespace: namespace,
+        }
             mint-index
         )
-        (map-set index-to-name mint-index
-            {
-                name: name,
-                namespace: namespace,
-            })
-        (map-set name-properties
-            {
-                name: name,
-                namespace: namespace,
-            }
-            {
-                registered-at: (some registered-at),
-                imported-at: none,
-                hashed-salted-fqn-preorder: none,
-                preordered-by: none,
-                renewal-height: (if (is-eq lifetime u0)
-                    u0
-                    (+ burn-block-height lifetime)
-                ),
-                stx-burn: u0,
-                owner: owner,
-            })
+        (map-set index-to-name mint-index {
+            name: name,
+            namespace: namespace,
+        })
+        (map-set name-properties {
+            name: name,
+            namespace: namespace,
+        } {
+            registered-at: (some registered-at),
+            imported-at: none,
+            hashed-salted-fqn-preorder: none,
+            preordered-by: none,
+            renewal-height: (if (is-eq lifetime u0)
+                u0
+                (+ burn-block-height lifetime)
+            ),
+            stx-burn: u0,
+            owner: owner,
+        })
         ;; Update the index
         (var-set bns-index mint-index)
         ;; Update the primary name of the recipient
         (map-set primary-name owner mint-index)
         ;; Mint the Name to the owner
         (try! (nft-mint? BNS-V2 mint-index owner))
-        (print
-            {
-                topic: "new-airdrop",
-                owner: owner,
-                name: {
-                    name: name,
-                    namespace: namespace,
-                },
-                id: mint-index,
-                registered-at: registered-at,
-            })
+        (print {
+            topic: "new-airdrop",
+            owner: owner,
+            name: {
+                name: name,
+                namespace: namespace,
+            },
+            id: mint-index,
+            registered-at: registered-at,
+        })
         ;; Confirm successful airdrop of the namespace
         (ok mint-index)
     )
 )
 
 (define-public (flip-migration-complete)
-    (ok
-        (begin
-            (asserts! (is-eq contract-caller DEPLOYER) ERR-NOT-AUTHORIZED)
-            (var-set migration-complete true)
-        ))
+    (ok (begin
+        (asserts! (is-eq contract-caller DEPLOYER) ERR-NOT-AUTHORIZED)
+        (var-set migration-complete true)
+    ))
 )

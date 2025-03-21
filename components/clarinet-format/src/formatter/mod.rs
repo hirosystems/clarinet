@@ -168,6 +168,7 @@ impl<'a> Aggregator<'a> {
                             NativeFunctions::And | NativeFunctions::Or => {
                                 self.format_booleans(list, previous_indentation)
                             }
+
                             // everything else that's not special cased
                             NativeFunctions::Add
                             | NativeFunctions::Subtract
@@ -209,9 +210,9 @@ impl<'a> Aggregator<'a> {
                             | NativeFunctions::IntToUtf8
                             | NativeFunctions::ListCons
                             | NativeFunctions::FetchVar
+                            | NativeFunctions::FetchEntry // map-get?
+                            | NativeFunctions::SetEntry // map-set?
                             | NativeFunctions::SetVar
-                            | NativeFunctions::FetchEntry
-                            | NativeFunctions::SetEntry
                             | NativeFunctions::InsertEntry
                             | NativeFunctions::DeleteEntry
                             | NativeFunctions::TupleGet
@@ -834,6 +835,35 @@ impl<'a> Aggregator<'a> {
         let indentation = self.settings.indentation.to_string();
         let base_indent = format!("{}{}", previous_indentation, indentation);
 
+        // Check if this is a simple wrapper expression
+        let is_simple_wrapper = list.len() == 2 && list[0].match_atom().is_some();
+
+        // Special handling for simple wrappers to avoid unnecessary line breaks
+        if is_simple_wrapper {
+            let atom_name = list[0].match_atom().unwrap();
+            let is_special_format = if let Some(native) = NativeFunctions::lookup_by_name(atom_name)
+            {
+                matches!(
+                    native,
+                    NativeFunctions::Let
+                        | NativeFunctions::Begin
+                        | NativeFunctions::Match
+                        | NativeFunctions::TupleCons
+                        | NativeFunctions::If
+                )
+            } else {
+                false
+            };
+
+            if !is_special_format {
+                // For simple wrappers like (ok ...), format compactly
+                let fn_name =
+                    self.format_source_exprs(slice::from_ref(&list[0]), previous_indentation);
+                let arg = self.format_source_exprs(slice::from_ref(&list[1]), previous_indentation);
+
+                return format!("({} {})", fn_name.trim(), arg.trim());
+            }
+        }
         // TODO: this should ignore comment length
         for expr in list.iter() {
             let indented = if first_on_line {
@@ -847,8 +877,13 @@ impl<'a> Aggregator<'a> {
             let expr_width = trimmed.len();
 
             if !first_on_line {
-                // For subexpressions over max line length, add newline with increased indent
-                if current_line_width + expr_width + 1 > self.settings.max_line_length {
+                // Don't break before an opening brace of a map
+                let is_map_opening = trimmed.starts_with("{");
+
+                // Only add line break if necessary and not breaking before a map opening
+                if !is_map_opening
+                    && (current_line_width + expr_width + 1 > self.settings.max_line_length)
+                {
                     result.push('\n');
                     result.push_str(&base_indent);
                     current_line_width = base_indent.len() + indentation.len();
@@ -1065,14 +1100,13 @@ mod tests_formatter {
     fn long_line_unwrapping() {
         let src = "(try! (unwrap! (complete-deposit-wrapper (get txid deposit) (get vout-index deposit) (get amount deposit) (get recipient deposit) (get burn-hash deposit) (get burn-height deposit) (get sweep-txid deposit)) (err (+ ERR_DEPOSIT_INDEX_PREFIX (+ u10 index)))))";
         let result = format_with_default(&String::from(src));
-        let expected = r#"(try!
-  (unwrap!
-    (complete-deposit-wrapper (get txid deposit) (get vout-index deposit)
-      (get amount deposit) (get recipient deposit) (get burn-hash deposit)
-      (get burn-height deposit) (get sweep-txid deposit)
-    )
-    (err (+ ERR_DEPOSIT_INDEX_PREFIX (+ u10 index)))
-  ))"#;
+        let expected = r#"(try! (unwrap!
+  (complete-deposit-wrapper (get txid deposit) (get vout-index deposit)
+    (get amount deposit) (get recipient deposit) (get burn-hash deposit)
+    (get burn-height deposit) (get sweep-txid deposit)
+  )
+  (err (+ ERR_DEPOSIT_INDEX_PREFIX (+ u10 index)))
+))"#;
         assert_eq!(expected, result);
 
         // non-max-length sanity case
@@ -1154,14 +1188,13 @@ mod tests_formatter {
   },
 })"#;
         assert_eq!(expected, result);
-        let src = r#"(ok
-  {
-    varslice: (unwrap! (slice? txbuff slice-start target-index) (err ERR-OUT-OF-BOUNDS)),
-    ctx: {
-      txbuff: tx,
-      index: (+ u1 ptr),
-    },
-  })"#;
+        let src = r#"(ok {
+  varslice: (unwrap! (slice? txbuff slice-start target-index) (err ERR-OUT-OF-BOUNDS)),
+  ctx: {
+    txbuff: tx,
+    index: (+ u1 ptr),
+  },
+})"#;
         let result = format_with_default(src);
         assert_eq!(src, result);
     }
@@ -1307,6 +1340,16 @@ mod tests_formatter {
         assert_eq!(src, result);
     }
 
+    #[test]
+    fn too_many_newlines() {
+        let src = r#"(ok (at-block
+  (unwrap! (get-stacks-block-info? id-header-hash block) ERR_BLOCK_NOT_FOUND)
+  (var-get count)
+))"#;
+        let result = format_with_default(&String::from(src));
+        assert_eq!(src, result);
+    }
+
     // this looks redundant, but a regression kept happening with ill-spaced
     // inner expressions. Likely this is a product of poorly handled nesting
     // logic
@@ -1375,13 +1418,10 @@ mod tests_formatter {
     }
     #[test]
     fn unwrap_wrapped_lines() {
-        let src = r#"(new-available-ids
-  (if (is-eq no-to-treasury u0)
-    (var-get available-ids)
-    (unwrap-panic
-      (as-max-len? (concat (var-get available-ids) ids-to-treasury) u10000)
-    )
-  ))"#;
+        let src = r#"(new-available-ids (if (is-eq no-to-treasury u0)
+  (var-get available-ids)
+  (unwrap-panic (as-max-len? (concat (var-get available-ids) ids-to-treasury) u10000))
+))"#;
         let result = format_with_default(src);
         assert_eq!(src, result);
     }
