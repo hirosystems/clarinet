@@ -22,9 +22,7 @@
   )
 )
 
-(define-public (something-else
-    (a uint)
-  )
+(define-public (something-else (a uint))
   (begin
     (+ 1 1)
     (ok true)
