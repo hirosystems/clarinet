@@ -777,32 +777,39 @@ impl<'a> Aggregator<'a> {
             if let Some((name, args)) = def.split_first() {
                 acc.push_str(&self.display_pse(name, ""));
 
-                let mut iter = args.iter().peekable();
-                while let Some(arg) = iter.next() {
-                    let trailing = get_trailing_comment(arg, &mut iter);
-                    if arg.match_list().is_some() {
-                        // expr args
-                        acc.push_str(&format!(
-                            "\n{}{}",
-                            args_indent,
-                            self.format_source_exprs(slice::from_ref(arg), &args_indent)
-                        ))
-                    } else {
-                        // atom args
-                        acc.push_str(&self.format_source_exprs(slice::from_ref(arg), &args_indent))
-                    }
-                    if let Some(comment) = trailing {
-                        acc.push(' ');
-                        acc.push_str(&self.display_pse(comment, ""));
-                    }
-                }
-                if args.is_empty() {
-                    acc.push(')')
+                // Keep everything on one line if there's only one argument
+                if args.len() == 1 {
+                    acc.push(' ');
+                    acc.push_str(&self.format_source_exprs(slice::from_ref(&args[0]), ""));
+                    acc.push(')');
                 } else {
-                    acc.push_str(&format!("\n{})", indentation))
+                    let mut iter = args.iter().peekable();
+                    while let Some(arg) = iter.next() {
+                        let trailing = get_trailing_comment(arg, &mut iter);
+                        if arg.match_list().is_some() {
+                            // expr args
+                            acc.push_str(&format!(
+                                "\n{}{}",
+                                args_indent,
+                                self.format_source_exprs(slice::from_ref(arg), &args_indent)
+                            ))
+                        } else {
+                            // atom args
+                            acc.push_str(
+                                &self.format_source_exprs(slice::from_ref(arg), &args_indent),
+                            )
+                        }
+                        if let Some(comment) = trailing {
+                            acc.push(' ');
+                            acc.push_str(&self.display_pse(comment, ""));
+                        }
+                    }
+                    if args.is_empty() {
+                        acc.push(')');
+                    } else {
+                        acc.push_str(&format!("\n{})", indentation))
+                    }
                 }
-            } else {
-                panic!("can't have a nameless function")
             }
         }
 
@@ -1039,6 +1046,21 @@ mod tests_formatter {
 
 "#;
         assert_eq!(expected, result);
+    }
+    #[test]
+    fn test_function_single_arg() {
+        let src = "(define-public (my-func (amount uint)) (ok true))";
+        let result = format_with_default(&String::from(src));
+        assert_eq!(
+            result,
+            "(define-public (my-func (amount uint))\n  (ok true)\n)\n\n"
+        );
+        let src = "(define-public (my-func (amount uint)) (ok true))";
+        let result = format_with_default(&String::from(src));
+        assert_eq!(
+            result,
+            "(define-public (my-func (amount uint))\n  (ok true)\n)\n\n"
+        );
     }
     #[test]
     fn test_function_args_multiline() {
