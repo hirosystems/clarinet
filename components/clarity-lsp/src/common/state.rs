@@ -43,7 +43,7 @@ pub struct ActiveContractData {
     pub expressions: Option<Vec<SymbolicExpression>>,
     pub definitions: Option<HashMap<(u32, u32), DefinitionLocation>>,
     pub diagnostic: Option<ClarityDiagnostic>,
-    source: String,
+    pub source: String,
 }
 
 impl ActiveContractData {
