@@ -14,14 +14,14 @@ use clarity::types::chainstate::{
 };
 use clarity::types::chainstate::{StacksAddress, StacksPublicKey};
 use clarity::types::{PrivateKey, StacksEpochId};
-use clarity::util::hash::{Hash160, Sha512Trunc256Sum};
+use clarity::util::hash::{Hash160, Sha256Sum, Sha512Trunc256Sum};
 use clarity::util::retry::BoundReader;
 use clarity::util::secp256k1::{
     MessageSignature, Secp256k1PrivateKey, Secp256k1PublicKey, MESSAGE_SIGNATURE_ENCODED_SIZE,
 };
 use clarity::util::vrf::VRFProof;
 use clarity::vm::types::{
-    PrincipalData, QualifiedContractIdentifier, StandardPrincipalData, Value,
+    PrincipalData, QualifiedContractIdentifier, StandardPrincipalData, TupleData, Value
 };
 use clarity::vm::ClarityVersion;
 use clarity::vm::{ClarityName, ContractName};
@@ -4222,7 +4222,7 @@ impl SignerMessageMetadata {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MockSignature {
     /// The signer's signature across the mock proposal
-    signature: MessageSignature,
+    pub signature: MessageSignature,
     /// The mock block proposal that was signed across
     pub mock_proposal: MockProposal,
     /// The signature metadata
@@ -4316,7 +4316,103 @@ pub struct MockProposal {
     /// The view of the stacks node peer information at the time of the mock proposal
     pub peer_info: PeerInfo,
     /// The miner's signature across the peer info
-    signature: MessageSignature,
+    pub signature: MessageSignature,
+}
+
+// Helper function to generate domain for structured data hash
+pub fn make_structured_data_domain(name: &str, version: &str, chain_id: u32) -> Value {
+    Value::Tuple(
+        TupleData::from_data(vec![
+            (
+                "name".into(),
+                Value::string_ascii_from_bytes(name.into()).unwrap(),
+            ),
+            (
+                "version".into(),
+                Value::string_ascii_from_bytes(version.into()).unwrap(),
+            ),
+            ("chain-id".into(), Value::UInt(chain_id.into())),
+        ])
+        .unwrap(),
+    )
+}
+
+/// Message prefix for signed structured data. "SIP018" in ascii
+pub const STRUCTURED_DATA_PREFIX: [u8; 6] = [0x53, 0x49, 0x50, 0x30, 0x31, 0x38];
+
+pub fn structured_data_hash(value: Value) -> Sha256Sum {
+    let mut bytes = vec![];
+    value.serialize_write(&mut bytes).unwrap();
+    Sha256Sum::from_data(bytes.as_slice())
+}
+
+/// Generate a message hash for signing structured Clarity data.
+/// Reference [SIP018](https://github.com/stacksgov/sips/blob/main/sips/sip-018/sip-018-signed-structured-data.md) for more information.
+pub fn structured_data_message_hash(structured_data: Value, domain: Value) -> Sha256Sum {
+    let message = [
+        STRUCTURED_DATA_PREFIX.as_ref(),
+        structured_data_hash(domain).as_bytes(),
+        structured_data_hash(structured_data).as_bytes(),
+    ]
+    .concat();
+
+    Sha256Sum::from_data(&message)
+}
+
+impl MockProposal {
+    /// The signature hash for the mock proposal
+    pub fn miner_signature_hash(&self) -> Sha256Sum {
+        let domain_tuple =
+            make_structured_data_domain("mock-miner", "1.0.0", self.peer_info.network_id);
+        let data_tuple = Value::Tuple(
+            TupleData::from_data(vec![
+                (
+                    "stacks-tip-consensus-hash".into(),
+                    Value::buff_from((*self.peer_info.stacks_tip_consensus_hash.as_bytes()).into())
+                        .unwrap(),
+                ),
+                (
+                    "stacks-tip".into(),
+                    Value::buff_from((*self.peer_info.stacks_tip.as_bytes()).into()).unwrap(),
+                ),
+                (
+                    "stacks-tip-height".into(),
+                    Value::UInt(self.peer_info.stacks_tip_height.into()),
+                ),
+                (
+                    "server-version".into(),
+                    Value::string_ascii_from_bytes(self.peer_info.server_version.clone().into())
+                        .unwrap(),
+                ),
+                (
+                    "pox-consensus".into(),
+                    Value::buff_from((*self.peer_info.pox_consensus.as_bytes()).into()).unwrap(),
+                ),
+            ])
+            .expect("Error creating signature hash"),
+        );
+        structured_data_message_hash(data_tuple, domain_tuple)
+    }
+
+    /// The signature hash including the miner's signature. Used by signers.
+    pub fn signer_signature_hash(&self) -> Sha256Sum {
+        let domain_tuple =
+            make_structured_data_domain("mock-signer", "1.0.0", self.peer_info.network_id);
+        let data_tuple = Value::Tuple(
+            TupleData::from_data(vec![
+                (
+                    "miner-signature-hash".into(),
+                    Value::buff_from((*self.miner_signature_hash().as_bytes()).into()).unwrap(),
+                ),
+                (
+                    "miner-signature".into(),
+                    Value::buff_from((*self.signature.as_bytes()).into()).unwrap(),
+                ),
+            ])
+            .expect("Error creating signature hash"),
+        );
+        structured_data_message_hash(data_tuple, domain_tuple)
+    }
 }
 
 impl StacksMessageCodec for MockProposal {
