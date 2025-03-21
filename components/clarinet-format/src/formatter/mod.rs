@@ -528,22 +528,27 @@ impl<'a> Aggregator<'a> {
         let space = format!("{}{}", previous_indentation, indentation);
 
         if let Some(args) = exprs[1].match_list() {
-            let mut iter = args.iter().peekable();
-            while let Some(arg) = iter.next() {
-                let trailing = get_trailing_comment(arg, &mut iter);
-                acc.push_str(&format!(
-                    "\n{}{}",
-                    space,
-                    self.format_source_exprs(slice::from_ref(arg), &space)
-                ));
-                if let Some(comment) = trailing {
-                    acc.push(' ');
-                    acc.push_str(&self.display_pse(comment, previous_indentation));
+            if args.len() == 1 {
+                acc.push_str(&self.format_source_exprs(slice::from_ref(&args[0]), &space));
+                acc.push(')');
+            } else {
+                let mut iter = args.iter().peekable();
+                while let Some(arg) = iter.next() {
+                    let trailing = get_trailing_comment(arg, &mut iter);
+                    acc.push_str(&format!(
+                        "\n{}{}",
+                        space,
+                        self.format_source_exprs(slice::from_ref(arg), &space)
+                    ));
+                    if let Some(comment) = trailing {
+                        acc.push(' ');
+                        acc.push_str(&self.display_pse(comment, previous_indentation));
+                    }
                 }
+                // close the args paren
+                acc.push_str(&format!("\n{})", previous_indentation));
             }
         }
-        // close the args paren
-        acc.push_str(&format!("\n{})", previous_indentation));
         // start the let body
         for e in exprs.get(2..).unwrap_or_default() {
             acc.push_str(&format!(
@@ -1162,6 +1167,15 @@ mod tests_formatter {
         let expected = "(let (\n  (a 1)\n  (b 2)\n)\n  (+ a b)\n)";
         assert_eq!(expected, result);
     }
+    #[test]
+    fn test_single_let() {
+        let src = r#"(let ((current-count (var-get count)))
+  (asserts! (> current-count u0) ERR_COUNT_MUST_BE_POSITIVE)
+  (ok (var-set count (- current-count u1)))
+)"#;
+        let result = format_with_default(&String::from(src));
+        assert_eq!(src, result);
+    }
 
     #[test]
     fn test_option_match() {
@@ -1406,12 +1420,10 @@ mod tests_formatter {
     #[test]
     fn if_let_if() {
         let src = r#"(if (true)
-  (let (
-    (a (if (true)
+  (let ((a (if (true)
       (list)
       (list)
-    ))
-  )
+    )))
     (list)
   )
   (list)

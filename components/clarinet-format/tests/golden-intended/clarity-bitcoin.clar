@@ -271,9 +271,7 @@
       uint
     ))
   )
-  (let (
-    (state (unwrap! result result))
-  )
+  (let ((state (unwrap! result result)))
     (let (
       (remaining (get remaining state))
       (ctx (get ctx state))
@@ -459,14 +457,12 @@
   )
     (if (> varint u0)
       ;; read all stack items for current txin and add to witnesses.
-      (let (
-        (parsed-items (try! (fold read-next-item (bool-list-of-len varint)
+      (let ((parsed-items (try! (fold read-next-item (bool-list-of-len varint)
           (ok {
             ctx: ctx,
             items: (list),
           })
-        )))
-      )
+        ))))
         (ok {
           witnesses: (unwrap-panic (as-max-len? (append (get witnesses state) (get items parsed-items)) u8)),
           ctx: (get ctx parsed-items),
@@ -814,9 +810,7 @@
     })
     (result (buff 128))
   )
-  (let (
-    (commitment (get scriptPubKey out))
-  )
+  (let ((commitment (get scriptPubKey out)))
     (if (is-commitment-pattern commitment)
       commitment
       result
@@ -864,9 +858,7 @@
       tree-depth: uint,
     })
   )
-  (let (
-    (block (unwrap! (parse-block-header header) (err ERR-BAD-HEADER)))
-  )
+  (let ((block (unwrap! (parse-block-header header) (err ERR-BAD-HEADER))))
     (was-tx-mined-internal height tx header (get merkle-root block) proof)
   )
 )

@@ -303,9 +303,7 @@
         (namespace (buff 20))
         (name (buff 48))
     )
-    (let (
-        (namespace-props (unwrap! (map-get? namespaces namespace) ERR-NAMESPACE-NOT-FOUND))
-    )
+    (let ((namespace-props (unwrap! (map-get? namespaces namespace) ERR-NAMESPACE-NOT-FOUND)))
         (ok (compute-name-price name (get price-function namespace-props)))
     )
 )
@@ -2330,9 +2328,7 @@
         (lifetime uint)
         (owner principal)
     )
-    (let (
-        (mint-index (+ u1 (var-get bns-index)))
-    )
+    (let ((mint-index (+ u1 (var-get bns-index))))
         ;; Check if migration is complete
         (asserts! (not (var-get migration-complete)) ERR-MIGRATION-IN-PROGRESS)
         ;; Ensure the contract-caller is the airdrop contract.
