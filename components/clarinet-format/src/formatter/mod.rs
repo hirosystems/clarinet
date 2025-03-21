@@ -835,11 +835,6 @@ impl<'a> Aggregator<'a> {
         let indentation = self.settings.indentation.to_string();
         let base_indent = format!("{}{}", previous_indentation, indentation);
 
-        let is_map_get = list.len() > 2
-            && list[0].match_atom().map_or(false, |atom_name| {
-                atom_name.to_string() == "map-get?" || atom_name.to_string() == "map-set?"
-            })
-            && matches!(&list[2].pre_expr, PreSymbolicExpressionType::Tuple(_));
         // Check if this is a simple wrapper expression
         let is_simple_wrapper = list.len() == 2 && list[0].match_atom().is_some();
 
@@ -870,7 +865,7 @@ impl<'a> Aggregator<'a> {
             }
         }
         // TODO: this should ignore comment length
-        for (i, expr) in list.iter().enumerate() {
+        for expr in list.iter() {
             let indented = if first_on_line {
                 &base_indent
             } else {
