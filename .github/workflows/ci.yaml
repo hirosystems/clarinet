@@ -565,7 +565,7 @@ jobs:
     if: startsWith(github.ref, 'refs/heads/main') && needs.get_release_info.outputs.tag != ''
     needs:
       - get_release_info
-      - audit
+      - sanity-check
       - test_coverage_cargo
       - dist_stacks_devnet_js
       - dist_clarity_repl
