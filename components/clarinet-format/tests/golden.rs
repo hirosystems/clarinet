@@ -68,6 +68,9 @@ fn test_irl_contracts() {
             // Apply formatting and compare
             let result = format_file_with_metadata(&src);
             pretty_assertions::assert_eq!(result, intended, "Mismatch in file: {:?}", file_name);
+            // parse resulting contract
+            let pse = clarity::vm::ast::parser::v2::parse(&result);
+            assert!(pse.is_ok());
         }
     }
 }
