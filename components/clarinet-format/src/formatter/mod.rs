@@ -528,22 +528,27 @@ impl<'a> Aggregator<'a> {
         let space = format!("{}{}", previous_indentation, indentation);
 
         if let Some(args) = exprs[1].match_list() {
-            let mut iter = args.iter().peekable();
-            while let Some(arg) = iter.next() {
-                let trailing = get_trailing_comment(arg, &mut iter);
-                acc.push_str(&format!(
-                    "\n{}{}",
-                    space,
-                    self.format_source_exprs(slice::from_ref(arg), &space)
-                ));
-                if let Some(comment) = trailing {
-                    acc.push(' ');
-                    acc.push_str(&self.display_pse(comment, previous_indentation));
+            if args.len() == 1 {
+                acc.push_str(&self.format_source_exprs(slice::from_ref(&args[0]), &space));
+                acc.push(')');
+            } else {
+                let mut iter = args.iter().peekable();
+                while let Some(arg) = iter.next() {
+                    let trailing = get_trailing_comment(arg, &mut iter);
+                    acc.push_str(&format!(
+                        "\n{}{}",
+                        space,
+                        self.format_source_exprs(slice::from_ref(arg), &space)
+                    ));
+                    if let Some(comment) = trailing {
+                        acc.push(' ');
+                        acc.push_str(&self.display_pse(comment, previous_indentation));
+                    }
                 }
+                // close the args paren
+                acc.push_str(&format!("\n{})", previous_indentation));
             }
         }
-        // close the args paren
-        acc.push_str(&format!("\n{})", previous_indentation));
         // start the let body
         for e in exprs.get(2..).unwrap_or_default() {
             acc.push_str(&format!(
@@ -780,7 +785,9 @@ impl<'a> Aggregator<'a> {
             PreSymbolicExpressionType::FieldIdentifier(ref trait_id) => {
                 format!("'{}", trait_id)
             }
-            PreSymbolicExpressionType::TraitReference(ref name) => name.to_string(),
+            PreSymbolicExpressionType::TraitReference(ref name) => {
+                format!("<{}>", name.to_string())
+            }
             PreSymbolicExpressionType::Comment(ref text) => {
                 if text.is_empty() {
                     ";;".to_string()
@@ -814,32 +821,39 @@ impl<'a> Aggregator<'a> {
             if let Some((name, args)) = def.split_first() {
                 acc.push_str(&self.display_pse(name, ""));
 
-                let mut iter = args.iter().peekable();
-                while let Some(arg) = iter.next() {
-                    let trailing = get_trailing_comment(arg, &mut iter);
-                    if arg.match_list().is_some() {
-                        // expr args
-                        acc.push_str(&format!(
-                            "\n{}{}",
-                            args_indent,
-                            self.format_source_exprs(slice::from_ref(arg), &args_indent)
-                        ))
-                    } else {
-                        // atom args
-                        acc.push_str(&self.format_source_exprs(slice::from_ref(arg), &args_indent))
-                    }
-                    if let Some(comment) = trailing {
-                        acc.push(' ');
-                        acc.push_str(&self.display_pse(comment, ""));
-                    }
-                }
-                if args.is_empty() {
-                    acc.push(')')
+                // Keep everything on one line if there's only one argument
+                if args.len() == 1 {
+                    acc.push(' ');
+                    acc.push_str(&self.format_source_exprs(slice::from_ref(&args[0]), ""));
+                    acc.push(')');
                 } else {
-                    acc.push_str(&format!("\n{})", indentation))
+                    let mut iter = args.iter().peekable();
+                    while let Some(arg) = iter.next() {
+                        let trailing = get_trailing_comment(arg, &mut iter);
+                        if arg.match_list().is_some() {
+                            // expr args
+                            acc.push_str(&format!(
+                                "\n{}{}",
+                                args_indent,
+                                self.format_source_exprs(slice::from_ref(arg), &args_indent)
+                            ))
+                        } else {
+                            // atom args
+                            acc.push_str(
+                                &self.format_source_exprs(slice::from_ref(arg), &args_indent),
+                            )
+                        }
+                        if let Some(comment) = trailing {
+                            acc.push(' ');
+                            acc.push_str(&self.display_pse(comment, ""));
+                        }
+                    }
+                    if args.is_empty() {
+                        acc.push(')');
+                    } else {
+                        acc.push_str(&format!("\n{})", indentation))
+                    }
                 }
-            } else {
-                panic!("can't have a nameless function")
             }
         }
 
@@ -1078,6 +1092,21 @@ mod tests_formatter {
         assert_eq!(expected, result);
     }
     #[test]
+    fn test_function_single_arg() {
+        let src = "(define-public (my-func (amount uint)) (ok true))";
+        let result = format_with_default(&String::from(src));
+        assert_eq!(
+            result,
+            "(define-public (my-func (amount uint))\n  (ok true)\n)\n\n"
+        );
+        let src = "(define-public (my-func (amount uint)) (ok true))";
+        let result = format_with_default(&String::from(src));
+        assert_eq!(
+            result,
+            "(define-public (my-func (amount uint))\n  (ok true)\n)\n\n"
+        );
+    }
+    #[test]
     fn test_function_args_multiline() {
         let src = "(define-public (my-func (amount uint) (sender principal)) (ok true))";
         let result = format_with_default(&String::from(src));
@@ -1176,6 +1205,15 @@ mod tests_formatter {
         let result = format_with_default(&String::from(src));
         let expected = "(let (\n  (a 1)\n  (b 2)\n)\n  (+ a b)\n)";
         assert_eq!(expected, result);
+    }
+    #[test]
+    fn test_single_let() {
+        let src = r#"(let ((current-count (var-get count)))
+  (asserts! (> current-count u0) ERR_COUNT_MUST_BE_POSITIVE)
+  (ok (var-set count (- current-count u1)))
+)"#;
+        let result = format_with_default(&String::from(src));
+        assert_eq!(src, result);
     }
 
     #[test]
@@ -1371,6 +1409,22 @@ mod tests_formatter {
         assert_eq!(src, result);
     }
     #[test]
+    fn test_detailed_traits() {
+        let src = r#"(define-public (parse-and-verify-vaa
+    (core-contract <core-trait>)
+    (vaa-bytes (buff 8192))
+  )
+  (begin
+    (try! (check-active-wormhole-core-contract core-contract))
+    (contract-call? core-contract parse-and-verify-vaa vaa-bytes)
+  )
+)
+
+"#;
+        let result = format_with_default(&String::from(src));
+        assert_eq!(src, result);
+    }
+    #[test]
     fn test_as_contract() {
         let src = "(as-contract (contract-call? .tokens mint! u19))";
         let result = format_with(&String::from(src), Settings::new(Indentation::Space(4), 80));
@@ -1421,12 +1475,10 @@ mod tests_formatter {
     #[test]
     fn if_let_if() {
         let src = r#"(if (true)
-  (let (
-    (a (if (true)
+  (let ((a (if (true)
       (list)
       (list)
-    ))
-  )
+    )))
     (list)
   )
   (list)

@@ -20,21 +20,17 @@
 ;; Helper functions to parse bitcoin transactions
 ;;
 ;; Create a list with n elments `true`. n must be smaller than 9.
-(define-private (bool-list-of-len
-    (n uint)
-  )
+(define-private (bool-list-of-len (n uint))
   (unwrap-panic (slice? (list true true true true true true true true) u0 n))
 )
 
 ;; Reads the next two bytes from txbuff as a little-endian 16-bit integer, and updates the index.
 ;; Returns (ok { uint16: uint, ctx: { txbuff: (buff 4096), index: uint } }) on success.
 ;; Returns (err ERR-OUT-OF-BOUNDS) if we read past the end of txbuff
-(define-read-only (read-uint8
-    (ctx {
-      txbuff: (buff 4096),
-      index: uint,
-    })
-  )
+(define-read-only (read-uint8 (ctx {
+  txbuff: (buff 4096),
+  index: uint,
+}))
   (let (
     (data (get txbuff ctx))
     (base (get index ctx))
@@ -54,12 +50,10 @@
 ;; Reads the next two bytes from txbuff as a little-endian 16-bit integer, and updates the index.
 ;; Returns (ok { uint16: uint, ctx: { txbuff: (buff 4096), index: uint } }) on success.
 ;; Returns (err ERR-OUT-OF-BOUNDS) if we read past the end of txbuff
-(define-read-only (read-uint16
-    (ctx {
-      txbuff: (buff 4096),
-      index: uint,
-    })
-  )
+(define-read-only (read-uint16 (ctx {
+  txbuff: (buff 4096),
+  index: uint,
+}))
   (let (
     (data (get txbuff ctx))
     (base (get index ctx))
@@ -79,12 +73,10 @@
 ;; Reads the next four bytes from txbuff as a little-endian 32-bit integer, and updates the index.
 ;; Returns (ok { uint32: uint, ctx: { txbuff: (buff 4096), index: uint } }) on success.
 ;; Returns (err ERR-OUT-OF-BOUNDS) if we read past the end of txbuff
-(define-read-only (read-uint32
-    (ctx {
-      txbuff: (buff 4096),
-      index: uint,
-    })
-  )
+(define-read-only (read-uint32 (ctx {
+  txbuff: (buff 4096),
+  index: uint,
+}))
   (let (
     (data (get txbuff ctx))
     (base (get index ctx))
@@ -104,12 +96,10 @@
 ;; Reads the next eight bytes from txbuff as a little-endian 64-bit integer, and updates the index.
 ;; Returns (ok { uint64: uint, ctx: { txbuff: (buff 4096), index: uint } }) on success.
 ;; Returns (err ERR-OUT-OF-BOUNDS) if we read past the end of txbuff
-(define-read-only (read-uint64
-    (ctx {
-      txbuff: (buff 4096),
-      index: uint,
-    })
-  )
+(define-read-only (read-uint64 (ctx {
+  txbuff: (buff 4096),
+  index: uint,
+}))
   (let (
     (data (get txbuff ctx))
     (base (get index ctx))
@@ -129,12 +119,10 @@
 ;; Reads the next varint from txbuff, and updates the index.
 ;; Returns (ok { varint: uint, ctx: { txbuff: (buff 4096), index: uint } }) on success
 ;; Returns (err ERR-OUT-OF-BOUNDS) if we read past the end of txbuff.
-(define-read-only (read-varint
-    (ctx {
-      txbuff: (buff 4096),
-      index: uint,
-    })
-  )
+(define-read-only (read-varint (ctx {
+  txbuff: (buff 4096),
+  index: uint,
+}))
   (let (
     (ptr (get index ctx))
     (tx (get txbuff ctx))
@@ -196,12 +184,10 @@
 ;; Reads a varint-prefixed byte slice from txbuff, and updates the index to point to the byte after the varint and slice.
 ;; Returns (ok { varslice: (buff 4096), ctx: { txbuff: (buff 4096), index: uint } }) on success, where varslice has the length of the varint prefix.
 ;; Returns (err ERR-OUT-OF-BOUNDS) if we read past the end of txbuff.
-(define-read-only (read-varslice
-    (old-ctx {
-      txbuff: (buff 4096),
-      index: uint,
-    })
-  )
+(define-read-only (read-varslice (old-ctx {
+  txbuff: (buff 4096),
+  index: uint,
+}))
   (let (
     (parsed (try! (read-varint old-ctx)))
     (ctx (get ctx parsed))
@@ -219,15 +205,11 @@
   )
 )
 
-(define-private (reverse-buff16
-    (input (buff 16))
-  )
+(define-private (reverse-buff16 (input (buff 16)))
   (unwrap-panic (slice? (unwrap-panic (to-consensus-buff? (buff-to-uint-le input))) u1 u17))
 )
 
-(define-read-only (reverse-buff32
-    (input (buff 32))
-  )
+(define-read-only (reverse-buff32 (input (buff 32)))
   (unwrap-panic (as-max-len?
     (concat
       (reverse-buff16 (unwrap-panic (as-max-len? (unwrap-panic (slice? input u16 u32)) u16)))
@@ -240,12 +222,10 @@
 ;; Reads a little-endian hash -- consume the next 32 bytes, and reverse them.
 ;; Returns (ok { hashslice: (buff 32), ctx: { txbuff: (buff 4096), index: uint } }) on success, and updates the index.
 ;; Returns (err ERR-OUT-OF-BOUNDS) if we read past the end of txbuff.
-(define-read-only (read-hashslice
-    (old-ctx {
-      txbuff: (buff 4096),
-      index: uint,
-    })
-  )
+(define-read-only (read-hashslice (old-ctx {
+  txbuff: (buff 4096),
+  index: uint,
+}))
   (let (
     (slice-start (get index old-ctx))
     (target-index (+ u32 slice-start))
@@ -291,9 +271,7 @@
       uint
     ))
   )
-  (let (
-    (state (unwrap! result result))
-  )
+  (let ((state (unwrap! result result)))
     (let (
       (remaining (get remaining state))
       (ctx (get ctx state))
@@ -332,12 +310,10 @@
 ;; Returns (err ERR-OUT-OF-BOUNDS) if we read past the end of txbuff.
 ;; Returns (err ERR-VARSLICE-TOO-LONG) if we find a scriptSig that's too long to parse.
 ;; Returns (err ERR-TOO-MANY-TXINS) if there are more than eight inputs to read.
-(define-read-only (read-txins
-    (ctx {
-      txbuff: (buff 4096),
-      index: uint,
-    })
-  )
+(define-read-only (read-txins (ctx {
+  txbuff: (buff 4096),
+  index: uint,
+}))
   (let (
     (parsed-num-txins (try! (read-varint ctx)))
     (num-txins (get varint parsed-num-txins))
@@ -405,12 +381,10 @@
 ;; Returns (err ERR-OUT-OF-BOUNDS) if we read past the end of txbuff.
 ;; Returns (err ERR-VARSLICE-TOO-LONG) if we find a scriptPubKey that's too long to parse.
 ;; Returns (err ERR-TOO-MANY-TXOUTS) if there are more than eight outputs to read.
-(define-read-only (read-txouts
-    (ctx {
-      txbuff: (buff 4096),
-      index: uint,
-    })
-  )
+(define-read-only (read-txouts (ctx {
+  txbuff: (buff 4096),
+  index: uint,
+}))
   (let (
     (parsed-num-txouts (try! (read-varint ctx)))
     (num-txouts (get varint parsed-num-txouts))
@@ -483,14 +457,12 @@
   )
     (if (> varint u0)
       ;; read all stack items for current txin and add to witnesses.
-      (let (
-        (parsed-items (try! (fold read-next-item (bool-list-of-len varint)
+      (let ((parsed-items (try! (fold read-next-item (bool-list-of-len varint)
           (ok {
             ctx: ctx,
             items: (list),
           })
-        )))
-      )
+        ))))
         (ok {
           witnesses: (unwrap-panic (as-max-len? (append (get witnesses state) (get items parsed-items)) u8)),
           ctx: (get ctx parsed-items),
@@ -629,9 +601,7 @@
 ;; Returns (err ERR-TOO-MANY-TXOUTS) if there are more than eight inputs to read.
 ;; Returns (err ERR-TOO-MANY-TXINS) if there are more than eight outputs to read.
 ;; Returns (err ERR-LEFTOVER-DATA) if the tx buffer contains leftover data at the end.
-(define-read-only (parse-tx
-    (tx (buff 4096))
-  )
+(define-read-only (parse-tx (tx (buff 4096)))
   (let (
     (ctx {
       txbuff: tx,
@@ -666,9 +636,7 @@
 ;; nbits: uint,                    ;; compact block difficulty representation
 ;; nonce: uint                     ;; PoW solution
 ;; })
-(define-read-only (parse-block-header
-    (headerbuff (buff 80))
-  )
+(define-read-only (parse-block-header (headerbuff (buff 80)))
   (let (
     (ctx {
       txbuff: headerbuff,
@@ -705,9 +673,7 @@
   (ok (map-set mock-burnchain-header-hashes burn-height hash))
 )
 
-(define-read-only (get-bc-h-hash
-    (bh uint)
-  )
+(define-read-only (get-bc-h-hash (bh uint))
   (if DEBUG-MODE
     (map-get? mock-burnchain-header-hashes bh)
     (get-burn-block-info? header-hash bh)
@@ -730,17 +696,13 @@
 
 ;; Get the txid of a transaction, but little-endian.
 ;; This is the reverse of what you see on block explorers.
-(define-read-only (get-reversed-txid
-    (tx (buff 4096))
-  )
+(define-read-only (get-reversed-txid (tx (buff 4096)))
   (sha256 (sha256 tx))
 )
 
 ;; Get the txid of a transaction.
 ;; This is what you see on block explorers.
-(define-read-only (get-txid
-    (tx (buff 4096))
-  )
+(define-read-only (get-txid (tx (buff 4096)))
   (reverse-buff32 (sha256 (sha256 tx)))
 )
 
@@ -834,12 +796,10 @@
 ;; Helper for wtxid commitments
 ;; Gets the scriptPubKey in the last output that follows the 0x6a24aa21a9ed pattern regardless of its content
 ;; as per BIP-0141 (https://github.com/bitcoin/bips/blob/master/bip-0141.mediawiki#commitment-structure)
-(define-read-only (get-commitment-scriptPubKey
-    (outs (list 8 {
-      value: uint,
-      scriptPubKey: (buff 128),
-    }))
-  )
+(define-read-only (get-commitment-scriptPubKey (outs (list 8 {
+  value: uint,
+  scriptPubKey: (buff 128),
+})))
   (fold inner-get-commitment-scriptPubKey outs 0x)
 )
 
@@ -850,9 +810,7 @@
     })
     (result (buff 128))
   )
-  (let (
-    (commitment (get scriptPubKey out))
-  )
+  (let ((commitment (get scriptPubKey out)))
     (if (is-commitment-pattern commitment)
       commitment
       result
@@ -861,9 +819,7 @@
 )
 
 ;; Returns false, if scriptPubKey does not have the commitment prefix.
-(define-read-only (is-commitment-pattern
-    (scriptPubKey (buff 128))
-  )
+(define-read-only (is-commitment-pattern (scriptPubKey (buff 128)))
   (asserts! (is-eq (unwrap! (slice? scriptPubKey u0 u6) false) 0x6a24aa21a9ed)
     false
   )
@@ -902,9 +858,7 @@
       tree-depth: uint,
     })
   )
-  (let (
-    (block (unwrap! (parse-block-header header) (err ERR-BAD-HEADER)))
-  )
+  (let ((block (unwrap! (parse-block-header header) (err ERR-BAD-HEADER))))
     (was-tx-mined-internal height tx header (get merkle-root block) proof)
   )
 )

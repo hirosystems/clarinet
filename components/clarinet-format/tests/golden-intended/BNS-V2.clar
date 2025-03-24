@@ -29,9 +29,7 @@
 (define-constant DEPLOYER tx-sender)
 ;; (new) Var to store the token URI, allowing for metadata association with the NFT
 (define-data-var token-uri (string-ascii 256) "ipfs://QmUQY1aZ799SPRaNBFqeCvvmZ4fTQfZvWHauRvHAukyQDB")
-(define-public (update-token-uri
-        (new-token-uri (string-ascii 256))
-    )
+(define-public (update-token-uri (new-token-uri (string-ascii 256)))
     (ok (begin
         (asserts! (is-eq contract-caller DEPLOYER) ERR-NOT-AUTHORIZED)
         (var-set token-uri new-token-uri)
@@ -39,9 +37,7 @@
 )
 
 (define-data-var contract-uri (string-ascii 256) "ipfs://QmWKTZEMQNWngp23i7bgPzkineYC9LDvcxYkwNyVQVoH8y")
-(define-public (update-contract-uri
-        (new-contract-uri (string-ascii 256))
-    )
+(define-public (update-contract-uri (new-contract-uri (string-ascii 256)))
     (ok (begin
         (asserts! (is-eq contract-caller DEPLOYER) ERR-NOT-AUTHORIZED)
         (var-set token-uri new-contract-uri)
@@ -195,9 +191,7 @@
     (ok (var-get bns-index))
 )
 
-(define-read-only (get-renewal-height
-        (id uint)
-    )
+(define-read-only (get-renewal-height (id uint))
     (let (
         (name-namespace (unwrap! (get-bns-from-id id) ERR-NO-NAME))
         (namespace-props (unwrap! (map-get? namespaces (get namespace name-namespace))
@@ -257,9 +251,7 @@
 )
 
 ;; @desc (new) SIP-09 compliant function to get token URI
-(define-read-only (get-token-uri
-        (id uint)
-    )
+(define-read-only (get-token-uri (id uint))
     ;; Returns a predefined set URI for the token metadata
     (ok (some (var-get token-uri)))
 )
@@ -270,9 +262,7 @@
 )
 
 ;; @desc (new) SIP-09 compliant function to get the owner of a specific token by its ID
-(define-read-only (get-owner
-        (id uint)
-    )
+(define-read-only (get-owner (id uint))
     ;; Check and return the owner of the specified NFT
     (ok (nft-get-owner? BNS-V2 id))
 )
@@ -289,9 +279,7 @@
 ;; Read-only function `get-namespace-price` calculates the registration price for a namespace based on its length.
 ;; @params:
 ;; namespace (buff 20): The namespace for which the price is being calculated.
-(define-read-only (get-namespace-price
-        (namespace (buff 20))
-    )
+(define-read-only (get-namespace-price (namespace (buff 20)))
     (let (
         ;; Calculate the length of the namespace.
         (namespace-len (len namespace))
@@ -315,9 +303,7 @@
         (namespace (buff 20))
         (name (buff 48))
     )
-    (let (
-        (namespace-props (unwrap! (map-get? namespaces namespace) ERR-NAMESPACE-NOT-FOUND))
-    )
+    (let ((namespace-props (unwrap! (map-get? namespaces namespace) ERR-NAMESPACE-NOT-FOUND)))
         (ok (compute-name-price name (get price-function namespace-props)))
     )
 )
@@ -325,9 +311,7 @@
 ;; Read-only function `can-namespace-be-registered` checks if a namespace is available for registration.
 ;; @params:
 ;; namespace (buff 20): The namespace being checked for availability.
-(define-read-only (can-namespace-be-registered
-        (namespace (buff 20))
-    )
+(define-read-only (can-namespace-be-registered (namespace (buff 20)))
     ;; Returns the result of `is-namespace-available` directly, indicating if the namespace can be registered.
     (ok (is-namespace-available namespace))
 )
@@ -335,9 +319,7 @@
 ;; Read-only function `get-namespace-properties` for retrieving properties of a specific namespace.
 ;; @params:
 ;; namespace (buff 20): The namespace whose properties are being queried.
-(define-read-only (get-namespace-properties
-        (namespace (buff 20))
-    )
+(define-read-only (get-namespace-properties (namespace (buff 20)))
     (let (
         ;; Fetch the properties of the specified namespace from the `namespaces` map.
         (namespace-props (unwrap! (map-get? namespaces namespace) ERR-NAMESPACE-NOT-FOUND))
@@ -374,24 +356,18 @@
 )
 
 ;; (new) Defines a read-only function to fetch the BNS name and the namespace given a unique ID.
-(define-read-only (get-bns-from-id
-        (id uint)
-    )
+(define-read-only (get-bns-from-id (id uint))
     ;; Attempts to retrieve the name and namespace from the 'index-to-name' map using the provided id as the key.
     (map-get? index-to-name id)
 )
 
 ;; (new) Fetcher for primary name
-(define-read-only (get-primary-name
-        (owner principal)
-    )
+(define-read-only (get-primary-name (owner principal))
     (map-get? primary-name owner)
 )
 
 ;; (new) Fetcher for primary name returns name and namespace
-(define-read-only (get-primary
-        (owner principal)
-    )
+(define-read-only (get-primary (owner principal))
     (ok (get-bns-from-id (unwrap! (map-get? primary-name owner) ERR-NO-PRIMARY-NAME)))
 )
 
@@ -562,7 +538,7 @@
 (define-public (list-in-ustx
         (id uint)
         (price uint)
-        (comm-trait commission-trait)
+        (comm-trait <commission-trait>)
     )
     (let (
         ;; Get the name and namespace of the NFT.
@@ -615,9 +591,7 @@
 
 ;; @desc (new) Function to remove an NFT listing from the market.
 ;; @param id: ID of the NFT being unlisted.
-(define-public (unlist-in-ustx
-        (id uint)
-    )
+(define-public (unlist-in-ustx (id uint))
     (let (
         ;; Get the name and namespace of the NFT.
         (name-and-namespace (unwrap! (map-get? index-to-name id) ERR-NO-NAME))
@@ -655,7 +629,7 @@
 ;; @param comm-trait: Address of the commission-trait.
 (define-public (buy-in-ustx
         (id uint)
-        (comm-trait commission-trait)
+        (comm-trait <commission-trait>)
     )
     (let (
         ;; Retrieves current owner and listing details
@@ -688,9 +662,7 @@
 
 ;; @desc (new) Sets the primary name for the caller to a specific BNS name they own.
 ;; @param primary-name-id: ID of the name to be set as primary.
-(define-public (set-primary-name
-        (primary-name-id uint)
-    )
+(define-public (set-primary-name (primary-name-id uint))
     (begin
         ;; Check if migration is complete
         (asserts! (var-get migration-complete) ERR-MIGRATION-IN-PROGRESS)
@@ -710,9 +682,7 @@
 
 ;; @desc (new) Defines a public function to burn an NFT, under managed namespaces.
 ;; @param id: ID of the NFT to be burned.
-(define-public (mng-burn
-        (id uint)
-    )
+(define-public (mng-burn (id uint))
     (let (
         ;; Get the name details associated with the given ID.
         (name-and-namespace (unwrap! (get-bns-from-id id) ERR-NO-NAME))
@@ -804,9 +774,7 @@
 
 ;; @desc (new) freezes the ability to make manager transfers
 ;; @param namespace: Buffer of the namespace.
-(define-public (freeze-manager
-        (namespace (buff 20))
-    )
+(define-public (freeze-manager (namespace (buff 20)))
     (let (
         ;; Retrieve namespace properties and current manager.
         (namespace-props (unwrap! (map-get? namespaces namespace) ERR-NAMESPACE-NOT-FOUND))
@@ -1010,9 +978,7 @@
 
 ;; @desc Public function `namespace-launch` marks a namespace as launched and available for public name registrations.
 ;; @param: namespace (buff 20): The namespace to be launched and made available for public registrations.
-(define-public (namespace-launch
-        (namespace (buff 20))
-    )
+(define-public (namespace-launch (namespace (buff 20)))
     (let (
         ;; Retrieve the properties of the namespace to ensure it exists and to check its current state.
         (namespace-props (unwrap! (map-get? namespaces namespace) ERR-NAMESPACE-NOT-FOUND))
@@ -1051,9 +1017,7 @@
 
 ;; @desc (new) Public function `turn-off-manager-transfers` disables manager transfers for a namespace (callable only once).
 ;; @param: namespace (buff 20): The namespace for which manager transfers will be disabled.
-(define-public (turn-off-manager-transfers
-        (namespace (buff 20))
-    )
+(define-public (turn-off-manager-transfers (namespace (buff 20)))
     (let (
         ;; Retrieve the properties of the namespace and manager.
         (namespace-props (unwrap! (map-get? namespaces namespace) ERR-NAMESPACE-NOT-FOUND))
@@ -1251,9 +1215,7 @@
 
 ;; @desc Public function `namespace-freeze-price` disables the ability to update the price function for a given namespace.
 ;; @param: namespace (buff 20): The target namespace for which the price function update capability is being revoked.
-(define-public (namespace-freeze-price
-        (namespace (buff 20))
-    )
+(define-public (namespace-freeze-price (namespace (buff 20)))
     (let (
         ;; Retrieve the properties of the specified namespace to verify its existence and fetch its current settings.
         (namespace-props (unwrap! (map-get? namespaces namespace) ERR-NAMESPACE-NOT-FOUND))
@@ -1517,9 +1479,7 @@
 ;; @desc (new) Defines a public function `claim-preorder` for claiming back the STX commited to be burnt on registration.
 ;; This should only be allowed to go through if preorder-claimability-ttl has passed
 ;; @param: hashed-salted-fqn (buff 20): The hashed and salted fully qualified name.
-(define-public (claim-preorder
-        (hashed-salted-fqn (buff 20))
-    )
+(define-public (claim-preorder (hashed-salted-fqn (buff 20)))
     (let (
         ;; Retrieves the preorder details.
         (preorder (unwrap!
@@ -1559,9 +1519,7 @@
 ;; @desc (new) This function is similar to `name-preorder` but only for namespace managers, without the burning of STX tokens.
 ;; Intended only for managers as mng-name-register & name-register will validate.
 ;; @param: hashed-salted-fqn (buff 20): The hashed and salted fully-qualified name (FQN) being preordered.
-(define-public (mng-name-preorder
-        (hashed-salted-fqn (buff 20))
-    )
+(define-public (mng-name-preorder (hashed-salted-fqn (buff 20)))
     (begin
         ;; Check if migration is complete
         (asserts! (var-get migration-complete) ERR-MIGRATION-IN-PROGRESS)
@@ -1905,9 +1863,7 @@
 )
 
 ;; Determines if a character is a digit (0-9).
-(define-private (is-digit
-        (char (buff 1))
-    )
+(define-private (is-digit (char (buff 1)))
     (or
         ;; Checks if the character is between '0' and '9' using hex values.
         (is-eq char 0x30) ;; 0
@@ -1924,9 +1880,7 @@
 )
 
 ;; Checks if a character is a lowercase alphabetic character (a-z).
-(define-private (is-lowercase-alpha
-        (char (buff 1))
-    )
+(define-private (is-lowercase-alpha (char (buff 1)))
     (or
         ;; Checks for each lowercase letter using hex values.
         (is-eq char 0x61) ;; a
@@ -1959,9 +1913,7 @@
 )
 
 ;; Determines if a character is a vowel (a, e, i, o, u, and y).
-(define-private (is-vowel
-        (char (buff 1))
-    )
+(define-private (is-vowel (char (buff 1)))
     (or
         (is-eq char 0x61) ;; a
         (is-eq char 0x65) ;; e
@@ -1973,9 +1925,7 @@
 )
 
 ;; Identifies if a character is a special character, specifically '-' or '_'.
-(define-private (is-special-char
-        (char (buff 1))
-    )
+(define-private (is-special-char (char (buff 1)))
     (or
         (is-eq char 0x2d) ;; -
         (is-eq char 0x5f)
@@ -1984,9 +1934,7 @@
 )
 
 ;; Determines if a character is valid within a name, based on allowed character sets.
-(define-private (is-char-valid
-        (char (buff 1))
-    )
+(define-private (is-char-valid (char (buff 1)))
     (or
         (is-lowercase-alpha char)
         (is-digit char)
@@ -1995,30 +1943,22 @@
 )
 
 ;; Checks if a character is non-alphabetic, either a digit or a special character.
-(define-private (is-nonalpha
-        (char (buff 1))
-    )
+(define-private (is-nonalpha (char (buff 1)))
     (or (is-digit char) (is-special-char char))
 )
 
 ;; Evaluates if a name contains any vowel characters.
-(define-private (has-vowels-chars
-        (name (buff 48))
-    )
+(define-private (has-vowels-chars (name (buff 48)))
     (> (len (filter is-vowel name)) u0)
 )
 
 ;; Determines if a name contains non-alphabetic characters.
-(define-private (has-nonalpha-chars
-        (name (buff 48))
-    )
+(define-private (has-nonalpha-chars (name (buff 48)))
     (> (len (filter is-nonalpha name)) u0)
 )
 
 ;; Identifies if a name contains any characters that are not considered valid.
-(define-private (has-invalid-chars
-        (name (buff 48))
-    )
+(define-private (has-invalid-chars (name (buff 48)))
     (< (len (filter is-char-valid name)) (len name))
 )
 
@@ -2026,9 +1966,7 @@
 ;; It considers if the namespace has been launched and whether it has expired.
 ;; @params:
 ;; namespace (buff 20): The namespace to check for availability.
-(define-private (is-namespace-available
-        (namespace (buff 20))
-    )
+(define-private (is-namespace-available (namespace (buff 20)))
     ;; Check if the namespace exists
     (match (map-get? namespaces namespace)
         namespace-props
@@ -2396,9 +2334,7 @@
         (lifetime uint)
         (owner principal)
     )
-    (let (
-        (mint-index (+ u1 (var-get bns-index)))
-    )
+    (let ((mint-index (+ u1 (var-get bns-index))))
         ;; Check if migration is complete
         (asserts! (not (var-get migration-complete)) ERR-MIGRATION-IN-PROGRESS)
         ;; Ensure the contract-caller is the airdrop contract.
