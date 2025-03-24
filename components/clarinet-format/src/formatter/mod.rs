@@ -620,18 +620,55 @@ impl<'a> Aggregator<'a> {
                     acc.push('\n');
                     continue;
                 }
-                let value = iter.next().unwrap();
-                let trailing = get_trailing_comment(value, &mut iter);
-                // Pass the current indentation level to nested formatting
                 let key_str = self.format_source_exprs(slice::from_ref(key), &space);
-                let value_str = self.format_source_exprs(slice::from_ref(value), &space);
-                acc.push_str(&format!("{}{}: {},", space, key_str, value_str));
+                acc.push_str(&format!("{}{}:", space, key_str));
+                if let Some(value) = iter.next() {
+                    if is_comment(value) {
+                        acc.push('\n');
+                        acc.push_str(&format!("{}{}", space, indentation));
+                        acc.push_str(&self.display_pse(value, &space));
+                        acc.push('\n');
+                        // Try to get the actual value after the comment
+                        if let Some(actual_value) = iter.next() {
+                            // comment implies next indent level which we don't
+                            // want if this is a normal value
+                            let indent = if is_comment(value) {
+                                &format!("{}{}", space, indentation)
+                            } else {
+                                &space
+                            };
+                            let trailing = get_trailing_comment(actual_value, &mut iter);
+                            let value_str =
+                                self.format_source_exprs(slice::from_ref(actual_value), &indent);
+                            acc.push_str(&indent);
+                            acc.push_str(&value_str);
+                            acc.push(',');
 
-                if let Some(comment) = trailing {
-                    acc.push(' ');
-                    acc.push_str(&self.display_pse(comment, previous_indentation));
+                            // Add trailing comment if present
+                            if let Some(comment) = trailing {
+                                acc.push(' ');
+                                acc.push_str(&self.display_pse(comment, &space));
+                            }
+                        }
+                    } else {
+                        let trailing = get_trailing_comment(value, &mut iter);
+                        let indent = if is_comment(value) {
+                            &format!("{}{}", space, indentation)
+                        } else {
+                            &space
+                        };
+                        // Pass the current indentation level to nested formatting
+                        let value_str = self.format_source_exprs(slice::from_ref(value), &indent);
+                        acc.push_str(&format!(" {}", value_str));
+                        acc.push(',');
+
+                        if let Some(comment) = trailing {
+                            acc.push(' ');
+                            acc.push_str(&self.display_pse(comment, previous_indentation));
+                        }
+                    }
+                    acc.push('\n');
                 }
-                acc.push('\n');
             }
         } else {
             // for cases where we keep it on the same line with 1 k/v pair
@@ -1398,6 +1435,26 @@ mod tests_formatter {
         assert_eq!(src, result);
     }
 
+    #[test]
+    fn weird_nesting() {
+        let src = r#"(merge name-props {
+  something: u1,
+  ;; comment
+  renewal-height:
+    ;; If still within lifetime, extend from current renewal height; otherwise, use new renewal height
+    (if (< burn-block-height
+        (unwrap-panic (get-renewal-height (unwrap-panic (get-id-from-bns name namespace))))
+      )
+      (+
+        (unwrap-panic (get-renewal-height (unwrap-panic (get-id-from-bns name namespace))))
+        lifetime
+      )
+      new-renewal-height
+    ),
+})"#;
+        let result = format_with_default(src);
+        assert_eq!(src, result);
+    }
     #[test]
     fn define_data_var_test() {
         let src = "(define-data-var my-data-var principal tx-sender)\n";
