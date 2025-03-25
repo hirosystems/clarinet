@@ -1,5 +1,5 @@
 [alias]
 clarinet-install = "install --path components/clarinet-cli --locked --force"
-tst = "nextest run --workspace --no-fail-fast --locked --exclude clarinet-sdk-wasm --exclude clarity-jupyter-kernel"
-cov = "llvm-cov nextest --workspace --locked --exclude clarinet-sdk-wasm --exclude clarity-jupyter-kernel --lcov --output-path lcov.info"
-cov-dev = "llvm-cov nextest --workspace --locked --exclude clarinet-sdk-wasm --exclude clarity-jupyter-kernel --html"
+tst = "nextest run --workspace --no-fail-fast --locked --exclude clarinet-sdk-wasm"
+cov = "llvm-cov nextest --workspace --locked --exclude clarinet-sdk-wasm --lcov --output-path lcov.info"
+cov-dev = "llvm-cov nextest --workspace --locked --exclude clarinet-sdk-wasm --html"
