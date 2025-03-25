@@ -615,7 +615,9 @@ impl<'a> Aggregator<'a> {
         let over_2_kvs = without_comments_len(exprs) > 2;
         let mut acc = "{".to_string();
 
-        if over_2_kvs {
+        // differing_lines breaks determinism but is a good way to break up
+        // complex values in maps
+        if over_2_kvs || differing_lines(exprs) {
             acc.push('\n');
             let mut iter = exprs.iter().peekable();
             while let Some(key) = iter.next() {
@@ -675,6 +677,7 @@ impl<'a> Aggregator<'a> {
                     acc.push('\n');
                 }
             }
+            acc.push_str(previous_indentation);
         } else {
             // for cases where we keep it on the same line with 1 k/v pair
             let fkey = self.display_pse(&exprs[0], previous_indentation);
@@ -684,9 +687,6 @@ impl<'a> Aggregator<'a> {
             ));
         }
 
-        if over_2_kvs {
-            acc.push_str(previous_indentation);
-        }
         acc.push('}');
         acc
     }
@@ -1504,6 +1504,32 @@ mod tests_formatter {
       new-renewal-height
     ),
 })"#;
+        let result = format_with_default(src);
+        assert_eq!(src, result);
+    }
+
+    #[test]
+    fn weird_nesting_single_value() {
+        let src = r#"(begin
+  (map-set name-properties {
+    name: name,
+    namespace: namespace,
+  }
+    (merge name-props {
+      renewal-height:
+        ;; If still within lifetime, extend from current renewal height; otherwise, use new renewal height
+        (if (< burn-block-height
+            (unwrap-panic (get-renewal-height (unwrap-panic (get-id-from-bns name namespace))))
+          )
+          (+
+            (unwrap-panic (get-renewal-height (unwrap-panic (get-id-from-bns name namespace))))
+            lifetime
+          )
+          new-renewal-height
+        ),
+    })
+  )
+)"#;
         let result = format_with_default(src);
         assert_eq!(src, result);
     }
