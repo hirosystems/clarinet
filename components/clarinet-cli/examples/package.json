@@ -1,0 +1,17 @@
+{
+  "name": "@hirosystems/clarinet-examples",
+  "private": true,
+  "description": "Basic workspace to easily manage the example dependencies",
+  "author": "hirosystems",
+  "license": "GPL-3.0",
+  "workspaces": [
+    "./billboard",
+    "./cbtc",
+    "./counter",
+    "./simple-nft",
+    "./swappool"
+  ],
+  "scripts": {
+    "test": "npm test --workspaces --if-present"
+  }
+}
