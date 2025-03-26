@@ -21,7 +21,7 @@ use clarity::util::secp256k1::{
 };
 use clarity::util::vrf::VRFProof;
 use clarity::vm::types::{
-    PrincipalData, QualifiedContractIdentifier, StandardPrincipalData, TupleData, Value
+    PrincipalData, QualifiedContractIdentifier, StandardPrincipalData, TupleData, Value,
 };
 use clarity::vm::ClarityVersion;
 use clarity::vm::{ClarityName, ContractName};
