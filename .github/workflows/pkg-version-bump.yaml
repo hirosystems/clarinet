@@ -21,10 +21,13 @@ jobs:
   homebrew:
     name: Homebrew
     runs-on: macos-latest
+    permissions:
+      contents: write
+      issues: write
     steps:
       - name: Homebrew version bump
         env:
-          HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.GH_TOKEN }}
+          HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ github.event.client_payload.tag || github.event.inputs.tag }}
         run: |
           # Get version info
@@ -65,6 +68,6 @@ jobs:
           ./wingetcreate.exe update `
             --urls https://github.com/${{ github.repository }}/releases/download/${env:TAG}/clarinet-windows-x64.msi `
             --version ${VERSION} `
-            --token ${{ secrets.GH_TOKEN }} `
+            --token ${{ secrets.GITHUB_TOKEN }} `
             --submit `
             HiroSystems.Clarinet
