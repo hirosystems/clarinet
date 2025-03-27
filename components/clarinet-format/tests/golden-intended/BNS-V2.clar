@@ -1759,7 +1759,19 @@
             name: name,
             namespace: namespace,
         }
-            (merge name-props { renewal-height: ;; If still within lifetime, extend from current renewal height; otherwise, use new renewal height })
+            (merge name-props {
+                renewal-height:
+                    ;; If still within lifetime, extend from current renewal height; otherwise, use new renewal height
+                    (if (< burn-block-height
+                            (unwrap-panic (get-renewal-height (unwrap-panic (get-id-from-bns name namespace))))
+                        )
+                        (+
+                            (unwrap-panic (get-renewal-height (unwrap-panic (get-id-from-bns name namespace))))
+                            lifetime
+                        )
+                        new-renewal-height
+                    ),
+            })
         )
         (print {
             topic: "renew-name",
