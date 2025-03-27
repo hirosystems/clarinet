@@ -1,42 +1,40 @@
-use crate::impl_byte_array_newtype;
+use std::convert::{TryFrom, TryInto};
+use std::fmt;
+use std::io::{Read, Write};
+use std::ops::{Deref, DerefMut};
+use std::str::FromStr;
 
 pub use clarity::codec::StacksMessageCodec;
 
-use clarity::address::AddressHashMode;
 use clarity::address::{
-    C32_ADDRESS_VERSION_MAINNET_MULTISIG, C32_ADDRESS_VERSION_MAINNET_SINGLESIG,
+    AddressHashMode, C32_ADDRESS_VERSION_MAINNET_MULTISIG, C32_ADDRESS_VERSION_MAINNET_SINGLESIG,
     C32_ADDRESS_VERSION_TESTNET_MULTISIG, C32_ADDRESS_VERSION_TESTNET_SINGLESIG,
 };
-use clarity::codec::{read_next, write_next, Error as CodecError};
-use clarity::codec::{read_next_exact, MAX_MESSAGE_LEN};
+use clarity::codec::{
+    read_next, read_next_exact, write_next, Error as CodecError, MAX_MESSAGE_LEN,
+};
 use clarity::types::chainstate::{
-    BlockHeaderHash, BurnchainHeaderHash, ConsensusHash, StacksBlockId, StacksWorkScore, TrieHash,
+    BlockHeaderHash, BurnchainHeaderHash, ConsensusHash, StacksAddress, StacksBlockId,
+    StacksPublicKey, StacksWorkScore, TrieHash,
 };
-use clarity::types::chainstate::{StacksAddress, StacksPublicKey};
 use clarity::types::{PrivateKey, StacksEpochId};
-use clarity::util::hash::{Hash160, Sha256Sum, Sha512Trunc256Sum};
-use clarity::util::retry::BoundReader;
-use clarity::util::secp256k1::{
-    MessageSignature, Secp256k1PrivateKey, Secp256k1PublicKey, MESSAGE_SIGNATURE_ENCODED_SIZE,
-};
-use clarity::util::vrf::VRFProof;
 use clarity::vm::types::{
     PrincipalData, QualifiedContractIdentifier, StandardPrincipalData, TupleData, Value,
 };
-use clarity::vm::ClarityVersion;
-use clarity::vm::{ClarityName, ContractName};
+use clarity::vm::{ClarityName, ClarityVersion, ContractName};
 use clarity::{
     impl_array_hexstring_fmt, impl_array_newtype, impl_byte_array_message_codec,
     impl_byte_array_serde,
 };
 use serde::{Deserialize, Serialize};
-use std::convert::TryFrom;
-use std::convert::TryInto;
-use std::fmt;
-use std::io::{Read, Write};
-use std::ops::Deref;
-use std::ops::DerefMut;
-use std::str::FromStr;
+use stacks_common::util::hash::{Hash160, Sha256Sum, Sha512Trunc256Sum};
+use stacks_common::util::retry::BoundReader;
+use stacks_common::util::secp256k1::{
+    MessageSignature, Secp256k1PrivateKey, Secp256k1PublicKey, MESSAGE_SIGNATURE_ENCODED_SIZE,
+};
+use stacks_common::util::vrf::VRFProof;
+
+use crate::impl_byte_array_newtype;
 
 pub const MAX_BLOCK_LEN: u32 = 2 * 1024 * 1024;
 pub const MAX_TRANSACTION_LEN: u32 = MAX_BLOCK_LEN;
