@@ -83,13 +83,22 @@ impl ClarityFormatter {
     pub fn format_section(&self, source: &str) -> String {
         let pse = clarity::vm::ast::parser::v2::parse(source).unwrap();
 
-        // TODO: range formatting should specify to the aggregator that we're
+        // range formatting specifies to the aggregator that we're
         // starting mid-source and thus should pre-populate
         // `previous_indentation` for format_source_exprs
+        let indentation_level = source.chars().take_while(|c| c.is_whitespace()).count();
+        let leading_spaces = &source[..indentation_level];
         let agg = Aggregator::new(&self.settings, &pse, source);
-        agg.generate()
+
+        let result = agg.generate();
+        if leading_spaces.is_empty() {
+            result
+        } else {
+            format!("{}{}", leading_spaces, result)
+        }
     }
 }
+
 /// Aggregator does the heavy lifting and generates the final output string.
 /// all the formatting methods live within this struct.
 pub struct Aggregator<'a> {
@@ -111,7 +120,13 @@ impl<'a> Aggregator<'a> {
     }
     pub fn generate(&self) -> String {
         self.cache.borrow_mut().clear();
-        self.format_source_exprs(self.pse, "")
+        // this handles if we're formatting a section of code rather than the whole file
+        let indentation_level = self
+            .source
+            .chars()
+            .take_while(|c| c.is_whitespace())
+            .count();
+        self.format_source_exprs(self.pse, &self.source[..indentation_level])
     }
 
     fn format_source_exprs(

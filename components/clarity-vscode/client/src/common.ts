@@ -47,6 +47,7 @@ export async function initClient(
   }
 
   let config = getConfig();
+  const formatEnabled = config.get("format") === true;
 
   /* clarity insight webview */
   const insightsViewProvider = new InsightsViewProvider(context.extensionUri);
@@ -65,6 +66,7 @@ export async function initClient(
       "completion",
       "completionSmartParenthesisWrap",
       "completionIncludeNativePlaceholders",
+      "format",
       "hover",
       "documentSymbols",
       "goToDefinition",
@@ -138,6 +140,54 @@ export async function initClient(
             vscode.commands.executeCommand("vscode.open", surveyUri);
           }
         });
+    }
+
+    const formatEnabled = config.get("format") === true;
+
+    if (formatEnabled) {
+      // register format-on-save if needed
+      context.subscriptions.push(
+        vscode.languages.registerDocumentFormattingEditProvider("clarity", {
+          provideDocumentFormattingEdits: (document, options, _token) => {
+            // Only format clarity documents
+            if (document.languageId !== "clarity") return null;
+
+            // Get formatting edits from the server
+            const params = {
+              textDocument: {
+                uri: document.uri.toString(),
+              },
+              options: {
+                tabSize: options.tabSize,
+                insertSpaces: options.insertSpaces,
+                trimTrailingWhitespace: vscode.workspace
+                  .getConfiguration("files")
+                  .get("trimTrailingWhitespace", false),
+                trimFinalNewlines: vscode.workspace
+                  .getConfiguration("files")
+                  .get("trimFinalNewlines", false),
+                insertFinalNewline: vscode.workspace
+                  .getConfiguration("files")
+                  .get("insertFinalNewline", false),
+              },
+            };
+
+            return client.sendRequest("textDocument/formatting", params);
+          },
+        }),
+      );
+
+      // Listen for document save and format if enabled
+      context.subscriptions.push(
+        vscode.workspace.onWillSaveTextDocument((event) => {
+          if (event.document.languageId === "clarity") {
+            const formatPromise = vscode.commands.executeCommand(
+              "editor.action.formatDocument",
+            );
+            event.waitUntil(formatPromise);
+          }
+        }),
+      );
     }
 
     if (config.panels["insights-panel"]) {
