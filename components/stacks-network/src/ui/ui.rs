@@ -17,7 +17,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
             ]
             .as_ref(),
         )
-        .split(f.size());
+        .split(f.area());
 
     let devnet_status_components = Layout::default()
         .direction(Direction::Horizontal)
@@ -343,7 +343,7 @@ fn draw_help(f: &mut Frame, app: &mut App, area: Rect) {
     // let help =
     //     " ⬅️  ➡️  Explore blocks          ⬆️  ⬇️  Explore transactions          0️⃣  Genesis Reset";
     let help = format!(" ⬅️  ➡️  Explore blocks          Path: {}", app.devnet_path);
-    let paragraph = Paragraph::new(help.clone())
+    let paragraph = Paragraph::new(help)
         .style(Style::default().fg(Color::White))
         .block(Block::default().borders(Borders::NONE));
 

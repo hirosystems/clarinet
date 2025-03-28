@@ -1342,7 +1342,7 @@ start_height = {epoch_3_1}
             .id;
 
         ctx.try_log(|logger| slog::info!(logger, "Created container stacks-node: {}", container));
-        self.stacks_node_container_id = Some(container.clone());
+        self.stacks_node_container_id = Some(container);
 
         Ok(())
     }
@@ -1504,7 +1504,7 @@ db_path = "stacks-signer-{signer_id}.sqlite"
                 container
             )
         });
-        self.stacks_signers_containers_ids.push(container.clone());
+        self.stacks_signers_containers_ids.push(container);
 
         Ok(())
     }
@@ -1512,9 +1512,8 @@ db_path = "stacks-signer-{signer_id}.sqlite"
     pub async fn boot_stacks_signer_container(&mut self, signer_id: u32) -> Result<(), String> {
         let container = self.stacks_signers_containers_ids[signer_id as usize].clone();
 
-        let docker = match &self.docker_client {
-            Some(ref docker) => docker,
-            _ => return Err("unable to get Docker client".into()),
+        let Some(docker) = &self.docker_client else {
+            return Err("unable to get Docker client".into());
         };
 
         docker
@@ -1750,7 +1749,7 @@ events_keys = ["*"]
             .id;
 
         ctx.try_log(|logger| slog::info!(logger, "Created container subnet-node: {}", container));
-        self.subnet_node_container_id = Some(container.clone());
+        self.subnet_node_container_id = Some(container);
 
         Ok(())
     }

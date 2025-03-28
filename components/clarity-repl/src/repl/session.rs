@@ -22,7 +22,7 @@ use clarity::vm::{
     SymbolicExpression,
 };
 use colored::Colorize;
-use prettytable::{Cell, Row, Table};
+use comfy_table::Table;
 
 use std::collections::{BTreeMap, HashMap};
 use std::fmt;
@@ -252,7 +252,7 @@ impl Session {
         ) {
             Ok((mut output, result)) => {
                 if let EvaluationResult::Contract(contract_result) = result.result.clone() {
-                    let snippet = format!("→ .{} contract successfully stored. Use (contract-call? ...) for invoking the public functions:", contract_result.contract.contract_identifier.clone());
+                    let snippet = format!("→ .{} contract successfully stored. Use (contract-call? ...) for invoking the public functions:", contract_result.contract.contract_identifier);
                     output.push(green!(snippet));
                 };
                 (output, result.cost.clone(), Ok(result))
@@ -267,53 +267,39 @@ impl Session {
                 "Limit".to_string(),
                 "Percentage".to_string(),
             ];
-            let mut headers_cells = vec![];
-            for header in headers.iter() {
-                headers_cells.push(Cell::new(header));
-            }
-            let mut table = Table::new();
-            table.add_row(Row::new(headers_cells));
-            table.add_row(Row::new(vec![
-                Cell::new("Runtime"),
-                Cell::new(&cost.total.runtime.to_string()),
-                Cell::new(&cost.limit.runtime.to_string()),
-                Cell::new(&(Self::get_costs_percentage(&cost.total.runtime, &cost.limit.runtime))),
-            ]));
-            table.add_row(Row::new(vec![
-                Cell::new("Read count"),
-                Cell::new(&cost.total.read_count.to_string()),
-                Cell::new(&cost.limit.read_count.to_string()),
-                Cell::new(
-                    &(Self::get_costs_percentage(&cost.total.read_count, &cost.limit.read_count)),
-                ),
-            ]));
-            table.add_row(Row::new(vec![
-                Cell::new("Read length (bytes)"),
-                Cell::new(&cost.total.read_length.to_string()),
-                Cell::new(&cost.limit.read_length.to_string()),
-                Cell::new(
-                    &(Self::get_costs_percentage(&cost.total.read_length, &cost.limit.read_length)),
-                ),
-            ]));
-            table.add_row(Row::new(vec![
-                Cell::new("Write count"),
-                Cell::new(&cost.total.write_count.to_string()),
-                Cell::new(&cost.limit.write_count.to_string()),
-                Cell::new(
-                    &(Self::get_costs_percentage(&cost.total.write_count, &cost.limit.write_count)),
-                ),
-            ]));
-            table.add_row(Row::new(vec![
-                Cell::new("Write length (bytes)"),
-                Cell::new(&cost.total.write_length.to_string()),
-                Cell::new(&cost.limit.write_length.to_string()),
-                Cell::new(
-                    &(Self::get_costs_percentage(
-                        &cost.total.write_length,
-                        &cost.limit.write_length,
-                    )),
-                ),
-            ]));
+
+            let mut table = comfy_table::Table::new();
+            table.add_row(headers);
+            table.add_row(vec![
+                "Runtime",
+                &cost.total.runtime.to_string(),
+                &cost.limit.runtime.to_string(),
+                &(Self::get_costs_percentage(&cost.total.runtime, &cost.limit.runtime)),
+            ]);
+            table.add_row(vec![
+                "Read count",
+                &cost.total.read_count.to_string(),
+                &cost.limit.read_count.to_string(),
+                &Self::get_costs_percentage(&cost.total.read_count, &cost.limit.read_count),
+            ]);
+            table.add_row(vec![
+                "Read length (bytes)",
+                &cost.total.read_length.to_string(),
+                &cost.limit.read_length.to_string(),
+                &Self::get_costs_percentage(&cost.total.read_length, &cost.limit.read_length),
+            ]);
+            table.add_row(vec![
+                "Write count",
+                &cost.total.write_count.to_string(),
+                &cost.limit.write_count.to_string(),
+                &Self::get_costs_percentage(&cost.total.write_count, &cost.limit.write_count),
+            ]);
+            table.add_row(vec![
+                "Write length (bytes)",
+                &cost.total.write_length.to_string(),
+                &cost.limit.write_length.to_string(),
+                &(Self::get_costs_percentage(&cost.total.write_length, &cost.limit.write_length)),
+            ]);
             output.push(format!("{}", table));
         }
         output.append(&mut result);
@@ -394,7 +380,7 @@ impl Session {
         ) {
             Ok((mut output, result)) => {
                 if let EvaluationResult::Contract(contract_result) = result.result {
-                    let snippet = format!("→ .{} contract successfully stored. Use (contract-call? ...) for invoking the public functions:", contract_result.contract.contract_identifier.clone());
+                    let snippet = format!("→ .{} contract successfully stored. Use (contract-call? ...) for invoking the public functions:", contract_result.contract.contract_identifier);
                     output.push(snippet.green().to_string());
                 };
                 output
@@ -488,8 +474,8 @@ impl Session {
         amount: u64,
         recipient: &str,
     ) -> Result<ExecutionResult, Vec<Diagnostic>> {
-        let snippet = format!("(stx-transfer? u{} tx-sender '{})", amount, recipient);
-        self.eval(snippet.clone(), false)
+        let snippet = format!("(stx-transfer? u{amount} tx-sender '{recipient})");
+        self.eval(snippet, false)
     }
 
     pub fn deploy_contract(
@@ -619,15 +605,13 @@ impl Session {
 
         let result = self
             .interpreter
-            .run(&contract.clone(), None, cost_track, Some(hooks));
+            .run(&contract, None, cost_track, Some(hooks));
 
         match result {
             Ok(result) => {
                 if let EvaluationResult::Contract(contract_result) = &result.result {
-                    self.contracts.insert(
-                        contract_identifier.clone(),
-                        contract_result.contract.clone(),
-                    );
+                    self.contracts
+                        .insert(contract_identifier, contract_result.contract.clone());
                 };
                 Ok(result)
             }
@@ -664,15 +648,13 @@ impl Session {
 
         let result = self
             .interpreter
-            .run(&contract.clone(), None, cost_track, eval_hooks);
+            .run(&contract, None, cost_track, eval_hooks);
 
         match result {
             Ok(result) => {
                 if let EvaluationResult::Contract(contract_result) = &result.result {
-                    self.contracts.insert(
-                        contract_identifier.clone(),
-                        contract_result.contract.clone(),
-                    );
+                    self.contracts
+                        .insert(contract_identifier, contract_result.contract.clone());
                 };
                 Ok(result)
             }
@@ -692,7 +674,7 @@ impl Session {
         let mut keys = self
             .api_reference
             .keys()
-            .map(|k| k.to_string())
+            .map(String::from)
             .collect::<Vec<String>>();
         keys.sort();
         keys
@@ -702,7 +684,7 @@ impl Session {
         let mut keys = self
             .keywords_reference
             .keys()
-            .map(|k| k.to_string())
+            .map(String::from)
             .collect::<Vec<String>>();
         keys.sort();
         keys
@@ -1078,26 +1060,22 @@ impl Session {
             }
         }
 
-        let mut headers_cells = vec![];
-        for header in headers.iter() {
-            headers_cells.push(Cell::new(header));
-        }
         let mut table = Table::new();
-        table.add_row(Row::new(headers_cells));
+        table.add_row(headers);
         for account in accounts.iter() {
             let mut cells = vec![];
 
             if let Some(name) = self.get_account_name(account) {
-                cells.push(Cell::new(&format!("{} ({})", account, name)));
+                cells.push(format!("{} ({})", account, name));
             } else {
-                cells.push(Cell::new(account));
+                cells.push(account.to_string());
             }
 
             for token in tokens.iter() {
                 let balance = self.interpreter.get_balance_for_account(account, token);
-                cells.push(Cell::new(&format!("{}", balance)));
+                cells.push(format!("{}", balance));
             }
-            table.add_row(Row::new(cells));
+            table.add_row(cells);
         }
         Some(format!("{}", table))
     }
@@ -1111,7 +1089,7 @@ impl Session {
         }
 
         let mut table = Table::new();
-        table.add_row(row!["Contract identifier", "Public functions"]);
+        table.add_row(["Contract identifier", "Public functions"]);
         let contracts = self.contracts.clone();
         for (contract_id, contract) in contracts.iter() {
             let contract_id_str = contract_id.to_string();
@@ -1131,10 +1109,7 @@ impl Session {
                     formatted_methods.push(format!("({}{})", method_name, formatted_args));
                 }
                 let formatted_spec = formatted_methods.join("\n").to_string();
-                table.add_row(Row::new(vec![
-                    Cell::new(&contract_id_str),
-                    Cell::new(&formatted_spec),
-                ]));
+                table.add_row(vec![&contract_id_str, &formatted_spec]);
             }
         }
         Some(format!("{}", table))

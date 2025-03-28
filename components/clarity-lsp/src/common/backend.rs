@@ -167,7 +167,7 @@ pub async fn process_notification(
                 };
 
                 let issuer = metadata.and_then(|(_, deployer)| match deployer {
-                    ContractDeployer::ContractIdentifier(id) => Some(id.issuer.to_owned()),
+                    ContractDeployer::ContractIdentifier(id) => Some(id.issuer),
                     _ => None,
                 });
 

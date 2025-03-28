@@ -1,7 +1,5 @@
 ;; Determines if a character is a vowel (a, e, i, o, u, and y).
-(define-private (is-vowel
-    (char (buff 1))
-  )
+(define-private (is-vowel (char (buff 1)))
   (or
     (is-eq char 0x61) ;; a
     (is-eq char 0x65) ;; e
@@ -21,9 +19,7 @@
   )
 )
 
-(define-read-only (is-borroweable-isolated
-    (asset principal)
-  )
+(define-read-only (is-borroweable-isolated (asset principal))
   (match (index-of? (contract-call? .pool-reserve-data get-borroweable-isolated-read)
     asset
   )

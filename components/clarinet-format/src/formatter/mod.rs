@@ -183,6 +183,7 @@ impl<'a> Aggregator<'a> {
                             NativeFunctions::And | NativeFunctions::Or => {
                                 self.format_booleans(list, previous_indentation)
                             }
+
                             // everything else that's not special cased
                             NativeFunctions::Add
                             | NativeFunctions::Subtract
@@ -224,9 +225,9 @@ impl<'a> Aggregator<'a> {
                             | NativeFunctions::IntToUtf8
                             | NativeFunctions::ListCons
                             | NativeFunctions::FetchVar
+                            | NativeFunctions::FetchEntry // map-get?
+                            | NativeFunctions::SetEntry // map-set?
                             | NativeFunctions::SetVar
-                            | NativeFunctions::FetchEntry
-                            | NativeFunctions::SetEntry
                             | NativeFunctions::InsertEntry
                             | NativeFunctions::DeleteEntry
                             | NativeFunctions::TupleGet
@@ -542,22 +543,27 @@ impl<'a> Aggregator<'a> {
         let space = format!("{}{}", previous_indentation, indentation);
 
         if let Some(args) = exprs[1].match_list() {
-            let mut iter = args.iter().peekable();
-            while let Some(arg) = iter.next() {
-                let trailing = get_trailing_comment(arg, &mut iter);
-                acc.push_str(&format!(
-                    "\n{}{}",
-                    space,
-                    self.format_source_exprs(slice::from_ref(arg), &space)
-                ));
-                if let Some(comment) = trailing {
-                    acc.push(' ');
-                    acc.push_str(&self.display_pse(comment, previous_indentation));
+            if args.len() == 1 {
+                acc.push_str(&self.format_source_exprs(slice::from_ref(&args[0]), &space));
+                acc.push(')');
+            } else {
+                let mut iter = args.iter().peekable();
+                while let Some(arg) = iter.next() {
+                    let trailing = get_trailing_comment(arg, &mut iter);
+                    acc.push_str(&format!(
+                        "\n{}{}",
+                        space,
+                        self.format_source_exprs(slice::from_ref(arg), &space)
+                    ));
+                    if let Some(comment) = trailing {
+                        acc.push(' ');
+                        acc.push_str(&self.display_pse(comment, previous_indentation));
+                    }
                 }
+                // close the args paren
+                acc.push_str(&format!("\n{})", previous_indentation));
             }
         }
-        // close the args paren
-        acc.push_str(&format!("\n{})", previous_indentation));
         // start the let body
         for e in exprs.get(2..).unwrap_or_default() {
             acc.push_str(&format!(
@@ -624,7 +630,9 @@ impl<'a> Aggregator<'a> {
         let over_2_kvs = without_comments_len(exprs) > 2;
         let mut acc = "{".to_string();
 
-        if over_2_kvs {
+        // differing_lines breaks determinism but is a good way to break up
+        // complex values in maps
+        if over_2_kvs || differing_lines(exprs) {
             acc.push('\n');
             let mut iter = exprs.iter().peekable();
             while let Some(key) = iter.next() {
@@ -634,19 +642,57 @@ impl<'a> Aggregator<'a> {
                     acc.push('\n');
                     continue;
                 }
-                let value = iter.next().unwrap();
-                let trailing = get_trailing_comment(value, &mut iter);
-                // Pass the current indentation level to nested formatting
                 let key_str = self.format_source_exprs(slice::from_ref(key), &space);
-                let value_str = self.format_source_exprs(slice::from_ref(value), &space);
-                acc.push_str(&format!("{}{}: {},", space, key_str, value_str));
+                acc.push_str(&format!("{}{}:", space, key_str));
+                if let Some(value) = iter.next() {
+                    if is_comment(value) {
+                        acc.push('\n');
+                        acc.push_str(&format!("{}{}", space, indentation));
+                        acc.push_str(&self.display_pse(value, &space));
+                        acc.push('\n');
+                        // Try to get the actual value after the comment
+                        if let Some(actual_value) = iter.next() {
+                            // comment implies next indent level which we don't
+                            // want if this is a normal value
+                            let indent = if is_comment(value) {
+                                &format!("{}{}", space, indentation)
+                            } else {
+                                &space
+                            };
+                            let trailing = get_trailing_comment(actual_value, &mut iter);
+                            let value_str =
+                                self.format_source_exprs(slice::from_ref(actual_value), &indent);
+                            acc.push_str(&indent);
+                            acc.push_str(&value_str);
+                            acc.push(',');
 
-                if let Some(comment) = trailing {
-                    acc.push(' ');
-                    acc.push_str(&self.display_pse(comment, previous_indentation));
+                            // Add trailing comment if present
+                            if let Some(comment) = trailing {
+                                acc.push(' ');
+                                acc.push_str(&self.display_pse(comment, &space));
+                            }
+                        }
+                    } else {
+                        let trailing = get_trailing_comment(value, &mut iter);
+                        let indent = if is_comment(value) {
+                            &format!("{}{}", space, indentation)
+                        } else {
+                            &space
+                        };
+                        // Pass the current indentation level to nested formatting
+                        let value_str = self.format_source_exprs(slice::from_ref(value), &indent);
+                        acc.push_str(&format!(" {}", value_str));
+                        acc.push(',');
+
+                        if let Some(comment) = trailing {
+                            acc.push(' ');
+                            acc.push_str(&self.display_pse(comment, previous_indentation));
+                        }
+                    }
+                    acc.push('\n');
                 }
-                acc.push('\n');
             }
+            acc.push_str(previous_indentation);
         } else {
             // for cases where we keep it on the same line with 1 k/v pair
             let fkey = self.display_pse(&exprs[0], previous_indentation);
@@ -656,9 +702,6 @@ impl<'a> Aggregator<'a> {
             ));
         }
 
-        if over_2_kvs {
-            acc.push_str(previous_indentation);
-        }
         acc.push('}');
         acc
     }
@@ -757,7 +800,9 @@ impl<'a> Aggregator<'a> {
             PreSymbolicExpressionType::FieldIdentifier(ref trait_id) => {
                 format!("'{}", trait_id)
             }
-            PreSymbolicExpressionType::TraitReference(ref name) => name.to_string(),
+            PreSymbolicExpressionType::TraitReference(ref name) => {
+                format!("<{}>", name.to_string())
+            }
             PreSymbolicExpressionType::Comment(ref text) => {
                 if text.is_empty() {
                     ";;".to_string()
@@ -791,32 +836,39 @@ impl<'a> Aggregator<'a> {
             if let Some((name, args)) = def.split_first() {
                 acc.push_str(&self.display_pse(name, ""));
 
-                let mut iter = args.iter().peekable();
-                while let Some(arg) = iter.next() {
-                    let trailing = get_trailing_comment(arg, &mut iter);
-                    if arg.match_list().is_some() {
-                        // expr args
-                        acc.push_str(&format!(
-                            "\n{}{}",
-                            args_indent,
-                            self.format_source_exprs(slice::from_ref(arg), &args_indent)
-                        ))
-                    } else {
-                        // atom args
-                        acc.push_str(&self.format_source_exprs(slice::from_ref(arg), &args_indent))
-                    }
-                    if let Some(comment) = trailing {
-                        acc.push(' ');
-                        acc.push_str(&self.display_pse(comment, ""));
-                    }
-                }
-                if args.is_empty() {
-                    acc.push(')')
+                // Keep everything on one line if there's only one argument
+                if args.len() == 1 {
+                    acc.push(' ');
+                    acc.push_str(&self.format_source_exprs(slice::from_ref(&args[0]), ""));
+                    acc.push(')');
                 } else {
-                    acc.push_str(&format!("\n{})", indentation))
+                    let mut iter = args.iter().peekable();
+                    while let Some(arg) = iter.next() {
+                        let trailing = get_trailing_comment(arg, &mut iter);
+                        if arg.match_list().is_some() {
+                            // expr args
+                            acc.push_str(&format!(
+                                "\n{}{}",
+                                args_indent,
+                                self.format_source_exprs(slice::from_ref(arg), &args_indent)
+                            ))
+                        } else {
+                            // atom args
+                            acc.push_str(
+                                &self.format_source_exprs(slice::from_ref(arg), &args_indent),
+                            )
+                        }
+                        if let Some(comment) = trailing {
+                            acc.push(' ');
+                            acc.push_str(&self.display_pse(comment, ""));
+                        }
+                    }
+                    if args.is_empty() {
+                        acc.push(')');
+                    } else {
+                        acc.push_str(&format!("\n{})", indentation))
+                    }
                 }
-            } else {
-                panic!("can't have a nameless function")
             }
         }
 
@@ -849,6 +901,35 @@ impl<'a> Aggregator<'a> {
         let indentation = self.settings.indentation.to_string();
         let base_indent = format!("{}{}", previous_indentation, indentation);
 
+        // Check if this is a simple wrapper expression
+        let is_simple_wrapper = list.len() == 2 && list[0].match_atom().is_some();
+
+        // Special handling for simple wrappers to avoid unnecessary line breaks
+        if is_simple_wrapper {
+            let atom_name = list[0].match_atom().unwrap();
+            let is_special_format = if let Some(native) = NativeFunctions::lookup_by_name(atom_name)
+            {
+                matches!(
+                    native,
+                    NativeFunctions::Let
+                        | NativeFunctions::Begin
+                        | NativeFunctions::Match
+                        | NativeFunctions::TupleCons
+                        | NativeFunctions::If
+                )
+            } else {
+                false
+            };
+
+            if !is_special_format {
+                // For simple wrappers like (ok ...), format compactly
+                let fn_name =
+                    self.format_source_exprs(slice::from_ref(&list[0]), previous_indentation);
+                let arg = self.format_source_exprs(slice::from_ref(&list[1]), previous_indentation);
+
+                return format!("({} {})", fn_name.trim(), arg.trim());
+            }
+        }
         // TODO: this should ignore comment length
         for expr in list.iter() {
             let indented = if first_on_line {
@@ -862,8 +943,13 @@ impl<'a> Aggregator<'a> {
             let expr_width = trimmed.len();
 
             if !first_on_line {
-                // For subexpressions over max line length, add newline with increased indent
-                if current_line_width + expr_width + 1 > self.settings.max_line_length {
+                // Don't break before an opening brace of a map
+                let is_map_opening = trimmed.starts_with("{");
+
+                // Only add line break if necessary and not breaking before a map opening
+                if !is_map_opening
+                    && (current_line_width + expr_width + 1 > self.settings.max_line_length)
+                {
                     result.push('\n');
                     result.push_str(&base_indent);
                     current_line_width = base_indent.len() + indentation.len();
@@ -1021,6 +1107,21 @@ mod tests_formatter {
         assert_eq!(expected, result);
     }
     #[test]
+    fn test_function_single_arg() {
+        let src = "(define-public (my-func (amount uint)) (ok true))";
+        let result = format_with_default(&String::from(src));
+        assert_eq!(
+            result,
+            "(define-public (my-func (amount uint))\n  (ok true)\n)\n\n"
+        );
+        let src = "(define-public (my-func (amount uint)) (ok true))";
+        let result = format_with_default(&String::from(src));
+        assert_eq!(
+            result,
+            "(define-public (my-func (amount uint))\n  (ok true)\n)\n\n"
+        );
+    }
+    #[test]
     fn test_function_args_multiline() {
         let src = "(define-public (my-func (amount uint) (sender principal)) (ok true))";
         let result = format_with_default(&String::from(src));
@@ -1080,14 +1181,13 @@ mod tests_formatter {
     fn long_line_unwrapping() {
         let src = "(try! (unwrap! (complete-deposit-wrapper (get txid deposit) (get vout-index deposit) (get amount deposit) (get recipient deposit) (get burn-hash deposit) (get burn-height deposit) (get sweep-txid deposit)) (err (+ ERR_DEPOSIT_INDEX_PREFIX (+ u10 index)))))";
         let result = format_with_default(&String::from(src));
-        let expected = r#"(try!
-  (unwrap!
-    (complete-deposit-wrapper (get txid deposit) (get vout-index deposit)
-      (get amount deposit) (get recipient deposit) (get burn-hash deposit)
-      (get burn-height deposit) (get sweep-txid deposit)
-    )
-    (err (+ ERR_DEPOSIT_INDEX_PREFIX (+ u10 index)))
-  ))"#;
+        let expected = r#"(try! (unwrap!
+  (complete-deposit-wrapper (get txid deposit) (get vout-index deposit)
+    (get amount deposit) (get recipient deposit) (get burn-hash deposit)
+    (get burn-height deposit) (get sweep-txid deposit)
+  )
+  (err (+ ERR_DEPOSIT_INDEX_PREFIX (+ u10 index)))
+))"#;
         assert_eq!(expected, result);
 
         // non-max-length sanity case
@@ -1120,6 +1220,15 @@ mod tests_formatter {
         let result = format_with_default(&String::from(src));
         let expected = "(let (\n  (a 1)\n  (b 2)\n)\n  (+ a b)\n)";
         assert_eq!(expected, result);
+    }
+    #[test]
+    fn test_single_let() {
+        let src = r#"(let ((current-count (var-get count)))
+  (asserts! (> current-count u0) ERR_COUNT_MUST_BE_POSITIVE)
+  (ok (var-set count (- current-count u1)))
+)"#;
+        let result = format_with_default(&String::from(src));
+        assert_eq!(src, result);
     }
 
     #[test]
@@ -1169,14 +1278,13 @@ mod tests_formatter {
   },
 })"#;
         assert_eq!(expected, result);
-        let src = r#"(ok
-  {
-    varslice: (unwrap! (slice? txbuff slice-start target-index) (err ERR-OUT-OF-BOUNDS)),
-    ctx: {
-      txbuff: tx,
-      index: (+ u1 ptr),
-    },
-  })"#;
+        let src = r#"(ok {
+  varslice: (unwrap! (slice? txbuff slice-start target-index) (err ERR-OUT-OF-BOUNDS)),
+  ctx: {
+    txbuff: tx,
+    index: (+ u1 ptr),
+  },
+})"#;
         let result = format_with_default(src);
         assert_eq!(src, result);
     }
@@ -1316,9 +1424,35 @@ mod tests_formatter {
         assert_eq!(src, result);
     }
     #[test]
+    fn test_detailed_traits() {
+        let src = r#"(define-public (parse-and-verify-vaa
+    (core-contract <core-trait>)
+    (vaa-bytes (buff 8192))
+  )
+  (begin
+    (try! (check-active-wormhole-core-contract core-contract))
+    (contract-call? core-contract parse-and-verify-vaa vaa-bytes)
+  )
+)
+
+"#;
+        let result = format_with_default(&String::from(src));
+        assert_eq!(src, result);
+    }
+    #[test]
     fn test_as_contract() {
         let src = "(as-contract (contract-call? .tokens mint! u19))";
         let result = format_with(&String::from(src), Settings::new(Indentation::Space(4), 80));
+        assert_eq!(src, result);
+    }
+
+    #[test]
+    fn too_many_newlines() {
+        let src = r#"(ok (at-block
+  (unwrap! (get-stacks-block-info? id-header-hash block) ERR_BLOCK_NOT_FOUND)
+  (var-get count)
+))"#;
+        let result = format_with_default(&String::from(src));
         assert_eq!(src, result);
     }
 
@@ -1356,12 +1490,10 @@ mod tests_formatter {
     #[test]
     fn if_let_if() {
         let src = r#"(if (true)
-  (let (
-    (a (if (true)
+  (let ((a (if (true)
       (list)
       (list)
-    ))
-  )
+    )))
     (list)
   )
   (list)
@@ -1370,6 +1502,52 @@ mod tests_formatter {
         assert_eq!(src, result);
     }
 
+    #[test]
+    fn weird_nesting() {
+        let src = r#"(merge name-props {
+  something: u1,
+  ;; comment
+  renewal-height:
+    ;; If still within lifetime, extend from current renewal height; otherwise, use new renewal height
+    (if (< burn-block-height
+        (unwrap-panic (get-renewal-height (unwrap-panic (get-id-from-bns name namespace))))
+      )
+      (+
+        (unwrap-panic (get-renewal-height (unwrap-panic (get-id-from-bns name namespace))))
+        lifetime
+      )
+      new-renewal-height
+    ),
+})"#;
+        let result = format_with_default(src);
+        assert_eq!(src, result);
+    }
+
+    #[test]
+    fn weird_nesting_single_value() {
+        let src = r#"(begin
+  (map-set name-properties {
+    name: name,
+    namespace: namespace,
+  }
+    (merge name-props {
+      renewal-height:
+        ;; If still within lifetime, extend from current renewal height; otherwise, use new renewal height
+        (if (< burn-block-height
+            (unwrap-panic (get-renewal-height (unwrap-panic (get-id-from-bns name namespace))))
+          )
+          (+
+            (unwrap-panic (get-renewal-height (unwrap-panic (get-id-from-bns name namespace))))
+            lifetime
+          )
+          new-renewal-height
+        ),
+    })
+  )
+)"#;
+        let result = format_with_default(src);
+        assert_eq!(src, result);
+    }
     #[test]
     fn define_data_var_test() {
         let src = "(define-data-var my-data-var principal tx-sender)\n";
@@ -1390,13 +1568,10 @@ mod tests_formatter {
     }
     #[test]
     fn unwrap_wrapped_lines() {
-        let src = r#"(new-available-ids
-  (if (is-eq no-to-treasury u0)
-    (var-get available-ids)
-    (unwrap-panic
-      (as-max-len? (concat (var-get available-ids) ids-to-treasury) u10000)
-    )
-  ))"#;
+        let src = r#"(new-available-ids (if (is-eq no-to-treasury u0)
+  (var-get available-ids)
+  (unwrap-panic (as-max-len? (concat (var-get available-ids) ids-to-treasury) u10000))
+))"#;
         let result = format_with_default(src);
         assert_eq!(src, result);
     }

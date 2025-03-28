@@ -117,8 +117,8 @@ pub fn encode_contract_call(
     let payload = TransactionContractCall {
         contract_name: contract_id.name.clone(),
         address: StacksAddress::from(contract_id.issuer.clone()),
-        function_name: function_name.clone(),
-        function_args: function_args.clone(),
+        function_name,
+        function_args,
     };
     sign_transaction_payload(
         wallet,
