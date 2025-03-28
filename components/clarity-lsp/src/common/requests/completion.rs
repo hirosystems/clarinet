@@ -541,7 +541,7 @@ pub fn build_default_native_keywords_list(version: ClarityVersion) -> Vec<Comple
                     kind: MarkupKind::Markdown,
                     value: api.description,
                 })),
-                insert_text: Some(api.snippet.clone()),
+                insert_text: Some(api.snippet),
                 insert_text_format: Some(InsertTextFormat::SNIPPET),
                 command: Some(command.clone()),
                 ..Default::default()
@@ -566,7 +566,7 @@ pub fn build_default_native_keywords_list(version: ClarityVersion) -> Vec<Comple
                     kind: MarkupKind::Markdown,
                     value: api.description,
                 })),
-                insert_text: Some(api.snippet.clone()),
+                insert_text: Some(api.snippet),
                 insert_text_format: Some(InsertTextFormat::SNIPPET),
                 command: Some(command.clone()),
                 ..Default::default()

@@ -239,7 +239,7 @@ impl LanguageServer for LspNativeBridge {
                 notification = notification_response.notification.take();
             }
         }
-        for (location, mut diags) in aggregated_diagnostics.drain(..) {
+        for (location, mut diags) in aggregated_diagnostics.into_iter() {
             if let Ok(url) = location.to_url_string() {
                 self.client
                     .publish_diagnostics(
@@ -282,7 +282,7 @@ impl LanguageServer for LspNativeBridge {
             }
         }
 
-        for (location, mut diags) in aggregated_diagnostics.drain(..) {
+        for (location, mut diags) in aggregated_diagnostics.into_iter() {
             if let Ok(url) = location.to_url_string() {
                 self.client
                     .publish_diagnostics(

@@ -510,7 +510,7 @@ pub fn main() {
                 }
             };
             clap_complete::generate(cmd.shell, &mut app, "clarinet", &mut file);
-            println!("{} {}", green!("Created file"), file_name.clone());
+            println!("{} {}", green!("Created file"), file_name);
             println!("Check your shell's documentation for details about using this file to enable completions for clarinet");
         }
         Command::New(project_opts) => {
@@ -962,11 +962,11 @@ pub fn main() {
                         yellow!("Updated Clarinet.toml"),
                         green!(format!("{}", cmd.contract_id))
                     ),
-                    manifest_location: manifest.location.clone(),
+                    manifest_location: manifest.location,
                     contracts_to_rm: vec![],
                     contracts_to_add: HashMap::new(),
                     requirements_to_add: vec![RequirementConfig {
-                        contract_id: cmd.contract_id.clone(),
+                        contract_id: cmd.contract_id,
                     }],
                 };
                 if !execute_changes(vec![Changes::EditTOML(change)]) {

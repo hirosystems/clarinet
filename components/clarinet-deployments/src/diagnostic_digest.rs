@@ -100,7 +100,7 @@ impl DiagnosticsDigest {
             warnings,
             total,
             contracts_checked,
-            message: outputs.join("\n").to_string(),
+            message: outputs.join("\n"),
         }
     }
 

@@ -26,7 +26,7 @@ impl GetChangesForNewProject {
         telemetry_enabled: bool,
     ) -> Self {
         let project_path = if use_current_dir {
-            project_path.clone()
+            project_path
         } else {
             format!("{}/{}", project_path, project_name)
         };
