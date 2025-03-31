@@ -17,8 +17,9 @@ use std::sync::Mutex;
 use tower_lsp::jsonrpc::{Error, ErrorCode, Result};
 use tower_lsp::lsp_types::{
     CompletionParams, CompletionResponse, DidChangeTextDocumentParams, DidCloseTextDocumentParams,
-    DidOpenTextDocumentParams, DidSaveTextDocumentParams, ExecuteCommandParams, Hover, HoverParams,
-    InitializeParams, InitializeResult, InitializedParams, MessageType, Url,
+    DidOpenTextDocumentParams, DidSaveTextDocumentParams, DocumentFormattingParams,
+    DocumentRangeFormattingParams, ExecuteCommandParams, Hover, HoverParams, InitializeParams,
+    InitializeResult, InitializedParams, MessageType, TextEdit, Url,
 };
 use tower_lsp::{async_trait, Client, LanguageServer};
 
@@ -198,6 +199,39 @@ impl LanguageServer for LspNativeBridge {
         let response_rx = self.response_rx.lock().expect("failed to lock response_rx");
         let response = &response_rx.recv().expect("failed to get value from recv");
         if let LspResponse::Request(LspRequestResponse::SignatureHelp(data)) = response {
+            return Ok(data.to_owned());
+        }
+
+        Ok(None)
+    }
+
+    async fn formatting(&self, params: DocumentFormattingParams) -> Result<Option<Vec<TextEdit>>> {
+        let _ = match self.request_tx.lock() {
+            Ok(tx) => tx.send(LspRequest::DocumentFormatting(params)),
+            Err(_) => return Ok(None),
+        };
+
+        let response_rx = self.response_rx.lock().expect("failed to lock response_rx");
+        let response = &response_rx.recv().expect("failed to get value from recv");
+        if let LspResponse::Request(LspRequestResponse::DocumentFormatting(data)) = response {
+            return Ok(data.to_owned());
+        }
+
+        Ok(None)
+    }
+
+    async fn range_formatting(
+        &self,
+        params: DocumentRangeFormattingParams,
+    ) -> Result<Option<Vec<TextEdit>>> {
+        let _ = match self.request_tx.lock() {
+            Ok(tx) => tx.send(LspRequest::DocumentRangeFormatting(params)),
+            Err(_) => return Ok(None),
+        };
+
+        let response_rx = self.response_rx.lock().expect("failed to lock response_rx");
+        let response = &response_rx.recv().expect("failed to get value from recv");
+        if let LspResponse::Request(LspRequestResponse::DocumentRangeFormatting(data)) = response {
             return Ok(data.to_owned());
         }
 

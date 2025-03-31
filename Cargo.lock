@@ -811,6 +811,7 @@ version = "2.15.2"
 dependencies = [
  "clarinet-deployments",
  "clarinet-files",
+ "clarinet-format",
  "clarity-repl",
  "console_error_panic_hook",
  "js-sys",
