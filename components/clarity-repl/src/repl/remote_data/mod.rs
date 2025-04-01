@@ -9,6 +9,7 @@ use clarity::vm::errors::InterpreterResult;
 use serde::de::Error as SerdeError;
 use serde::{de::DeserializeOwned, Deserialize, Deserializer};
 
+pub mod fs;
 mod http_request;
 pub const MAINNET_20_START_HEIGHT: u32 = 1;
 pub const MAINNET_2_05_START_HEIGHT: u32 = 40_607;

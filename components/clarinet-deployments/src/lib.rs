@@ -97,6 +97,7 @@ pub fn initiate_session_from_manifest(manifest: &ProjectManifest) -> Session {
     let settings = SessionSettings {
         repl_settings: manifest.repl_settings.clone(),
         disk_cache_enabled: true,
+        cache_location: Some(manifest.project.cache_location.to_string()),
         ..Default::default()
     };
     Session::new(settings)

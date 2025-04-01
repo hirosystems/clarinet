@@ -2,7 +2,9 @@ use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
 use std::rc::Rc;
 
+use super::remote_data::fs::{get_file_from_cache, write_file_to_cache};
 use super::remote_data::{epoch_for_height, Block, HttpClient};
+
 use clarity::types::chainstate::{
     BlockHeaderHash, BurnchainHeaderHash, ConsensusHash, SortitionId, StacksAddress, StacksBlockId,
     TrieHash, VRFSeed,
@@ -42,7 +44,8 @@ fn epoch_to_peer_version(epoch: StacksEpochId) -> u8 {
     }
 }
 
-#[derive(Debug)]
+/// This stores all of the data for the Clarity VM, especially MARF values
+/// It also includes the data needed for mainnet execution simulation (HTTP Client, FS Cache)
 pub struct ClarityDatastore {
     open_chain_tip: StacksBlockId,
     current_chain_tip: Rc<RefCell<StacksBlockId>>,
@@ -53,6 +56,7 @@ pub struct ClarityDatastore {
 
     remote_network_info: Option<RemoteNetworkInfo>,
     remote_block_info_cache: Rc<RefCell<HashMap<StacksBlockId, Block>>>,
+    fs_cache_location: String,
     local_accounts: Vec<StandardPrincipalData>,
 
     client: HttpClient,
@@ -73,6 +77,7 @@ impl Clone for ClarityDatastore {
             chain_tip_at_height: self.chain_tip_at_height.clone(),
             remote_network_info: self.remote_network_info.clone(),
             remote_block_info_cache: Rc::clone(&self.remote_block_info_cache),
+            fs_cache_location: self.fs_cache_location.clone(),
             local_accounts: self.local_accounts.clone(),
             client: self.client.clone(),
         }
@@ -121,6 +126,7 @@ impl Default for StacksConstants {
     }
 }
 
+/// Store the Stacks and Burn blocks info
 #[derive(Clone, Debug)]
 pub struct Datastore {
     genesis_id: StacksBlockId,
@@ -182,6 +188,12 @@ impl ClarityDatastore {
 
         let height = 0;
         let id = StacksBlockId(height_to_hashed_bytes(height));
+        let fs_cache_location = format!(
+            "{}/datastore",
+            remote_network_info
+                .and_then(|r| r.cache_location)
+                .unwrap_or("./.cache".to_string())
+        );
 
         Self {
             open_chain_tip: id,
@@ -193,6 +205,7 @@ impl ClarityDatastore {
 
             remote_network_info: None,
             remote_block_info_cache: Rc::new(RefCell::new(HashMap::new())),
+            fs_cache_location,
             local_accounts: Vec::new(),
 
             client,
@@ -204,6 +217,13 @@ impl ClarityDatastore {
         let path = format!("/extended/v2/blocks/{}", height);
         let block = client.fetch_block(&path);
         let cache = HashMap::from([(block.index_block_hash, block.clone())]);
+        let fs_cache_location = format!(
+            "{}/datastore",
+            remote_network_info
+                .cache_location
+                .as_ref()
+                .map_or("./.cache", |v| v)
+        );
 
         let id = block.index_block_hash;
 
@@ -217,6 +237,7 @@ impl ClarityDatastore {
 
             remote_network_info: Some(remote_network_info),
             remote_block_info_cache: Rc::new(RefCell::new(cache)),
+            fs_cache_location,
             local_accounts: Vec::new(),
 
             client,
@@ -341,12 +362,28 @@ impl ClarityDatastore {
     ) -> Result<Option<String>> {
         let addr = contract.issuer.to_string();
         let contract = contract.name.to_string();
-        let tip = { self.get_remote_chaintip() };
+        let cache_file_name = format!("{}_{}_{}.json", addr, contract, key);
+        if let Some(cached) = get_file_from_cache(&self.fs_cache_location, &cache_file_name) {
+            return Ok(Some(cached));
+        }
+
+        let tip = self.get_remote_chaintip();
         let url = format!(
             "/v2/clarity/metadata/{}/{}/{}?tip={}",
             addr, contract, key, tip
         );
-        self.client.fetch_clarity_data(&url)
+        let response = self.client.fetch_clarity_data(&url)?;
+
+        // Save response to cache if successful
+        if let Some(content) = &response {
+            write_file_to_cache(
+                &self.fs_cache_location,
+                &cache_file_name,
+                content.as_bytes(),
+            );
+        }
+
+        Ok(response)
     }
 }
 
@@ -1162,6 +1199,7 @@ mod tests {
                 api_url: ApiUrl(server.url().to_string()),
                 network_id: 2147483648,
                 stacks_tip_height: 10,
+                cache_location: Some("./.cache".to_string()),
             }),
             client,
         );

@@ -1,3 +1,6 @@
+use std::collections::BTreeMap;
+use std::collections::HashMap;
+
 use clarinet_files::StacksNetwork;
 use clarinet_files::{FileAccessor, FileLocation};
 use clarity_repl::clarity::util::hash::{hex_bytes, to_hex};
@@ -13,8 +16,6 @@ use clarity_repl::clarity::{ClarityName, ClarityVersion, ContractName, StacksEpo
 use clarity_repl::repl::{Session, DEFAULT_CLARITY_VERSION};
 use serde::{Deserialize, Serialize};
 use serde_yaml;
-use std::collections::BTreeMap;
-use std::collections::HashMap;
 
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone, Copy, Eq, PartialOrd, Ord)]
 pub enum EpochSpec {
@@ -71,7 +72,7 @@ impl From<EpochSpec> for StacksEpochId {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct DeploymentGenerationArtifacts {
     pub asts: BTreeMap<QualifiedContractIdentifier, ContractAST>,
     pub deps: BTreeMap<QualifiedContractIdentifier, DependencySet>,

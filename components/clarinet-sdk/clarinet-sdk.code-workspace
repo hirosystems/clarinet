@@ -6,6 +6,8 @@
       "clippy",
       "--package=clarinet-sdk-wasm",
       "--target=wasm32-unknown-unknown",
+      "--no-default-features",
+      "--features=web",
       "--tests",
       "--message-format=json",
     ],
