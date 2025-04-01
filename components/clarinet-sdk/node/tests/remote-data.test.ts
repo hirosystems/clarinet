@@ -102,7 +102,7 @@ describe("simnet remote interactions", async () => {
     const files = fs.readdirSync(cachePath);
     expect(files).toHaveLength(3);
     expect(files).toContain(
-      "STJCAB2T9TR2EJM7YS4DM2CGBBVTF7BV237Y8KNV_counter_vm-metadata::9::contract.json",
+      "STJCAB2T9TR2EJM7YS4DM2CGBBVTF7BV237Y8KNV_counter_vm-metadata__9__contract.json",
     );
   });
 });
