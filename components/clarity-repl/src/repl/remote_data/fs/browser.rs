@@ -1,17 +1,17 @@
 use wasm_bindgen::prelude::*;
 
+use std::path::Path;
+
 use js_sys::{Object, Reflect};
 
 #[wasm_bindgen]
 extern "C" {
     #[wasm_bindgen(js_namespace = window)]
     fn vfs(action: String, data: JsValue) -> JsValue;
-
 }
 
-pub fn get_file_from_cache(cache_location: &str, name: &str) -> Option<String> {
-    let cache_dir = std::path::Path::new(cache_location);
-    let path = cache_dir.join(name);
+pub fn get_file_from_cache(cache_location: &Path, name: &Path) -> Option<String> {
+    let path = cache_location.join(name);
     let options = Object::new();
     Reflect::set(
         &options,
@@ -23,7 +23,7 @@ pub fn get_file_from_cache(cache_location: &str, name: &str) -> Option<String> {
     file_data.as_string()
 }
 
-pub fn write_file_to_cache(cache_location: &str, name: &str, data: &[u8]) {
+pub fn write_file_to_cache(cache_location: &Path, name: &Path, data: &[u8]) {
     let cache_dir = std::path::Path::new(cache_location);
     let path = cache_dir.join(name);
     let options = Object::new();

@@ -21,6 +21,8 @@ fn eval_snippet(session: &mut Session, snippet: &str) -> Value {
 
 fn init_session(initial_heigth: u32) -> Session {
     let mut settings = SessionSettings::default();
+    let temp_dir = tempfile::tempdir().unwrap();
+    settings.cache_location = Some(temp_dir.path().to_path_buf());
     settings.repl_settings.remote_data = RemoteDataSettings {
         enabled: true,
         api_url: ApiUrl("https://api.testnet.hiro.so".to_string()),

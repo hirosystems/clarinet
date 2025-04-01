@@ -1,5 +1,7 @@
 use wasm_bindgen::prelude::*;
 
+use std::path::Path;
+
 #[wasm_bindgen(module = "fs")]
 extern "C" {
     #[wasm_bindgen(js_name = readFileSync)]
@@ -12,9 +14,8 @@ extern "C" {
     fn write_file_sync(path: &str, data: &[u8]);
 }
 
-pub fn get_file_from_cache(cache_location: &str, name: &str) -> Option<String> {
-    let cache_dir = std::path::Path::new(cache_location);
-    let cache_path = cache_dir.join(name);
+pub fn get_file_from_cache(cache_location: &Path, name: &Path) -> Option<String> {
+    let cache_path = cache_location.join(name);
     if !exists_sync(cache_path.to_str().unwrap()) {
         None
     } else {
@@ -22,9 +23,8 @@ pub fn get_file_from_cache(cache_location: &str, name: &str) -> Option<String> {
     }
 }
 
-pub fn write_file_to_cache(cache_location: &str, name: &str, data: &[u8]) {
-    let cache_dir = std::path::Path::new(cache_location);
-    if !exists_sync(cache_dir.to_str().unwrap()) {
+pub fn write_file_to_cache(cache_location: &Path, name: &Path, data: &[u8]) {
+    if !exists_sync(cache_location.to_str().unwrap()) {
         let options = js_sys::Object::new();
         js_sys::Reflect::set(
             &options,
@@ -32,8 +32,8 @@ pub fn write_file_to_cache(cache_location: &str, name: &str, data: &[u8]) {
             &JsValue::from_bool(true),
         )
         .unwrap();
-        mkdir_sync(cache_dir.to_str().unwrap(), options.into());
+        mkdir_sync(cache_location.to_str().unwrap(), options.into());
     }
-    let cache_path = cache_dir.join(name);
+    let cache_path = cache_location.join(name);
     write_file_sync(cache_path.to_str().unwrap(), data);
 }

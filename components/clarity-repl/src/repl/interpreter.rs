@@ -1,4 +1,5 @@
 use std::collections::{btree_map::Entry, BTreeMap, BTreeSet};
+use std::path::PathBuf;
 
 use crate::analysis::annotation::{Annotation, AnnotationKind};
 use crate::analysis::ast_dependency_detector::{ASTDependencyDetector, Dependency};
@@ -58,7 +59,7 @@ impl ClarityInterpreter {
     pub fn new(
         tx_sender: StandardPrincipalData,
         repl_settings: Settings,
-        cache_location: Option<String>,
+        cache_location: Option<PathBuf>,
     ) -> Self {
         let remote_data_settings = repl_settings.remote_data.clone();
 

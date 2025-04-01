@@ -1,5 +1,6 @@
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
+use std::path::PathBuf;
 use std::rc::Rc;
 
 use super::remote_data::fs::{get_file_from_cache, write_file_to_cache};
@@ -56,7 +57,7 @@ pub struct ClarityDatastore {
 
     remote_network_info: Option<RemoteNetworkInfo>,
     remote_block_info_cache: Rc<RefCell<HashMap<StacksBlockId, Block>>>,
-    fs_cache_location: String,
+    fs_cache_location: PathBuf,
     local_accounts: Vec<StandardPrincipalData>,
 
     client: HttpClient,
@@ -188,12 +189,10 @@ impl ClarityDatastore {
 
         let height = 0;
         let id = StacksBlockId(height_to_hashed_bytes(height));
-        let fs_cache_location = format!(
-            "{}/datastore",
-            remote_network_info
-                .and_then(|r| r.cache_location)
-                .unwrap_or("./.cache".to_string())
-        );
+        let fs_cache_location = remote_network_info
+            .and_then(|r| r.cache_location)
+            .unwrap_or(PathBuf::from("./.cache"))
+            .join("datastore");
 
         Self {
             open_chain_tip: id,
@@ -217,13 +216,11 @@ impl ClarityDatastore {
         let path = format!("/extended/v2/blocks/{}", height);
         let block = client.fetch_block(&path);
         let cache = HashMap::from([(block.index_block_hash, block.clone())]);
-        let fs_cache_location = format!(
-            "{}/datastore",
-            remote_network_info
-                .cache_location
-                .as_ref()
-                .map_or("./.cache", |v| v)
-        );
+        let fs_cache_location = remote_network_info
+            .cache_location
+            .as_ref()
+            .unwrap_or(&PathBuf::from("./.cache"))
+            .join("datastore");
 
         let id = block.index_block_hash;
 
@@ -234,8 +231,7 @@ impl ClarityDatastore {
             metadata: HashMap::new(),
             height_at_chain_tip: HashMap::from([(id, height)]),
             chain_tip_at_height: HashMap::from([(height, id)]),
-
-            remote_network_info: Some(remote_network_info),
+            remote_network_info: Some(remote_network_info), // Clone to avoid partial move
             remote_block_info_cache: Rc::new(RefCell::new(cache)),
             fs_cache_location,
             local_accounts: Vec::new(),
@@ -362,8 +358,10 @@ impl ClarityDatastore {
     ) -> Result<Option<String>> {
         let addr = contract.issuer.to_string();
         let contract = contract.name.to_string();
-        let cache_file_name = format!("{}_{}_{}.json", addr, contract, key);
-        if let Some(cached) = get_file_from_cache(&self.fs_cache_location, &cache_file_name) {
+        let cache_file_path =
+            PathBuf::from(format!("{}_{}_{}", addr, contract, key)).with_extension("json");
+
+        if let Some(cached) = get_file_from_cache(&self.fs_cache_location, &cache_file_path) {
             return Ok(Some(cached));
         }
 
@@ -378,7 +376,7 @@ impl ClarityDatastore {
         if let Some(content) = &response {
             write_file_to_cache(
                 &self.fs_cache_location,
-                &cache_file_name,
+                &cache_file_path,
                 content.as_bytes(),
             );
         }
@@ -1199,7 +1197,7 @@ mod tests {
                 api_url: ApiUrl(server.url().to_string()),
                 network_id: 2147483648,
                 stacks_tip_height: 10,
-                cache_location: Some("./.cache".to_string()),
+                cache_location: Some(PathBuf::from("./.cache")),
             }),
             client,
         );
