@@ -100,7 +100,10 @@ jobs:
           path: |
             ~/.cargo/
             ./target/debug/build/
-          key: ${{ runner.os }}-rust-${{ env.RUST_VERSION_HASH }}-${{ hashFiles('./Cargo.lock') }}
+          key: ${{ runner.os-version }}-rust-${{ env.RUST_VERSION_HASH }}-${{ hashFiles('./Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os-version }}-rust-${{ env.RUST_VERSION_HASH }}-
+            ${{ runner.os-version }}-
 
       - name: install dependencies
         uses: taiki-e/install-action@v2
