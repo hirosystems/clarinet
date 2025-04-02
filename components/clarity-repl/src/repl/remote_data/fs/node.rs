@@ -16,15 +16,17 @@ extern "C" {
 
 pub fn get_file_from_cache(cache_location: &Path, name: &Path) -> Option<String> {
     let cache_path = cache_location.join(name);
-    if !exists_sync(cache_path.to_str().unwrap()) {
+    let cache_path_str = cache_path.to_str()?;
+    if !exists_sync(cache_path_str) {
         None
     } else {
-        Some(String::from_utf8(read_file_sync(cache_path.to_str().unwrap())).unwrap())
+        Some(String::from_utf8(read_file_sync(cache_path_str)).ok()?)
     }
 }
 
 pub fn write_file_to_cache(cache_location: &Path, name: &Path, data: &[u8]) {
-    if !exists_sync(cache_location.to_str().unwrap()) {
+    let cache_location_str = cache_location.to_str().unwrap();
+    if !exists_sync(cache_location_str) {
         let options = js_sys::Object::new();
         js_sys::Reflect::set(
             &options,
@@ -32,7 +34,7 @@ pub fn write_file_to_cache(cache_location: &Path, name: &Path, data: &[u8]) {
             &JsValue::from_bool(true),
         )
         .unwrap();
-        mkdir_sync(cache_location.to_str().unwrap(), options.into());
+        mkdir_sync(cache_location_str, options.into());
     }
     let cache_path = cache_location.join(name);
     write_file_sync(cache_path.to_str().unwrap(), data);
