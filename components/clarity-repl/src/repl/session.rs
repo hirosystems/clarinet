@@ -196,7 +196,6 @@ impl Session {
     }
 
     pub fn handle_command(&mut self, command: &str) -> String {
-        println!("Command executed: {}", command);
         match command {
             "::help" => self.display_help(),
 

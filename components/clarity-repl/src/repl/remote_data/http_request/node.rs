@@ -16,12 +16,6 @@ extern "C" {
     pub static ENV: JsValue;
 }
 
-#[wasm_bindgen]
-extern "C" {
-    #[wasm_bindgen(js_namespace = console)]
-    fn log(s: &str);
-}
-
 fn get_env() -> JsValue {
     ENV.with(JsValue::clone)
 }
