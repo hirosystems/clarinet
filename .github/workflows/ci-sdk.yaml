@@ -100,5 +100,5 @@ jobs:
 
       - name: Run tests
         env:
-          HIRO_API_KEY: ${{ secrets.HIRO_KONG_API_KEY }}
+          HIRO_API_KEY: ${{ secrets.HIRO_API_KEY }}
         run: npm run test

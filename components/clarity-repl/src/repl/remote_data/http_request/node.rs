@@ -43,7 +43,7 @@ pub fn http_request<T: DeserializeOwned>(url: &str) -> Result<T, String> {
     curl_command.push("-H \"Accept: application/json\"".to_string());
     curl_command.push("-H \"x-hiro-product: clarinet-sdk\"".to_string());
     if let Some(api_key) = &*HIRO_API_KEY {
-        curl_command.push(format!("-H \"-api-key: {}\"", api_key));
+        curl_command.push(format!("-H \"x-api-key: {}\"", api_key));
     }
     curl_command.push(format!("\"{}\"", url));
     let command = curl_command.join(" ");
