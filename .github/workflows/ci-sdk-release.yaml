@@ -1,0 +1,71 @@
+# The clarinet-sdk is published to npm when a release is created.
+# It's based on the npm workspace defined in the package.json at the root of the project.
+# Two packages are built with wasm-pack - @hirosystems/clarinet-sdk-wasm and @hirosystems/clarinet-sdk-wasm-browser
+# They need to be built first
+# Then two packages are built with tsc - @hirosystems/clarinet-sdk and @hirosystems/clarinet-sdk-browser
+
+
+name: Publish clarinet-sdk packages to npm
+on:
+  release:
+    types: [published]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Setup cache keys
+        run: echo "RUST_VERSION_HASH=$(rustc --version | sha256sum | awk '{print $1}')" >> $GITHUB_ENV
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/release/build/
+            target/release/deps/
+            target/release/.fingerprint/
+            target/wasm32-unknown-unknown/
+          key: clarinet-sdk-cargo-${{ runner.os }}-${{ env.RUST_VERSION_HASH }}-${{ hashFiles('./Cargo.lock') }}
+          restore-keys: |
+            clarinet-sdk-cargo-${{ runner.os }}-${{ env.RUST_VERSION_HASH }}-
+            clarinet-sdk-cargo-${{ runner.os }}-
+
+      - name: Install wasm-pack if not available
+        run: |
+          if ! command -v wasm-pack &> /dev/null; then
+            cargo install wasm-pack
+          fi
+
+      - name: Build Wasm packages
+        run: npm run build:sdk-wasm
+
+      - name: Publish sdk-wasm package
+        run: npm publish -w components/clarinet-sdk-wasm/pkg-node -w components/clarinet-sdk-wasm/pkg-browser --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build sdk package
+        run: npm run build:sdk
+
+      - name: Publish sdk package
+        run: npm publish -w components/clarinet-sdk/node -w components/clarinet-sdk/browser --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
