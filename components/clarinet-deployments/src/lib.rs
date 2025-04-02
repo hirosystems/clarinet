@@ -1,6 +1,5 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 use std::fmt::Write;
-use std::path::PathBuf;
 
 extern crate serde;
 

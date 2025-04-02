@@ -358,15 +358,20 @@ impl ClarityDatastore {
     ) -> Result<Option<String>> {
         let addr = contract.issuer.to_string();
         let contract = contract.name.to_string();
-        let cache_file_path =
-            PathBuf::from(format!("{}_{}_{}", addr, contract, key.replace(":", "_")))
-                .with_extension("json");
+        let tip = self.get_remote_chaintip();
+        let cache_file_path = PathBuf::from(format!(
+            "{}_{}_{}_{}",
+            addr,
+            contract,
+            key.replace(":", "_"),
+            tip
+        ))
+        .with_extension("json");
 
         if let Some(cached) = get_file_from_cache(&self.fs_cache_location, &cache_file_path) {
             return Ok(Some(cached));
         }
 
-        let tip = self.get_remote_chaintip();
         let url = format!(
             "/v2/clarity/metadata/{}/{}/{}?tip={}",
             addr, contract, key, tip

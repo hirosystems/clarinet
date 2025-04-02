@@ -100,9 +100,22 @@ describe("simnet remote interactions", async () => {
     const cachePath = path.join(process.cwd(), "./.cache/datastore");
     expect(fs.existsSync(cachePath)).toBe(true);
     const files = fs.readdirSync(cachePath);
-    expect(files).toHaveLength(3);
+    console.log(files);
+    expect(files).toHaveLength(6);
     expect(files).toContain(
-      "STJCAB2T9TR2EJM7YS4DM2CGBBVTF7BV237Y8KNV_counter_vm-metadata__9__contract.json",
+      "STJCAB2T9TR2EJM7YS4DM2CGBBVTF7BV237Y8KNV_counter_vm-metadata__9__contract_8b1963abdc117b1b925d8f0390bf5001dec17ad91adc5309c00c7d5ac0b5bfd0.json",
+    );
+  });
+
+  it("throws an error if the contract is not available at a given block height", async () => {
+    await simnet.initEmptySession({
+      enabled: true,
+      api_url: "https://api.testnet.hiro.so",
+      // the counter contract is deployed at 41613
+      initial_height: 41000,
+    });
+    expect(() => simnet.callReadOnlyFn(counterAddress, "get-count", [], sender)).toThrowError(
+      `Call contract function error: ${counterAddress}::get-count() -> Error calling contract function: Runtime error while interpreting ${counterAddress}: Interpreter(Expect("Failed to read non-consensus contract metadata, even though contract exists in MARF."))`,
     );
   });
 });
