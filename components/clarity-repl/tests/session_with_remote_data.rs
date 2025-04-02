@@ -211,7 +211,7 @@ fn it_saves_metadata_to_cache() {
     let cache_location = session.settings.cache_location.unwrap();
     let cache_file_path = cache_location
         .join(PathBuf::from(
-            "datastore/STJCAB2T9TR2EJM7YS4DM2CGBBVTF7BV237Y8KNV_counter_vm-metadata__9__contract",
+            "datastore/STJCAB2T9TR2EJM7YS4DM2CGBBVTF7BV237Y8KNV_counter_vm-metadata__9__contract_645949d1e1701aea7bd5ca574bf26a7828a26a068ea6409134bc8a9b1329b4fd",
         ))
         .with_extension("json");
     assert!(cache_file_path.exists());
