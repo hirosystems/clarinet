@@ -83,7 +83,7 @@ jobs:
             ${{ runner.os }}-${{ github.job }}-
 
       - name: Install dependencies
-        run: cargo install cargo-audit
+        run: cargo install cargo-audit || true
 
       - name: Run audit
         run: cargo audit --ignore RUSTSEC-2024-0344 --ignore RUSTSEC-2022-0028
@@ -133,13 +133,15 @@ jobs:
 
       - name: Cache cargo
         uses: actions/cache@v4
+        # we don't want to include target/debug/incremental/ and target/debug/llvm-cov/target
         with:
           path: |
             ~/.cargo/bin/
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
-            target/
+            target/debug/build/
+            target/debug/deps/
           key: ${{ matrix.os }}-${{ matrix.target }}-${{ github.job }}-${{ env.RUST_VERSION }}-${{ hashFiles('./Cargo.lock') }}
           restore-keys: |
             ${{ matrix.os }}-${{ matrix.target }}-${{ github.job }}-${{ env.RUST_VERSION }}-
