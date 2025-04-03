@@ -303,11 +303,11 @@ impl FileLocation {
     pub fn get_file_name(&self) -> Option<String> {
         match self {
             FileLocation::FileSystem { path } => {
-                path.file_name().and_then(|f| Some(f.to_str()?.to_string()))
+                path.file_name().and_then(|f| f.to_str().map(String::from))
             }
             FileLocation::Url { url } => url
                 .path_segments()
-                .and_then(|p| Some(p.last()?.to_string())),
+                .and_then(|mut segments| segments.next_back().map(String::from)),
         }
     }
 }

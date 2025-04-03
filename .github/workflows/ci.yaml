@@ -53,6 +53,8 @@ jobs:
   sanity-check:
     name: Sanity checks
     runs-on: ubuntu-latest
+    env:
+      RUSTFLAGS: "-Dwarnings"
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
