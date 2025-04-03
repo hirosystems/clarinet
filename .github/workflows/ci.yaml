@@ -133,7 +133,7 @@ jobs:
 
       - name: Cache cargo
         uses: actions/cache@v4
-        # we don't want to include target/debug/incremental/ and target/debug/llvm-cov/target
+        # we don't want to include target/debug/incremental/ and target/debug/llvm-cov-target
         with:
           path: |
             ~/.cargo/bin/
