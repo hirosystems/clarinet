@@ -41,8 +41,11 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
-            ~/.cargo/
-            ./target/
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
           key: ${{ runner.os }}-${{ github.job }}-${{ env.RUST_VERSION }}-${{ hashFiles('./Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-${{ github.job }}-${{ env.RUST_VERSION }}-

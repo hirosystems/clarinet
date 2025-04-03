@@ -72,8 +72,11 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
-            ~/.cargo/
-            ./target/
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
           key: ${{ runner.os }}-${{ github.job }}-${{ env.RUST_VERSION }}-${{ hashFiles('./Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-${{ github.job }}-${{ env.RUST_VERSION }}-
@@ -132,8 +135,11 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
-            ~/.cargo/
-            ./target/
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
           key: ${{ matrix.os }}-${{ matrix.target }}-${{ github.job }}-${{ env.RUST_VERSION }}-${{ hashFiles('./Cargo.lock') }}
           restore-keys: |
             ${{ matrix.os }}-${{ matrix.target }}-${{ github.job }}-${{ env.RUST_VERSION }}-
@@ -215,8 +221,11 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
-            ~/.cargo/
-            ./target/
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
           key: ${{ matrix.os }}-${{ matrix.target }}-${{ github.job }}-${{ env.RUST_VERSION }}-${{ hashFiles('./Cargo.lock') }}
           restore-keys: |
             ${{ matrix.os }}-${{ matrix.target }}-${{ github.job }}-${{ env.RUST_VERSION }}-
@@ -429,8 +438,11 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
-            ~/.cargo/
-            ./target/
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
           key: ${{ matrix.os }}-${{ matrix.target }}-${{ github.job }}-${{ env.RUST_VERSION }}-${{ hashFiles('./Cargo.lock') }}
           restore-keys: |
             ${{ matrix.os }}-${{ matrix.target }}-${{ github.job }}-${{ env.RUST_VERSION }}-
@@ -521,8 +533,11 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
-            ~/.cargo/
-            ./target/
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
           key: ${{ runner.os }}-${{ github.job }}-${{ env.RUST_VERSION }}-${{ hashFiles('./Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-${{ github.job }}-${{ env.RUST_VERSION }}-
