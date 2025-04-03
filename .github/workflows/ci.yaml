@@ -140,6 +140,7 @@ jobs:
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
+            target/debug/.fingerprint/
             target/debug/build/
             target/debug/deps/
           key: ${{ matrix.os }}-${{ matrix.target }}-${{ github.job }}-${{ env.RUST_VERSION }}-${{ hashFiles('./Cargo.lock') }}
@@ -365,11 +366,6 @@ jobs:
         with:
           name: clarinet-${{ env.SHORT_TARGET_NAME }}
           path: clarinet-${{ env.SHORT_TARGET_NAME }}.msi
-
-      - name: Unit Tests - Cargo
-        # can't easily run mac-arm64 tests in GH without native runners for that arch
-        if: matrix.target != 'aarch64-apple-darwin'
-        run: cargo test --workspace --release --locked --exclude clarinet-sdk-wasm --target ${{ matrix.target }}
 
   dist_stacks_devnet_js:
     name: Build Stacks Devnet JS Distributions
