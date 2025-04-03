@@ -27,13 +27,15 @@ jobs:
       - name: Setup Rust toolchain
         run: rustup toolchain install stable --profile minimal --component rustfmt --target wasm32-unknown-unknown
 
+      - name: Setup cache keys
+        run: |
+          RUST_VERSION=$(rustc -vV | shasum -a 256 | cut -d ' ' -f1)
+          echo "RUST_VERSION=$RUST_VERSION" >> $GITHUB_ENV
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-
-      - name: Setup cache keys
-        run: echo "RUST_VERSION=$(rustc -V | sed 's/[()]//g' | tr ' \n' '_' | sed 's/_$//')" >> $GITHUB_ENV
 
       - name: Cache cargo
         uses: actions/cache@v4
