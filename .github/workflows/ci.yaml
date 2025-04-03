@@ -114,7 +114,7 @@ jobs:
 
       - name: Install Rust toolchain
         run: |
-          rustup toolchain install stable --profile minimal
+          rustup toolchain install stable --profile minimal --target ${{ matrix.target }}
           echo "RUST_VERSION=$(rustc -V | sed 's/[()]//g' | tr ' \n' '_' | sed 's/_$//')" >> $GITHUB_ENV
 
       - name: Cache cargo
@@ -384,7 +384,7 @@ jobs:
 
       - name: Install Rust toolchain
         run: |
-          rustup toolchain install stable --profile minimal
+          rustup toolchain install stable --profile minimal --target ${{ matrix.target }}
           echo "RUST_VERSION=$(rustc -V | sed 's/[()]//g' | tr ' \n' '_' | sed 's/_$//')" >> $GITHUB_ENV
 
       - name: Install and cache Node
