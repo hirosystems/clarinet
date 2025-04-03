@@ -148,7 +148,7 @@ jobs:
             ${{ matrix.os }}-${{ matrix.target }}-${{ github.job }}-${{ env.RUST_VERSION }}-
             ${{ matrix.os }}-${{ matrix.target }}-${{ github.job }}-
 
-      - name: install dependencies
+      - name: Install dependencies
         uses: taiki-e/install-action@v2
         with:
           tool: cargo-llvm-cov,nextest
@@ -158,6 +158,10 @@ jobs:
         env:
           HIRO_API_KEY: ${{ secrets.HIRO_API_KEY }}
         run: cargo tst
+
+      - name: Install llvm-cov
+        if: matrix.target == 'x86_64-unknown-linux-gnu'
+        run: rustup component add llvm-tools-preview --toolchain stable-x86_64-unknown-linux-gnu
 
       - name: Run unit test with coverage
         if: matrix.target == 'x86_64-unknown-linux-gnu'
