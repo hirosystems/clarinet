@@ -1,8 +1,8 @@
-import { Task, afterAll, beforeAll, beforeEach, afterEach } from "vitest";
+import { afterAll, beforeAll, beforeEach, afterEach, RunnerTask } from "vitest";
 
 import "./clarityValuesMatchers";
 
-function getFullTestName(task: Task, names: string[]) {
+function getFullTestName(task: RunnerTask, names: string[]) {
   const fullNames = [task.name, ...names];
   if (task.suite?.name) {
     return getFullTestName(task.suite, fullNames);

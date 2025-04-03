@@ -1,4 +1,5 @@
 use std::collections::{btree_map::Entry, BTreeMap, BTreeSet};
+use std::path::PathBuf;
 
 use crate::analysis::annotation::{Annotation, AnnotationKind};
 use crate::analysis::ast_dependency_detector::{ASTDependencyDetector, Dependency};
@@ -40,7 +41,7 @@ pub const BLOCK_LIMIT_MAINNET: ExecutionCost = ExecutionCost {
     runtime: 5_000_000_000,
 };
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct ClarityInterpreter {
     pub clarity_datastore: ClarityDatastore,
     pub datastore: Datastore,
@@ -55,14 +56,18 @@ pub struct ClarityInterpreter {
 pub struct Txid(pub [u8; 32]);
 
 impl ClarityInterpreter {
-    pub fn new(tx_sender: StandardPrincipalData, repl_settings: Settings) -> Self {
+    pub fn new(
+        tx_sender: StandardPrincipalData,
+        repl_settings: Settings,
+        cache_location: Option<PathBuf>,
+    ) -> Self {
         let remote_data_settings = repl_settings.remote_data.clone();
 
         let client = HttpClient::new(ApiUrl(remote_data_settings.api_url.to_string()));
         let remote_network_info = if remote_data_settings.enabled {
             Some(
                 remote_data_settings
-                    .get_initial_remote_network_info(&client)
+                    .get_initial_remote_network_info(&client, cache_location)
                     .unwrap(),
             )
         } else {
@@ -1205,6 +1210,7 @@ mod tests {
         ClarityInterpreter::new(
             StandardPrincipalData::transient(),
             settings.unwrap_or_default(),
+            None,
         )
     }
 

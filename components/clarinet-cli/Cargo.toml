@@ -23,7 +23,7 @@ serde_json = { version = "1.0.79", features = ["preserve_order"] }
 serde_derive = "1"
 tokio = { version = "1.35.1", features = ["full"] }
 crossterm = { workspace = true }
-ratatui = { workspace = true, default-features = false, features = ["crossterm"] }
+ratatui = { workspace = true }
 similar = "2.1.0"
 crossbeam-channel = "0.5.6"
 

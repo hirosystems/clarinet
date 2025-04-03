@@ -42,7 +42,7 @@ pub struct CostsReport {
     pub cost_result: CostSynthesis,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Session {
     pub settings: SessionSettings,
     pub contracts: BTreeMap<QualifiedContractIdentifier, ParsedContract>,
@@ -67,7 +67,11 @@ impl Session {
         };
 
         Self {
-            interpreter: ClarityInterpreter::new(tx_sender, settings.repl_settings.clone()),
+            interpreter: ClarityInterpreter::new(
+                tx_sender,
+                settings.repl_settings.clone(),
+                settings.cache_location.clone(),
+            ),
             contracts: BTreeMap::new(),
             api_reference: build_api_reference(),
             show_costs: false,

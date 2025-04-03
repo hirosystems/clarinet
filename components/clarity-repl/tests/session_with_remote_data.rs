@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use clarity::{
     types::{
         chainstate::{BlockHeaderHash, StacksBlockId},
@@ -21,6 +23,8 @@ fn eval_snippet(session: &mut Session, snippet: &str) -> Value {
 
 fn init_session(initial_heigth: u32) -> Session {
     let mut settings = SessionSettings::default();
+    let temp_dir = tempfile::tempdir().unwrap();
+    settings.cache_location = Some(temp_dir.path().to_path_buf());
     settings.repl_settings.remote_data = RemoteDataSettings {
         enabled: true,
         api_url: ApiUrl("https://api.testnet.hiro.so".to_string()),
@@ -195,4 +199,20 @@ fn it_handles_chain_constants() {
     assert_eq!(result, Value::Bool(true));
     let result = eval_snippet(&mut session, "chain-id");
     assert_eq!(result, Value::UInt(1));
+}
+
+#[test]
+fn it_saves_metadata_to_cache() {
+    let mut session = init_session(57000);
+    let snippet = format!("(contract-call? '{} get-count)", COUNTER_ADDR);
+    let result = eval_snippet(&mut session, &snippet);
+    assert_eq!(result, Value::UInt(1));
+
+    let cache_location = session.settings.cache_location.unwrap();
+    let cache_file_path = cache_location
+        .join(PathBuf::from(
+            "datastore/STJCAB2T9TR2EJM7YS4DM2CGBBVTF7BV237Y8KNV_counter_vm-metadata__9__contract_645949d1e1701aea7bd5ca574bf26a7828a26a068ea6409134bc8a9b1329b4fd",
+        ))
+        .with_extension("json");
+    assert!(cache_file_path.exists());
 }

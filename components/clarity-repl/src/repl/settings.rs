@@ -1,5 +1,6 @@
 use std::convert::TryInto;
 use std::fmt;
+use std::path::PathBuf;
 use std::str::FromStr;
 
 use clarity::types::chainstate::StacksAddress;
@@ -51,6 +52,7 @@ pub struct SessionSettings {
     pub initial_deployer: Option<Account>,
     pub disk_cache_enabled: bool,
     pub repl_settings: Settings,
+    pub cache_location: Option<PathBuf>,
     pub epoch_id: Option<StacksEpochId>,
 }
 
@@ -134,6 +136,7 @@ pub struct RemoteNetworkInfo {
     pub network_id: u32,
     pub stacks_tip_height: u32,
     pub is_mainnet: bool,
+    pub cache_location: Option<PathBuf>,
 }
 
 impl From<RemoteDataSettingsFile> for RemoteDataSettings {
@@ -150,6 +153,7 @@ impl RemoteDataSettings {
     pub fn get_initial_remote_network_info(
         &self,
         client: &HttpClient,
+        cache_location: Option<PathBuf>,
     ) -> Result<RemoteNetworkInfo, String> {
         let info = client.fetch_info();
 
@@ -169,6 +173,7 @@ impl RemoteDataSettings {
             network_id: info.network_id,
             stacks_tip_height: info.stacks_tip_height,
             is_mainnet: info.network_id == 1,
+            cache_location,
         })
     }
 }

@@ -168,8 +168,11 @@ pub static BOOT_CONTRACTS_DATA: LazyLock<
         (&*BOOT_MAINNET_PRINCIPAL, *BOOT_CODE_MAINNET),
     ];
 
-    let interpreter =
-        ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+    let interpreter = ClarityInterpreter::new(
+        StandardPrincipalData::transient(),
+        Settings::default(),
+        None,
+    );
     for (deployer, boot_code) in deploy.iter() {
         for (name, code) in boot_code.iter() {
             let (epoch, clarity_version) = match *name {

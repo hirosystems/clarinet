@@ -310,9 +310,7 @@ impl FileLocation {
                 .and_then(|mut segments| segments.next_back().map(String::from)),
         }
     }
-}
 
-impl FileLocation {
     pub fn read_content(&self) -> Result<Vec<u8>, String> {
         let bytes = match &self {
             FileLocation::FileSystem { path } => FileLocation::fs_read_content(path),
@@ -361,6 +359,13 @@ impl FileLocation {
             FileLocation::Url { url } => Ok(url.to_string()),
             #[allow(unreachable_patterns)]
             _ => unreachable!(),
+        }
+    }
+
+    pub fn to_path_buf(&self) -> PathBuf {
+        match self {
+            FileLocation::FileSystem { path } => path.clone(),
+            FileLocation::Url { url } => PathBuf::from(url.to_string()),
         }
     }
 }
