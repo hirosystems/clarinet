@@ -235,7 +235,7 @@ jobs:
 
       - name: Install wix (Windows)
         if: matrix.os == 'windows-latest' && steps.cache-cargo.outputs.cache-hit != 'true'
-        run: cargo install cargo-wix
+        run: cargo install cargo-wix || true
 
       # Set environment variables required from cross compiling from macos-x86_64 to macos-arm64
       - name: Configure macos-arm64 cross compile config
