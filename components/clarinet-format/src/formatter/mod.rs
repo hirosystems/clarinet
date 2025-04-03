@@ -661,8 +661,8 @@ impl<'a> Aggregator<'a> {
                             };
                             let trailing = get_trailing_comment(actual_value, &mut iter);
                             let value_str =
-                                self.format_source_exprs(slice::from_ref(actual_value), &indent);
-                            acc.push_str(&indent);
+                                self.format_source_exprs(slice::from_ref(actual_value), indent);
+                            acc.push_str(indent);
                             acc.push_str(&value_str);
                             acc.push(',');
 
@@ -680,7 +680,7 @@ impl<'a> Aggregator<'a> {
                             &space
                         };
                         // Pass the current indentation level to nested formatting
-                        let value_str = self.format_source_exprs(slice::from_ref(value), &indent);
+                        let value_str = self.format_source_exprs(slice::from_ref(value), indent);
                         acc.push_str(&format!(" {}", value_str));
                         acc.push(',');
 
@@ -801,7 +801,7 @@ impl<'a> Aggregator<'a> {
                 format!("'{}", trait_id)
             }
             PreSymbolicExpressionType::TraitReference(ref name) => {
-                format!("<{}>", name.to_string())
+                format!("<{}>", name)
             }
             PreSymbolicExpressionType::Comment(ref text) => {
                 if text.is_empty() {
