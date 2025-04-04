@@ -25,17 +25,17 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Rust toolchain
+        run: rustup toolchain install stable --profile minimal --component rustfmt --target wasm32-unknown-unknown
+
+      - name: Setup cache keys
         run: |
-          rustup toolchain install stable --profile minimal --component rustfmt
-          rustup target add wasm32-unknown-unknown
+          RUST_VERSION=$(rustc -vV | shasum -a 256 | cut -d ' ' -f1)
+          echo "RUST_VERSION=$RUST_VERSION" >> $GITHUB_ENV
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-
-      - name: Setup cache keys
-        run: echo "RUST_VERSION_HASH=$(rustc --version | sha256sum | awk '{print $1}')" >> $GITHUB_ENV
 
       - name: Cache cargo
         uses: actions/cache@v4
@@ -45,14 +45,11 @@ jobs:
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
-            target/release/build/
-            target/release/deps/
-            target/release/.fingerprint/
-            target/wasm32-unknown-unknown/
-          key: clarinet-sdk-cargo-${{ runner.os }}-${{ env.RUST_VERSION_HASH }}-${{ hashFiles('./Cargo.lock') }}
+            target/
+          key: ${{ runner.os }}-${{ github.job }}-${{ env.RUST_VERSION }}-${{ hashFiles('./Cargo.lock') }}
           restore-keys: |
-            clarinet-sdk-cargo-${{ runner.os }}-${{ env.RUST_VERSION_HASH }}-
-            clarinet-sdk-cargo-${{ runner.os }}-
+            ${{ runner.os }}-${{ github.job }}-${{ env.RUST_VERSION }}-
+            ${{ runner.os }}-${{ github.job }}-
 
       - name: Install wasm-pack if not available
         run: |
