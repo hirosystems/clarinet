@@ -119,8 +119,10 @@ struct Formatter {
     /// use tabs instead of spaces
     pub use_tabs: bool,
     #[clap(long = "dry-run", conflicts_with = "in_place")]
+    /// Only echo the result of formatting
     pub dry_run: bool,
     #[clap(long = "in-place", conflicts_with = "dry_run")]
+    /// Replace the contents of a file with the formatted code
     pub in_place: bool,
 }
 
