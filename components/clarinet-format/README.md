@@ -6,6 +6,8 @@ For examples of well-formatted contracts, check `components/clarinet-format/test
 
 By default lines will be wrapped at 80 characters and indents will be 2 spaces but both are configurable.
 
+If you want to ignore a specific block with the formatter, you can precede it with a comment `;; @format-ignore`
+
 ### LSP / VSCode integration
 
 From VSCode or using LSP you can configure formatting on-demand or on-save. There is also "Format Section" which formats only the highlighted section. Format-on-save can be enabled in VSCode settings and is off by default.
