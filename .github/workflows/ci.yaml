@@ -170,6 +170,8 @@ jobs:
         env:
           HIRO_API_KEY: ${{ secrets.HIRO_API_KEY }}
           CARGO_INCREMENTAL: 0
+          # prevents linux from recompiling dependencies when cache is hit
+          CARGO_BUILD_DEP_INFO_BASEDIR: "."
           RUSTFLAGS: "-C debuginfo=0"
         run: cargo cov
 
