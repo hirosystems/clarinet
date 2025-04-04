@@ -1,6 +1,6 @@
 # Clarity Formatter
 
-Clarity format provides a consistent, opinionated, and readable formatting for your clarity smart contracts and is accessible from CLI (`clarinet fmt`) and VSCode/LSP.
+Clarity format provides a consistent, opinionated, and readable formatting for your Clarity smart contracts and is accessible from CLI (`clarinet fmt`) and VSCode/LSP.
 
 For examples of well-formatted contracts, check `components/clarinet-format/tests/golden-intended`
 
