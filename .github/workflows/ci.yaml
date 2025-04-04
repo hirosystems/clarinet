@@ -157,6 +157,8 @@ jobs:
         if: matrix.target != 'x86_64-unknown-linux-gnu'
         env:
           HIRO_API_KEY: ${{ secrets.HIRO_API_KEY }}
+          CARGO_INCREMENTAL: 0
+          RUSTFLAGS: "-C debuginfo=0"
         run: cargo tst
 
       - name: Install llvm-cov
@@ -167,6 +169,8 @@ jobs:
         if: matrix.target == 'x86_64-unknown-linux-gnu'
         env:
           HIRO_API_KEY: ${{ secrets.HIRO_API_KEY }}
+          CARGO_INCREMENTAL: 0
+          RUSTFLAGS: "-C debuginfo=0"
         run: cargo cov
 
       - name: Upload coverage data to codecov
