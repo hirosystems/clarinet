@@ -581,7 +581,7 @@ jobs:
       - get_release_info
       - sanity_check
       - cargo_test
-      -dist_clarinet
+      - dist_clarinet
     outputs:
       version: ${{ steps.docker_meta.outputs.version }}
     strategy:
