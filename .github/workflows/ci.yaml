@@ -86,15 +86,18 @@ jobs:
 
   test_coverage_cargo:
     name: Generate test coverage
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Install Rust toolchain
+        run:  rustup toolchain install stable --profile minimal
+
+      - name: Set cache keys
         run: |
-          rustup toolchain install stable --profile minimal
           echo "RUST_VERSION_HASH=$(rustc --version | sha256sum | awk '{print $1}')" >> $GITHUB_ENV
+          echo "OS_VERSION=$(lsb_release -rs)" >> $GITHUB_ENV
 
       - name: Cache cargo
         uses: actions/cache@v4
@@ -102,7 +105,10 @@ jobs:
           path: |
             ~/.cargo/
             ./target/debug/build/
-          key: ${{ runner.os }}-rust-${{ env.RUST_VERSION_HASH }}-${{ hashFiles('./Cargo.lock') }}
+          key: ${{ env.OS_VERSION }}-rust-${{ env.RUST_VERSION_HASH }}-${{ hashFiles('./Cargo.lock') }}
+          restore-keys: |
+            ${{ env.OS_VERSION }}-rust-${{ env.RUST_VERSION_HASH }}-
+            ${{ env.OS_VERSION }}-
 
       - name: install dependencies
         uses: taiki-e/install-action@v2
@@ -128,7 +134,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-latest
+          - os: ubuntu-22.04
             platform: linux
             target: x86_64-unknown-linux-gnu
             architecture: x64
