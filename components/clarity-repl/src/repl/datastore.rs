@@ -489,6 +489,7 @@ impl ClarityBackingStore for ClarityDatastore {
     ///  i.e., it changes on time-shifted evaluation. the open_chain_tip functions always
     ///   return data about the chain tip that is currently open for writing.
     fn get_current_block_height(&mut self) -> u32 {
+        println!("get_current_block_height");
         let current_chain_tip = *self.current_chain_tip.borrow();
         if let Some(&height) = self.height_at_chain_tip.get(&current_chain_tip) {
             return height;
@@ -505,6 +506,7 @@ impl ClarityBackingStore for ClarityDatastore {
     }
 
     fn get_open_chain_tip_height(&mut self) -> u32 {
+        println!("get_open_chain_tip_height");
         self.height_at_chain_tip
             .get(&self.open_chain_tip)
             .copied()
@@ -715,6 +717,7 @@ impl Datastore {
     }
 
     pub fn get_current_burn_block_height(&self) -> u32 {
+        println!("get_current_burn_block_height");
         self.burn_chain_height
     }
 
@@ -863,6 +866,8 @@ impl HeadersDB for Datastore {
         id_bhh: &StacksBlockId,
         _epoch_id: &StacksEpochId,
     ) -> Option<BlockHeaderHash> {
+        println!("get_stacks_block_header_hash_for_block");
+        println!("id_bhh: {:?}", id_bhh);
         if let Some(hash) = self
             .stacks_blocks
             .get(id_bhh)
@@ -881,6 +886,8 @@ impl HeadersDB for Datastore {
         &self,
         id_bhh: &StacksBlockId,
     ) -> Option<BurnchainHeaderHash> {
+        println!("get_burn_header_hash_for_block");
+        println!("id_bhh: {:?}", id_bhh);
         self.stacks_blocks
             .get(id_bhh)
             .map(|block| block.burn_block_header_hash)
@@ -891,6 +898,8 @@ impl HeadersDB for Datastore {
         id_bhh: &StacksBlockId,
         _epoch_id: &StacksEpochId,
     ) -> Option<ConsensusHash> {
+        println!("get_consensus_hash_for_block");
+        println!("id_bhh: {:?}", id_bhh);
         self.stacks_blocks
             .get(id_bhh)
             .map(|block| block.burn_block_header_hash)
@@ -903,6 +912,8 @@ impl HeadersDB for Datastore {
         id_bhh: &StacksBlockId,
         _epoch_id: &StacksEpochId,
     ) -> Option<VRFSeed> {
+        println!("get_vrf_seed_for_block");
+        println!("id_bhh: {:?}", id_bhh);
         self.stacks_blocks
             .get(id_bhh)
             .map(|block| block.burn_block_header_hash)
@@ -930,12 +941,16 @@ impl HeadersDB for Datastore {
         id_bhh: &StacksBlockId,
         _epoch_id: Option<&StacksEpochId>,
     ) -> Option<u64> {
+        println!("get_burn_block_time_for_block");
+        println!("id_bhh: {:?}", id_bhh);
         self.get_burn_header_hash_for_block(id_bhh)
             .and_then(|hash| self.burn_blocks.get(&hash))
             .map(|b| b.burn_block_time)
     }
 
     fn get_burn_block_height_for_block(&self, id_bhh: &StacksBlockId) -> Option<u32> {
+        println!("get_burn_block_height_for_block");
+        println!("id_bhh: {:?}", id_bhh);
         if let Some(height) = self
             .get_burn_header_hash_for_block(id_bhh)
             .and_then(|hash| self.burn_blocks.get(&hash))
@@ -1031,6 +1046,7 @@ impl BurnStateDB for Datastore {
     }
 
     fn get_tip_burn_block_height(&self) -> Option<u32> {
+        println!("get_tip_burn_block_height");
         use StacksEpochId::*;
         match self.current_epoch {
             Epoch10 | Epoch20 | Epoch2_05 | Epoch21 | Epoch22 | Epoch23 | Epoch24 | Epoch25 => {
@@ -1051,6 +1067,9 @@ impl BurnStateDB for Datastore {
     }
 
     fn get_tip_sortition_id(&self) -> Option<SortitionId> {
+        println!("get_tip_sortition_id");
+        println!("current_chain_tip: {:?}", self.current_chain_tip.borrow());
+        println!("burn_chain_tip: {:?}", self.burn_chain_tip);
         let current_chain_tip = self.current_chain_tip.borrow();
         self.get_burn_header_hash_for_block(&current_chain_tip)
             .and_then(|hash| self.burn_blocks.get(&hash))
@@ -1059,6 +1078,8 @@ impl BurnStateDB for Datastore {
 
     /// Returns the *burnchain block height* for the `sortition_id` is associated with.
     fn get_burn_block_height(&self, sortition_id: &SortitionId) -> Option<u32> {
+        println!("get_burn_block_height");
+        println!("sortition_id: {:?}", sortition_id);
         self.sortition_lookup
             .get(sortition_id)
             .and_then(|hash| self.burn_blocks.get(hash))
@@ -1090,6 +1111,8 @@ impl BurnStateDB for Datastore {
         _height: u32,
         sortition_id: &SortitionId,
     ) -> Option<BurnchainHeaderHash> {
+        println!("get_burn_header_hash");
+        println!("sortition_id: {:?}", sortition_id);
         self.sortition_lookup.get(sortition_id).copied()
     }
 
@@ -1100,6 +1123,8 @@ impl BurnStateDB for Datastore {
         &self,
         consensus_hash: &ConsensusHash,
     ) -> Option<SortitionId> {
+        println!("get_sortition_id_from_consensus_hash");
+        println!("consensus_hash: {:?}", consensus_hash);
         self.consensus_hash_lookup.get(consensus_hash).copied()
     }
 

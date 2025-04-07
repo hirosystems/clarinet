@@ -1821,6 +1821,23 @@ mod tests {
     }
 
     #[test]
+    fn get_burn_block_info_past() {
+        let settings = SessionSettings::default();
+        let mut session = Session::new(settings);
+        session.start().expect("session could not start");
+        session.update_epoch(StacksEpochId::Epoch30);
+
+        session.advance_burn_chain_tip(10);
+
+        println!("---- 10");
+        let result1 = run_session_snippet(&mut session, "(get-burn-block-info? header-hash u10)");
+
+        println!("---- 9");
+        let result2 = run_session_snippet(&mut session, "(get-burn-block-info? header-hash u9)");
+        assert_ne!(result1, result2);
+    }
+
+    #[test]
     fn burn_block_height_behavior_epoch3_0() {
         // test that clarinet preserves the 3.0 and 3.1 special behavior of burn-block-height
         // https://github.com/stacks-network/stacks-core/pull/5524

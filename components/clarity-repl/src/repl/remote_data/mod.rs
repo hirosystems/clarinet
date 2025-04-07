@@ -207,6 +207,12 @@ impl HttpClient {
         sortitions.into_iter().next().unwrap()
     }
 
+    pub fn fetch_sortition_with_height(&self, height: u32) -> Sortition {
+        let url = format!("/v3/sortitions/burn_height/{}", height);
+        let sortitions = self.get::<Vec<Sortition>>(&url).unwrap();
+        sortitions.into_iter().next().unwrap()
+    }
+
     pub fn fetch_block(&self, url: &str) -> Block {
         self.get::<Block>(url).unwrap()
     }
