@@ -1108,12 +1108,16 @@ impl BurnStateDB for Datastore {
     /// Returns Some if `self.get_burn_start_height() <= height < self.get_burn_block_height(sortition_id)`, and None otherwise.
     fn get_burn_header_hash(
         &self,
-        _height: u32,
-        sortition_id: &SortitionId,
+        height: u32,
+        _sortition_id: &SortitionId,
     ) -> Option<BurnchainHeaderHash> {
         println!("get_burn_header_hash");
-        println!("sortition_id: {:?}", sortition_id);
-        self.sortition_lookup.get(sortition_id).copied()
+        println!("sortition_id: {:?}", _sortition_id);
+        if height > self.burn_chain_height {
+            return None;
+        }
+        let burn_block_hashes = BurnBlockHashes::from_height(height);
+        Some(burn_block_hashes.header_hash)
     }
 
     /// Lookup a `SortitionId` keyed to a `ConsensusHash`.
