@@ -171,8 +171,6 @@ fn it_can_fetch_burn_chain_info() {
 
     let result = eval_snippet(&mut session, "burn-block-height");
     assert_eq!(result, Value::UInt(30850));
-
-    println!("---- 30850");
     let result = eval_snippet(&mut session, "(get-burn-block-info? header-hash u30850)");
     let expected_header_hash =
         hex_bytes("0bf01726f390e2d61d22ac1b8468a33b7802966efbdb7c85861763ca0d9e29b8").unwrap();
@@ -180,8 +178,6 @@ fn it_can_fetch_burn_chain_info() {
         result,
         Value::some(Value::buff_from(expected_header_hash).unwrap()).unwrap()
     );
-
-    println!("---- 30849");
     let result = eval_snippet(&mut session, "(get-burn-block-info? header-hash u30849)");
     let expected_header_hash =
         hex_bytes("7593042f0e4229276f7d5a71c86b5c7f59db7cef106d29f2542b0ec1461bba15").unwrap();
