@@ -18,8 +18,8 @@ Clarinet is the fastest way to build, test, and deploy smart contracts on the St
 
 ### Documentation
 
-- [Clarinet →](https://docs.hiro.so/stacks/clarinet)  
-- [Clarinet JS SDK →](https://docs.hiro.so/stacks/clarinet-js-sdk)
+- [Clarinet CLI](https://docs.hiro.so/stacks/clarinet)  
+- [Clarinet JS SDK and testing framework](https://docs.hiro.so/stacks/clarinet-js-sdk)
 
 ---
 
