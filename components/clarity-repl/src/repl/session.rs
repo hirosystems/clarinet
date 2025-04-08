@@ -1284,7 +1284,7 @@ fn clarity_keywords() -> HashMap<String, String> {
 #[allow(clippy::items_after_test_module)]
 #[cfg(test)]
 mod tests {
-    use clarity::vm::types::TupleData;
+    use clarity::{util::hash::hex_bytes, vm::types::TupleData};
 
     use super::*;
     use crate::{
@@ -1829,12 +1829,20 @@ mod tests {
 
         session.advance_burn_chain_tip(10);
 
-        println!("---- 10");
-        let result1 = run_session_snippet(&mut session, "(get-burn-block-info? header-hash u10)");
-
-        println!("---- 9");
-        let result2 = run_session_snippet(&mut session, "(get-burn-block-info? header-hash u9)");
-        assert_ne!(result1, result2);
+        let result = run_session_snippet(&mut session, "(get-burn-block-info? header-hash u10)");
+        let expected_header_hash =
+            hex_bytes("02e51c71171ecd6467c472e11374c5a5ae882f8591c8d2b8ba24d916680f3e8a").unwrap();
+        assert_eq!(
+            result,
+            Value::some(Value::buff_from(expected_header_hash).unwrap()).unwrap()
+        );
+        let result = run_session_snippet(&mut session, "(get-burn-block-info? header-hash u9)");
+        let expected_header_hash =
+            hex_bytes("02128940fbe65bd02156e79e09b8f84cf889c7353c9cd16e7f43a3f60902ca90").unwrap();
+        assert_eq!(
+            result,
+            Value::some(Value::buff_from(expected_header_hash).unwrap()).unwrap()
+        );
     }
 
     #[test]

@@ -144,6 +144,8 @@ pub struct Datastore {
     current_epoch: StacksEpochId,
     current_epoch_start_height: u32,
     constants: StacksConstants,
+    remote_network_info: Option<RemoteNetworkInfo>,
+    client: HttpClient,
 }
 
 fn height_to_hashed_bytes(height: u32) -> [u8; 32] {
@@ -489,7 +491,6 @@ impl ClarityBackingStore for ClarityDatastore {
     ///  i.e., it changes on time-shifted evaluation. the open_chain_tip functions always
     ///   return data about the chain tip that is currently open for writing.
     fn get_current_block_height(&mut self) -> u32 {
-        println!("get_current_block_height");
         let current_chain_tip = *self.current_chain_tip.borrow();
         if let Some(&height) = self.height_at_chain_tip.get(&current_chain_tip) {
             return height;
@@ -506,7 +507,6 @@ impl ClarityBackingStore for ClarityDatastore {
     }
 
     fn get_open_chain_tip_height(&mut self) -> u32 {
-        println!("get_open_chain_tip_height");
         self.height_at_chain_tip
             .get(&self.open_chain_tip)
             .copied()
@@ -580,9 +580,13 @@ impl ClarityBackingStore for ClarityDatastore {
 }
 
 impl Datastore {
-    pub fn new(clarity_datastore: &ClarityDatastore, constants: StacksConstants) -> Self {
+    pub fn new(
+        clarity_datastore: &ClarityDatastore,
+        constants: StacksConstants,
+        client: HttpClient,
+    ) -> Self {
         if clarity_datastore.remote_network_info.is_some() {
-            return Self::new_with_remote_data(clarity_datastore, constants);
+            return Self::new_with_remote_data(clarity_datastore, constants, client);
         }
 
         let stacks_chain_height = 0;
@@ -630,12 +634,15 @@ impl Datastore {
             current_epoch: StacksEpochId::Epoch2_05,
             current_epoch_start_height: stacks_chain_height,
             constants,
+            remote_network_info: None,
+            client,
         }
     }
 
     fn new_with_remote_data(
         clarity_datastore: &ClarityDatastore,
         constants: StacksConstants,
+        client: HttpClient,
     ) -> Self {
         let current_chain_tip = clarity_datastore.current_chain_tip.borrow();
         let stacks_chain_height = clarity_datastore
@@ -659,9 +666,7 @@ impl Datastore {
         let burn_block_header_hash = block.burn_block_hash;
         let block_header_hash = block.hash;
 
-        let sortition = clarity_datastore
-            .client
-            .fetch_sortition(&burn_block_header_hash);
+        let sortition = clarity_datastore.client.fetch_sortition(burn_chain_height);
         let sortition_id = sortition.sortition_id;
         let consensus_hash = sortition.consensus_hash;
 
@@ -705,6 +710,8 @@ impl Datastore {
             current_epoch: epoch_for_height(is_mainnet, *stacks_chain_height),
             current_epoch_start_height: *stacks_chain_height,
             constants,
+            remote_network_info: clarity_datastore.remote_network_info.clone(),
+            client,
         }
     }
 
@@ -717,7 +724,6 @@ impl Datastore {
     }
 
     pub fn get_current_burn_block_height(&self) -> u32 {
-        println!("get_current_burn_block_height");
         self.burn_chain_height
     }
 
@@ -866,8 +872,6 @@ impl HeadersDB for Datastore {
         id_bhh: &StacksBlockId,
         _epoch_id: &StacksEpochId,
     ) -> Option<BlockHeaderHash> {
-        println!("get_stacks_block_header_hash_for_block");
-        println!("id_bhh: {:?}", id_bhh);
         if let Some(hash) = self
             .stacks_blocks
             .get(id_bhh)
@@ -886,8 +890,6 @@ impl HeadersDB for Datastore {
         &self,
         id_bhh: &StacksBlockId,
     ) -> Option<BurnchainHeaderHash> {
-        println!("get_burn_header_hash_for_block");
-        println!("id_bhh: {:?}", id_bhh);
         self.stacks_blocks
             .get(id_bhh)
             .map(|block| block.burn_block_header_hash)
@@ -898,8 +900,6 @@ impl HeadersDB for Datastore {
         id_bhh: &StacksBlockId,
         _epoch_id: &StacksEpochId,
     ) -> Option<ConsensusHash> {
-        println!("get_consensus_hash_for_block");
-        println!("id_bhh: {:?}", id_bhh);
         self.stacks_blocks
             .get(id_bhh)
             .map(|block| block.burn_block_header_hash)
@@ -912,8 +912,6 @@ impl HeadersDB for Datastore {
         id_bhh: &StacksBlockId,
         _epoch_id: &StacksEpochId,
     ) -> Option<VRFSeed> {
-        println!("get_vrf_seed_for_block");
-        println!("id_bhh: {:?}", id_bhh);
         self.stacks_blocks
             .get(id_bhh)
             .map(|block| block.burn_block_header_hash)
@@ -941,16 +939,12 @@ impl HeadersDB for Datastore {
         id_bhh: &StacksBlockId,
         _epoch_id: Option<&StacksEpochId>,
     ) -> Option<u64> {
-        println!("get_burn_block_time_for_block");
-        println!("id_bhh: {:?}", id_bhh);
         self.get_burn_header_hash_for_block(id_bhh)
             .and_then(|hash| self.burn_blocks.get(&hash))
             .map(|b| b.burn_block_time)
     }
 
     fn get_burn_block_height_for_block(&self, id_bhh: &StacksBlockId) -> Option<u32> {
-        println!("get_burn_block_height_for_block");
-        println!("id_bhh: {:?}", id_bhh);
         if let Some(height) = self
             .get_burn_header_hash_for_block(id_bhh)
             .and_then(|hash| self.burn_blocks.get(&hash))
@@ -1046,7 +1040,6 @@ impl BurnStateDB for Datastore {
     }
 
     fn get_tip_burn_block_height(&self) -> Option<u32> {
-        println!("get_tip_burn_block_height");
         use StacksEpochId::*;
         match self.current_epoch {
             Epoch10 | Epoch20 | Epoch2_05 | Epoch21 | Epoch22 | Epoch23 | Epoch24 | Epoch25 => {
@@ -1067,9 +1060,6 @@ impl BurnStateDB for Datastore {
     }
 
     fn get_tip_sortition_id(&self) -> Option<SortitionId> {
-        println!("get_tip_sortition_id");
-        println!("current_chain_tip: {:?}", self.current_chain_tip.borrow());
-        println!("burn_chain_tip: {:?}", self.burn_chain_tip);
         let current_chain_tip = self.current_chain_tip.borrow();
         self.get_burn_header_hash_for_block(&current_chain_tip)
             .and_then(|hash| self.burn_blocks.get(&hash))
@@ -1078,8 +1068,6 @@ impl BurnStateDB for Datastore {
 
     /// Returns the *burnchain block height* for the `sortition_id` is associated with.
     fn get_burn_block_height(&self, sortition_id: &SortitionId) -> Option<u32> {
-        println!("get_burn_block_height");
-        println!("sortition_id: {:?}", sortition_id);
         self.sortition_lookup
             .get(sortition_id)
             .and_then(|hash| self.burn_blocks.get(hash))
@@ -1111,11 +1099,18 @@ impl BurnStateDB for Datastore {
         height: u32,
         _sortition_id: &SortitionId,
     ) -> Option<BurnchainHeaderHash> {
-        println!("get_burn_header_hash");
-        println!("sortition_id: {:?}", _sortition_id);
         if height > self.burn_chain_height {
             return None;
         }
+
+        if let Some(remote_info) = &self.remote_network_info {
+            if height <= remote_info.initial_height {
+                let sortition = self.client.fetch_sortition(height);
+                return Some(sortition.burn_block_hash);
+            }
+        }
+
+        // Otherwise, generate the burn block hashes locally
         let burn_block_hashes = BurnBlockHashes::from_height(height);
         Some(burn_block_hashes.header_hash)
     }
@@ -1127,8 +1122,6 @@ impl BurnStateDB for Datastore {
         &self,
         consensus_hash: &ConsensusHash,
     ) -> Option<SortitionId> {
-        println!("get_sortition_id_from_consensus_hash");
-        println!("consensus_hash: {:?}", consensus_hash);
         self.consensus_hash_lookup.get(consensus_hash).copied()
     }
 
@@ -1177,8 +1170,8 @@ mod tests {
     fn get_datastores() -> (ClarityDatastore, Datastore) {
         let client = HttpClient::new(ApiUrl("https://api.tesnet.hiro.so".to_string()));
         let constants = StacksConstants::default();
-        let clarity_datastore = ClarityDatastore::new(None, client);
-        let datastore = Datastore::new(&clarity_datastore, constants);
+        let clarity_datastore = ClarityDatastore::new(None, client.clone());
+        let datastore = Datastore::new(&clarity_datastore, constants, client.clone());
         (clarity_datastore, datastore)
     }
 
@@ -1209,7 +1202,7 @@ mod tests {
             )
             .create();
         let _ = server
-            .mock("GET", "/v3/sortitions/burn/57f3e2bd4519e4263353bf6b7614a9cee7f2d36fe61409852d42e41afe5e6cad")
+            .mock("GET", "/v3/sortitions/burn_height/798")
             .with_status(200)
             .with_header("content-type", "application/json")
             .with_body(
@@ -1234,9 +1227,9 @@ mod tests {
                 stacks_tip_height: 10,
                 cache_location: Some(PathBuf::from("./.cache")),
             }),
-            client,
+            client.clone(),
         );
-        let datastore = Datastore::new(&clarity_datastore, constants);
+        let datastore = Datastore::new(&clarity_datastore, constants, client);
         (clarity_datastore, datastore)
     }
 
