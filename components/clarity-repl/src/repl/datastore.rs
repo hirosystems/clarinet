@@ -1171,7 +1171,7 @@ mod tests {
         let client = HttpClient::new(ApiUrl("https://api.tesnet.hiro.so".to_string()));
         let constants = StacksConstants::default();
         let clarity_datastore = ClarityDatastore::new(None, client.clone());
-        let datastore = Datastore::new(&clarity_datastore, constants, client.clone());
+        let datastore = Datastore::new(&clarity_datastore, constants, client);
         (clarity_datastore, datastore)
     }
 
