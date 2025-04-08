@@ -2,7 +2,7 @@
 
 Clarinet is the fastest way to build, test, and deploy smart contracts on the Stacks blockchain. It gives you a local devnet, REPL, testing framework, and debugging tools to ship high-quality Clarity code with confidence.
 
-- 🧑‍💻 **Leverage a powerful CLI package**  
+- 🧑‍💻 **Leverage a powerful CLI**  
   Use a command line interface to write Clarity contracts, run tests, deploy to devnet, and debug step by step.
 
 - 🧪 **Write unit tests with the SDK**  
