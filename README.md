@@ -30,6 +30,8 @@ Clarinet is the fastest way to build, test, and deploy smart contracts on the St
 brew install clarinet
 ```
 
+> To check out more installation methods, click [here](https://docs.hiro.so/stacks/clarinet#installation)
+
 ```bash
 # Create a new project
 clarinet new hello-world
@@ -61,7 +63,7 @@ clarinet contract new counter
 # Check the contract
 clarinet check
 
-# Launch the console
+# Launch the REPL
 clarinet console
 ```
 
