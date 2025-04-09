@@ -144,6 +144,8 @@ pub struct Datastore {
     current_epoch: StacksEpochId,
     current_epoch_start_height: u32,
     constants: StacksConstants,
+    remote_network_info: Option<RemoteNetworkInfo>,
+    client: HttpClient,
 }
 
 fn height_to_hashed_bytes(height: u32) -> [u8; 32] {
@@ -578,9 +580,13 @@ impl ClarityBackingStore for ClarityDatastore {
 }
 
 impl Datastore {
-    pub fn new(clarity_datastore: &ClarityDatastore, constants: StacksConstants) -> Self {
+    pub fn new(
+        clarity_datastore: &ClarityDatastore,
+        constants: StacksConstants,
+        client: HttpClient,
+    ) -> Self {
         if clarity_datastore.remote_network_info.is_some() {
-            return Self::new_with_remote_data(clarity_datastore, constants);
+            return Self::new_with_remote_data(clarity_datastore, constants, client);
         }
 
         let stacks_chain_height = 0;
@@ -628,12 +634,15 @@ impl Datastore {
             current_epoch: StacksEpochId::Epoch2_05,
             current_epoch_start_height: stacks_chain_height,
             constants,
+            remote_network_info: None,
+            client,
         }
     }
 
     fn new_with_remote_data(
         clarity_datastore: &ClarityDatastore,
         constants: StacksConstants,
+        client: HttpClient,
     ) -> Self {
         let current_chain_tip = clarity_datastore.current_chain_tip.borrow();
         let stacks_chain_height = clarity_datastore
@@ -657,9 +666,7 @@ impl Datastore {
         let burn_block_header_hash = block.burn_block_hash;
         let block_header_hash = block.hash;
 
-        let sortition = clarity_datastore
-            .client
-            .fetch_sortition(&burn_block_header_hash);
+        let sortition = client.fetch_sortition(burn_chain_height);
         let sortition_id = sortition.sortition_id;
         let consensus_hash = sortition.consensus_hash;
 
@@ -703,6 +710,8 @@ impl Datastore {
             current_epoch: epoch_for_height(is_mainnet, *stacks_chain_height),
             current_epoch_start_height: *stacks_chain_height,
             constants,
+            remote_network_info: clarity_datastore.remote_network_info.clone(),
+            client,
         }
     }
 
@@ -1087,10 +1096,23 @@ impl BurnStateDB for Datastore {
     /// Returns Some if `self.get_burn_start_height() <= height < self.get_burn_block_height(sortition_id)`, and None otherwise.
     fn get_burn_header_hash(
         &self,
-        _height: u32,
-        sortition_id: &SortitionId,
+        height: u32,
+        _sortition_id: &SortitionId,
     ) -> Option<BurnchainHeaderHash> {
-        self.sortition_lookup.get(sortition_id).copied()
+        if height > self.burn_chain_height {
+            return None;
+        }
+
+        if let Some(remote_info) = &self.remote_network_info {
+            if height <= remote_info.initial_height {
+                let sortition = self.client.fetch_sortition(height);
+                return Some(sortition.burn_block_hash);
+            }
+        }
+
+        // Otherwise, generate the burn block hashes locally
+        let burn_block_hashes = BurnBlockHashes::from_height(height);
+        Some(burn_block_hashes.header_hash)
     }
 
     /// Lookup a `SortitionId` keyed to a `ConsensusHash`.
@@ -1148,8 +1170,8 @@ mod tests {
     fn get_datastores() -> (ClarityDatastore, Datastore) {
         let client = HttpClient::new(ApiUrl("https://api.tesnet.hiro.so".to_string()));
         let constants = StacksConstants::default();
-        let clarity_datastore = ClarityDatastore::new(None, client);
-        let datastore = Datastore::new(&clarity_datastore, constants);
+        let clarity_datastore = ClarityDatastore::new(None, client.clone());
+        let datastore = Datastore::new(&clarity_datastore, constants, client);
         (clarity_datastore, datastore)
     }
 
@@ -1180,7 +1202,7 @@ mod tests {
             )
             .create();
         let _ = server
-            .mock("GET", "/v3/sortitions/burn/57f3e2bd4519e4263353bf6b7614a9cee7f2d36fe61409852d42e41afe5e6cad")
+            .mock("GET", "/v3/sortitions/burn_height/798")
             .with_status(200)
             .with_header("content-type", "application/json")
             .with_body(
@@ -1205,9 +1227,9 @@ mod tests {
                 stacks_tip_height: 10,
                 cache_location: Some(PathBuf::from("./.cache")),
             }),
-            client,
+            client.clone(),
         );
-        let datastore = Datastore::new(&clarity_datastore, constants);
+        let datastore = Datastore::new(&clarity_datastore, constants, client);
         (clarity_datastore, datastore)
     }
 

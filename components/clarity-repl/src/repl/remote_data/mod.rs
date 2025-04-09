@@ -201,8 +201,8 @@ impl HttpClient {
         self.get::<Info>("/v2/info").unwrap()
     }
 
-    pub fn fetch_sortition(&self, burn_block_hash: &BurnchainHeaderHash) -> Sortition {
-        let url = format!("/v3/sortitions/burn/{}", burn_block_hash);
+    pub fn fetch_sortition(&self, height: u32) -> Sortition {
+        let url = format!("/v3/sortitions/burn_height/{}", height);
         let sortitions = self.get::<Vec<Sortition>>(&url).unwrap();
         sortitions.into_iter().next().unwrap()
     }
@@ -262,7 +262,7 @@ mod tests {
         let mut server = mockito::Server::new();
 
         let _ = server
-            .mock("GET", "/v3/sortitions/burn/000000000000000000012f34a6727bf7dc9ceae203022cb14a3b37fe8de0e6ad")
+            .mock("GET", "/v3/sortitions/burn_height/882262")
             .with_status(200)
             .with_header("content-type", "application/json")
             .with_body(
@@ -283,12 +283,7 @@ mod tests {
             .create();
 
         let client = HttpClient::new(ApiUrl(server.url()));
-        let sortition = client.fetch_sortition(
-            &BurnchainHeaderHash::from_hex(
-                "000000000000000000012f34a6727bf7dc9ceae203022cb14a3b37fe8de0e6ad",
-            )
-            .unwrap(),
-        );
+        let sortition = client.fetch_sortition(882262);
 
         assert_eq!(sortition.burn_block_height, 882262);
         assert_eq!(

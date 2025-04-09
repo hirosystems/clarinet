@@ -74,8 +74,8 @@ impl ClarityInterpreter {
             None
         };
 
-        let clarity_datastore = ClarityDatastore::new(remote_network_info.clone(), client);
-        let datastore = Datastore::new(&clarity_datastore, StacksConstants::default());
+        let clarity_datastore = ClarityDatastore::new(remote_network_info.clone(), client.clone());
+        let datastore = Datastore::new(&clarity_datastore, StacksConstants::default(), client);
 
         Self {
             tx_sender,
