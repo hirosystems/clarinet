@@ -666,7 +666,7 @@ impl Datastore {
         let burn_block_header_hash = block.burn_block_hash;
         let block_header_hash = block.hash;
 
-        let sortition = clarity_datastore.client.fetch_sortition(burn_chain_height);
+        let sortition = client.fetch_sortition(burn_chain_height);
         let sortition_id = sortition.sortition_id;
         let consensus_hash = sortition.consensus_hash;
 
