@@ -65,6 +65,7 @@
     "@stacks/transactions": "^7.0.5",
     "kolorist": "^1.8.0",
     "prompts": "^2.4.2",
+    "vitest": "^3.0.5",
     "yargs": "^17.7.2"
   },
   "devDependencies": {
