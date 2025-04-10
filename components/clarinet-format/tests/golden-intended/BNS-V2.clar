@@ -1995,13 +1995,13 @@
 ;; Private helper function `compute-name-price` calculates the registration price for a name based on its length and character composition.
 ;; It utilizes a configurable pricing function that can adjust prices based on the name's characteristics.
 ;; @params:
-;; name (buff 48): The name for which the price is being calculated.
-;; price-function (tuple): A tuple containing the parameters of the pricing function, including:
-;; buckets (list 16 uint): A list defining price multipliers for different name lengths.
-;; base (uint): The base price multiplier.
-;; coeff (uint): A coefficient that adjusts the base price.
-;; nonalpha-discount (uint): A discount applied to names containing non-alphabetic characters.
-;; no-vowel-discount (uint): A discount applied to names lacking vowel characters.
+;;     name (buff 48): The name for which the price is being calculated.
+;;     price-function (tuple): A tuple containing the parameters of the pricing function, including:
+;;         buckets (list 16 uint): A list defining price multipliers for different name lengths.
+;;         base (uint): The base price multiplier.
+;;         coeff (uint): A coefficient that adjusts the base price.
+;;         nonalpha-discount (uint): A discount applied to names containing non-alphabetic characters.
+;;         no-vowel-discount (uint): A discount applied to names lacking vowel characters.
 (define-private (compute-name-price
         (name (buff 48))
         (price-function {

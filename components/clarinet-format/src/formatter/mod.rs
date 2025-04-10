@@ -807,7 +807,7 @@ impl<'a> Aggregator<'a> {
                 if text.is_empty() {
                     ";;".to_string()
                 } else {
-                    comment_piece(text)
+                    comment_piece(text, pse)
                 }
             }
             PreSymbolicExpressionType::Placeholder(ref placeholder) => {
@@ -1030,11 +1030,14 @@ where
     }
 }
 
-fn comment_piece(text: &str) -> String {
+fn comment_piece(text: &str, pse: &PreSymbolicExpression) -> String {
     let (comment_part, rest) = text
         .find(|c| c != ';')
         .map_or((text, ""), |idx| (&text[..idx], &text[idx..]));
-    format!(";;{} {}", comment_part, t(rest))
+    let comment_length = text.len() as u32;
+    let space_count = pse.span().end_column - comment_length - pse.span().start_column - 1; // 1 to account for span starting at 1 instead of 0
+    let spaces = " ".repeat(space_count as usize);
+    format!(";;{}{}{}", comment_part, spaces, rest)
 }
 
 #[cfg(test)]
@@ -1091,6 +1094,20 @@ mod tests_formatter {
         assert_eq!(result, "(define-private (my-func)\n  (ok true)\n)\n\n");
     }
 
+    #[test]
+    fn intact_comment_spacing() {
+        let src = r#";; (define-read-only (has-access)
+;;   (begin
+;;     (ok true)
+;;   )
+;; )"#;
+        let result = format_with_default(&String::from(src));
+        assert_eq!(src, result);
+
+        let src = "(ok true) ;;     spaced";
+        let result = format_with_default(&String::from(src));
+        assert_eq!(src, result);
+    }
     #[test]
     fn test_multi_function() {
         let src = "(define-public (my-func) (ok true))\n(define-public (my-func2) (ok true))";
