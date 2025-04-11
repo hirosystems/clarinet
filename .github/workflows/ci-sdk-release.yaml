@@ -25,31 +25,8 @@ jobs:
           node-version: '22.x'
           registry-url: 'https://registry.npmjs.org'
 
-      - name: Setup cache keys
-        run: echo "RUST_VERSION_HASH=$(rustc --version | sha256sum | awk '{print $1}')" >> $GITHUB_ENV
-
-      - name: Cache cargo
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/release/build/
-            target/release/deps/
-            target/release/.fingerprint/
-            target/wasm32-unknown-unknown/
-          key: clarinet-sdk-cargo-${{ runner.os }}-${{ env.RUST_VERSION_HASH }}-${{ hashFiles('./Cargo.lock') }}
-          restore-keys: |
-            clarinet-sdk-cargo-${{ runner.os }}-${{ env.RUST_VERSION_HASH }}-
-            clarinet-sdk-cargo-${{ runner.os }}-
-
       - name: Install wasm-pack if not available
-        run: |
-          if ! command -v wasm-pack &> /dev/null; then
-            cargo install wasm-pack
-          fi
+        run: cargo install wasm-pack
 
       - name: Build Wasm packages
         run: npm run build:sdk-wasm
