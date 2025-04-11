@@ -478,9 +478,11 @@ impl ClarityBackingStore for ClarityDatastore {
     }
 
     fn get_block_at_height(&mut self, height: u32) -> Option<StacksBlockId> {
+        println!("get_block_at_height");
         if let Some(remote_network_info) = &self.remote_network_info {
             if height <= remote_network_info.initial_height {
                 let block_info = self.get_remote_block_info_from_height(height);
+                println!("block_info: {:#?}", block_info);
                 return Some(block_info.index_block_hash);
             }
         }
@@ -890,9 +892,23 @@ impl HeadersDB for Datastore {
         &self,
         id_bhh: &StacksBlockId,
     ) -> Option<BurnchainHeaderHash> {
-        self.stacks_blocks
+        if let Some(hash) = self
+            .stacks_blocks
             .get(id_bhh)
             .map(|block| block.burn_block_header_hash)
+        {
+            return Some(hash);
+        }
+
+        if self.remote_network_info.is_some() {
+            return self
+                .remote_block_info_cache
+                .borrow()
+                .get(id_bhh)
+                .map(|block| block.burn_block_hash);
+        }
+
+        None
     }
 
     fn get_consensus_hash_for_block(
@@ -939,9 +955,23 @@ impl HeadersDB for Datastore {
         id_bhh: &StacksBlockId,
         _epoch_id: Option<&StacksEpochId>,
     ) -> Option<u64> {
-        self.get_burn_header_hash_for_block(id_bhh)
+        if let Some(hash) = self
+            .get_burn_header_hash_for_block(id_bhh)
             .and_then(|hash| self.burn_blocks.get(&hash))
             .map(|b| b.burn_block_time)
+        {
+            return Some(hash);
+        }
+
+        if self.remote_network_info.is_some() {
+            return self
+                .remote_block_info_cache
+                .borrow()
+                .get(id_bhh)
+                .map(|block| block.burn_block_time);
+        }
+
+        None
     }
 
     fn get_burn_block_height_for_block(&self, id_bhh: &StacksBlockId) -> Option<u32> {
