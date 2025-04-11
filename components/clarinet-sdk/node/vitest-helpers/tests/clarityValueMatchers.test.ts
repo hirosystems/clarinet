@@ -402,7 +402,7 @@ describe("test nested types", () => {
     expect(complexTuple).toEqual(complexTuple);
 
     // toBeTuple with a Cl.tuple
-    expect(complexTuple).toBeTuple(complexTuple.data);
+    expect(complexTuple).toBeTuple(complexTuple.value);
 
     // toBeTuple asymmetric matched
     expect(complexTuple).toBeTuple({
