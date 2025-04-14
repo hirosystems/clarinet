@@ -537,18 +537,19 @@ pub fn process_mutating_request(
 ) -> Result<LspRequestResponse, String> {
     match command {
         LspRequest::Initialize(params) => {
-            let initialization_options = params
+            let initialization_options: InitializationOptions = params
                 .initialization_options
                 .and_then(|o| serde_json::from_value(o).ok())
-                .unwrap_or(InitializationOptions::default());
+                .unwrap_or_default();
 
-            match editor_state.try_write(|es| es.settings = initialization_options.clone()) {
-                Ok(_) => Ok(LspRequestResponse::Initialize(Box::new(InitializeResult {
-                    server_info: None,
-                    capabilities: get_capabilities(&initialization_options),
-                }))),
-                Err(err) => Err(err),
-            }
+            editor_state
+                .try_write(|es| es.settings = initialization_options.clone())
+                .map(|_| {
+                    LspRequestResponse::Initialize(Box::new(InitializeResult {
+                        server_info: None,
+                        capabilities: get_capabilities(&initialization_options),
+                    }))
+                })
         }
         _ => Err(format!(
             "Unexpected command: {:?}, should not mutate state",

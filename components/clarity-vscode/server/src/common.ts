@@ -19,6 +19,7 @@ export function initConnection(
   connection.onInitialize((params) => {
     try {
       initializationOptions = JSON.parse(params.initializationOptions);
+      params.initializationOptions = initializationOptions;
     } catch (err) {
       console.error("Invalid initialization options");
       throw err;

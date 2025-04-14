@@ -93,7 +93,7 @@
             "order": 0,
             "description": "If set to true, the auto-completion of native functions will include placeholders for the arguments."
           },
-          "clarity-lsp.format": {
+          "clarity-lsp.formatting": {
             "type": "boolean",
             "default": false,
             "order": 0,
@@ -253,14 +253,14 @@
     "@types/webpack-env": "^1.17.0",
     "@typescript-eslint/eslint-plugin": "^8.11.0",
     "@typescript-eslint/parser": "^8.11.0",
-    "@vscode/test-web": "^0.0.66",
+    "@vscode/test-web": "^0.0.68",
     "@vscode/vsce": "^3.2.2",
     "@wasm-tool/wasm-pack-plugin": "^1.6.0",
     "chai": "^5.0.3",
     "concurrently": "^9.1.2",
-    "copy-webpack-plugin": "^12.0.2",
+    "copy-webpack-plugin": "^13.0.0",
     "eslint": "^9.13.0",
-    "mocha": "^11.1.0",
+    "mocha": "^11.2.2",
     "path-browserify": "^1.0.1",
     "regenerator-runtime": "^0.14.0",
     "rimraf": "^6.0.1",
