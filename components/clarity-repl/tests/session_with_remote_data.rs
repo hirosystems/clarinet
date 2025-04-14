@@ -204,6 +204,31 @@ fn it_keeps_track_of_historical_data() {
 }
 
 #[test]
+fn it_can_get_tenure_info_time() {
+    let mut session = init_session(57000);
+    let result = eval_snippet(&mut session, "(get-tenure-info? time u56999)");
+    assert_eq!(result, Value::some(Value::UInt(1737053962)).unwrap());
+    let result = eval_snippet(&mut session, "(get-tenure-info? time u50999)");
+    assert_eq!(result, Value::some(Value::UInt(1736980481)).unwrap());
+}
+#[test]
+fn it_can_get_tenure_info_bhh() {
+    let mut session = init_session(57000);
+
+    let result = eval_snippet(
+        &mut session,
+        "(get-tenure-info? burnchain-header-hash u56888)",
+    );
+
+    let expected_header_hash =
+        hex_bytes("026c12afb50b4baabb5cac8b940eda8b437f979b9819eef4cdd14c9f1a78133c").unwrap();
+    assert_eq!(
+        result,
+        Value::some(Value::buff_from(expected_header_hash).unwrap()).unwrap()
+    );
+}
+
+#[test]
 fn it_handles_chain_constants() {
     let mut session = init_session(57000);
     let result = eval_snippet(&mut session, "is-in-mainnet");

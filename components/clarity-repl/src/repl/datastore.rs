@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use std::rc::Rc;
 
 use super::remote_data::fs::{get_file_from_cache, write_file_to_cache};
-use super::remote_data::{epoch_for_height, Block, HttpClient};
+use super::remote_data::{epoch_for_height, Block, HttpClient, Sortition};
 
 use clarity::types::chainstate::{
     BlockHeaderHash, BurnchainHeaderHash, ConsensusHash, SortitionId, StacksAddress, StacksBlockId,
@@ -57,6 +57,7 @@ pub struct ClarityDatastore {
 
     remote_network_info: Option<RemoteNetworkInfo>,
     remote_block_info_cache: Rc<RefCell<HashMap<StacksBlockId, Block>>>,
+    remote_sortition_cache: Rc<RefCell<HashMap<BurnchainHeaderHash, Sortition>>>,
     fs_cache_location: PathBuf,
     local_accounts: Vec<StandardPrincipalData>,
 
@@ -78,6 +79,7 @@ impl Clone for ClarityDatastore {
             chain_tip_at_height: self.chain_tip_at_height.clone(),
             remote_network_info: self.remote_network_info.clone(),
             remote_block_info_cache: Rc::clone(&self.remote_block_info_cache),
+            remote_sortition_cache: Rc::clone(&self.remote_sortition_cache),
             fs_cache_location: self.fs_cache_location.clone(),
             local_accounts: self.local_accounts.clone(),
             client: self.client.clone(),
@@ -135,6 +137,7 @@ pub struct Datastore {
     burn_chain_height: u32,
     current_chain_tip: Rc<RefCell<StacksBlockId>>,
     remote_block_info_cache: Rc<RefCell<HashMap<StacksBlockId, Block>>>,
+    remote_sortition_cache: Rc<RefCell<HashMap<BurnchainHeaderHash, Sortition>>>,
     burn_blocks: HashMap<BurnchainHeaderHash, BurnBlockInfo>,
     stacks_chain_height: u32,
     stacks_blocks: HashMap<StacksBlockId, StacksBlockInfo>,
@@ -206,6 +209,7 @@ impl ClarityDatastore {
 
             remote_network_info: None,
             remote_block_info_cache: Rc::new(RefCell::new(HashMap::new())),
+            remote_sortition_cache: Rc::new(RefCell::new(HashMap::new())),
             fs_cache_location,
             local_accounts: Vec::new(),
 
@@ -217,7 +221,9 @@ impl ClarityDatastore {
         let height = remote_network_info.initial_height;
         let path = format!("/extended/v2/blocks/{}", height);
         let block = client.fetch_block(&path);
-        let cache = HashMap::from([(block.index_block_hash, block.clone())]);
+        let sortition = client.fetch_sortition(block.burn_block_height);
+        let block_cache = HashMap::from([(block.index_block_hash, block.clone())]);
+        let sortition_cache = HashMap::from([(block.burn_block_hash, sortition)]);
         let fs_cache_location = remote_network_info
             .cache_location
             .as_ref()
@@ -233,8 +239,9 @@ impl ClarityDatastore {
             metadata: HashMap::new(),
             height_at_chain_tip: HashMap::from([(id, height)]),
             chain_tip_at_height: HashMap::from([(height, id)]),
-            remote_network_info: Some(remote_network_info), // Clone to avoid partial move
-            remote_block_info_cache: Rc::new(RefCell::new(cache)),
+            remote_network_info: Some(remote_network_info),
+            remote_block_info_cache: Rc::new(RefCell::new(block_cache)),
+            remote_sortition_cache: Rc::new(RefCell::new(sortition_cache)),
             fs_cache_location,
             local_accounts: Vec::new(),
 
@@ -322,6 +329,19 @@ impl ClarityDatastore {
             .insert(block.index_block_hash, block.height);
         self.chain_tip_at_height
             .insert(block.height, block.index_block_hash);
+
+        if self
+            .remote_sortition_cache
+            .borrow()
+            .get(&block.burn_block_hash)
+            .is_none()
+        {
+            let sortition = self.client.fetch_sortition(block.burn_block_height);
+            self.remote_sortition_cache
+                .borrow_mut()
+                .insert(block.burn_block_hash, sortition);
+        }
+
         block
     }
 
@@ -478,9 +498,11 @@ impl ClarityBackingStore for ClarityDatastore {
     }
 
     fn get_block_at_height(&mut self, height: u32) -> Option<StacksBlockId> {
+        println!("get_block_at_height");
         if let Some(remote_network_info) = &self.remote_network_info {
             if height <= remote_network_info.initial_height {
                 let block_info = self.get_remote_block_info_from_height(height);
+                println!("block_info: {:#?}", block_info);
                 return Some(block_info.index_block_hash);
             }
         }
@@ -625,6 +647,7 @@ impl Datastore {
             burn_chain_height,
             current_chain_tip: Rc::clone(&clarity_datastore.current_chain_tip),
             remote_block_info_cache: Rc::clone(&clarity_datastore.remote_block_info_cache),
+            remote_sortition_cache: Rc::clone(&clarity_datastore.remote_sortition_cache),
             burn_blocks,
             stacks_chain_height,
             stacks_blocks,
@@ -654,6 +677,10 @@ impl Datastore {
             let cache = clarity_datastore.remote_block_info_cache.borrow();
             cache.get(&current_chain_tip).unwrap().clone()
         };
+        let sortition = {
+            let cache = clarity_datastore.remote_sortition_cache.borrow();
+            cache.get(&block.burn_block_hash).unwrap().clone()
+        };
 
         let is_mainnet = clarity_datastore
             .remote_network_info
@@ -666,7 +693,6 @@ impl Datastore {
         let burn_block_header_hash = block.burn_block_hash;
         let block_header_hash = block.hash;
 
-        let sortition = client.fetch_sortition(burn_chain_height);
         let sortition_id = sortition.sortition_id;
         let consensus_hash = sortition.consensus_hash;
 
@@ -701,6 +727,7 @@ impl Datastore {
             burn_chain_height,
             current_chain_tip: Rc::clone(&clarity_datastore.current_chain_tip),
             remote_block_info_cache: Rc::clone(&clarity_datastore.remote_block_info_cache),
+            remote_sortition_cache: Rc::clone(&clarity_datastore.remote_sortition_cache),
             burn_blocks,
             stacks_chain_height: *stacks_chain_height,
             stacks_blocks,
@@ -890,9 +917,23 @@ impl HeadersDB for Datastore {
         &self,
         id_bhh: &StacksBlockId,
     ) -> Option<BurnchainHeaderHash> {
-        self.stacks_blocks
+        if let Some(hash) = self
+            .stacks_blocks
             .get(id_bhh)
             .map(|block| block.burn_block_header_hash)
+        {
+            return Some(hash);
+        }
+
+        if self.remote_network_info.is_some() {
+            return self
+                .remote_block_info_cache
+                .borrow()
+                .get(id_bhh)
+                .map(|block| block.burn_block_hash);
+        }
+
+        None
     }
 
     fn get_consensus_hash_for_block(
@@ -900,11 +941,18 @@ impl HeadersDB for Datastore {
         id_bhh: &StacksBlockId,
         _epoch_id: &StacksEpochId,
     ) -> Option<ConsensusHash> {
-        self.stacks_blocks
-            .get(id_bhh)
-            .map(|block| block.burn_block_header_hash)
-            .and_then(|hash| self.burn_blocks.get(&hash))
-            .map(|b| b.consensus_hash)
+        let bbh = self.get_burn_header_hash_for_block(id_bhh)?;
+        if let Some(consensus_hash) = self.burn_blocks.get(&bbh).map(|b| b.consensus_hash) {
+            return Some(consensus_hash);
+        }
+        if self.remote_network_info.is_some() {
+            return self
+                .remote_sortition_cache
+                .borrow()
+                .get(&bbh)
+                .map(|s| s.consensus_hash);
+        }
+        None
     }
 
     fn get_vrf_seed_for_block(
@@ -912,11 +960,18 @@ impl HeadersDB for Datastore {
         id_bhh: &StacksBlockId,
         _epoch_id: &StacksEpochId,
     ) -> Option<VRFSeed> {
-        self.stacks_blocks
-            .get(id_bhh)
-            .map(|block| block.burn_block_header_hash)
-            .and_then(|hash| self.burn_blocks.get(&hash))
-            .map(|b| b.vrf_seed)
+        let bbh = self.get_burn_header_hash_for_block(id_bhh)?;
+        if let Some(vrf_seed) = self.burn_blocks.get(&bbh).map(|b| b.vrf_seed) {
+            return Some(vrf_seed);
+        }
+        if self.remote_network_info.is_some() {
+            return self
+                .remote_sortition_cache
+                .borrow()
+                .get(&bbh)
+                .and_then(|s| s.vrf_seed);
+        }
+        None
     }
 
     fn get_stacks_block_time_for_block(&self, id_bhh: &StacksBlockId) -> Option<u64> {
@@ -939,9 +994,23 @@ impl HeadersDB for Datastore {
         id_bhh: &StacksBlockId,
         _epoch_id: Option<&StacksEpochId>,
     ) -> Option<u64> {
-        self.get_burn_header_hash_for_block(id_bhh)
+        if let Some(hash) = self
+            .get_burn_header_hash_for_block(id_bhh)
             .and_then(|hash| self.burn_blocks.get(&hash))
             .map(|b| b.burn_block_time)
+        {
+            return Some(hash);
+        }
+
+        if self.remote_network_info.is_some() {
+            return self
+                .remote_block_info_cache
+                .borrow()
+                .get(id_bhh)
+                .map(|block| block.burn_block_time);
+        }
+
+        None
     }
 
     fn get_burn_block_height_for_block(&self, id_bhh: &StacksBlockId) -> Option<u32> {
