@@ -16,7 +16,7 @@
     "@stacks/transactions": "6.17.0",
     "chokidar-cli": "^3.0.0",
     "typescript": "^5.7.2",
-    "vite": "^6.2.4",
+    "vite": "^6.2.6",
     "vitest": "^3.0.0",
     "vitest-environment-clarinet": "^2.3.0"
   }
