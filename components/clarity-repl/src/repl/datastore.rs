@@ -498,11 +498,9 @@ impl ClarityBackingStore for ClarityDatastore {
     }
 
     fn get_block_at_height(&mut self, height: u32) -> Option<StacksBlockId> {
-        println!("get_block_at_height");
         if let Some(remote_network_info) = &self.remote_network_info {
             if height <= remote_network_info.initial_height {
                 let block_info = self.get_remote_block_info_from_height(height);
-                println!("block_info: {:#?}", block_info);
                 return Some(block_info.index_block_hash);
             }
         }
