@@ -534,11 +534,11 @@ block time could be impacted by this change.
 
 ##### Other Changes
 
-- Adjust 2.1 start height ([2e1e44c8](https://github.com/hirosystems/clarinet/commit/2e1e44c8)
+- Adjust 2.1 start height ([2e1e44c8](https://github.com/hirosystems/clarinet/commit/2e1e44c8))
 - Set Clarity2 and epoch 2.1 as default
-  ([6cb1e21d](https://github.com/hirosystems/clarinet/commit/6cb1e21d)
+  ([6cb1e21d](https://github.com/hirosystems/clarinet/commit/6cb1e21d))
 - Update api urls to use hiro.so
-  ([4e23a7ed](https://github.com/hirosystems/clarinet/commit/4e23a7ed)
+  ([4e23a7ed](https://github.com/hirosystems/clarinet/commit/4e23a7ed))
 
 # [1.5.2](https://github.com/hirosystems/clarinet/compare/v1.5.0...v1.5.2) (2023-03-16)
 
@@ -623,7 +623,7 @@ block time could be impacted by this change.
 
 # [1.3.1](https://github.com/hirosystems/clarinet/compare/v1.3.0...v1.3.1) (2023-01-03)
 
-### New Features
+#### New Features
 
 - Introduce use_docker_gateway_routing setting for CI environments
 - Improve signature help in LSP
@@ -635,7 +635,7 @@ block time could be impacted by this change.
   ([b379d29f](https://github.com/hirosystems/clarinet/commit/b379d29f4ad4e85df42e804bc00cec2baff375c0),
   [4f4c8806](https://github.com/hirosystems/clarinet/commit/4f4c88064e2045de9e48d75b507dd321d4543046))
 
-### Bug Fixes
+#### Bug Fixes
 
 - Fix STX assets title
   ([fdc748e7](https://github.com/hirosystems/clarinet/commit/fdc748e7b7df6ef1a6b62ab5cb8c1b68bde9b1ad),
@@ -648,7 +648,7 @@ block time could be impacted by this change.
 
 # [1.3.0](https://github.com/hirosystems/clarinet/compare/v1.2.0...v1.3.0) (2022-12-20)
 
-### New Features
+#### New Features
 
 - Improved Clarity 2 support ([#711](https://github.com/hirosystems/clarinet/pull/711)
   [#714](https://github.com/hirosystems/clarinet/pull/714))
@@ -660,7 +660,7 @@ block time could be impacted by this change.
 - Revamped [stacks-devnet-js](https://www.npmjs.com/package/@hirosystems/stacks-devnet-js) testing
   framework
 
-### Bug Fixes
+#### Bug Fixes
 
 - Fix deployment plans issue where contracts keep being re-ordered
   ([cf8140e6](https://github.com/hirosystems/clarinet/commit/cf8140e6534bfc1a2f01c09addcae3a45d85d290))
@@ -669,40 +669,40 @@ block time could be impacted by this change.
 
 # [1.2.0](https://github.com/hirosystems/clarinet/compare/v1.1.0...v1.2.0) (2022-12-03)
 
-### New Features
+#### New Features
 
 - Improve Stacks 2.1 support
 - Improve `stack-devnet-js` stability
 - Update Clarity VM
 
-### Bug Fixes
+#### Bug Fixes
 
 - `clarinet test` returns status code 1 when failing
 
 # [1.1.0]() (2022-11-17)
 
-### New Features
+#### New Features
 
 - Support for Stacks 2.1
   ([790c14bf](https://github.com/hirosystems/clarinet/commit/790c14bf8fd4a30d1f50c2c4a55873aecac1a076))
 - Display clarity documentation on hover in VSCode
   ([e605acb4](https://github.com/hirosystems/clarinet/commit/e605acb49f0892cb75b7a16edf37807f29133a20))
 
-### Chores
+#### Chores
 
 - Better error management in chainhook-node
   ([353ceb61](https://github.com/hirosystems/clarinet/commit/353ceb617b8a5b710331fe3387b07f6ad48e3f48))
 
 # [1.0.6]() (2022-11-10)
 
-### New Features
+#### New Features
 
 - Ability for chainhook-node to start with custom config
   ([473c86ba](https://github.com/hirosystems/clarinet/commit/473c86babe41f0c16ea9c370890d440a698dfa08))
 - Draft bitcoin replay implementation
   ([8580092e](https://github.com/hirosystems/clarinet/commit/8580092e2e8661c3d6e653be2c3f687774e560fa))
 
-### Bug Fixes
+#### Bug Fixes
 
 - Filter out boot contracts from requirement dependencies
   ([34fbcf96](https://github.com/hirosystems/clarinet/commit/34fbcf9686a9bdcdf2e11715abbcb9fa301e4dfb))
@@ -720,7 +720,7 @@ block time could be impacted by this change.
 
 # [1.0.5]() (2022-11-03)
 
-### New Features
+#### New Features
 
 - Many chainhooks enhancements: event payload augmented, new predicates (segwit, etc) implemented.
   Documentation coming soon!
@@ -731,7 +731,7 @@ block time could be impacted by this change.
 - Ability to send STX in deployment plans
   ([c9e3bac4](https://github.com/hirosystems/clarinet/commit/c9e3bac44c2fe97f2f6b5f6578cc309f2cc2e38f))
 
-### Bug Fixes
+#### Bug Fixes
 
 - Termination in `clarinet integrate --no-dashboard` mode fixed
   ([2cdb09a6](https://github.com/hirosystems/clarinet/commit/2cdb09a6aeed631236971f4d4206ff97b742683e))
@@ -743,7 +743,7 @@ block time could be impacted by this change.
 - Fixed stacks-js-helper generator
   ([11562ae7](https://github.com/hirosystems/clarinet/commit/11562ae739170a799620f4a62462219304dafc19))
 
-### Chores
+#### Chores
 
 - Types improvements clarinet deno library
   ([3bc5c51c](https://github.com/hirosystems/clarinet/commit/3bc5c51cda35bdc52c8867fe222341680e0e3880))
@@ -753,7 +753,7 @@ block time could be impacted by this change.
 
 # [1.0.4]() (2022-10-17)
 
-### New Features
+#### New Features
 
 - Devnet chainstate now lives in `cache` directory specified in Clarinet.toml
   ([a6fb383f](https://github.com/hirosystems/clarinet/commit/a6fb383fecb936d27386f3f914f98dda89a67dda))
@@ -764,7 +764,7 @@ block time could be impacted by this change.
 - Introduce stacks-network component
   ([ace64116](https://github.com/hirosystems/clarinet/commit/ace641164465d7a253375365a2f805a650981d09))
 
-### Bug Fixes
+#### Bug Fixes
 
 - Bump ingestion limits to 5 mb
   ([e4d539da](https://github.com/hirosystems/clarinet/commit/e4d539da703371d6046a64088e18fb23d0452575))
@@ -783,7 +783,7 @@ block time could be impacted by this change.
 
 # [1.0.0]() (2022-10-06)
 
-### New Features
+#### New Features
 
 - Introducing our brand new re-architected VSCode extension
   ([README](https://github.com/hirosystems/clarinet/tree/develop/components/clarity-vscode))
@@ -804,7 +804,7 @@ block time could be impacted by this change.
 - Ability to detect outdated deployment plans and display diffs
   ([#365](https://github.com/hirosystems/clarinet/issues/365))
 
-### Bug Fixes
+#### Bug Fixes
 
 A myriad of issues were addressed in this new version, the most notable being:
 
@@ -822,14 +822,14 @@ A myriad of issues were addressed in this new version, the most notable being:
 - Improve debugability of chain.mine_block()
   ([#91](https://github.com/hirosystems/clarinet/issues/91))
 
-### Documentation
+#### Documentation
 
 - Added new example - How to use Chainhooks for indexing data
   ([cdeca648](https://github.com/hirosystems/clarinet/commit/cdeca64837e51dd64292ba2f4ddfcdfc3ef77da1))
 - Added OpenAPI spec for Chainhooks
   ([01e8979c](https://github.com/hirosystems/clarinet/commit/01e8979c815cff701496d25e07dbf6777ff0afd5))
 
-### Compatibility Issue
+#### Compatibility Issue
 
 Clarinet v1.0.0 is not currently backwards-compatible with older versions of the Clarinet deno
 library. If you are upgrading Clarinet to Clarinet `v1.0.0`, you will need to enter the following
@@ -848,7 +848,7 @@ will need to specify the docker tag `v0.33.0`, instead of `latest`.
 
 # [0.33.0]() (2022-07-20)
 
-### Chores
+#### Chores
 
 - migrate to mono-repo layout ([#481](https://github.com/hirosystems/clarinet/pull/481))
 - **deps:**
@@ -859,18 +859,18 @@ will need to specify the docker tag `v0.33.0`, instead of `latest`.
   - bump nix in /components/stacks-devnet-js
     ([f453b4aa](https://github.com/hirosystems/clarinet/commit/f453b4aae32dee20f9d4f006e70b2518c2878bb3))
 
-### Continuous Integration
+#### Continuous Integration
 
 - revisit CI and release process
   ([423c3d36](https://github.com/hirosystems/clarinet/commit/423c3d36c7cb571156bb6553162dbac0b24a2e1c))
 
-### Documentation Changes
+#### Documentation Changes
 
 - README.md. Removed depends_on() field in the clarinet.toml file and added success message for
   clarinet check command.
   ([84d0a327](https://github.com/hirosystems/clarinet/commit/84d0a32776b69520228d2e5149a4a3428e970b56))
 
-### New Features
+#### New Features
 
 - polish hyperchain integration ([#432](https://github.com/hirosystems/clarinet/pull/432),
   [#480](https://github.com/hirosystems/clarinet/pull/480),
@@ -886,7 +886,7 @@ will need to specify the docker tag `v0.33.0`, instead of `latest`.
 
 # [0.32.0](https://github.com/hirosystems/clarinet/compare/v0.31.1...v0.32.0) (2022-06-23)
 
-### Bug Fixes
+#### Bug Fixes
 
 - add dotenv to cbtc dependencies
   ([158390a](https://github.com/hirosystems/clarinet/commit/158390aa42f6781a684a3322a2ce960a5c8329ec))
@@ -967,7 +967,7 @@ will need to specify the docker tag `v0.33.0`, instead of `latest`.
 - windows ui
   ([77fc359](https://github.com/hirosystems/clarinet/commit/77fc359503cfa0ab12858aa6a3e5fdbf0c3d429a))
 
-### Features
+#### Features
 
 - ability to add contract-call in deployment plans
   ([2e27031](https://github.com/hirosystems/clarinet/commit/2e2703105933d3be31a7df329452ced1de2f5e54))
@@ -1002,9 +1002,9 @@ will need to specify the docker tag `v0.33.0`, instead of `latest`.
 - use oreo as library in clarinet
   ([82057d4](https://github.com/hirosystems/clarinet/commit/82057d431e00032c7d397d524223f935e786cea3))
 
-## [0.31.1](https://github.com/hirosystems/clarinet/compare/v0.31.0...v0.31.1) (2022-05-27)
+# [0.31.1](https://github.com/hirosystems/clarinet/compare/v0.31.0...v0.31.1) (2022-05-27)
 
-### Bug Fixes
+#### Bug Fixes
 
 - code coverage not including initial executions
   ([6089e86](https://github.com/hirosystems/clarinet/commit/6089e8604384d5e86bb48df47de0404cd2781cf0))
@@ -1022,7 +1022,7 @@ will need to specify the docker tag `v0.33.0`, instead of `latest`.
 
 # [0.31.0](https://github.com/hirosystems/clarinet/compare/v0.30.0...v0.31.0) (2022-05-24)
 
-### Bug Fixes
+#### Bug Fixes
 
 - address feedbacks
   ([c03549d](https://github.com/hirosystems/clarinet/commit/c03549d1fa3804faa9fbd19f01e0933d0051ae0f))
@@ -1059,7 +1059,7 @@ will need to specify the docker tag `v0.33.0`, instead of `latest`.
 - windows builds
   ([d020d57](https://github.com/hirosystems/clarinet/commit/d020d57e427c493ef01051acb188cfb8eec1b754))
 
-### Features
+#### Features
 
 - add telemetry for DAP debugger
   ([c7a29f5](https://github.com/hirosystems/clarinet/commit/c7a29f5dc3962f53ecf1ea9e459f86fbcab3a692))
@@ -1096,12 +1096,12 @@ will need to specify the docker tag `v0.33.0`, instead of `latest`.
 
 # [0.30.0](https://github.com/hirosystems/clarinet/compare/v0.29.1...v0.30.0) (2022-05-13)
 
-### Bug Fixes
+#### Bug Fixes
 
 - unordered contracts
   ([4cc54c7](https://github.com/hirosystems/clarinet/commit/4cc54c772299d4d034a87f13b5c20997b59359a4))
 
-### Features
+#### Features
 
 - add telemetry for DAP debugger
   ([b1511e6](https://github.com/hirosystems/clarinet/commit/b1511e6427abffa14b4dda22b222aa856e575a32))
@@ -1116,16 +1116,16 @@ will need to specify the docker tag `v0.33.0`, instead of `latest`.
 - update to use repl with DAP support
   ([f937bb2](https://github.com/hirosystems/clarinet/commit/f937bb2b52560c55d4df74113d0a4e83cfd69d62))
 
-## [0.29.1](https://github.com/hirosystems/clarinet/compare/v0.29.0...v0.29.1) (2022-05-03)
+# [0.29.1](https://github.com/hirosystems/clarinet/compare/v0.29.0...v0.29.1) (2022-05-03)
 
-### Bug Fixes
+#### Bug Fixes
 
 - fixed problem with contract ordering in lsp
   ([12bccc5](https://github.com/hirosystems/clarinet/commit/12bccc5db45a230f7faa91a4ab784a4161c3a135))
 
 # [0.29.0](https://github.com/hirosystems/clarinet/compare/v0.28.1...v0.29.0) (2022-04-21)
 
-### Bug Fixes
+#### Bug Fixes
 
 - add new costs synthesis table
   ([d8f5f29](https://github.com/hirosystems/clarinet/commit/d8f5f2939521d56f71db06a0b4ab4ef718b16fcf))
@@ -1137,16 +1137,16 @@ will need to specify the docker tag `v0.33.0`, instead of `latest`.
 - remove warnings about manifest file
   ([49edfd4](https://github.com/hirosystems/clarinet/commit/49edfd41136b2389054c47c37808663cbc8faa6d))
 
-### Features
+#### Features
 
 - add boot_contracts config
   ([c1cab93](https://github.com/hirosystems/clarinet/commit/c1cab93ccffa03366d25956634311a9b886a1957))
 - add tx_per_block and improve formatting
   ([1fc6d4f](https://github.com/hirosystems/clarinet/commit/1fc6d4f56e311edfebc8378b684cedc5155e91a0))
 
-## [0.28.1](https://github.com/hirosystems/clarinet/compare/v0.28.0...v0.28.1) (2022-04-06)
+# [0.28.1](https://github.com/hirosystems/clarinet/compare/v0.28.0...v0.28.1) (2022-04-06)
 
-### Bug Fixes
+#### Bug Fixes
 
 - add `principal` type for completions
   ([1aa8fb7](https://github.com/hirosystems/clarinet/commit/1aa8fb74d099e06d4a14626588d6daafbf720652)),
@@ -1154,7 +1154,7 @@ will need to specify the docker tag `v0.33.0`, instead of `latest`.
 
 # [0.28.0](https://github.com/hirosystems/clarinet/compare/v0.27.0...v0.28.0) (2022-03-31)
 
-### Bug Fixes
+#### Bug Fixes
 
 - address https://github.com/hirosystems/clarinet/issues/279
   ([69253d3](https://github.com/hirosystems/clarinet/commit/69253d3f8f974e4841b30b25233e63971d38434b))
@@ -1172,7 +1172,7 @@ will need to specify the docker tag `v0.33.0`, instead of `latest`.
 - upgrade typescript from 4.5.2 to 4.5.5
   ([0129097](https://github.com/hirosystems/clarinet/commit/0129097cb2dfc1b3447edca02885f5f453b78075))
 
-### Features
+#### Features
 
 - **debugger:** add telemetry for debugger
   ([4438e23](https://github.com/hirosystems/clarinet/commit/4438e23430f3beee04ef0629c144b428adc55cf6))
@@ -1190,7 +1190,7 @@ will need to specify the docker tag `v0.33.0`, instead of `latest`.
 
 # [0.27.0](https://github.com/hirosystems/clarinet/compare/v0.26.1...v0.27.0) (2022-02-24)
 
-### Features
+#### Features
 
 - add shell completions files
   ([e6b1f25](https://github.com/hirosystems/clarinet/commit/e6b1f25683cb2c0e8f031e08fa0843fb0e5af690))
@@ -1203,28 +1203,28 @@ will need to specify the docker tag `v0.33.0`, instead of `latest`.
 - stacks-devnet-js support for linux-musl (non-glibc, e.g. alpine)
   ([6e322f1](https://github.com/hirosystems/clarinet/commit/6e322f1b668b9fcbc547e1053cf8d10807828c60))
 
-## [0.26.1](https://github.com/hirosystems/clarinet/compare/v0.26.0...v0.26.1) (2022-02-13)
+# [0.26.1](https://github.com/hirosystems/clarinet/compare/v0.26.0...v0.26.1) (2022-02-13)
 
-### Bug Fixes
+#### Bug Fixes
 
 - update to clarity-repl 0.22.1
   ([644c082](https://github.com/hirosystems/clarinet/commit/644c082da056511ebe3c5d0d9e2eb10411b78c4b))
 
 # [0.26.0](https://github.com/hirosystems/clarinet/compare/v0.25.1...v0.26.0) (2022-02-12)
 
-### Bug Fixes
+#### Bug Fixes
 
 - fix serialization of REPL settings
   ([5fc9d08](https://github.com/hirosystems/clarinet/commit/5fc9d080cdb499d61d69498050773b7cbaba72fe))
 
-### Features
+#### Features
 
 - macos-arm64 / Apple Silicon / M1 builds
   ([da5f1bc](https://github.com/hirosystems/clarinet/commit/da5f1bc43a977156656d3036861c2ff4978d53bf))
 
-## [0.25.1](https://github.com/hirosystems/clarinet/compare/v0.25.0...v0.25.1) (2022-02-11)
+# [0.25.1](https://github.com/hirosystems/clarinet/compare/v0.25.0...v0.25.1) (2022-02-11)
 
-### Bug Fixes
+#### Bug Fixes
 
 - crash on `clarinet new contract`
   ([d236370](https://github.com/hirosystems/clarinet/commit/d2363700b0a7594ea54802496dd4244343a7e238)),
@@ -1232,14 +1232,14 @@ will need to specify the docker tag `v0.33.0`, instead of `latest`.
 
 # [0.25.0](https://github.com/hirosystems/clarinet/compare/v0.24.0...v0.25.0) (2022-02-10)
 
-### Bug Fixes
+#### Bug Fixes
 
 - clarity-repl resolve_link adjustment
   ([f1e8b47](https://github.com/hirosystems/clarinet/commit/f1e8b47814173acb6cd39ed5bf98a987ff8c97cf))
 - link title typo
   ([20b5982](https://github.com/hirosystems/clarinet/commit/20b5982be084b0934a86938e7a67115c94c43168))
 
-### Features
+#### Features
 
 - add analysis settings support
   ([c7984e3](https://github.com/hirosystems/clarinet/commit/c7984e3036641ac95c65b6ae56f5b954641e282c)),
@@ -1259,7 +1259,7 @@ will need to specify the docker tag `v0.33.0`, instead of `latest`.
 
 # [0.24.0](https://github.com/hirosystems/clarinet/compare/v0.23.1...v0.24.0) (2022-01-19)
 
-### Bug Fixes
+#### Bug Fixes
 
 - fixed broken links
   ([b0f073a](https://github.com/hirosystems/clarinet/commit/b0f073ac634f480c86b0b788c51057605b202c64))
@@ -1271,54 +1271,54 @@ will need to specify the docker tag `v0.33.0`, instead of `latest`.
 - resolve bug with windows build in CI
   ([16ccd00](https://github.com/hirosystems/clarinet/commit/16ccd00110c6abde8f4e27b74ddd93f935028e36))
 
-### Features
+#### Features
 
 - added ignore and only options to clarinet test
   ([a57cc23](https://github.com/hirosystems/clarinet/commit/a57cc2373cfe25604290c59143469df649337657))
 
-## [0.23.1](https://github.com/hirosystems/clarinet/compare/v0.23.0...v0.23.1) (2022-01-13)
+# [0.23.1](https://github.com/hirosystems/clarinet/compare/v0.23.0...v0.23.1) (2022-01-13)
 
-### Bug Fixes
+#### Bug Fixes
 
 - issue with chunked information in Mempool section
   ([1dd1e22](https://github.com/hirosystems/clarinet/commit/1dd1e22e1f14f6d23a8cdfe364bebb88489b25cb))
 
 # [0.23.0](https://github.com/hirosystems/clarinet/compare/v0.22.0...v0.23.0) (2022-01-07)
 
-### Bug Fixes
+#### Bug Fixes
 
 - display warnings and notes
   ([e0c4e1c](https://github.com/hirosystems/clarinet/commit/e0c4e1c0a1bd41a1814225a2565607523cfb25be))
 - off by one spans
   ([c724911](https://github.com/hirosystems/clarinet/commit/c724911e1f252c123d382947576014fa648638ee))
 
-### Features
+#### Features
 
 - display warning as warning in popups
   ([0ec64cf](https://github.com/hirosystems/clarinet/commit/0ec64cf4ea53ac169c7f798edca69be24d0c97f9))
 
 # [0.22.0](https://github.com/hirosystems/clarinet/compare/v0.21.2...v0.22.0) (2022-01-05)
 
-### Bug Fixes
+#### Bug Fixes
 
 - lsp adjustment
   ([67233f2](https://github.com/hirosystems/clarinet/commit/67233f29fb01a4f3faa192d1a0d62866471605b1))
 
-### Features
+#### Features
 
 - fail gracefully on Clarinet.toml errors
   ([3023320](https://github.com/hirosystems/clarinet/commit/3023320cfe919f925fbb0710d42811d12100e430))
 
-## [0.21.2](https://github.com/hirosystems/clarinet/compare/v0.21.1...v0.21.2) (2021-12-23)
+# [0.21.2](https://github.com/hirosystems/clarinet/compare/v0.21.1...v0.21.2) (2021-12-23)
 
-### Bug Fixes
+#### Bug Fixes
 
 - rollback to clarity-repl v0.18.0
   ([c5db67b](https://github.com/hirosystems/clarinet/commit/c5db67be42915492f3a619156611d19133d5fb82))
 
-## [0.21.1](https://github.com/hirosystems/clarinet/compare/v0.21.0...v0.21.1) (2021-12-23)
+# [0.21.1](https://github.com/hirosystems/clarinet/compare/v0.21.0...v0.21.1) (2021-12-23)
 
-### Bug Fixes
+#### Bug Fixes
 
 - show errors when parsing opts
   ([2dad960](https://github.com/hirosystems/clarinet/commit/2dad96064c95b763a1df13b2ea56421acc527a27)),
@@ -1326,7 +1326,7 @@ will need to specify the docker tag `v0.33.0`, instead of `latest`.
 
 # [0.21.0](https://github.com/hirosystems/clarinet/compare/v0.20.0...v0.21.0) (2021-12-22)
 
-### Bug Fixes
+#### Bug Fixes
 
 - build error
   ([6399169](https://github.com/hirosystems/clarinet/commit/63991693e3f9ce33c7ee010a5419190d0ed2c7cf))
@@ -1351,7 +1351,7 @@ will need to specify the docker tag `v0.33.0`, instead of `latest`.
 - stacks-devnet-js build
   ([fe74897](https://github.com/hirosystems/clarinet/commit/fe74897b03b2b5a464e8f6a874f0a2f3a6311373))
 
-### Features
+#### Features
 
 - add `analysis` field into project config
   ([ce61daf](https://github.com/hirosystems/clarinet/commit/ce61dafb92048e8268cc0082250d838b9289163f))
@@ -1364,21 +1364,21 @@ will need to specify the docker tag `v0.33.0`, instead of `latest`.
 
 # [0.20.0](https://github.com/hirosystems/clarinet/compare/v0.19.1...v0.20.0) (2021-12-09)
 
-### Features
+#### Features
 
 - document CI how-to
   ([a4079d9](https://github.com/hirosystems/clarinet/commit/a4079d96dd762ae85804bd1d8b116eac75447dac))
 
-## [0.19.1](https://github.com/hirosystems/clarinet/compare/v0.19.0...v0.19.1) (2021-12-06)
+# [0.19.1](https://github.com/hirosystems/clarinet/compare/v0.19.0...v0.19.1) (2021-12-06)
 
-### Bug Fixes
+#### Bug Fixes
 
 - update package name
   ([6477408](https://github.com/hirosystems/clarinet/commit/647740816577ba7faa978281ac83fc3485e929fa))
 
 # [0.19.0](https://github.com/hirosystems/clarinet/compare/v0.18.3...v0.19.0) (2021-12-06)
 
-### Bug Fixes
+#### Bug Fixes
 
 - add 128bit numbers support
   ([a87a99c](https://github.com/hirosystems/clarinet/commit/a87a99c99e8377d7cef0eeb331dd537702dae588))
@@ -1429,7 +1429,7 @@ will need to specify the docker tag `v0.33.0`, instead of `latest`.
 - warnings, remove rustdoc
   ([c81d7a7](https://github.com/hirosystems/clarinet/commit/c81d7a7f0b887b9cb23642ec3232fd11a638d563))
 
-### Features
+#### Features
 
 - add expectFungibleTokenBurnEvent
   ([0a77641](https://github.com/hirosystems/clarinet/commit/0a77641d685d53eeda2db0e0c79e37415409a3a4))
@@ -1454,7 +1454,7 @@ will need to specify the docker tag `v0.33.0`, instead of `latest`.
 
 # [0.18.0](https://github.com/hirosystems/clarinet/compare/v0.17.0...v0.18.0) (2021-10-18)
 
-### Bug Fixes
+#### Bug Fixes
 
 - build settings
   ([2a0cf5f](https://github.com/hirosystems/clarinet/commit/2a0cf5f4365760c5b40ceb9bf8db9d6ebec2a80e))
@@ -1473,7 +1473,7 @@ will need to specify the docker tag `v0.33.0`, instead of `latest`.
 - re-enable audits, ignore RUSTSEC-2020-0159, RUSTSEC-2021-0119, RUSTSEC-2020-0071
   ([f853221](https://github.com/hirosystems/clarinet/commit/f853221cf73fe542d309f7b6b83ba62f569e0fe7))
 
-### Features
+#### Features
 
 - add expectPrintEvent function
   ([e835c5a](https://github.com/hirosystems/clarinet/commit/e835c5a9c7294b420e74abac0d216deb93d1d8c9))
@@ -1490,7 +1490,7 @@ will need to specify the docker tag `v0.33.0`, instead of `latest`.
 
 # [0.17.0](https://github.com/hirosystems/clarinet/compare/v0.16.0...v0.17.0) (2021-10-05)
 
-### Features
+#### Features
 
 - ability to cache repl sessions
   ([5e086cb](https://github.com/hirosystems/clarinet/commit/5e086cbf5bf173db034eea256bf617e3ab5efdee))
@@ -1507,9 +1507,9 @@ will need to specify the docker tag `v0.33.0`, instead of `latest`.
 - revamp extension usage
   ([ec8cdfc](https://github.com/hirosystems/clarinet/commit/ec8cdfc9fb86bbc5bbdb381fa10982dd2ba82581))
 
-## [0.15.1](https://github.com/hirosystems/clarinet/compare/v0.15.0...v0.15.1) (2021-08-18)
+# [0.15.1](https://github.com/hirosystems/clarinet/compare/v0.15.0...v0.15.1) (2021-08-18)
 
-### Bug Fixes
+#### Bug Fixes
 
 - attempt to address compatibility with Linux
   ([fdae2b2](https://github.com/hirosystems/clarinet/commit/fdae2b2930363fd6765b03ccfef7051270059ca0))
@@ -1526,7 +1526,7 @@ will need to specify the docker tag `v0.33.0`, instead of `latest`.
 
 # [0.15.0](https://github.com/hirosystems/clarinet/compare/v0.14.2...v0.15.0) (2021-08-11)
 
-### Bug Fixes
+#### Bug Fixes
 
 - better process termination
   ([1feec61](https://github.com/hirosystems/clarinet/commit/1feec612bbdc91e689a1671f86f5774f8b8e504f))
@@ -1559,7 +1559,7 @@ will need to specify the docker tag `v0.33.0`, instead of `latest`.
 - warnings
   ([0c9f7a2](https://github.com/hirosystems/clarinet/commit/0c9f7a2af8768688f41b51c0cf2cfa301a1c7099))
 
-### Features
+#### Features
 
 - ability to disable dashboard
   ([32ccaff](https://github.com/hirosystems/clarinet/commit/32ccaff18d3e1832bd352feb58c12facb5c279ff))
@@ -1596,18 +1596,18 @@ will need to specify the docker tag `v0.33.0`, instead of `latest`.
 - write logs to disk
   ([fa82cd9](https://github.com/hirosystems/clarinet/commit/fa82cd9aca9c623635dac003b06d91fb40fab784))
 
-## [0.14.2](https://github.com/hirosystems/clarinet/compare/v0.14.1...v0.14.2) (2021-07-20)
+# [0.14.2](https://github.com/hirosystems/clarinet/compare/v0.14.1...v0.14.2) (2021-07-20)
 
-### Bug Fixes
+#### Bug Fixes
 
 - enforce cache eviction
   ([6ef7d63](https://github.com/hirosystems/clarinet/commit/6ef7d631b9e0661ae0c5bf4e0aa03c5dabfae4d7))
 - un-hard code path (clarinet deploy)
   ([b3e933a](https://github.com/hirosystems/clarinet/commit/b3e933a1aaa58a656eebfb29624c51cf48ba18ab))
 
-## [0.14.1](https://github.com/hirosystems/clarinet/compare/v0.14.0...v0.14.1) (2021-06-28)
+# [0.14.1](https://github.com/hirosystems/clarinet/compare/v0.14.0...v0.14.1) (2021-06-28)
 
-### Bug Fixes
+#### Bug Fixes
 
 - display typescript errors
   ([e7af34b](https://github.com/hirosystems/clarinet/commit/e7af34b3061f8afa42d0788d5a47a149fb3885d6))
@@ -1618,14 +1618,14 @@ will need to specify the docker tag `v0.33.0`, instead of `latest`.
 
 # [0.14.0](https://github.com/hirosystems/clarinet/compare/v0.13.0...v0.14.0) (2021-06-25)
 
-### Bug Fixes
+#### Bug Fixes
 
 - implement tx.transferSTX
   ([4974e85](https://github.com/hirosystems/clarinet/commit/4974e8592e208f619e9aca029db42625dffa09bf))
 - turn manifest-path into optional argument
   ([bb44856](https://github.com/hirosystems/clarinet/commit/bb44856fd01abd4c4edbdd3ba92520f993d13772))
 
-### Features
+#### Features
 
 - add allow-wallets option to clarinet run
   ([2690879](https://github.com/hirosystems/clarinet/commit/269087994e0f4501485a1081fc55d8acfe3d4eea))
