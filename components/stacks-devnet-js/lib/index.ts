@@ -381,7 +381,7 @@ export interface DevnetConfig {
 }
 
 /**
- * Settings to use for the Devnet network to spawn. Load a given manifest file, that can be overriden.
+ * Settings to use for the Devnet network to spawn. Load a given manifest file, that can be overridden.
  * bitcoin-explorer, stacks-explorer and stacks-blockchain-api disabled by default.
  * @export
  * @interface NetworkConfig
