@@ -32,9 +32,9 @@
   index: uint,
 }))
   (let (
-    (data (get txbuff ctx))
-    (base (get index ctx))
-  )
+      (data (get txbuff ctx))
+      (base (get index ctx))
+    )
     (ok {
       uint8: (buff-to-uint-le (unwrap-panic (as-max-len?
         (unwrap! (slice? data base (+ base u1)) (err ERR-OUT-OF-BOUNDS)) u1
@@ -55,9 +55,9 @@
   index: uint,
 }))
   (let (
-    (data (get txbuff ctx))
-    (base (get index ctx))
-  )
+      (data (get txbuff ctx))
+      (base (get index ctx))
+    )
     (ok {
       uint16: (buff-to-uint-le (unwrap-panic (as-max-len?
         (unwrap! (slice? data base (+ base u2)) (err ERR-OUT-OF-BOUNDS)) u2
@@ -78,9 +78,9 @@
   index: uint,
 }))
   (let (
-    (data (get txbuff ctx))
-    (base (get index ctx))
-  )
+      (data (get txbuff ctx))
+      (base (get index ctx))
+    )
     (ok {
       uint32: (buff-to-uint-le (unwrap-panic (as-max-len?
         (unwrap! (slice? data base (+ base u4)) (err ERR-OUT-OF-BOUNDS)) u4
@@ -101,9 +101,9 @@
   index: uint,
 }))
   (let (
-    (data (get txbuff ctx))
-    (base (get index ctx))
-  )
+      (data (get txbuff ctx))
+      (base (get index ctx))
+    )
     (ok {
       uint64: (buff-to-uint-le (unwrap-panic (as-max-len?
         (unwrap! (slice? data base (+ base u8)) (err ERR-OUT-OF-BOUNDS)) u8
@@ -124,10 +124,10 @@
   index: uint,
 }))
   (let (
-    (ptr (get index ctx))
-    (tx (get txbuff ctx))
-    (byte (buff-to-uint-le (unwrap! (element-at tx ptr) (err ERR-OUT-OF-BOUNDS))))
-  )
+      (ptr (get index ctx))
+      (tx (get txbuff ctx))
+      (byte (buff-to-uint-le (unwrap! (element-at tx ptr) (err ERR-OUT-OF-BOUNDS))))
+    )
     (if (<= byte u252)
       ;; given byte is the varint
       (ok {
@@ -139,12 +139,12 @@
       })
       (if (is-eq byte u253)
         (let (
-          ;; next two bytes is the varint
-          (parsed-u16 (try! (read-uint16 {
-            txbuff: tx,
-            index: (+ u1 ptr),
-          })))
-        )
+            ;; next two bytes is the varint
+            (parsed-u16 (try! (read-uint16 {
+              txbuff: tx,
+              index: (+ u1 ptr),
+            })))
+          )
           (ok {
             varint: (get uint16 parsed-u16),
             ctx: (get ctx parsed-u16),
@@ -152,24 +152,24 @@
         )
         (if (is-eq byte u254)
           (let (
-            ;; next four bytes is the varint
-            (parsed-u32 (try! (read-uint32 {
-              txbuff: tx,
-              index: (+ u1 ptr),
-            })))
-          )
+              ;; next four bytes is the varint
+              (parsed-u32 (try! (read-uint32 {
+                txbuff: tx,
+                index: (+ u1 ptr),
+              })))
+            )
             (ok {
               varint: (get uint32 parsed-u32),
               ctx: (get ctx parsed-u32),
             })
           )
           (let (
-            ;; next eight bytes is the varint
-            (parsed-u64 (try! (read-uint64 {
-              txbuff: tx,
-              index: (+ u1 ptr),
-            })))
-          )
+              ;; next eight bytes is the varint
+              (parsed-u64 (try! (read-uint64 {
+                txbuff: tx,
+                index: (+ u1 ptr),
+              })))
+            )
             (ok {
               varint: (get uint64 parsed-u64),
               ctx: (get ctx parsed-u64),
@@ -189,12 +189,12 @@
   index: uint,
 }))
   (let (
-    (parsed (try! (read-varint old-ctx)))
-    (ctx (get ctx parsed))
-    (slice-start (get index ctx))
-    (target-index (+ slice-start (get varint parsed)))
-    (txbuff (get txbuff ctx))
-  )
+      (parsed (try! (read-varint old-ctx)))
+      (ctx (get ctx parsed))
+      (slice-start (get index ctx))
+      (target-index (+ slice-start (get varint parsed)))
+      (txbuff (get txbuff ctx))
+    )
     (ok {
       varslice: (unwrap! (slice? txbuff slice-start target-index) (err ERR-OUT-OF-BOUNDS)),
       ctx: {
@@ -227,14 +227,14 @@
   index: uint,
 }))
   (let (
-    (slice-start (get index old-ctx))
-    (target-index (+ u32 slice-start))
-    (txbuff (get txbuff old-ctx))
-    (hash-le (unwrap-panic (as-max-len?
-      (unwrap! (slice? txbuff slice-start target-index) (err ERR-OUT-OF-BOUNDS))
-      u32
-    )))
-  )
+      (slice-start (get index old-ctx))
+      (target-index (+ u32 slice-start))
+      (txbuff (get txbuff old-ctx))
+      (hash-le (unwrap-panic (as-max-len?
+        (unwrap! (slice? txbuff slice-start target-index) (err ERR-OUT-OF-BOUNDS))
+        u32
+      )))
+    )
     (ok {
       hashslice: (reverse-buff32 hash-le),
       ctx: {
@@ -273,14 +273,14 @@
   )
   (let ((state (unwrap! result result)))
     (let (
-      (remaining (get remaining state))
-      (ctx (get ctx state))
-      (parsed-hash (try! (read-hashslice ctx)))
-      (parsed-index (try! (read-uint32 (get ctx parsed-hash))))
-      (parsed-scriptSig (try! (read-varslice (get ctx parsed-index))))
-      (parsed-sequence (try! (read-uint32 (get ctx parsed-scriptSig))))
-      (new-ctx (get ctx parsed-sequence))
-    )
+        (remaining (get remaining state))
+        (ctx (get ctx state))
+        (parsed-hash (try! (read-hashslice ctx)))
+        (parsed-index (try! (read-uint32 (get ctx parsed-hash))))
+        (parsed-scriptSig (try! (read-varslice (get ctx parsed-index))))
+        (parsed-sequence (try! (read-uint32 (get ctx parsed-scriptSig))))
+        (new-ctx (get ctx parsed-sequence))
+      )
       (ok {
         ctx: new-ctx,
         remaining: (- remaining u1),
@@ -315,10 +315,10 @@
   index: uint,
 }))
   (let (
-    (parsed-num-txins (try! (read-varint ctx)))
-    (num-txins (get varint parsed-num-txins))
-    (new-ctx (get ctx parsed-num-txins))
-  )
+      (parsed-num-txins (try! (read-varint ctx)))
+      (num-txins (get varint parsed-num-txins))
+      (new-ctx (get ctx parsed-num-txins))
+    )
     (if (> num-txins u8)
       (err ERR-TOO-MANY-TXINS)
       (fold read-next-txin (bool-list-of-len num-txins)
@@ -353,11 +353,11 @@
     ))
   )
   (let (
-    (state (unwrap! result result))
-    (parsed-value (try! (read-uint64 (get ctx state))))
-    (parsed-script (try! (read-varslice (get ctx parsed-value))))
-    (new-ctx (get ctx parsed-script))
-  )
+      (state (unwrap! result result))
+      (parsed-value (try! (read-uint64 (get ctx state))))
+      (parsed-script (try! (read-varslice (get ctx parsed-value))))
+      (new-ctx (get ctx parsed-script))
+    )
     (ok {
       ctx: new-ctx,
       txouts: (unwrap!
@@ -386,10 +386,10 @@
   index: uint,
 }))
   (let (
-    (parsed-num-txouts (try! (read-varint ctx)))
-    (num-txouts (get varint parsed-num-txouts))
-    (new-ctx (get ctx parsed-num-txouts))
-  )
+      (parsed-num-txouts (try! (read-varint ctx)))
+      (num-txouts (get varint parsed-num-txouts))
+      (new-ctx (get ctx parsed-num-txouts))
+    )
     (if (> num-txouts u8)
       (err ERR-TOO-MANY-TXOUTS)
       (fold read-next-txout (bool-list-of-len num-txouts)
@@ -416,10 +416,10 @@
     ))
   )
   (let (
-    (state (unwrap! result result))
-    (parsed-item (try! (read-varslice (get ctx state))))
-    (new-ctx (get ctx parsed-item))
-  )
+      (state (unwrap! result result))
+      (parsed-item (try! (read-varslice (get ctx state))))
+      (new-ctx (get ctx parsed-item))
+    )
     (ok {
       ctx: new-ctx,
       items: (unwrap!
@@ -450,11 +450,11 @@
     ))
   )
   (let (
-    (state (unwrap! result result))
-    (parsed-num-items (try! (read-varint (get ctx state))))
-    (ctx (get ctx parsed-num-items))
-    (varint (get varint parsed-num-items))
-  )
+      (state (unwrap! result result))
+      (parsed-num-items (try! (read-varint (get ctx state))))
+      (ctx (get ctx parsed-num-items))
+      (varint (get varint parsed-num-items))
+    )
     (if (> varint u0)
       ;; read all stack items for current txin and add to witnesses.
       (let ((parsed-items (try! (fold read-next-item (bool-list-of-len varint)
@@ -534,18 +534,18 @@
     (calculate-txid bool)
   )
   (let (
-    (ctx {
-      txbuff: tx,
-      index: u0,
-    })
-    (parsed-version (try! (read-uint32 ctx)))
-    (parsed-segwit-marker (try! (read-uint8 (get ctx parsed-version))))
-    (parsed-segwit-version (try! (read-uint8 (get ctx parsed-segwit-marker))))
-    (parsed-txins (try! (read-txins (get ctx parsed-segwit-version))))
-    (parsed-txouts (try! (read-txouts (get ctx parsed-txins))))
-    (parsed-witnesses (try! (read-witnesses (get ctx parsed-txouts) (len (get txins parsed-txins)))))
-    (parsed-locktime (try! (read-uint32 (get ctx parsed-witnesses))))
-  )
+      (ctx {
+        txbuff: tx,
+        index: u0,
+      })
+      (parsed-version (try! (read-uint32 ctx)))
+      (parsed-segwit-marker (try! (read-uint8 (get ctx parsed-version))))
+      (parsed-segwit-version (try! (read-uint8 (get ctx parsed-segwit-marker))))
+      (parsed-txins (try! (read-txins (get ctx parsed-segwit-version))))
+      (parsed-txouts (try! (read-txouts (get ctx parsed-txins))))
+      (parsed-witnesses (try! (read-witnesses (get ctx parsed-txouts) (len (get txins parsed-txins)))))
+      (parsed-locktime (try! (read-uint32 (get ctx parsed-witnesses))))
+    )
     (asserts!
       (and (is-eq (get uint8 parsed-segwit-marker) u0) (is-eq (get uint8 parsed-segwit-version) u1))
       (err ERR-NOT-SEGWIT-TRANSACTION)
@@ -603,15 +603,15 @@
 ;; Returns (err ERR-LEFTOVER-DATA) if the tx buffer contains leftover data at the end.
 (define-read-only (parse-tx (tx (buff 4096)))
   (let (
-    (ctx {
-      txbuff: tx,
-      index: u0,
-    })
-    (parsed-version (try! (read-uint32 ctx)))
-    (parsed-txins (try! (read-txins (get ctx parsed-version))))
-    (parsed-txouts (try! (read-txouts (get ctx parsed-txins))))
-    (parsed-locktime (try! (read-uint32 (get ctx parsed-txouts))))
-  )
+      (ctx {
+        txbuff: tx,
+        index: u0,
+      })
+      (parsed-version (try! (read-uint32 ctx)))
+      (parsed-txins (try! (read-txins (get ctx parsed-version))))
+      (parsed-txouts (try! (read-txouts (get ctx parsed-txins))))
+      (parsed-locktime (try! (read-uint32 (get ctx parsed-txouts))))
+    )
     ;; check if it is a non-segwit transaction?
     ;; at least check what happens
     (asserts! (is-eq (len tx) (get index (get ctx parsed-locktime)))
@@ -638,17 +638,17 @@
 ;; })
 (define-read-only (parse-block-header (headerbuff (buff 80)))
   (let (
-    (ctx {
-      txbuff: headerbuff,
-      index: u0,
-    })
-    (parsed-version (try! (read-uint32 ctx)))
-    (parsed-parent-hash (try! (read-hashslice (get ctx parsed-version))))
-    (parsed-merkle-root (try! (read-hashslice (get ctx parsed-parent-hash))))
-    (parsed-timestamp (try! (read-uint32 (get ctx parsed-merkle-root))))
-    (parsed-nbits (try! (read-uint32 (get ctx parsed-timestamp))))
-    (parsed-nonce (try! (read-uint32 (get ctx parsed-nbits))))
-  )
+      (ctx {
+        txbuff: headerbuff,
+        index: u0,
+      })
+      (parsed-version (try! (read-uint32 ctx)))
+      (parsed-parent-hash (try! (read-hashslice (get ctx parsed-version))))
+      (parsed-merkle-root (try! (read-hashslice (get ctx parsed-parent-hash))))
+      (parsed-timestamp (try! (read-uint32 (get ctx parsed-merkle-root))))
+      (parsed-nbits (try! (read-uint32 (get ctx parsed-timestamp))))
+      (parsed-nonce (try! (read-uint32 (get ctx parsed-nbits))))
+    )
     (ok {
       version: (get uint32 parsed-version),
       parent: (get hashslice parsed-parent-hash),
@@ -733,22 +733,22 @@
     })
   )
   (let (
-    (path (get path state))
-    (is-left (is-bit-set path ctr))
-    (proof-hashes (get proof-hashes state))
-    (cur-hash (get cur-hash state))
-    (root-hash (get root-hash state))
-    (h1 (if is-left
-      (unwrap-panic (element-at proof-hashes ctr))
-      cur-hash
-    ))
-    (h2 (if is-left
-      cur-hash
-      (unwrap-panic (element-at proof-hashes ctr))
-    ))
-    (next-hash (sha256 (sha256 (concat h1 h2))))
-    (is-verified (and (is-eq (+ u1 ctr) (len proof-hashes)) (is-eq next-hash root-hash)))
-  )
+      (path (get path state))
+      (is-left (is-bit-set path ctr))
+      (proof-hashes (get proof-hashes state))
+      (cur-hash (get cur-hash state))
+      (root-hash (get root-hash state))
+      (h1 (if is-left
+        (unwrap-panic (element-at proof-hashes ctr))
+        cur-hash
+      ))
+      (h2 (if is-left
+        cur-hash
+        (unwrap-panic (element-at proof-hashes ctr))
+      ))
+      (next-hash (sha256 (sha256 (concat h1 h2))))
+      (is-verified (and (is-eq (+ u1 ctr) (len proof-hashes)) (is-eq next-hash root-hash)))
+    )
     (merge state {
       cur-hash: next-hash,
       verified: is-verified,
@@ -881,9 +881,9 @@
   )
   (if (verify-block-header header height)
     (let (
-      (reversed-txid (get-reversed-txid tx))
-      (txid (reverse-buff32 reversed-txid))
-    )
+        (reversed-txid (get-reversed-txid tx))
+        (txid (reverse-buff32 reversed-txid))
+      )
       ;; verify merkle proof
       (asserts!
         (or
@@ -937,11 +937,11 @@
       tree-depth: tree-depth,
     }))
     (let (
-      (witness-out (get-commitment-scriptPubKey (get outs (try! (parse-tx ctx)))))
-      (final-hash (sha256 (sha256 (concat witness-merkle-root witness-reserved-value))))
-      (reversed-wtxid (get-reversed-txid wtx))
-      (wtxid (reverse-buff32 reversed-wtxid))
-    )
+        (witness-out (get-commitment-scriptPubKey (get outs (try! (parse-tx ctx)))))
+        (final-hash (sha256 (sha256 (concat witness-merkle-root witness-reserved-value))))
+        (reversed-wtxid (get-reversed-txid wtx))
+        (wtxid (reverse-buff32 reversed-wtxid))
+      )
       ;; verify wtxid commitment
       (asserts! (is-eq witness-out (concat 0x6a24aa21a9ed final-hash))
         (err ERR-INVALID-COMMITMENT)
