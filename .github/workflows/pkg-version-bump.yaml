@@ -25,9 +25,22 @@ jobs:
       contents: write
       issues: write
     steps:
+      - name: Generate release bot app token
+        id: generate_token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.HIROSYSTEMS_PKG_RELEASE_BOT_APP_ID }}
+          private-key: ${{ secrets.HIROSYSTEMS_PKG_RELEASE_BOT_APP_PEM }}
+
+      - name: Get bot user ID
+        run: |
+          echo "user-id=$(gh api "/users/${{ steps.generate_token.outputs.app-slug }}[bot]" --jq .id)" >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ steps.generate_token.outputs.token }}
+
       - name: Homebrew version bump
         env:
-          HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HOMEBREW_GITHUB_API_TOKEN: ${{ steps.generate_token.outputs.token }}
           TAG: ${{ github.event.client_payload.tag || github.event.inputs.tag }}
         run: |
           # Get version info
