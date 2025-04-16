@@ -502,26 +502,26 @@
 ;; It will also calculate and return the TXID if calculate-txid is set to true.
 ;; Returns a tuple structured as follows on success:
 ;; (ok {
-;; version: uint,                      ;; tx version
-;; segwit-marker: uint,
-;; segwit-version: uint,
-;; txid: (optional (buff 32))
-;; ins: (list 8
-;; {
-;; outpoint: {                 ;; pointer to the utxo this input consumes
-;; hash: (buff 32),
-;; index: uint
-;; },
-;; scriptSig: (buff 256),      ;; spending condition script
-;; sequence: uint
-;; }),
-;; outs: (list 8
-;; {
-;; value: uint,                ;; satoshis sent
-;; scriptPubKey: (buff 128)    ;; parse this to get an address
-;; }),
-;; witnesses: (list 8 (list 8 (buff 128))),
-;; locktime: uint
+;;      version: uint,                      ;; tx version
+;;      segwit-marker: uint,
+;;      segwit-version: uint,
+;;      txid: (optional (buff 32))
+;;      ins: (list 8
+;;          {
+;;              outpoint: {                 ;; pointer to the utxo this input consumes
+;;                  hash: (buff 32),
+;;                  index: uint
+;;              },
+;;              scriptSig: (buff 256),      ;; spending condition script
+;;              sequence: uint
+;;          }),
+;;      outs: (list 8
+;;          {
+;;              value: uint,                ;; satoshis sent
+;;              scriptPubKey: (buff 128)    ;; parse this to get an address
+;;          }),
+;;      witnesses: (list 8 (list 8 (buff 128))),
+;;      locktime: uint
 ;; })
 ;; Returns (err ERR-OUT-OF-BOUNDS) if we read past the end of txbuff.
 ;; Returns (err ERR-VARSLICE-TOO-LONG) if we find a scriptPubKey or scriptSig that's too long to parse.
@@ -579,22 +579,22 @@
 ;; Parses a Bitcoin transaction, with up to 8 inputs and 8 outputs, with scriptSigs of up to 256 bytes each, and with scriptPubKeys up to 128 bytes.
 ;; Returns a tuple structured as follows on success:
 ;; (ok {
-;; version: uint,                      ;; tx version
-;; ins: (list 8
-;; {
-;; outpoint: {                 ;; pointer to the utxo this input consumes
-;; hash: (buff 32),
-;; index: uint
-;; },
-;; scriptSig: (buff 256),      ;; spending condition script
-;; sequence: uint
-;; }),
-;; outs: (list 8
-;; {
-;; value: uint,                ;; satoshis sent
-;; scriptPubKey: (buff 128)    ;; parse this to get an address
-;; }),
-;; locktime: uint
+;;      version: uint,                      ;; tx version
+;;      ins: (list 8
+;;          {
+;;              outpoint: {                 ;; pointer to the utxo this input consumes
+;;                  hash: (buff 32),
+;;                  index: uint
+;;              },
+;;              scriptSig: (buff 256),      ;; spending condition script
+;;              sequence: uint
+;;          }),
+;;      outs: (list 8
+;;          {
+;;              value: uint,                ;; satoshis sent
+;;              scriptPubKey: (buff 128)    ;; parse this to get an address
+;;          }),
+;;      locktime: uint
 ;; })
 ;; Returns (err ERR-OUT-OF-BOUNDS) if we read past the end of txbuff.
 ;; Returns (err ERR-VARSLICE-TOO-LONG) if we find a scriptPubKey or scriptSig that's too long to parse.
@@ -629,12 +629,12 @@
 ;; Parse a Bitcoin block header.
 ;; Returns a tuple structured as folowed on success:
 ;; (ok {
-;; version: uint,                  ;; block version,
-;; parent: (buff 32),              ;; parent block hash,
-;; merkle-root: (buff 32),         ;; merkle root for all this block's transactions
-;; timestamp: uint,                ;; UNIX epoch timestamp of this block, in seconds
-;; nbits: uint,                    ;; compact block difficulty representation
-;; nonce: uint                     ;; PoW solution
+;;      version: uint,                  ;; block version,
+;;      parent: (buff 32),              ;; parent block hash,
+;;      merkle-root: (buff 32),         ;; merkle root for all this block's transactions
+;;      timestamp: uint,                ;; UNIX epoch timestamp of this block, in seconds
+;;      nbits: uint,                    ;; compact block difficulty representation
+;;      nonce: uint                     ;; PoW solution
 ;; })
 (define-read-only (parse-block-header (headerbuff (buff 80)))
   (let (
@@ -902,10 +902,10 @@
 ;; with witnesses was mined in a prior Bitcoin block.
 ;; It takes
 ;; a) the bitcoin block height, the transaction "tx" with witness data,
-;; the bitcoin block header, the tx index in the block and
+;;    the bitcoin block header, the tx index in the block and
 ;; b) the depth of merkle proof of the block and
 ;; c) the merkle proof of the wtxid "wproof", its root "witness-merkle-proof",
-;; the witness reserved value and
+;;    the witness reserved value and
 ;; d) the coinbase transaction "ctx" without witnesses (non-segwit) and its merkle proof "cproof".
 ;;
 ;; It determines that:
