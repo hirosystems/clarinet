@@ -44,7 +44,7 @@ jobs:
             --force \
             --tag "${TAG}" \
             --version "${VERSION}" \
-            ${{ github.event.repository.name }}
+            clarinet
 
   winget:
     name: Winget

@@ -7,9 +7,10 @@
 
 name: Publish clarinet-sdk packages to npm
 on:
-  release:
-    types: [published]
   workflow_dispatch:
+  repository_dispatch:
+    types:
+      - released
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -26,7 +27,10 @@ jobs:
           node-version: '22.x'
           registry-url: 'https://registry.npmjs.org'
 
-      - name: Install wasm-pack if not available
+      - name: Setup Rust toolchain
+        run: rustup toolchain install stable --profile minimal --component rustfmt --target wasm32-unknown-unknown
+
+      - name: Install wasm-pack
         run: cargo install wasm-pack
 
       - name: Build Wasm packages
