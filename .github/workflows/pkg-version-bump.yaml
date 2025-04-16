@@ -33,7 +33,6 @@ jobs:
           private-key: ${{ secrets.HIROSYSTEMS_PKG_RELEASE_BOT_APP_PEM }}
 
       - name: Get bot user ID
-        id: bot-user-id
         run: |
           echo "user-id=$(gh api "/users/${{ steps.generate_token.outputs.app-slug }}[bot]" --jq .id)" >> "$GITHUB_OUTPUT"
         env:
