@@ -550,10 +550,11 @@ impl<'a> Aggregator<'a> {
                 let mut iter = args.iter().peekable();
                 while let Some(arg) = iter.next() {
                     let trailing = get_trailing_comment(arg, &mut iter);
+                    let double_indent = format!("{}{}", space, indentation);
                     acc.push_str(&format!(
                         "\n{}{}",
-                        space,
-                        self.format_source_exprs(slice::from_ref(arg), &space)
+                        double_indent,
+                        self.format_source_exprs(slice::from_ref(arg), &double_indent)
                     ));
                     if let Some(comment) = trailing {
                         acc.push(' ');
@@ -561,7 +562,7 @@ impl<'a> Aggregator<'a> {
                     }
                 }
                 // close the args paren
-                acc.push_str(&format!("\n{})", previous_indentation));
+                acc.push_str(&format!("\n{}{})", previous_indentation, indentation));
             }
         }
         // start the let body
@@ -1235,7 +1236,12 @@ mod tests_formatter {
     fn test_let() {
         let src = "(let ((a 1) (b 2)) (+ a b))";
         let result = format_with_default(&String::from(src));
-        let expected = "(let (\n  (a 1)\n  (b 2)\n)\n  (+ a b)\n)";
+        let expected = r#"(let (
+    (a 1)
+    (b 2)
+  )
+  (+ a b)
+)"#;
         assert_eq!(expected, result);
     }
     #[test]
@@ -1328,9 +1334,9 @@ mod tests_formatter {
         let result = format_with_default(&String::from(src));
         let expected = r#"(begin
   (let (
-    (a 1)
-    (b 2)
-  )
+      (a 1)
+      (b 2)
+    )
     (ok true)
   )
 )"#;
@@ -1340,9 +1346,9 @@ mod tests_formatter {
     fn test_let_comments() {
         let src = r#"(begin
   (let (
-    (a 1) ;; something
-    (b 2) ;; comment
-  )
+      (a 1) ;; something
+      (b 2) ;; comment
+    )
     (ok true)
   )
 )"#;
