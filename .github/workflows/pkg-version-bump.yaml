@@ -28,6 +28,7 @@ jobs:
         with:
           app-id: ${{ secrets.HIROSYSTEMS_PKG_RELEASE_BOT_APP_ID }}
           private-key: ${{ secrets.HIROSYSTEMS_PKG_RELEASE_BOT_APP_PEM }}
+          skip-token-revoke: true
 
       - name: Get bot user ID
         id: get-bot-user-id
@@ -37,8 +38,7 @@ jobs:
 
   homebrew:
     name: Homebrew
-    needs:
-      - generate-token
+    needs: generate-token
     runs-on: macos-latest
     steps:
       - name: Homebrew version bump
