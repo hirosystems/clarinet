@@ -12,6 +12,9 @@ on:
   repository_dispatch:
     types:
       - released
+  push:
+    branches:
+      - main
 
 jobs:
   generate-token:
@@ -58,6 +61,7 @@ jobs:
 
           brew update
           brew bump-formula-pr \
+            --dry-run \
             --no-browse \
             --no-audit \
             --force \
@@ -92,5 +96,4 @@ jobs:
             --urls https://github.com/${{ github.repository }}/releases/download/${env:TAG}/clarinet-windows-x64.msi `
             --version ${VERSION} `
             --token ${{ needs.generate-token.outputs.token }} `
-            --submit `
             HiroSystems.Clarinet
