@@ -18,9 +18,12 @@ env:
   GIT_USER_EMAIL: 45208873+blockstack-devops@users.noreply.github.com
 
 jobs:
-  homebrew:
-    name: Homebrew
-    runs-on: macos-latest
+  generate-token:
+    name: Generate Token
+    runs-on: ubuntu-latest
+    outputs:
+      token: ${{ steps.generate_token.outputs.token }}
+      app-slug: ${{ steps.generate_token.outputs.app-slug }}
     steps:
       - name: Generate release bot app token
         id: generate_token
@@ -31,12 +34,16 @@ jobs:
 
       - name: Get bot user ID
         run: echo "user-id=$(gh api "/users/${{ steps.generate_token.outputs.app-slug }}[bot]" --jq .id)" >> "$GITHUB_OUTPUT"
-        env:
-          GH_TOKEN: ${{ steps.generate_token.outputs.token }}
 
+  homebrew:
+    name: Homebrew
+    needs: generate-token
+    runs-on: macos-latest
+    steps:
       - name: Homebrew version bump
         env:
-          HOMEBREW_GITHUB_API_TOKEN: ${{ steps.generate_token.outputs.token }}
+          HOMEBREW_GITHUB_API_TOKEN: ${{ needs.generate-token.outputs.token }}
+          GH_TOKEN: ${{ needs.generate-token.outputs.token }}
           TAG: ${{ github.event.client_payload.tag || github.event.inputs.tag }}
         run: |
           # Get version info
@@ -57,17 +64,12 @@ jobs:
 
   winget:
     name: Winget
+    needs: generate-token
     runs-on: windows-latest
     steps:
-      - name: Generate release bot app token
-        id: generate_token
-        uses: actions/create-github-app-token@v1
-        with:
-          app-id: ${{ secrets.HIROSYSTEMS_PKG_RELEASE_BOT_APP_ID }}
-          private-key: ${{ secrets.HIROSYSTEMS_PKG_RELEASE_BOT_APP_PEM }}
-
       - name: Winget version bump
         env:
+          GH_TOKEN: ${{ needs.generate-token.outputs.token }}
           TAG: ${{ github.event.client_payload.tag || github.event.inputs.tag }}
         run: |
           # Get version info
@@ -84,6 +86,6 @@ jobs:
           ./wingetcreate.exe update `
             --urls https://github.com/${{ github.repository }}/releases/download/${env:TAG}/clarinet-windows-x64.msi `
             --version ${VERSION} `
-            --token ${{ steps.generate_token.outputs.token }} `
+            --token ${{ needs.generate-token.outputs.token }} `
             --submit `
             HiroSystems.Clarinet
