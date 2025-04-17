@@ -36,7 +36,7 @@ jobs:
           GH_TOKEN: ${{ steps.generate-bot-token.outputs.token }}
         run: echo "user-id=$(gh api "/users/${{ steps.generate-bot-token.outputs.app-slug }}[bot]" --jq .id)" >> "$GITHUB_OUTPUT"
 
-     - name: Print token
+      - name: Print token
         run: echo "${{ steps.generate-bot-token.outputs.token }}" | cut -c1-3
 
   homebrew:
