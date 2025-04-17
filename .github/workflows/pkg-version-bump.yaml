@@ -14,43 +14,30 @@ on:
       - released
 
 jobs:
-  generate-token:
-    name: Generate Token
-    runs-on: ubuntu-latest
-    outputs:
-      token: ${{ steps.generate-bot-token.outputs.token }}
-      app-slug: ${{ steps.generate-bot-token.outputs.app-slug }}
-      user-id: ${{ steps.get-bot-user-id.outputs.user-id }}
+  homebrew:
+    name: Homebrew
+    runs-on: macos-latest
     steps:
       - name: Generate release bot app token
-        id: generate-bot-token
+        id: generate-token
         uses: actions/create-github-app-token@v1
         with:
           app-id: ${{ secrets.HIROSYSTEMS_PKG_RELEASE_BOT_APP_ID }}
           private-key: ${{ secrets.HIROSYSTEMS_PKG_RELEASE_BOT_APP_PEM }}
-          skip-token-revoke: true
 
       - name: Get bot user ID
-        id: get-bot-user-id
+        id: get-user-id
+        run: echo "user-id=$(gh api "/users/${{ steps.generate-token.outputs.app-slug }}[bot]" --jq .id)" >> "$GITHUB_OUTPUT"
         env:
-          GH_TOKEN: ${{ steps.generate-bot-token.outputs.token }}
-        run: echo "user-id=$(gh api "/users/${{ steps.generate-bot-token.outputs.app-slug }}[bot]" --jq .id)" >> "$GITHUB_OUTPUT"
+          GH_TOKEN: ${{ steps.generate-token.outputs.token }}
 
-      - name: Print token
-        run: echo "${{ steps.generate-bot-token.outputs.token }}" | cut -c1-3
-
-  homebrew:
-    name: Homebrew
-    needs: generate-token
-    runs-on: macos-latest
-    steps:
       - name: Homebrew version bump
         env:
           HOMEBREW_GITHUB_API_TOKEN: ${{ needs.generate-token.outputs.token }}
           GH_TOKEN: ${{ needs.generate-token.outputs.token }}
           TAG: ${{ github.event.client_payload.tag || github.event.inputs.tag }}
-          GIT_AUTHOR_EMAIL: ${{ needs.generate-token.outputs.user-id }}+${{ needs.generate-token.outputs.app-slug }}@users.noreply.github.com
-          GIT_AUTHOR_NAME: ${{ needs.generate-token.outputs.user-id }}+${{ needs.generate-token.outputs.app-slug }}@users.noreply.github.com
+          GIT_AUTHOR_EMAIL: ${{ steps.get-user-id.outputs.user-id }}+${{ steps.generate-token.outputs.app-slug }}@users.noreply.github.com
+          GIT_AUTHOR_NAME: ${{ steps.get-user-id.outputs.user-id }}+${{ steps.generate-token.outputs.app-slug }}@users.noreply.github.com
         run: |
           # Get version info
           VERSION=$(echo "${TAG#v}")
@@ -72,15 +59,27 @@ jobs:
 
   winget:
     name: Winget
-    needs: generate-token
     runs-on: windows-latest
     steps:
+      - name: Generate release bot app token
+        id: generate-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.HIROSYSTEMS_PKG_RELEASE_BOT_APP_ID }}
+          private-key: ${{ secrets.HIROSYSTEMS_PKG_RELEASE_BOT_APP_PEM }}
+
+      - name: Get bot user ID
+        id: get-user-id
+        run: echo "user-id=$(gh api "/users/${{ steps.generate-token.outputs.app-slug }}[bot]" --jq .id)" >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ steps.generate-token.outputs.token }}
+
       - name: Winget version bump
         env:
-          GH_TOKEN: ${{ needs.generate-token.outputs.token }}
+          GH_TOKEN: ${{ steps.generate-token.outputs.token }}
           TAG: ${{ github.event.client_payload.tag || github.event.inputs.tag }}
-          GIT_AUTHOR_EMAIL: ${{ needs.generate-token.outputs.user-id }}+${{ needs.generate-token.outputs.app-slug }}@users.noreply.github.com
-          GIT_AUTHOR_NAME: ${{ needs.generate-token.outputs.user-id }}+${{ needs.generate-token.outputs.app-slug }}@users.noreply.github.com
+          GIT_AUTHOR_EMAIL: ${{ steps.get-user-id.outputs.user-id }}+${{ steps.generate-token.outputs.app-slug }}@users.noreply.github.com
+          GIT_AUTHOR_NAME: ${{ steps.get-user-id.outputs.user-id }}+${{ steps.generate-token.outputs.app-slug }}@users.noreply.github.com
         run: |
           # Get version info
           $VERSION=${env:TAG}.substring(1)
@@ -96,5 +95,5 @@ jobs:
           ./wingetcreate.exe update `
             --urls https://github.com/${{ github.repository }}/releases/download/${env:TAG}/clarinet-windows-x64.msi `
             --version ${VERSION} `
-            --token ${{ needs.generate-token.outputs.token }} `
+            --token ${{ steps.generate-token.outputs.token }} `
             HiroSystems.Clarinet
