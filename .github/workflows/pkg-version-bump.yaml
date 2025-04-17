@@ -13,10 +13,6 @@ on:
     types:
       - released
 
-env:
-  GIT_USER_NAME: Hiro DevOps
-  GIT_USER_EMAIL: 45208873+blockstack-devops@users.noreply.github.com
-
 jobs:
   generate-token:
     name: Generate Token
