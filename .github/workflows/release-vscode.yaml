@@ -42,8 +42,8 @@ jobs:
       - name: Build vsix
         run: npx vsce package --out clarity-lsp.vsix
 
-      # - name: Publish to VSCode Marketplace
-      #   run: npx vsce publish --packagePath clarity-lsp.vsix --pat ${{ secrets.VSCODE_TOKEN }} -skip-duplicate
+      - name: Publish to VSCode Marketplace
+        run: npx vsce publish --packagePath clarity-lsp.vsix --pat ${{ secrets.VSCE_TOKEN }}
 
       - name: Publish to Open VSX
-        run: npx ovsx publish --packagePath clarity-lsp.vsix --pat ${{ secrets.OVSX_TOKEN }} -skip-duplicate
+        run: npx ovsx publish --packagePath clarity-lsp.vsix --pat ${{ secrets.OVSX_TOKEN }}
