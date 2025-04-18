@@ -7,7 +7,7 @@ on:
   repository_dispatch:
     types:
       - released
-  push:
+  pull_request:
     branches:
       - main
 
