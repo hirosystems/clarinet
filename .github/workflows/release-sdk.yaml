@@ -5,9 +5,8 @@
 # Then two packages are built with tsc - @hirosystems/clarinet-sdk and @hirosystems/clarinet-sdk-browser
 
 
-name: Publish clarinet-sdk packages to npm
+name: Publish Clarinet SDK
 on:
-  workflow_dispatch:
   repository_dispatch:
     types:
       - released

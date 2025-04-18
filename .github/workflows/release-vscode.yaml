@@ -1,7 +1,7 @@
 # The vscode extension is published to npm when a release is created.
 # It's built with vsce and published to both the vscode marketplace and open vsx.
 
-name: Publish clarinet-sdk packages to npm
+name: Publish VSCode Extension
 on:
   workflow_dispatch:
   repository_dispatch:
