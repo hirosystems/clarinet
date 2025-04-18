@@ -344,7 +344,7 @@ describe("simnet can get contracts info and deploy contracts", () => {
     expect(getWithShortAddr).toBeDefined();
   });
 
-  it("can get commets in ast", () => {
+  it("can get comments in ast", () => {
     const counterAst = simnet.getContractAST(`${deployerAddr}.counter`);
 
     expect(counterAst).toBeDefined();
