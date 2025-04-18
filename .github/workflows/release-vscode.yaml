@@ -3,13 +3,9 @@
 
 name: Publish VSCode Extension
 on:
-  workflow_dispatch:
   repository_dispatch:
     types:
       - released
-  pull_request:
-    branches:
-      - main
 
 defaults:
   run:
