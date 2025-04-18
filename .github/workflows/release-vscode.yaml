@@ -31,8 +31,10 @@ jobs:
           node-version: '22.x'
           registry-url: 'https://registry.npmjs.org'
 
-      - name: Install wasm-pack
-        run: npm install -g wasm-pack
+      - name: Setup Rust
+        run: |
+          rustup toolchain install stable --profile minimal --target wasm32-unknown-unknown
+          cargo install wasm-pack
 
       - name: Install dependencies
         run: npm ci
