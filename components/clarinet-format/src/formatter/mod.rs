@@ -371,9 +371,9 @@ impl<'a> Aggregator<'a> {
             if let Some(list) = expr.match_list() {
                 let trailing = get_trailing_comment(expr, &mut iter);
                 acc.push('\n');
-                acc.push_str(&space);
-                acc.push_str(indentation);
-                acc.push_str(&self.format_list(list, indentation));
+                let double = format!("{}{}", space, indentation);
+                acc.push_str(&double);
+                acc.push_str(&self.format_list(list, &double));
 
                 if let Some(comment) = trailing {
                     acc.push(' ');
@@ -606,15 +606,39 @@ impl<'a> Aggregator<'a> {
     }
 
     fn format_list(&self, exprs: &[PreSymbolicExpression], previous_indentation: &str) -> String {
+        let indentation = &self.settings.indentation.to_string();
+        let space = format!("{}{}", previous_indentation, indentation);
         let mut acc = "(".to_string();
-        for (i, expr) in exprs[0..].iter().enumerate() {
-            let value = self.format_source_exprs(slice::from_ref(expr), previous_indentation);
-            if i < exprs.len() - 1 {
-                acc.push_str(&value.to_string());
-                acc.push(' ');
-            } else {
-                acc.push_str(&value.to_string());
+
+        if differing_lines(exprs) {
+            acc.push('\n');
+        }
+        let mut iter = exprs[0..].iter().peekable();
+        while let Some(item) = iter.next() {
+            let trailing = get_trailing_comment(item, &mut iter);
+            if differing_lines(exprs) {
+                acc.push_str(&space)
             }
+            let value = self.format_source_exprs(slice::from_ref(item), previous_indentation);
+            let start_line = item.span().start_line;
+            acc.push_str(&value.to_string());
+            if let Some(comment) = trailing {
+                let count = comment.span().start_column - item.span().end_column - 1;
+                let spaces = " ".repeat(count as usize);
+                acc.push_str(&spaces);
+                acc.push_str(&self.display_pse(comment, previous_indentation));
+            }
+            if let Some(next) = iter.peek() {
+                if start_line != next.span().start_line {
+                    acc.push('\n')
+                } else {
+                    acc.push(' ')
+                }
+            }
+        }
+        if differing_lines(exprs) {
+            acc.push_str(previous_indentation);
+            acc.push('\n')
         }
         acc.push(')');
         t(&acc).to_string()
@@ -1574,6 +1598,18 @@ mod tests_formatter {
     #[test]
     fn define_data_var_test() {
         let src = "(define-data-var my-data-var principal tx-sender)\n";
+        let result = format_with_default(src);
+        assert_eq!(src, result);
+    }
+
+    #[test]
+    fn define_multiline_list() {
+        let src = r#"(
+  (optional <sip-010>) ;; token
+  uint                 ;; amount
+  principal            ;; with
+  uint                 ;; nonce
+)"#;
         let result = format_with_default(src);
         assert_eq!(src, result);
     }
