@@ -358,35 +358,57 @@ impl<'a> Aggregator<'a> {
         result
     }
 
+    // (define-trait trait-name (
+    //   (func1-name
+    //     (arg1-type arg2-type ...)
+    //     (return-type)
+    //   )
+    //   (func2-name (arg1-type arg2-type ...) (return-type))
+    // )
     fn define_trait(&self, exprs: &[PreSymbolicExpression], previous_indentation: &str) -> String {
         let mut acc = "(define-trait ".to_string();
         let indentation = &self.settings.indentation.to_string();
         let space = format!("{}{}", indentation, previous_indentation);
         acc.push_str(&self.format_source_exprs(slice::from_ref(&exprs[1]), previous_indentation));
+        acc.push_str(" (");
         acc.push('\n');
         acc.push_str(&space);
-        acc.push('(');
         let mut iter = exprs[2].match_list().unwrap().iter().peekable();
         while let Some(expr) = iter.next() {
             if let Some(list) = expr.match_list() {
                 let trailing = get_trailing_comment(expr, &mut iter);
-                acc.push('\n');
+                acc.push('(');
+                // name
+                acc.push_str(&self.display_pse(&list[0], previous_indentation));
                 let double = format!("{}{}", space, indentation);
-                acc.push_str(&double);
-                acc.push_str(&self.format_list(list, &double));
+                // args
+                if let Some(args) = list[1].match_list() {
+                    acc.push('\n');
+                    acc.push_str(&double);
+                    acc.push_str(&self.format_list(args, &double));
+                }
+                // return
+                if let Some(returned) = list[2].match_list() {
+                    acc.push('\n');
+                    acc.push_str(&double);
+                    acc.push_str(&self.format_list(returned, &double));
+                }
 
                 if let Some(comment) = trailing {
                     acc.push(' ');
                     acc.push_str(&self.display_pse(comment, previous_indentation));
                 }
+                acc.push('\n');
+                acc.push_str(&space);
+                acc.push(')');
+                if iter.peek().is_some() {
+                    acc.push('\n');
+                    acc.push_str(&space);
+                }
             }
         }
         acc.push('\n');
-        acc.push_str(&space);
-        acc.push(')');
-        acc.push('\n');
-        acc.push_str(previous_indentation);
-        acc.push(')');
+        acc.push_str("))");
         acc
     }
 
@@ -637,8 +659,8 @@ impl<'a> Aggregator<'a> {
             }
         }
         if differing_lines(exprs) {
+            acc.push('\n');
             acc.push_str(previous_indentation);
-            acc.push('\n')
         }
         acc.push(')');
         t(&acc).to_string()
@@ -1604,12 +1626,12 @@ mod tests_formatter {
 
     #[test]
     fn define_multiline_list() {
-        let src = r#"(
-  (optional <sip-010>) ;; token
-  uint                 ;; amount
-  principal            ;; with
-  uint                 ;; nonce
-)"#;
+        let src = r#"  (
+    (optional <sip-010>) ;; token
+    uint                 ;; amount
+    principal            ;; with
+    uint                 ;; nonce
+  )"#;
         let result = format_with_default(src);
         assert_eq!(src, result);
     }
