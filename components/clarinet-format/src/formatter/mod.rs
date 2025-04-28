@@ -1637,12 +1637,16 @@ mod tests_formatter {
     }
     #[test]
     fn define_trait_test() {
-        let src = r#"(define-trait token-trait
-  (
-    (transfer? (principal principal uint) (response uint uint)) ;; comment
-    (get-balance (principal) (response uint uint))
+        let src = r#"(define-trait token-trait (
+  (transfer?
+    (principal principal uint)
+    (response uint uint) ;; comment
   )
-)
+  (get-balance
+    (principal)
+    (response uint uint)
+  )
+))
 "#;
         let result = format_with_default(src);
         assert_eq!(src, result);
