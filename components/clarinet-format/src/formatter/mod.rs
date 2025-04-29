@@ -375,23 +375,32 @@ impl<'a> Aggregator<'a> {
         acc.push_str(&space);
         let mut iter = exprs[2].match_list().unwrap().iter().peekable();
         while let Some(expr) = iter.next() {
+            let trailing = get_trailing_comment(expr, &mut iter);
             if let Some(list) = expr.match_list() {
-                let trailing = get_trailing_comment(expr, &mut iter);
                 acc.push('(');
                 // name
                 acc.push_str(&self.display_pse(&list[0], previous_indentation));
                 let double = format!("{}{}", space, indentation);
-                // args
-                if let Some(args) = list[1].match_list() {
-                    acc.push('\n');
-                    acc.push_str(&double);
-                    acc.push_str(&self.format_list(args, &double));
-                }
-                // return
-                if let Some(returned) = list[2].match_list() {
-                    acc.push('\n');
-                    acc.push_str(&double);
-                    acc.push_str(&self.format_list(returned, &double));
+                // Process each element in the list after the method name
+                let mut i = 1;
+                while i < list.len() {
+                    if let Some(element_list) = list[i].match_list() {
+                        // Found a list (either args or return type)
+                        acc.push('\n');
+                        acc.push_str(&double);
+                        acc.push_str(&self.format_list(element_list, &double));
+
+                        // Check if next item is a comment
+                        if i + 1 < list.len() && is_comment(&list[i+1]) {
+                            acc.push(' ');
+                            acc.push_str(&self.display_pse(&list[i+1], previous_indentation));
+                            i += 2; // Skip both the list and its comment
+                        } else {
+                            i += 1; // Just skip the list
+                        }
+                    } else {
+                        i += 1; // Skip any non-list elements
+                    }
                 }
 
                 if let Some(comment) = trailing {
@@ -1639,7 +1648,7 @@ mod tests_formatter {
     fn define_trait_test() {
         let src = r#"(define-trait token-trait (
   (transfer?
-    (principal principal uint)
+    (principal principal uint) ;; principal
     (response uint uint) ;; comment
   )
   (get-balance
