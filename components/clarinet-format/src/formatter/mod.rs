@@ -391,9 +391,12 @@ impl<'a> Aggregator<'a> {
                         acc.push_str(&self.format_list(element_list, &double));
 
                         // Check if next item is a comment
-                        if i + 1 < list.len() && is_comment(&list[i+1]) {
-                            acc.push(' ');
-                            acc.push_str(&self.display_pse(&list[i+1], previous_indentation));
+                        if i + 1 < list.len() && is_comment(&list[i + 1]) {
+                            let count =
+                                list[i + 1].span().start_column - list[i].span().end_column - 1;
+                            let spaces = " ".repeat(count as usize);
+                            acc.push_str(&spaces);
+                            acc.push_str(&self.display_pse(&list[i + 1], previous_indentation));
                             i += 2; // Skip both the list and its comment
                         } else {
                             i += 1; // Just skip the list
@@ -404,7 +407,9 @@ impl<'a> Aggregator<'a> {
                 }
 
                 if let Some(comment) = trailing {
-                    acc.push(' ');
+                    let count = comment.span().start_column - list[i].span().end_column - 1;
+                    let spaces = " ".repeat(count as usize);
+                    acc.push_str(&spaces);
                     acc.push_str(&self.display_pse(comment, previous_indentation));
                 }
                 acc.push('\n');
@@ -1649,7 +1654,7 @@ mod tests_formatter {
         let src = r#"(define-trait token-trait (
   (transfer?
     (principal principal uint) ;; principal
-    (response uint uint) ;; comment
+    (response uint uint)       ;; comment
   )
   (get-balance
     (principal)
