@@ -369,58 +369,75 @@ impl<'a> Aggregator<'a> {
         let mut acc = "(define-trait ".to_string();
         let indentation = &self.settings.indentation.to_string();
         let space = format!("{}{}", indentation, previous_indentation);
+
+        // name
         acc.push_str(&self.format_source_exprs(slice::from_ref(&exprs[1]), previous_indentation));
         acc.push_str(" (");
         acc.push('\n');
         acc.push_str(&space);
+
+        // methods
         let mut iter = exprs[2].match_list().unwrap().iter().peekable();
         while let Some(expr) = iter.next() {
             let trailing = get_trailing_comment(expr, &mut iter);
-            if let Some(list) = expr.match_list() {
-                acc.push('(');
-                // name
-                acc.push_str(&self.display_pse(&list[0], previous_indentation));
-                let double = format!("{}{}", space, indentation);
-                // Process each element in the list after the method name
-                let mut i = 1;
-                while i < list.len() {
-                    if let Some(element_list) = list[i].match_list() {
-                        // Found a list (either args or return type)
-                        acc.push('\n');
-                        acc.push_str(&double);
-                        acc.push_str(&self.format_list(element_list, &double));
 
-                        // Check if next item is a comment
-                        if i + 1 < list.len() && is_comment(&list[i + 1]) {
-                            let count =
-                                list[i + 1].span().start_column - list[i].span().end_column - 1;
-                            let spaces = " ".repeat(count as usize);
-                            acc.push_str(&spaces);
-                            acc.push_str(&self.display_pse(&list[i + 1], previous_indentation));
-                            i += 2; // Skip both the list and its comment
-                        } else {
-                            i += 1; // Just skip the list
+            if let Some(method_list) = expr.match_list() {
+                acc.push('(');
+
+                // method name
+                if let Some(method_name) = method_list.first() {
+                    acc.push_str(&self.display_pse(method_name, previous_indentation));
+                }
+
+                let double_indent = format!("{}{}", space, indentation);
+
+                let mut items_iter = method_list.iter().skip(1).peekable();
+
+                while let Some(arg) = items_iter.next() {
+                    if let Some(element_list) = arg.match_list() {
+                        // Found either args or return type
+                        acc.push('\n');
+                        acc.push_str(&double_indent);
+                        acc.push_str(&self.format_list(element_list, &double_indent));
+
+                        if let Some(next_item) = items_iter.peek() {
+                            if is_comment(next_item) {
+                                let count =
+                                    next_item.span().start_column - arg.span().end_column - 1;
+                                let spaces = " ".repeat(count as usize);
+                                acc.push_str(&spaces);
+                                acc.push_str(&self.display_pse(next_item, previous_indentation));
+                                items_iter.next();
+                            }
                         }
-                    } else {
-                        i += 1; // Skip any non-list elements
+                    } else if is_comment(arg) {
+                        // standalone comments
+                        acc.push('\n');
+                        acc.push_str(&double_indent);
+                        acc.push_str(&self.display_pse(arg, previous_indentation));
                     }
                 }
 
                 if let Some(comment) = trailing {
-                    let count = comment.span().start_column - list[i].span().end_column - 1;
-                    let spaces = " ".repeat(count as usize);
-                    acc.push_str(&spaces);
-                    acc.push_str(&self.display_pse(comment, previous_indentation));
+                    if let Some(last_item) = method_list.last() {
+                        let count = comment.span().start_column - last_item.span().end_column - 1;
+                        let spaces = " ".repeat(count as usize);
+                        acc.push_str(&spaces);
+                        acc.push_str(&self.display_pse(comment, previous_indentation));
+                    }
                 }
+
                 acc.push('\n');
                 acc.push_str(&space);
                 acc.push(')');
+
                 if iter.peek().is_some() {
                     acc.push('\n');
                     acc.push_str(&space);
                 }
             }
         }
+
         acc.push('\n');
         acc.push_str("))");
         acc
@@ -1654,6 +1671,7 @@ mod tests_formatter {
         let src = r#"(define-trait token-trait (
   (transfer?
     (principal principal uint) ;; principal
+    ;; pre comment
     (response uint uint)       ;; comment
   )
   (get-balance
