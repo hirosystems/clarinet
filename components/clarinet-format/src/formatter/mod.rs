@@ -154,6 +154,43 @@ impl<'a> Aggregator<'a> {
 
         while let Some(expr) = iter.next() {
             let trailing_comment = get_trailing_comment(expr, &mut iter);
+            // If this isn't the first expression and we're at a function definition or comment
+            // that leads to a function definition, add extra spacing
+            if !result.is_empty() {
+                // Check if we're at a function definition or a comment before one
+                if is_function_definition(expr) {
+                    // Direct function definition - add a blank line before it if not already there
+                    if !result.ends_with("\n\n") {
+                        if result.ends_with('\n') {
+                            result.push('\n'); // Add just one more newline
+                        } else {
+                            result.push_str("\n\n"); // Add two newlines
+                        }
+                    }
+                } else if is_comment(expr) {
+                    // This is a comment - check if it's part of a block that precedes a function
+                    let mut look_ahead = iter.clone();
+                    let mut found_function = false;
+
+                    // Skip through any subsequent comments
+                    while let Some(peek_expr) = look_ahead.next() {
+                        if !is_comment(peek_expr) {
+                            // Found a non-comment, is it a function?
+                            found_function = is_function_definition(peek_expr);
+                            break;
+                        }
+                    }
+
+                    // If this comment is part of a block before a function, add spacing
+                    if found_function && !result.ends_with("\n\n") {
+                        if result.ends_with('\n') {
+                            result.push('\n'); // Add just one more newline
+                        } else {
+                            result.push_str("\n\n"); // Add two newlines
+                        }
+                    }
+                }
+            }
             let cur = self.display_pse(expr, previous_indentation);
             if cur.contains(FORMAT_IGNORE_SYNTAX) {
                 result.push_str(&cur);
@@ -166,6 +203,24 @@ impl<'a> Aggregator<'a> {
                 }
                 continue;
             }
+
+            let needs_extra_spacing = if is_comment(expr) {
+                let mut found_function = false;
+
+                // Skip through comments
+                for next in iter.clone() {
+                    if !is_comment(next) {
+                        // Found a non-comment, is it a function?
+                        found_function = is_function_definition(next);
+                        break;
+                    }
+                }
+                found_function
+            } else {
+                // Directly check if this is a function
+                is_function_definition(expr)
+            };
+
             if let Some(list) = expr.match_list() {
                 if let Some(atom_name) = list.split_first().and_then(|(f, _)| f.match_atom()) {
                     let formatted = if let Some(native) = NativeFunctions::lookup_by_name(atom_name)
@@ -340,18 +395,27 @@ impl<'a> Aggregator<'a> {
                     continue;
                 }
             }
-            let current = self.display_pse(expr, previous_indentation);
+            let mut before = "";
             let mut between = " ";
             if let Some(next) = iter.peek() {
-                if !is_same_line(expr, next) || is_comment(expr) {
+                if needs_extra_spacing && !result.is_empty() {
+                    println!("HEREERERE");
+                    // If we need extra spacing and this isn't the first expression
+                    if result.ends_with('\n') {
+                        before = "\n";
+                    } else {
+                        before = "\n\n"; // Add two newlines
+                    }
+                } else if !is_same_line(expr, next) || is_comment(expr) {
                     between = "\n";
                 }
             } else {
                 // no next expression to space out
                 between = "";
             }
+            let current = self.display_pse(expr, previous_indentation);
 
-            result.push_str(&format!("{current}{between}"));
+            result.push_str(&format!("{before}{current}{between}"));
         }
         // Cache the result
         self.cache.borrow_mut().insert(key, result.clone());
@@ -1005,6 +1069,15 @@ fn differing_lines(exprs: &[PreSymbolicExpression]) -> bool {
         .all(|window| window[0].span().start_line == window[1].span().start_line)
 }
 
+fn is_function_definition(expr: &PreSymbolicExpression) -> bool {
+    if let Some(list) = expr.match_list() {
+        if let Some(atom) = list.first().and_then(|f| f.match_atom()) {
+            return atom.starts_with("define-");
+        }
+    }
+    false
+}
+
 fn is_same_line(expr1: &PreSymbolicExpression, expr2: &PreSymbolicExpression) -> bool {
     expr1.span().start_line == expr2.span().start_line
 }
@@ -1574,6 +1647,20 @@ mod tests_formatter {
     #[test]
     fn define_data_var_test() {
         let src = "(define-data-var my-data-var principal tx-sender)\n";
+        let result = format_with_default(src);
+        assert_eq!(src, result);
+    }
+
+    #[test]
+    fn spaced_define_functions() {
+        let src = r#"(define-data-var count uint u10)
+
+;; some comment
+(define-private (get-count)
+  (var-get count)
+)
+
+"#;
         let result = format_with_default(src);
         assert_eq!(src, result);
     }
