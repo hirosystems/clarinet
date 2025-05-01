@@ -336,6 +336,13 @@ impl<'a> Aggregator<'a> {
                     } else {
                         self.to_inner_content(list, previous_indentation)
                     };
+                    // if it's a top level expression, newline it
+                    if previous_indentation.is_empty()
+                        && result.ends_with(")")
+                        && !result.ends_with(")\n")
+                    {
+                        result.push('\n');
+                    }
                     result.push_str(&formatted);
                     continue;
                 }
@@ -1405,6 +1412,19 @@ mod tests_formatter {
         assert_eq!(result, expected);
     }
 
+    #[test]
+    fn top_level_exprs() {
+        let src = r#"(let ((x (+ u1 u1)))
+  (map-insert ns x true)
+)
+(define-public (get-value)
+  (ok (map-get? ns u2))
+)
+
+"#;
+        let result = format_with_default(src);
+        assert_eq!(result, src);
+    }
     #[test]
     fn test_indentation_levels() {
         let src = "(begin (let ((a 1) (b 2)) (ok true)))";
