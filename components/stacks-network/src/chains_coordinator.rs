@@ -4,6 +4,7 @@ use crate::event::send_status_update;
 use crate::event::DevnetEvent;
 use crate::event::Status;
 use crate::orchestrator::ServicesMapHosts;
+use crate::orchestrator::{copy_directory, get_global_cache_dir, get_project_cache_dir};
 
 use base58::FromBase58;
 use bitcoincore_rpc::bitcoin::Address;
@@ -48,6 +49,7 @@ use stackslib::types::chainstate::StacksPublicKey;
 use stackslib::util_lib::signed_structured_data::pox4::make_pox_4_signer_key_signature;
 use stackslib::util_lib::signed_structured_data::pox4::Pox4SignatureTopic;
 use std::convert::TryFrom;
+use std::fs;
 use std::str;
 use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -183,6 +185,24 @@ pub async fn start_chains_coordinator(
     let mut should_deploy_protocol = true; // Will change when `stacks-network` components becomes compatible with Testnet / Mainnet setups
     let boot_completed = Arc::new(AtomicBool::new(false));
     let mut current_burn_height = 0;
+
+    let global_cache_dir = get_global_cache_dir();
+    let project_cache_dir = get_project_cache_dir(&config.devnet_config);
+    // Ensure directories exist
+    fs::create_dir_all(&global_cache_dir)
+        .map_err(|e| format!("unable to create global cache directory: {:?}", e))?;
+    fs::create_dir_all(&project_cache_dir)
+        .map_err(|e| format!("unable to create project cache directory: {:?}", e))?;
+
+    let project_cache_ready = project_cache_dir.join("epoch_3_ready").exists();
+
+    if project_cache_ready {
+        devnet_event_tx
+            .send(DevnetEvent::info(
+                "Using cached blockchain data up to epoch 3.0. Startup will be faster.".to_string(),
+            ))
+            .expect("Failed to send event");
+    }
 
     let (deployment_commands_tx, deployments_command_rx) = channel();
     let (deployment_events_tx, deployment_events_rx) = channel();
@@ -326,6 +346,81 @@ pub async fn start_chains_coordinator(
                         let comment =
                             format!("mining blocks (chain_tip = #{})", bitcoin_block_height);
 
+                        let global_cache_dir = get_global_cache_dir();
+                        let project_cache_dir = get_project_cache_dir(&config.devnet_config);
+                        // If we've reached epoch 3.0, create marker files
+                        if bitcoin_block_height >= config.devnet_config.epoch_3_0 {
+                            // Project cache marker
+                            let project_marker = project_cache_dir.join("epoch_3_ready");
+                            if !project_marker.exists() {
+                                match std::fs::File::create(&project_marker) {
+                                    Ok(_) => {
+                                        let _ = devnet_event_tx.send(DevnetEvent::success(
+                                            "Project cache data prepared up to epoch 3.0. Future project starts will be faster.".to_string(),
+                                        ));
+                                    }
+                                    Err(e) => {
+                                        let _ =
+                                            devnet_event_tx.send(DevnetEvent::warning(format!(
+                                                "Failed to create project cache marker file: {}",
+                                                e
+                                            )));
+                                    }
+                                }
+                            }
+
+                            // Global cache marker - keep this as a template for future projects
+                            let global_marker = global_cache_dir.join("epoch_3_ready");
+                            if !global_marker.exists() {
+                                // Copy project cache to global cache as a template
+                                if project_cache_dir != global_cache_dir {
+                                    // Copy bitcoin data
+                                    let project_bitcoin_cache = project_cache_dir.join("bitcoin");
+                                    let global_bitcoin_cache = global_cache_dir.join("bitcoin");
+                                    if project_bitcoin_cache.exists() {
+                                        let _ = copy_directory(
+                                            &project_bitcoin_cache,
+                                            &global_bitcoin_cache,
+                                        );
+                                    }
+
+                                    // Copy stacks data
+                                    let project_stacks_cache = project_cache_dir.join("stacks");
+                                    let global_stacks_cache = global_cache_dir.join("stacks");
+                                    if project_stacks_cache.exists() {
+                                        let _ = copy_directory(
+                                            &project_stacks_cache,
+                                            &global_stacks_cache,
+                                        );
+                                    }
+
+                                    // Copy signer data
+                                    let project_signer_cache = project_cache_dir.join("signer");
+                                    let global_signer_cache = global_cache_dir.join("signer");
+                                    if project_signer_cache.exists() {
+                                        let _ = copy_directory(
+                                            &project_signer_cache,
+                                            &global_signer_cache,
+                                        );
+                                    }
+                                }
+
+                                match std::fs::File::create(&global_marker) {
+                                    Ok(_) => {
+                                        let _ = devnet_event_tx.send(DevnetEvent::success(
+                                            "Global template cache data prepared. Future project initializations will be faster.".to_string(),
+                                        ));
+                                    }
+                                    Err(e) => {
+                                        let _ =
+                                            devnet_event_tx.send(DevnetEvent::warning(format!(
+                                                "Failed to create global cache marker file: {}",
+                                                e
+                                            )));
+                                    }
+                                }
+                            }
+                        }
                         // Stacking orders can't be published until devnet is ready
                         if !stacks_signers_keys.is_empty()
                             && bitcoin_block_height >= DEFAULT_FIRST_BURN_HEADER_HEIGHT + 10
