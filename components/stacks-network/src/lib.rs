@@ -19,7 +19,7 @@ use clarinet_files::NetworkManifest;
 pub use event::DevnetEvent;
 pub use log::{LogData, LogLevel};
 pub use orchestrator::DevnetOrchestrator;
-use orchestrator::ServicesMapHosts;
+use orchestrator::{setup_cache_directories, ServicesMapHosts};
 use std::{
     sync::mpsc::{self, channel, Receiver, Sender},
     thread::sleep,
@@ -76,6 +76,33 @@ async fn do_run_devnet(
         },
         _ => Err("Unable to retrieve config"),
     }?;
+
+    // Check for and potentially copy cached data
+    if start_local_devnet_services {
+        let using_cache = match setup_cache_directories(&devnet_config, &devnet_events_tx) {
+            Ok(using_cache) => {
+                if using_cache {
+                    let _ = devnet_events_tx.send(DevnetEvent::info(
+                        "Using cached blockchain data up to epoch 3.0. Startup will be faster."
+                            .to_string(),
+                    ));
+                } else {
+                    let _ = devnet_events_tx.send(DevnetEvent::info(
+                        "No cached blockchain data found. Initial startup may take longer."
+                            .to_string(),
+                    ));
+                }
+                using_cache
+            }
+            Err(e) => {
+                let _ = devnet_events_tx.send(DevnetEvent::warning(format!(
+                    "Error setting up cache directories: {}. Continuing without cache.",
+                    e
+                )));
+                false
+            }
+        };
+    }
     // if we're starting all services, all trace logs go to networking.log
     if start_local_devnet_services {
         let file_appender =
