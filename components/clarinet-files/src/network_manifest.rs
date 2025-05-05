@@ -1027,7 +1027,7 @@ impl NetworkManifest {
                 disable_stacks_api: devnet_config.disable_stacks_api.unwrap_or(false),
                 disable_postgres: devnet_config.disable_postgres.unwrap_or(false),
                 disable_stacks_explorer: devnet_config.disable_stacks_explorer.unwrap_or(false),
-                bind_containers_volumes: devnet_config.bind_containers_volumes.unwrap_or(false),
+                bind_containers_volumes: devnet_config.bind_containers_volumes.unwrap_or(true),
                 enable_subnet_node,
                 subnet_node_image_url: devnet_config
                     .subnet_node_image_url

@@ -883,7 +883,7 @@ rpcport={bitcoin_node_rpc_port}
                 "-conf=/etc/bitcoin/bitcoin.conf".into(),
                 "-nodebuglogfile".into(),
                 "-pid=/run/bitcoind.pid".into(),
-                // "-datadir=/root/.bitcoin".into(),
+                "-datadir=/root/.bitcoin".into(),
             ]),
             ..Default::default()
         };
@@ -1051,7 +1051,7 @@ microblock_frequency = 1000
 # inv_sync_interval = 10
 # download_interval = 10
 # walk_interval = 10
-disable_block_download = true
+disable_block_download = false
 disable_inbound_handshakes = true
 disable_inbound_walks = true
 public_ip_address = "1.1.1.1:1234"
@@ -2635,6 +2635,7 @@ events_keys = ["*"]
         let project_cache_dir = get_project_cache_dir(devnet_config);
         let cache_ready_marker = project_cache_dir.join("epoch_3_ready");
         let use_existing_cache = cache_ready_marker.exists();
+        println!("{}", use_existing_cache);
 
         let miner_address = Address::from_str(&devnet_config.miner_btc_address)
             .map_err(|e| format!("unable to create miner address: {:?}", e))?;
@@ -2694,6 +2695,7 @@ events_keys = ["*"]
                 }
             }
             std::thread::sleep(std::time::Duration::from_secs(1));
+            println!("1");
             let _ = devnet_event_tx.send(DevnetEvent::info("Waiting for bitcoin-node".to_string()));
         }
 
@@ -2726,6 +2728,8 @@ events_keys = ["*"]
                 }
             }
             std::thread::sleep(std::time::Duration::from_secs(1));
+
+            println!("2");
             let _ = devnet_event_tx.send(DevnetEvent::info("Waiting for bitcoin-node".to_string()));
         }
 
@@ -2758,6 +2762,8 @@ events_keys = ["*"]
                 }
             }
             std::thread::sleep(std::time::Duration::from_secs(1));
+
+            println!("3");
             let _ = devnet_event_tx.send(DevnetEvent::info("Waiting for bitcoin-node".to_string()));
         }
 
@@ -2790,48 +2796,52 @@ events_keys = ["*"]
                 }
             }
             std::thread::sleep(std::time::Duration::from_secs(1));
+
+            println!("4");
             let _ = devnet_event_tx.send(DevnetEvent::info("Waiting for bitcoin-node".to_string()));
         }
 
-        let mut error_count = 0;
-        loop {
-            let rpc_call = base_builder(
-                &bitcoin_node_url,
-                &devnet_config.bitcoin_node_username,
-                &devnet_config.bitcoin_node_password,
-            )
-            .json(&json!({
-                "jsonrpc": "1.0",
-                "id": "stacks-network",
-                "method": "createwallet",
-                "params": json!({ "wallet_name": devnet_config.miner_wallet_name, "disable_private_keys": true })
-            }))
-            .send()
-            .await
-            .map_err(|e| format!("unable to send 'createwallet' request ({})", e));
+        // let mut error_count = 0;
+        // loop {
+        //     let rpc_call = base_builder(
+        //         &bitcoin_node_url,
+        //         &devnet_config.bitcoin_node_username,
+        //         &devnet_config.bitcoin_node_password,
+        //     )
+        //     .json(&json!({
+        //         "jsonrpc": "1.0",
+        //         "id": "stacks-network",
+        //         "method": "createwallet",
+        //         "params": json!({ "wallet_name": devnet_config.miner_wallet_name, "disable_private_keys": true })
+        //     }))
+        //     .send()
+        //     .await
+        //     .map_err(|e| format!("unable to send 'createwallet' request ({})", e));
 
-            match rpc_call {
-                Ok(r) => {
-                    if r.status().is_success() {
-                        break;
-                    } else {
-                        let err = r.text().await;
-                        let msg = format!("{:?}", err);
-                        let _ = devnet_event_tx.send(DevnetEvent::error(msg));
-                    }
-                }
-                Err(e) => {
-                    error_count += 1;
-                    if error_count > max_errors {
-                        return Err(e);
-                    } else if error_count > 1 {
-                        let _ = devnet_event_tx.send(DevnetEvent::error(e));
-                    }
-                }
-            }
-            std::thread::sleep(std::time::Duration::from_secs(1));
-            let _ = devnet_event_tx.send(DevnetEvent::info("Waiting for bitcoin-node".to_string()));
-        }
+        //     match rpc_call {
+        //         Ok(r) => {
+        //             if r.status().is_success() {
+        //                 break;
+        //             } else {
+        //                 let err = r.text().await;
+        //                 let msg = format!("{:?}", err);
+        //                 let _ = devnet_event_tx.send(DevnetEvent::error(msg));
+        //             }
+        //         }
+        //         Err(e) => {
+        //             error_count += 1;
+        //             if error_count > max_errors {
+        //                 return Err(e);
+        //             } else if error_count > 1 {
+        //                 let _ = devnet_event_tx.send(DevnetEvent::error(e));
+        //             }
+        //         }
+        //     }
+        //     std::thread::sleep(std::time::Duration::from_secs(1));
+
+        //     println!("5");
+        //     let _ = devnet_event_tx.send(DevnetEvent::info("Waiting for bitcoin-node".to_string()));
+        // }
 
         let mut error_count = 0;
         loop {
@@ -2907,6 +2917,8 @@ events_keys = ["*"]
                 }
             }
             std::thread::sleep(std::time::Duration::from_secs(1));
+
+            println!("6");
             let _ = devnet_event_tx.send(DevnetEvent::info("Waiting for bitcoin-node".to_string()));
         }
 
@@ -2984,6 +2996,8 @@ events_keys = ["*"]
                 }
             }
             std::thread::sleep(std::time::Duration::from_secs(1));
+
+            println!("7");
             let _ = devnet_event_tx.send(DevnetEvent::info("Waiting for bitcoin-node".to_string()));
         }
         // Index devnet's wallets by default
@@ -3065,6 +3079,8 @@ events_keys = ["*"]
                     }
                 }
                 std::thread::sleep(std::time::Duration::from_secs(1));
+
+                println!("8");
                 let _ =
                     devnet_event_tx.send(DevnetEvent::info("Waiting for bitcoin-node".to_string()));
             }
@@ -3090,7 +3106,9 @@ pub fn get_global_cache_dir() -> std::path::PathBuf {
 }
 
 pub fn get_project_cache_dir(devnet_config: &DevnetConfig) -> std::path::PathBuf {
-    PathBuf::from(&devnet_config.working_dir).join(".cache")
+    PathBuf::from(&devnet_config.working_dir)
+        .join("data")
+        .join("1")
 }
 
 pub fn setup_cache_directories(
@@ -3123,6 +3141,10 @@ pub fn setup_cache_directories(
         let global_bitcoin_cache = global_cache_dir.join("bitcoin");
         let project_bitcoin_cache = project_cache_dir.join("bitcoin");
         if global_bitcoin_cache.exists() && !project_bitcoin_cache.exists() {
+            println!(
+                "copying bitcoin cache to project {}",
+                project_bitcoin_cache.display()
+            );
             copy_directory(&global_bitcoin_cache, &project_bitcoin_cache)
                 .map_err(|e| format!("Failed to copy Bitcoin template cache: {}", e))?;
         }
@@ -3131,6 +3153,7 @@ pub fn setup_cache_directories(
         let global_stacks_cache = global_cache_dir.join("stacks");
         let project_stacks_cache = project_cache_dir.join("stacks");
         if global_stacks_cache.exists() && !project_stacks_cache.exists() {
+            println!("copying stacks cache to project");
             copy_directory(&global_stacks_cache, &project_stacks_cache)
                 .map_err(|e| format!("Failed to copy Stacks template cache: {}", e))?;
         }
@@ -3139,6 +3162,7 @@ pub fn setup_cache_directories(
         let global_signer_cache = global_cache_dir.join("signer");
         let project_signer_cache = project_cache_dir.join("signer");
         if global_signer_cache.exists() && !project_signer_cache.exists() {
+            println!("copying signer cache to project");
             copy_directory(&global_signer_cache, &project_signer_cache)
                 .map_err(|e| format!("Failed to copy Signer template cache: {}", e))?;
         }
