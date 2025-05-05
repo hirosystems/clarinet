@@ -173,7 +173,12 @@ impl<'a> Aggregator<'a> {
                         match native {
                             NativeFunctions::Let => self.format_let(list, previous_indentation),
                             NativeFunctions::Begin => self.format_begin(list, previous_indentation),
-                            NativeFunctions::Match => self.format_match(list, previous_indentation),
+                            NativeFunctions::Match =>
+                              if contains_comments(list) {
+                                self.match_with_comments(list, previous_indentation)
+                              } else {
+                                self.format_match(list, previous_indentation)
+                              },
                             NativeFunctions::TupleCons => {
                                 // if the kv map is defined with (tuple (c 1)) then we strip the
                                 // ClarityName("tuple") out first and convert it to key/value syntax
@@ -633,6 +638,54 @@ impl<'a> Aggregator<'a> {
     // * match *
     // always multiple lines
     fn format_match(&self, exprs: &[PreSymbolicExpression], previous_indentation: &str) -> String {
+        let mut acc = "(match ".to_string();
+        let indentation = &self.settings.indentation.to_string();
+        let space = format!("{}{}", previous_indentation, indentation);
+
+        // value to match on
+        acc.push_str(&self.format_source_exprs(slice::from_ref(&exprs[1]), previous_indentation));
+        acc.push('\n');
+
+        let mut iter = exprs[2..].iter().peekable();
+        while let Some(branch) = iter.next() {
+            let trailing = get_trailing_comment(branch, &mut iter);
+            let next_is_expr = iter.peek().is_some_and(|next| next.match_list().is_some());
+            let is_binding = branch.match_list().is_none() && next_is_expr;
+            acc.push_str(&space);
+            acc.push_str(&self.format_source_exprs(slice::from_ref(branch), &space));
+
+            // If this is a binding pattern, add the next expression on the same line
+            if is_binding {
+                if let Some(expr_part) = iter.next() {
+                    let expr_trailing = get_trailing_comment(expr_part, &mut iter);
+                    acc.push(' ');
+                    acc.push_str(&self.format_source_exprs(slice::from_ref(expr_part), &space));
+                    if let Some(comment) = expr_trailing {
+                        acc.push(' ');
+                        acc.push_str(&self.display_pse(comment, previous_indentation));
+                    }
+                }
+            }
+            if let Some(comment) = trailing {
+                acc.push(' ');
+                acc.push_str(&self.display_pse(comment, previous_indentation));
+            }
+
+            if iter.peek().is_some() {
+                acc.push('\n');
+            }
+        }
+        acc.push_str(&format!("\n{})", previous_indentation));
+        acc
+    }
+
+    /// Special case for match with comments in line.
+    /// aligns all bindings and values
+    fn match_with_comments(
+        &self,
+        exprs: &[PreSymbolicExpression],
+        previous_indentation: &str,
+    ) -> String {
         let mut acc = "(match ".to_string();
         let indentation = &self.settings.indentation.to_string();
         let space = format!("{}{}", previous_indentation, indentation);
@@ -1108,6 +1161,10 @@ where
     }
 }
 
+fn contains_comments(exprs: &[PreSymbolicExpression]) -> bool {
+    exprs.iter().any(is_comment)
+}
+
 fn comment_piece(text: &str, pse: &PreSymbolicExpression) -> String {
     let (comment_part, rest) = text
         .find(|c| c != ';')
@@ -1337,8 +1394,7 @@ mod tests_formatter {
         let result = format_with_default(&String::from(src));
         // "(match opt\n
         let expected = r#"(match opt
-  value
-  (ok (handle-new-value value))
+  value (ok (handle-new-value value))
   (ok 1)
 )"#;
         assert_eq!(result, expected);
@@ -1349,12 +1405,23 @@ mod tests_formatter {
         let src = "(match x value (ok (+ to-add value)) err-value (err err-value))";
         let result = format_with_default(&String::from(src));
         let expected = r#"(match x
-  value
-  (ok (+ to-add value))
-  err-value
-  (err err-value)
+  value (ok (+ to-add value))
+  err-value (err err-value)
 )"#;
         assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_commented_match() {
+        let src = r#"(match x
+  ;; comment
+  value
+  ;; comment
+  (ok (+ to-add value))
+  (ok true)
+)"#;
+        let result = format_with_default(&String::from(src));
+        assert_eq!(src, result);
     }
     #[test]
     fn test_key_value_sugar() {

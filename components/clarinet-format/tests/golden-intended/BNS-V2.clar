@@ -708,8 +708,7 @@
         )
         ;; Unlist the NFT if it is listed.
         (match (map-get? market id)
-            listed-name
-            (map-delete market id)
+            listed-name (map-delete market id)
             true
         )
         ;; Update primary name if needed for the owner of the name
@@ -1823,8 +1822,7 @@
         (begin
             ;; Check if the name is listed on the market and remove the listing if it is
             (match (map-get? market name-index)
-                listed-name
-                (map-delete market name-index)
+                listed-name (map-delete market name-index)
                 true
             )
             (map-set name-properties {
