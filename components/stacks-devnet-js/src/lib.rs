@@ -659,7 +659,7 @@ impl StacksDevnet {
         {
             overrides.bind_containers_volumes = Some(res.value(&mut cx));
         } else {
-            overrides.bind_containers_volumes = Some(false);
+            overrides.bind_containers_volumes = Some(true);
         }
 
         if let Ok(res) = devnet_settings
