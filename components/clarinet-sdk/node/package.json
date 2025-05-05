@@ -12,7 +12,6 @@
   },
   "files": [
     "dist",
-    "templates",
     "vitest-helpers/src"
   ],
   "main": "./dist/cjs/node/src/index.js",
@@ -39,9 +38,6 @@
         "default": "./dist/cjs/node/src/vitest/index.js"
       }
     }
-  },
-  "bin": {
-    "clarinet-sdk": "dist/cjs/node/src/bin/index.js"
   },
   "scripts": {
     "clean": "rimraf dist",

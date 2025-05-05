@@ -9,6 +9,6 @@
                 (ok (+ index u1))
             )
         err-response
-            (err err-response) ;; something
+            (err err-response)
     )
 )
