@@ -1,7 +1,7 @@
 export const defaultFileStore = new Map<string, string>();
 
 // @ts-ignore
-window.fsStore = defaultFileStore;
+(globalThis as any).fsStore = defaultFileStore;
 
 function fileArrayToString(bufferArray: Uint8Array) {
   return Array.from(bufferArray)
