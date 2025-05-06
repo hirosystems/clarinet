@@ -13,8 +13,7 @@
     (helper-response (response uint uint))
   )
   (match helper-response
-    index
-    (begin
+    index (begin
       (try! (unwrap!
         (complete-deposit-wrapper (get txid deposit) (get vout-index deposit)
           (get amount deposit) (get recipient deposit) (get burn-hash deposit)
@@ -24,7 +23,6 @@
       ))
       (ok (+ index u1))
     )
-    err-response
-    (err err-response) ;; something
+    err-response (err err-response)
   )
 )

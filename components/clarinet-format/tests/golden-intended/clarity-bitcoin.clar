@@ -688,8 +688,7 @@
     (expected-block-height uint)
   )
   (match (get-bc-h-hash expected-block-height)
-    bhh
-    (is-eq bhh (reverse-buff32 (sha256 (sha256 headerbuff))))
+    bhh (is-eq bhh (reverse-buff32 (sha256 (sha256 headerbuff))))
     false
   )
 )
