@@ -883,6 +883,7 @@ rpcport={bitcoin_node_rpc_port}
                 "-conf=/etc/bitcoin/bitcoin.conf".into(),
                 "-nodebuglogfile".into(),
                 "-pid=/run/bitcoind.pid".into(),
+                "-reindex".into(), // TODO make this only for cached startups
                 "-datadir=/root/.bitcoin".into(),
             ]),
             ..Default::default()
@@ -2708,7 +2709,6 @@ events_keys = ["*"]
                 }
             }
             std::thread::sleep(std::time::Duration::from_secs(1));
-            println!("1");
             let _ = devnet_event_tx.send(DevnetEvent::info("Waiting for bitcoin-node".to_string()));
         }
 
@@ -2742,7 +2742,6 @@ events_keys = ["*"]
             }
             std::thread::sleep(std::time::Duration::from_secs(1));
 
-            println!("2");
             let _ = devnet_event_tx.send(DevnetEvent::info("Waiting for bitcoin-node".to_string()));
         }
 
@@ -2775,8 +2774,6 @@ events_keys = ["*"]
                 }
             }
             std::thread::sleep(std::time::Duration::from_secs(1));
-
-            println!("3");
             let _ = devnet_event_tx.send(DevnetEvent::info("Waiting for bitcoin-node".to_string()));
         }
 
@@ -2809,8 +2806,6 @@ events_keys = ["*"]
                 }
             }
             std::thread::sleep(std::time::Duration::from_secs(1));
-
-            println!("4");
             let _ = devnet_event_tx.send(DevnetEvent::info("Waiting for bitcoin-node".to_string()));
         }
 
@@ -2859,9 +2854,13 @@ events_keys = ["*"]
                                 } else {
                                     let err = r.text().await;
                                     let msg = format!("{:?}", err);
-                                    println!("msg: {}", msg);
+                                    println!("{}", msg);
                                     // if it returns "Wallet is already loaded" we break out
-                                    break;
+                                    if err.unwrap().contains("Wallet is already loaded") {
+                                        break;
+                                    } else {
+                                        let _ = devnet_event_tx.send(DevnetEvent::error(msg));
+                                    }
                                 }
                             }
                             Err(e) => {
@@ -2890,8 +2889,6 @@ events_keys = ["*"]
                 }
             }
             std::thread::sleep(std::time::Duration::from_secs(1));
-
-            println!("5");
             let _ = devnet_event_tx.send(DevnetEvent::info("Waiting for bitcoin-node".to_string()));
         }
 
@@ -2969,8 +2966,6 @@ events_keys = ["*"]
                 }
             }
             std::thread::sleep(std::time::Duration::from_secs(1));
-
-            println!("6");
             let _ = devnet_event_tx.send(DevnetEvent::info("Waiting for bitcoin-node".to_string()));
         }
 
@@ -3048,8 +3043,6 @@ events_keys = ["*"]
                 }
             }
             std::thread::sleep(std::time::Duration::from_secs(1));
-
-            println!("7");
             let _ = devnet_event_tx.send(DevnetEvent::info("Waiting for bitcoin-node".to_string()));
         }
         // Index devnet's wallets by default
@@ -3131,8 +3124,6 @@ events_keys = ["*"]
                     }
                 }
                 std::thread::sleep(std::time::Duration::from_secs(1));
-
-                println!("8");
                 let _ =
                     devnet_event_tx.send(DevnetEvent::info("Waiting for bitcoin-node".to_string()));
             }
