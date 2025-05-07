@@ -40,7 +40,7 @@ afterEach(() => {
 
 describe("basic simnet interactions", () => {
   it("initialize simnet", () => {
-    expect(simnet.blockHeight).toBe(1);
+    expect(simnet.blockHeight).toBe(2);
   });
 
   it("can run command", () => {
@@ -277,7 +277,7 @@ describe("simnet can call contracts function", () => {
 });
 
 describe("mineBlock and callPublicFunction properly handle block height incrementation", () => {
-  const expectedReturnedBH = 2;
+  const expectedReturnedBH = 3;
 
   it("increases the block height after the call in callPublicFn", () => {
     const { result } = simnet.callPublicFn("block-height-tests", "get-block-height", [], address1);
