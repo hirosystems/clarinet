@@ -95,7 +95,7 @@
           },
           "clarity-lsp.formatting": {
             "type": "boolean",
-            "default": false,
+            "default": true,
             "order": 0,
             "description": "If set to true, clarity files will be formatted on save"
           },
