@@ -63,12 +63,7 @@ export function getSessionProxy() {
       if (prop === "callReadOnlyFn" || prop === "callPublicFn" || prop === "callPrivateFn") {
         const callFn: CallFn = (contract, method, args, sender) => {
           const response = session[prop](
-            new CallFnArgs(
-              contract,
-              method,
-              args.map((a) => serializeCVBytes(a)),
-              sender,
-            ),
+            new CallFnArgs(contract, method, args.map(serializeCVBytes), sender),
           );
           return parseTxResponse(response);
         };
@@ -112,7 +107,7 @@ export function getSessionProxy() {
               return {
                 callPublicFn: {
                   ...tx.callPublicFn,
-                  args_maps: tx.callPublicFn.args.map(Cl.serialize),
+                  args_maps: tx.callPublicFn.args.map(serializeCVBytes),
                 },
               };
             }
@@ -120,7 +115,7 @@ export function getSessionProxy() {
               return {
                 callPrivateFn: {
                   ...tx.callPrivateFn,
-                  args_maps: tx.callPrivateFn.args.map(Cl.serialize),
+                  args_maps: tx.callPrivateFn.args.map(serializeCVBytes),
                 },
               };
             }
