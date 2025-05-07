@@ -4,16 +4,18 @@ import { describe, expect, it, beforeEach } from "vitest";
 // test the built package and not the source code
 // makes it simpler to handle wasm build
 import { Simnet, initSimnet } from "..";
+import { assert } from "node:console";
 
 let simnet: Simnet;
 
 beforeEach(async () => {
-  simnet = await initSimnet("tests/fixtures/Clarinet.toml");
+  simnet = await initSimnet("tests/fixtures/EmptyManifest.toml");
 });
 
 describe("the sdk handle all clarity version", () => {
   it("handle clarity 1", () => {
     simnet.setEpoch("2.05");
+    expect(simnet.currentEpoch).toBe("2.05");
     let resOk = simnet.execute('(index-of "stacks" "s")');
     expect(resOk.result).toStrictEqual(Cl.some(Cl.uint(0)));
 
@@ -60,7 +62,7 @@ describe("the sdk handle all clarity version", () => {
 
     // `tenure-height` was introduced in clarity 3
     let resOk3 = simnet.execute("(print tenure-height)");
-    expect(resOk3.result).toStrictEqual(Cl.uint(2));
+    expect(resOk3.result).toStrictEqual(Cl.uint(1));
 
     // `block-height` was removed in clarity 3
     expect(() => simnet.execute("(print block-height)")).toThrowError(
