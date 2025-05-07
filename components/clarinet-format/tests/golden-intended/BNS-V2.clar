@@ -1,11 +1,13 @@
 ;; title: BNS-V2
 ;; version: V-2
 ;; summary: Updated BNS contract, handles the creation of new namespaces and new names on each namespace
+
 ;; traits
 ;; (new) Import SIP-09 NFT trait
 (impl-trait 'SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.nft-trait.nft-trait)
 ;; (new) Import a custom commission trait for handling commissions for NFT marketplaces functions
 (use-trait commission-trait .commission-trait.commission)
+
 ;; token definition
 ;; (new) Define the non-fungible token (NFT) called BNS-V2 with unique identifiers as unsigned integers
 (define-non-fungible-token BNS-V2 uint)
@@ -25,10 +27,13 @@
     u64000000000 u64000000000
     u6400000000 u6400000000 u6400000000 u6400000000
     u640000000 u640000000 u640000000 u640000000 u640000000 u640000000 u640000000 u640000000 u640000000 u640000000 u640000000 u640000000 u640000000)
-);; Only authorized caller to flip the switch and update URI
+)
+;; Only authorized caller to flip the switch and update URI
 (define-constant DEPLOYER tx-sender)
+
 ;; (new) Var to store the token URI, allowing for metadata association with the NFT
 (define-data-var token-uri (string-ascii 256) "ipfs://QmUQY1aZ799SPRaNBFqeCvvmZ4fTQfZvWHauRvHAukyQDB")
+
 (define-public (update-token-uri (new-token-uri (string-ascii 256)))
     (ok (begin
         (asserts! (is-eq contract-caller DEPLOYER) ERR-NOT-AUTHORIZED)
@@ -37,6 +42,7 @@
 )
 
 (define-data-var contract-uri (string-ascii 256) "ipfs://QmWKTZEMQNWngp23i7bgPzkineYC9LDvcxYkwNyVQVoH8y")
+
 (define-public (update-contract-uri (new-contract-uri (string-ascii 256)))
     (ok (begin
         (asserts! (is-eq contract-caller DEPLOYER) ERR-NOT-AUTHORIZED)
@@ -76,11 +82,14 @@
 (define-constant ERR-LIFETIME-EQUAL-0 (err u129))
 (define-constant ERR-MIGRATION-IN-PROGRESS (err u130))
 (define-constant ERR-NO-PRIMARY-NAME (err u131))
+
 ;; variables
 ;; (new) Variable to see if migration is complete
 (define-data-var migration-complete bool false)
+
 ;; (new) Counter to keep track of the last minted NFT ID, ensuring unique identifiers
 (define-data-var bns-index uint u0)
+
 ;; maps
 ;; (new) Map to track market listings, associating NFT IDs with price and commission details
 (define-map market
@@ -90,6 +99,7 @@
         commission: principal,
     }
 )
+
 ;; (new) Define a map to link NFT IDs to their respective names and namespaces.
 (define-map index-to-name
     uint
@@ -106,6 +116,7 @@
     }
     uint
 )
+
 ;; (updated) Contains detailed properties of names, including registration and importation times
 (define-map name-properties
     {
@@ -124,6 +135,7 @@
         owner: principal,
     }
 )
+
 ;; (update) Stores properties of namespaces, including their import principals, reveal and launch times, and pricing functions.
 (define-map namespaces
     (buff 20)
@@ -145,6 +157,7 @@
         },
     }
 )
+
 ;; Records namespace preorder transactions with their creation times, and STX burned.
 (define-map namespace-preorders
     {
@@ -157,16 +170,19 @@
         claimed: bool,
     }
 )
+
 ;; Tracks preorders, to avoid attacks
 (define-map namespace-single-preorder
     (buff 20)
     bool
 )
+
 ;; Tracks preorders, to avoid attacks
 (define-map name-single-preorder
     (buff 20)
     bool
 )
+
 ;; Tracks preorders for names, including their creation times, and STX burned.
 (define-map name-preorders
     {
@@ -179,11 +195,13 @@
         claimed: bool,
     }
 )
+
 ;; It maps a user's principal to the ID of their primary name.
 (define-map primary-name
     principal
     uint
 )
+
 ;; read-only
 ;; @desc (new) SIP-09 compliant function to get the last minted token's ID
 (define-read-only (get-last-token-id)

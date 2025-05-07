@@ -347,6 +347,8 @@ impl<'a> Aggregator<'a> {
                             result_with_comment
                                 .push_str(&self.display_pse(comment, previous_indentation));
                             format!("{}\n", result_with_comment)
+                        } else if result.ends_with('\n') {
+                            result.to_string()
                         } else {
                             format!("{}\n", result)
                         }
@@ -1248,7 +1250,7 @@ mod tests_formatter {
     #[test]
     fn test_function_formatter() {
         let result = format_with_default(&String::from("(define-private (my-func) (ok true))"));
-        assert_eq!(result, "(define-private (my-func)\n  (ok true)\n)\n\n");
+        assert_eq!(result, "(define-private (my-func)\n  (ok true)\n)\n");
     }
 
     #[test]
@@ -1272,11 +1274,9 @@ mod tests_formatter {
         let expected = r#"(define-public (my-func)
   (ok true)
 )
-
 (define-public (my-func2)
   (ok true)
 )
-
 "#;
         assert_eq!(expected, result);
     }
@@ -1286,13 +1286,13 @@ mod tests_formatter {
         let result = format_with_default(&String::from(src));
         assert_eq!(
             result,
-            "(define-public (my-func (amount uint))\n  (ok true)\n)\n\n"
+            "(define-public (my-func (amount uint))\n  (ok true)\n)\n"
         );
         let src = "(define-public (my-func (amount uint)) (ok true))";
         let result = format_with_default(&String::from(src));
         assert_eq!(
             result,
-            "(define-public (my-func (amount uint))\n  (ok true)\n)\n\n"
+            "(define-public (my-func (amount uint))\n  (ok true)\n)\n"
         );
     }
     #[test]
@@ -1301,7 +1301,7 @@ mod tests_formatter {
         let result = format_with_default(&String::from(src));
         assert_eq!(
             result,
-            "(define-public (my-func\n    (amount uint)\n    (sender principal)\n  )\n  (ok true)\n)\n\n"
+            "(define-public (my-func\n    (amount uint)\n    (sender principal)\n  )\n  (ok true)\n)\n"
         );
     }
     #[test]
@@ -1502,7 +1502,6 @@ mod tests_formatter {
 (define-public (get-value)
   (ok (map-get? ns u2))
 )
-
 "#;
         let result = format_with_default(src);
         assert_eq!(result, src);
@@ -1636,7 +1635,6 @@ mod tests_formatter {
     (contract-call? core-contract parse-and-verify-vaa vaa-bytes)
   )
 )
-
 "#;
         let result = format_with_default(&String::from(src));
         assert_eq!(src, result);
