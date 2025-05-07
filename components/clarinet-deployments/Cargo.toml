@@ -16,6 +16,7 @@ clarity = { workspace = true }
 
 clarity-repl = { path = "../clarity-repl", default-features = false }
 clarinet-files = { path = "../clarinet-files" }
+stacks-rpc-client = { path = "../stacks-rpc-client" }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 bitcoin = "0.31.2"

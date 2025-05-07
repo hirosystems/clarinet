@@ -5,6 +5,7 @@ use clarity::util::hash::{bytes_to_hex, hex_bytes, to_hex};
 use clarity::vm::types::Value;
 use stacks_codec::codec::{StacksTransaction, TransactionPayload};
 
+use reqwest;
 use reqwest::blocking::Client;
 
 #[derive(Clone, Debug)]
@@ -101,6 +102,7 @@ pub struct Balance {
 pub struct Contract {
     pub source: String,
     pub publish_height: u64,
+    pub clarity_version: Option<u8>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -314,4 +316,17 @@ impl StacksRpc {
         }
         Err(RpcError::Generic)
     }
+}
+
+pub async fn fetch_contract(request_url: String) -> Result<Contract, String> {
+    let response = reqwest::get(&request_url)
+        .await
+        .map_err(|_| format!("Unable to retrieve contract {}", request_url))?;
+
+    let contract = response
+        .json()
+        .await
+        .map_err(|_| format!("Unable to parse contract {}", request_url))?;
+
+    Ok(contract)
 }

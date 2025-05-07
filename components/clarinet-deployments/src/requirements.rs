@@ -6,7 +6,7 @@ use clarity_repl::{
     },
     repl::{remote_data::epoch_for_height, DEFAULT_CLARITY_VERSION, DEFAULT_EPOCH},
 };
-use reqwest;
+use stacks_rpc_client::rpc_client::fetch_contract;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContractMetadata {
@@ -119,25 +119,4 @@ pub async fn retrieve_contract(
     };
 
     Ok((contract.source, epoch, clarity_version, contract_location))
-}
-
-#[allow(dead_code)]
-#[derive(Deserialize, Debug, Default, Clone)]
-struct Contract {
-    source: String,
-    publish_height: u32,
-    clarity_version: Option<u8>,
-}
-
-async fn fetch_contract(request_url: String) -> Result<Contract, String> {
-    let response = reqwest::get(&request_url)
-        .await
-        .map_err(|_| format!("Unable to retrieve contract {}", request_url))?;
-
-    let contract = response
-        .json()
-        .await
-        .map_err(|_| format!("Unable to parse contract {}", request_url))?;
-
-    Ok(contract)
 }

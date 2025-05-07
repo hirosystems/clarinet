@@ -732,7 +732,7 @@ impl Datastore {
             sortition_lookup,
             consensus_hash_lookup,
             tenure_blocks_height,
-            current_epoch: epoch_for_height(is_mainnet, *stacks_chain_height),
+            current_epoch: epoch_for_height(is_mainnet, *stacks_chain_height as u64),
             current_epoch_start_height: *stacks_chain_height,
             constants,
             remote_network_info: clarity_datastore.remote_network_info.clone(),
