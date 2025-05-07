@@ -1,3 +1,37 @@
+# [3.0.0](https://github.com/hirosystems/clarinet/compare/v2.16.0...v3.0.0) (2025-05-07)
+
+While most recent features were shipped in the 2.x series, this 3.0.0 version allows us to stabilize
+the Clarity Formatter and Mainnet execution simulation features.
+
+With a major version bump comes breaking changes, especially since the Clarinet JS SDK will now use
+Stacks.js v7. The most significant change for Clarity developers is how Stacks.js handles Clarity
+values. See the
+[Stacks.js migration guide](https://github.com/hirosystems/stacks.js/blob/main/.github/MIGRATION.md#clarity-representation)
+for more details.
+
+##### New Featurs (Breaking change!)
+
+- Support Stacks.js v7 (#1605) (03630428)
+
+##### Chores
+
+- Default formatting to true in LSP (#1785) (23028924)
+- Inline values in match when no comments are present (#1775) (68dbafe3)
+- Remove migration script (#1779) (31304f23)
+
+##### Continuous Integration
+
+- Fix NPM release (#1768) (ab193602)
+
+##### Bug Fixes
+
+- Formatter:
+  - Inline values in match when no comments are present (#1775) (68dbafe3)
+  - Preserve user newlines (#1786) (90d97943)
+  - Top-level spacing (#1776) (6a633692)
+  - Trait and eol comment fix (#1773) (f5153eb3)
+- Clippy lint (#1780) (68ee00e5)
+
 # [2.16.0](https://github.com/hirosystems/clarinet/compare/v2.15.2...v2.16.0) (2025-04-15)
 
 ##### New Features
