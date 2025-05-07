@@ -148,6 +148,9 @@ impl<'a> Aggregator<'a> {
         if let Some(result) = cached_result {
             return result.clone();
         }
+        // Track the end line of the previous expression
+        let mut prev_end_line = 0;
+
         // use peekable to handle trailing comments nicely
         let mut iter = expressions.iter().peekable();
         let mut result = "".to_owned(); // Accumulate results here
@@ -165,6 +168,15 @@ impl<'a> Aggregator<'a> {
                     }
                 }
                 continue;
+            }
+
+            if prev_end_line > 0 {
+                let blank_lines = expr.span().start_line - prev_end_line - 1;
+                // Add extra newlines based on original blank lines (limit to 1 consecutive blank lines)
+                let extra_newlines = std::cmp::min(blank_lines, 1);
+                for _ in 0..extra_newlines {
+                    result.push('\n');
+                }
             }
             if let Some(list) = expr.match_list() {
                 if let Some(atom_name) = list.split_first().and_then(|(f, _)| f.match_atom()) {
@@ -349,6 +361,7 @@ impl<'a> Aggregator<'a> {
                         result.push('\n');
                     }
                     result.push_str(&formatted);
+                    prev_end_line = expr.span().end_line;
                     continue;
                 }
             }
@@ -362,6 +375,8 @@ impl<'a> Aggregator<'a> {
                 // no next expression to space out
                 between = "";
             }
+
+            prev_end_line = expr.span().end_line;
 
             result.push_str(&format!("{current}{between}"));
         }
@@ -1752,6 +1767,25 @@ mod tests_formatter {
   )"#;
         let result = format_with_default(src);
         assert_eq!(src, result);
+    }
+
+    #[test]
+    fn significant_newline_preserving() {
+        let src = r#";; comment
+
+;; another
+;; more
+
+
+;; after 2 spaces, now it's 1"#;
+        let result = format_with_default(src);
+        let expected = r#";; comment
+
+;; another
+;; more
+
+;; after 2 spaces, now it's 1"#;
+        assert_eq!(expected, result);
     }
     #[test]
     fn define_trait_test() {
