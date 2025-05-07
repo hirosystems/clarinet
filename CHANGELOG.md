@@ -1,3 +1,9 @@
+# [3.0.1](https://github.com/hirosystems/clarinet/compare/v3.0.0...v3.0.1) (2025-05-07)
+
+##### Bug Fixes
+
+- JS SDK tx arg serialization in simnet.mineBlock (#1795) (677a0062)
+
 # [3.0.0](https://github.com/hirosystems/clarinet/compare/v2.16.0...v3.0.0) (2025-05-07)
 
 While most recent features were shipped in the 2.x series, this 3.0.0 version allows us to stabilize
