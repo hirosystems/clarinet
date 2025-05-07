@@ -148,6 +148,9 @@ impl<'a> Aggregator<'a> {
         if let Some(result) = cached_result {
             return result.clone();
         }
+        // Track the end line of the previous expression
+        let mut prev_end_line = 0;
+
         // use peekable to handle trailing comments nicely
         let mut iter = expressions.iter().peekable();
         let mut result = "".to_owned(); // Accumulate results here
@@ -165,6 +168,15 @@ impl<'a> Aggregator<'a> {
                     }
                 }
                 continue;
+            }
+
+            if prev_end_line > 0 {
+                let blank_lines = expr.span().start_line - prev_end_line - 1;
+                // Add extra newlines based on original blank lines (limit to 1 consecutive blank lines)
+                let extra_newlines = std::cmp::min(blank_lines, 1);
+                for _ in 0..extra_newlines {
+                    result.push('\n');
+                }
             }
             if let Some(list) = expr.match_list() {
                 if let Some(atom_name) = list.split_first().and_then(|(f, _)| f.match_atom()) {
@@ -335,6 +347,8 @@ impl<'a> Aggregator<'a> {
                             result_with_comment
                                 .push_str(&self.display_pse(comment, previous_indentation));
                             format!("{}\n", result_with_comment)
+                        } else if result.ends_with('\n') {
+                            result.to_string()
                         } else {
                             format!("{}\n", result)
                         }
@@ -349,6 +363,7 @@ impl<'a> Aggregator<'a> {
                         result.push('\n');
                     }
                     result.push_str(&formatted);
+                    prev_end_line = expr.span().end_line;
                     continue;
                 }
             }
@@ -362,6 +377,8 @@ impl<'a> Aggregator<'a> {
                 // no next expression to space out
                 between = "";
             }
+
+            prev_end_line = expr.span().end_line;
 
             result.push_str(&format!("{current}{between}"));
         }
@@ -1233,7 +1250,7 @@ mod tests_formatter {
     #[test]
     fn test_function_formatter() {
         let result = format_with_default(&String::from("(define-private (my-func) (ok true))"));
-        assert_eq!(result, "(define-private (my-func)\n  (ok true)\n)\n\n");
+        assert_eq!(result, "(define-private (my-func)\n  (ok true)\n)\n");
     }
 
     #[test]
@@ -1257,11 +1274,9 @@ mod tests_formatter {
         let expected = r#"(define-public (my-func)
   (ok true)
 )
-
 (define-public (my-func2)
   (ok true)
 )
-
 "#;
         assert_eq!(expected, result);
     }
@@ -1271,13 +1286,13 @@ mod tests_formatter {
         let result = format_with_default(&String::from(src));
         assert_eq!(
             result,
-            "(define-public (my-func (amount uint))\n  (ok true)\n)\n\n"
+            "(define-public (my-func (amount uint))\n  (ok true)\n)\n"
         );
         let src = "(define-public (my-func (amount uint)) (ok true))";
         let result = format_with_default(&String::from(src));
         assert_eq!(
             result,
-            "(define-public (my-func (amount uint))\n  (ok true)\n)\n\n"
+            "(define-public (my-func (amount uint))\n  (ok true)\n)\n"
         );
     }
     #[test]
@@ -1286,7 +1301,7 @@ mod tests_formatter {
         let result = format_with_default(&String::from(src));
         assert_eq!(
             result,
-            "(define-public (my-func\n    (amount uint)\n    (sender principal)\n  )\n  (ok true)\n)\n\n"
+            "(define-public (my-func\n    (amount uint)\n    (sender principal)\n  )\n  (ok true)\n)\n"
         );
     }
     #[test]
@@ -1487,7 +1502,6 @@ mod tests_formatter {
 (define-public (get-value)
   (ok (map-get? ns u2))
 )
-
 "#;
         let result = format_with_default(src);
         assert_eq!(result, src);
@@ -1621,7 +1635,6 @@ mod tests_formatter {
     (contract-call? core-contract parse-and-verify-vaa vaa-bytes)
   )
 )
-
 "#;
         let result = format_with_default(&String::from(src));
         assert_eq!(src, result);
@@ -1752,6 +1765,25 @@ mod tests_formatter {
   )"#;
         let result = format_with_default(src);
         assert_eq!(src, result);
+    }
+
+    #[test]
+    fn significant_newline_preserving() {
+        let src = r#";; comment
+
+;; another
+;; more
+
+
+;; after 2 spaces, now it's 1"#;
+        let result = format_with_default(src);
+        let expected = r#";; comment
+
+;; another
+;; more
+
+;; after 2 spaces, now it's 1"#;
+        assert_eq!(expected, result);
     }
     #[test]
     fn define_trait_test() {

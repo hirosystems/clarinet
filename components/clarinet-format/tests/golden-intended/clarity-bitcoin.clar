@@ -1,7 +1,10 @@
 ;; source: https://github.com/hirosystems/clarity-examples/blob/main/examples/clarity-bitcoin/contracts/clarity-bitcoin.clar
+
 ;; @contract stateless contract to verify bitcoin transaction
 ;; @version 5
+
 ;; version 5 adds support for txid generation and improves security
+
 ;; Error codes
 (define-constant ERR-OUT-OF-BOUNDS u1)
 (define-constant ERR-TOO-MANY-TXINS u2)
@@ -16,9 +19,11 @@
 (define-constant ERR-WITNESS-TX-NOT-IN-COMMITMENT u11)
 (define-constant ERR-NOT-SEGWIT-TRANSACTION u12)
 (define-constant ERR-LEFTOVER-DATA u13)
+
 ;;
 ;; Helper functions to parse bitcoin transactions
 ;;
+
 ;; Create a list with n elments `true`. n must be smaller than 9.
 (define-private (bool-list-of-len (n uint))
   (unwrap-panic (slice? (list true true true true true true true true) u0 n))
@@ -662,10 +667,12 @@
 
 ;; MOCK section
 (define-constant DEBUG-MODE true)
+
 (define-map mock-burnchain-header-hashes
   uint
   (buff 32)
 )
+
 (define-public (mock-add-burnchain-block-header-hash
     (burn-height uint)
     (hash (buff 32))
@@ -681,6 +688,7 @@
 )
 
 ;; END MOCK section
+
 ;; Verify that a block header hashes to a burnchain header hash at a given height.
 ;; Returns true if so; false if not.
 (define-read-only (verify-block-header
@@ -793,6 +801,7 @@
 )
 
 ;; Helper for wtxid commitments
+
 ;; Gets the scriptPubKey in the last output that follows the 0x6a24aa21a9ed pattern regardless of its content
 ;; as per BIP-0141 (https://github.com/bitcoin/bips/blob/master/bip-0141.mediawiki#commitment-structure)
 (define-read-only (get-commitment-scriptPubKey (outs (list 8 {
@@ -827,11 +836,13 @@
 ;;
 ;; Top-level verification functions
 ;;
+
 ;; Determine whether or not a Bitcoin transaction without witnesses
 ;; was mined in a prior Bitcoin block.
 ;; It takes the block height, the transaction, the block header and a merkle proof, and determines that:
 ;; * the block header corresponds to the block that was mined at the given Bitcoin height
 ;; * the transaction's merkle proof links it to the block header's merkle root.
+
 ;; To verify that the merkle root is part of the block header there are two options:
 ;; a) read the merkle root from the header buffer
 ;; b) build the header buffer from its parts including the merkle root

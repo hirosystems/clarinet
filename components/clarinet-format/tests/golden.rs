@@ -1,5 +1,4 @@
 use clarinet_format::formatter::{ClarityFormatter, Indentation, Settings};
-use clarity::vm::diagnostic;
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;

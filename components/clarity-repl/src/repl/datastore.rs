@@ -877,17 +877,13 @@ impl Datastore {
         clarity_datastore: &mut ClarityDatastore,
         epoch: StacksEpochId,
     ) {
-        if epoch == self.current_epoch {
+        if epoch <= self.current_epoch {
             return;
         }
         clarity_datastore.put("vm-epoch::epoch-version", &format!("{:08x}", epoch as u32));
         self.current_epoch = epoch;
         self.current_epoch_start_height = self.stacks_chain_height;
-        if epoch >= StacksEpochId::Epoch30 {
-            // ideally the burn chain tip should be advanced for each new epoch
-            // but this would introduce breaking changes to existing 2.x tests
-            self.advance_burn_chain_tip(clarity_datastore, 1);
-        }
+        self.advance_burn_chain_tip(clarity_datastore, 1);
     }
 }
 
@@ -1311,7 +1307,15 @@ mod tests {
     fn test_set_current_epoch() {
         let (mut clarity_datastore, mut datastore) = get_datastores();
         let epoch_id = StacksEpochId::Epoch25;
+        assert_eq!(datastore.burn_chain_height, 0);
         datastore.set_current_epoch(&mut clarity_datastore, epoch_id);
+        assert_eq!(datastore.burn_chain_height, 1);
+        assert_eq!(datastore.current_epoch, epoch_id);
+
+        // epoch can not be decreased
+        let lower_epoch_id = StacksEpochId::Epoch25;
+        datastore.set_current_epoch(&mut clarity_datastore, lower_epoch_id);
+        assert_eq!(datastore.burn_chain_height, 1);
         assert_eq!(datastore.current_epoch, epoch_id);
     }
 

@@ -43,7 +43,7 @@ describe("deployment plans test", async () => {
     expect(fs.existsSync(deploymentPlanPath)).toBe(true);
 
     // make sure the simnet is running
-    expect(simnet.blockHeight).toBe(1);
+    expect(simnet.blockHeight).toBe(2);
   });
 
   it("can use custom deployment plan", async () => {
