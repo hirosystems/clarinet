@@ -1,15 +1,35 @@
-# [3.0.0](https://github.com/hirosystems/clarinet/compare/v2.16.0...v3.0.0) (2025-05-07)
+#### 2025-05-07
 
-While most recent features were shipped in the 2.x versions, this 3.0.0 version
+##### Chores
 
-##### Breaking changes
+*  update changelog (0c5f52ea)
+*  upgrade stacks-core dependencies (3e3e13ca)
+*  bump version (b41a7faf)
+*  default format on save to true (#1785) (23028924)
+*  inline values in match when no comments are present (#1775) (68dbafe3)
+*  remvoe migration script (#1779) (31304f23)
+* **deps:**  bump vite in /components/clarinet-cli/examples (#1774) (d38ec08b)
 
-- Use Stacks.js v7 in Clarinet SDK (#1605) (03630428)
+##### Continuous Integration
+
+*  winget release token (#1771) (118f73fe)
+*  update release to use GH App token (#1770) (137c177a)
+*  fix npm release (#1768) (ab193602)
+*  allow running ci sdk release manually (#1766) (2eec418e)
+
+##### New Features
+
+*  improve simnet epoch handling (#1787) (b46b3cb4)
+*  support stacks.js v7 (#1605) (03630428)
 
 ##### Bug Fixes
 
-- Formatter: Top-level spacing (#1776) (6a633692)
-- Formatter: Trait and eol comment fix (#1773) (f5153eb3)
+*  preserve user newlines  (#1786) (90d97943)
+*  clippy lint (#1780) (68ee00e5)
+*  set fsStore in globalThis (#1777) (17f6687d)
+*  top-level spacing (#1776) (6a633692)
+*  cargo audit (#1778) (d2c0490c)
+*  trait and eol comment fix (#1773) (f5153eb3)
 
 # [2.16.0](https://github.com/hirosystems/clarinet/compare/v2.15.2...v2.16.0) (2025-04-15)
 
