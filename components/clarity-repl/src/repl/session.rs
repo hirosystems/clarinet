@@ -1431,19 +1431,20 @@ mod tests {
         // initial epoch is 2.05
         assert_eq!(initial_epoch, "Current epoch: 2.05");
 
-        // it can be lowered to 2.0
-        // it's possible that in the feature we want to start from 2.0 and forbid lowering the epoch
-        // this test would have to be updated
+        // epoch can not be decreased
         session.handle_command("::set_epoch 2.0");
         let current_epoch = session.handle_command("::get_epoch");
-        assert_eq!(current_epoch, "Current epoch: 2.0");
+        assert_eq!(current_epoch, "Current epoch: 2.05");
 
         session.handle_command("::set_epoch 2.4");
         let current_epoch = session.handle_command("::get_epoch");
         assert_eq!(current_epoch, "Current epoch: 2.4");
 
         // changing epoch in 2.x does not impact the block height
-        assert_eq!(session.interpreter.get_block_height(), initial_block_height);
+        assert_eq!(
+            session.interpreter.get_block_height(),
+            initial_block_height + 1
+        );
 
         session.handle_command("::set_epoch 3.0");
         let current_epoch = session.handle_command("::get_epoch");
@@ -1452,7 +1453,7 @@ mod tests {
         // changing epoch in 3.x increments the block height
         assert_eq!(
             session.interpreter.get_block_height(),
-            initial_block_height + 1
+            initial_block_height + 2
         );
     }
 
@@ -1639,7 +1640,7 @@ mod tests {
         assert_eq!(session.process_console_input("(at-block (unwrap-panic (get-block-info? id-header-hash u0)) burn-block-height)").1[0], "u0".green().to_string());
         assert_eq!(session.process_console_input("(at-block (unwrap-panic (get-block-info? id-header-hash u5000)) burn-block-height)").1[0], "u4999".green().to_string());
 
-        assert_eq!(session.process_console_input("(at-block (unwrap-panic (get-block-info? id-header-hash u0)) (contract-call? .contract get-x))").1[0], "u0".green().to_string());
+        assert_eq!(session.process_console_input("(at-block (unwrap-panic (get-block-info? id-header-hash u1)) (contract-call? .contract get-x))").1[0], "u0".green().to_string());
         assert_eq!(session.process_console_input("(at-block (unwrap-panic (get-block-info? id-header-hash u5000)) (contract-call? .contract get-x))").1[0], "u0".green().to_string());
 
         // advance chain tip again and test at-block
@@ -1660,13 +1661,13 @@ mod tests {
                 .1[0],
             "u2".green().to_string()
         );
-        assert_eq!(session.process_console_input("(at-block (unwrap-panic (get-block-info? id-header-hash u10000)) (contract-call? .contract get-x))").1[0], "u1".green().to_string());
+        assert_eq!(session.process_console_input("(at-block (unwrap-panic (get-block-info? id-header-hash u10001)) (contract-call? .contract get-x))").1[0], "u1".green().to_string());
 
         session.handle_command("::set_epoch 3.1");
 
         let _ = session.advance_burn_chain_tip(10000);
 
-        assert_eq!(session.process_console_input("(at-block (unwrap-panic (get-stacks-block-info? id-header-hash u19000)) burn-block-height)").1[0], "u20021".green().to_string());
+        assert_eq!(session.process_console_input("(at-block (unwrap-panic (get-stacks-block-info? id-header-hash u19001)) burn-block-height)").1[0], "u20022".green().to_string());
     }
 
     #[test]
@@ -1792,6 +1793,8 @@ mod tests {
         let mut session = Session::new(settings);
         session.start().expect("session could not start");
         session.update_epoch(StacksEpochId::Epoch25);
+        let result = run_session_snippet(&mut session, "block-height");
+        assert_eq!(result, Value::UInt(1));
 
         let snippet = [
             "(define-read-only (get-burn (height uint))",
@@ -1810,9 +1813,9 @@ mod tests {
         session.advance_burn_chain_tip(10);
 
         let result = run_session_snippet(&mut session, "block-height");
-        assert_eq!(result, Value::UInt(10));
+        assert_eq!(result, Value::UInt(11));
         let result = run_session_snippet(&mut session, "burn-block-height");
-        assert_eq!(result, Value::UInt(9));
+        assert_eq!(result, Value::UInt(10));
         let result = run_session_snippet(
             &mut session,
             format!("(contract-call? .{} get-burn u6)", contract.name).as_str(),
@@ -1910,7 +1913,7 @@ mod tests {
         session.advance_burn_chain_tip(10);
 
         let result = run_session_snippet(&mut session, "stacks-block-height");
-        assert_eq!(result, Value::UInt(21));
+        assert_eq!(result, Value::UInt(22));
 
         // calling a 2.5 contract in epoch 3.0 has the same behavior as epoch 2.5
 
@@ -1924,6 +1927,6 @@ mod tests {
             &mut session,
             format!("(contract-call? .{} get-burn u18)", contract.name).as_str(),
         );
-        assert_eq!(result, Value::UInt(21));
+        assert_eq!(result, Value::UInt(22));
     }
 }
