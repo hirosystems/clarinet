@@ -95,7 +95,7 @@ describe("test pox-3", () => {
     ];
     simnet.callPublicFn(poxContract, "stack-stx", stackStxArgs, address1);
 
-    simnet.mineEmptyBlocks(2097);
+    simnet.mineEmptyBlocks(2098);
     const stxAccountBefore = simnet.execute(`(stx-account '${address1})`);
     expect(stxAccountBefore.result).toStrictEqual(
       Cl.tuple({
