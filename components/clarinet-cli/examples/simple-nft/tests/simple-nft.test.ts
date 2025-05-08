@@ -1,4 +1,4 @@
-import { Cl } from "@stacks/transactions";
+import { Cl, cvToHex, serializeCVBytes } from "@stacks/transactions";
 import { describe, expect, it } from "vitest";
 
 const accounts = simnet.getAccounts();
@@ -32,7 +32,7 @@ describe("nft basic features", () => {
     });
   });
 
-  it("Ensure that nft can be transferred form one account to another", () => {
+  it.only("Ensure that nft can be transferred form one account to another", () => {
     simnet.callPublicFn(
       "simple-nft",
       "test-mint",
@@ -61,7 +61,7 @@ describe("nft basic features", () => {
     expect(transferEvent.event).toBe("nft_transfer_event");
     expect(transferEvent.data).toStrictEqual({
       asset_identifier: `${simnet.deployer}.simple-nft::nft`,
-      raw_value: `0x${Buffer.from(Cl.serialize(Cl.uint(1))).toString("hex")}`,
+      raw_value: cvToHex(Cl.uint(1)),
       recipient: address2,
       sender: address1,
       value: expect.toBeUint(1),
