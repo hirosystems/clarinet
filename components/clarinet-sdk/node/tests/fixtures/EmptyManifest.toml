@@ -1,6 +1,0 @@
-[project]
-name = 'fixtures'
-description = 'sample project to test clarinet-sdk'
-telemetry = false
-cache_dir = './.cache'
-requirements = []
