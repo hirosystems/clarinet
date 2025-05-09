@@ -63,6 +63,45 @@ pub struct ProjectManifest {
     pub contracts_settings: HashMap<FileLocation, ClarityContractMetadata>,
 }
 
+impl ProjectManifest {
+    pub fn default_project_manifest(
+        enable_telemetry: bool,
+        project_root_location: FileLocation,
+    ) -> ProjectManifest {
+        ProjectManifest {
+            project: ProjectManifest::default_project_config(
+                enable_telemetry,
+                project_root_location,
+            ),
+            contracts: BTreeMap::new(),
+            repl_settings: repl::Settings::default(),
+            location: default_location(),
+            contracts_settings: HashMap::new(),
+        }
+    }
+
+    fn default_project_config(
+        enable_telemetry: bool,
+        project_root_location: FileLocation,
+    ) -> ProjectConfig {
+        ProjectConfig {
+            name: String::new(),
+            authors: Vec::new(),
+            description: String::new(),
+            telemetry: enable_telemetry,
+            requirements: None,
+            cache_location: ProjectManifest::new_cache_location(project_root_location),
+            boot_contracts: Vec::new(),
+        }
+    }
+
+    fn new_cache_location(project_root_location: FileLocation) -> FileLocation {
+        let mut cache_location = project_root_location.clone();
+        let _ = cache_location.append_path(".cache");
+        cache_location
+    }
+}
+
 fn default_location() -> FileLocation {
     let path = std::env::temp_dir();
     FileLocation::from_path(path)
