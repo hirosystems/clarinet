@@ -1,4 +1,7 @@
-use clarinet_files::chainhook_types::StacksNetwork;
+use std::collections::BTreeMap;
+use std::collections::HashMap;
+
+use clarinet_files::StacksNetwork;
 use clarinet_files::{FileAccessor, FileLocation};
 use clarity_repl::clarity::util::hash::{hex_bytes, to_hex};
 use clarity_repl::clarity::vm::analysis::ContractAnalysis;
@@ -13,8 +16,6 @@ use clarity_repl::clarity::{ClarityName, ClarityVersion, ContractName, StacksEpo
 use clarity_repl::repl::{Session, DEFAULT_CLARITY_VERSION};
 use serde::{Deserialize, Serialize};
 use serde_yaml;
-use std::collections::BTreeMap;
-use std::collections::HashMap;
 
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone, Copy, Eq, PartialOrd, Ord)]
 pub enum EpochSpec {
@@ -34,6 +35,8 @@ pub enum EpochSpec {
     Epoch2_5,
     #[serde(rename = "3.0")]
     Epoch3_0,
+    #[serde(rename = "3.1")]
+    Epoch3_1,
 }
 
 impl From<StacksEpochId> for EpochSpec {
@@ -47,6 +50,7 @@ impl From<StacksEpochId> for EpochSpec {
             StacksEpochId::Epoch24 => EpochSpec::Epoch2_4,
             StacksEpochId::Epoch25 => EpochSpec::Epoch2_5,
             StacksEpochId::Epoch30 => EpochSpec::Epoch3_0,
+            StacksEpochId::Epoch31 => EpochSpec::Epoch3_1,
             StacksEpochId::Epoch10 => unreachable!("epoch 1.0 is not supported"),
         }
     }
@@ -63,11 +67,12 @@ impl From<EpochSpec> for StacksEpochId {
             EpochSpec::Epoch2_4 => StacksEpochId::Epoch24,
             EpochSpec::Epoch2_5 => StacksEpochId::Epoch25,
             EpochSpec::Epoch3_0 => StacksEpochId::Epoch30,
+            EpochSpec::Epoch3_1 => StacksEpochId::Epoch31,
         }
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct DeploymentGenerationArtifacts {
     pub asts: BTreeMap<QualifiedContractIdentifier, ContractAST>,
     pub deps: BTreeMap<QualifiedContractIdentifier, DependencySet>,
@@ -1094,11 +1099,13 @@ impl DeploymentSpecification {
                             };
                             transactions.push(transaction);
                         }
-                        batches.push(TransactionsBatchSpecification {
-                            id: batch.id,
-                            transactions,
-                            epoch: batch.epoch,
-                        });
+                        if !transactions.is_empty() {
+                            batches.push(TransactionsBatchSpecification {
+                                id: batch.id,
+                                transactions,
+                                epoch: batch.epoch,
+                            });
+                        }
                     }
                 }
                 if let Some(ref genesis_specs) = specs.genesis {
@@ -1118,7 +1125,7 @@ impl DeploymentSpecification {
                                     TransactionSpecification::ContractCall(ContractCallSpecification::from_specifications(spec)?)
                                 }
                                 TransactionSpecificationFile::RequirementPublish(spec) => {
-                                    if network.is_mainnet() {
+                                    if matches!(network, StacksNetwork::Mainnet) {
                                         return Err(format!("{} only supports transactions of type 'contract-call' and 'contract-publish", specs.network.to_lowercase()))
                                     }
                                     let spec = RequirementPublishSpecification::from_specifications(spec, project_root_location)?;
@@ -1145,11 +1152,13 @@ impl DeploymentSpecification {
                             };
                             transactions.push(transaction);
                         }
-                        batches.push(TransactionsBatchSpecification {
-                            id: batch.id,
-                            transactions,
-                            epoch: batch.epoch,
-                        });
+                        if !transactions.is_empty() {
+                            batches.push(TransactionsBatchSpecification {
+                                id: batch.id,
+                                transactions,
+                                epoch: batch.epoch,
+                            });
+                        }
                     }
                 }
                 (TransactionPlanSpecification { batches }, None)
@@ -1246,7 +1255,7 @@ impl DeploymentSpecification {
                 .find(|b| b.id == custom_batch.id && b.epoch == custom_batch.epoch)
             {
                 batch.transactions.extend(custom_batch.transactions);
-            } else {
+            } else if !custom_batch.transactions.is_empty() {
                 self.plan.batches.push(custom_batch);
             }
         }
@@ -1302,6 +1311,7 @@ pub struct WalletSpecificationFile {
     pub name: String,
     pub address: String,
     pub balance: String,
+    pub sbtc_balance: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
@@ -1332,6 +1342,7 @@ impl GenesisSpecification {
                 name: wallet.name.to_string(),
                 address: wallet.address.to_string(),
                 balance: format!("{}", wallet.balance),
+                sbtc_balance: Some(format!("{}", wallet.sbtc_balance)),
             })
         }
 
@@ -1348,36 +1359,37 @@ pub struct WalletSpecification {
     #[serde(with = "standard_principal_data_serde")]
     pub address: StandardPrincipalData,
     pub balance: u128,
+    pub sbtc_balance: u128,
 }
 
 impl WalletSpecification {
     pub fn from_specifications(
         specs: &WalletSpecificationFile,
     ) -> Result<WalletSpecification, String> {
-        let address = match PrincipalData::parse_standard_principal(&specs.address) {
-            Ok(res) => res,
-            Err(_) => {
-                return Err(format!(
-                    "unable to parse {}'s principal as a valid Stacks address",
-                    specs.name
-                ))
-            }
-        };
+        let address = PrincipalData::parse_standard_principal(&specs.address).map_err(|_| {
+            format!(
+                "unable to parse {}'s principal as a valid Stacks address",
+                specs.name
+            )
+        })?;
 
-        let balance = match specs.balance.parse::<u128>() {
-            Ok(res) => res,
-            Err(_) => {
-                return Err(format!(
-                    "unable to parse {}'s balance as a u128",
-                    specs.name
-                ))
-            }
-        };
+        let balance = specs
+            .balance
+            .parse::<u128>()
+            .map_err(|_| format!("unable to parse {}'s balance as a u128", specs.name))?;
+
+        let sbtc_balance = specs
+            .sbtc_balance
+            .clone()
+            .unwrap_or("1000000000".to_string())
+            .parse::<u128>()
+            .map_err(|_| format!("unable to parse {}'s sbtc_balance as a u128", specs.name))?;
 
         Ok(WalletSpecification {
             name: specs.name.to_string(),
             address,
             balance,
+            sbtc_balance,
         })
     }
 }

@@ -7,7 +7,7 @@ use clarity_repl::{
     },
     repl::diagnostic::output_code,
 };
-use colored::*;
+use colored::Colorize;
 
 use crate::types::DeploymentSpecification;
 
@@ -100,7 +100,7 @@ impl DiagnosticsDigest {
             warnings,
             total,
             contracts_checked,
-            message: outputs.join("\n").to_string(),
+            message: outputs.join("\n"),
         }
     }
 

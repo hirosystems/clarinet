@@ -17,8 +17,9 @@ use std::sync::Mutex;
 use tower_lsp::jsonrpc::{Error, ErrorCode, Result};
 use tower_lsp::lsp_types::{
     CompletionParams, CompletionResponse, DidChangeTextDocumentParams, DidCloseTextDocumentParams,
-    DidOpenTextDocumentParams, DidSaveTextDocumentParams, ExecuteCommandParams, Hover, HoverParams,
-    InitializeParams, InitializeResult, InitializedParams, MessageType, Url,
+    DidOpenTextDocumentParams, DidSaveTextDocumentParams, DocumentFormattingParams,
+    DocumentRangeFormattingParams, ExecuteCommandParams, Hover, HoverParams, InitializeParams,
+    InitializeResult, InitializedParams, MessageType, TextEdit, Url,
 };
 use tower_lsp::{async_trait, Client, LanguageServer};
 
@@ -101,14 +102,14 @@ impl LspNativeBridge {
 impl LanguageServer for LspNativeBridge {
     async fn initialize(&self, params: InitializeParams) -> Result<InitializeResult> {
         let _ = match self.request_tx.lock() {
-            Ok(tx) => tx.send(LspRequest::Initialize(params)),
+            Ok(tx) => tx.send(LspRequest::Initialize(Box::new(params))),
             Err(_) => return Err(Error::new(ErrorCode::InternalError)),
         };
 
         let response_rx = self.response_rx.lock().expect("failed to lock response_rx");
         let response = &response_rx.recv().expect("failed to get value from recv");
         if let LspResponse::Request(LspRequestResponse::Initialize(initialize)) = response {
-            return Ok(initialize.to_owned());
+            return Ok(*initialize.to_owned());
         }
         Err(Error::new(ErrorCode::InternalError))
     }
@@ -204,6 +205,39 @@ impl LanguageServer for LspNativeBridge {
         Ok(None)
     }
 
+    async fn formatting(&self, params: DocumentFormattingParams) -> Result<Option<Vec<TextEdit>>> {
+        let _ = match self.request_tx.lock() {
+            Ok(tx) => tx.send(LspRequest::DocumentFormatting(params)),
+            Err(_) => return Ok(None),
+        };
+
+        let response_rx = self.response_rx.lock().expect("failed to lock response_rx");
+        let response = &response_rx.recv().expect("failed to get value from recv");
+        if let LspResponse::Request(LspRequestResponse::DocumentFormatting(data)) = response {
+            return Ok(data.to_owned());
+        }
+
+        Ok(None)
+    }
+
+    async fn range_formatting(
+        &self,
+        params: DocumentRangeFormattingParams,
+    ) -> Result<Option<Vec<TextEdit>>> {
+        let _ = match self.request_tx.lock() {
+            Ok(tx) => tx.send(LspRequest::DocumentRangeFormatting(params)),
+            Err(_) => return Ok(None),
+        };
+
+        let response_rx = self.response_rx.lock().expect("failed to lock response_rx");
+        let response = &response_rx.recv().expect("failed to get value from recv");
+        if let LspResponse::Request(LspRequestResponse::DocumentRangeFormatting(data)) = response {
+            return Ok(data.to_owned());
+        }
+
+        Ok(None)
+    }
+
     async fn did_open(&self, params: DidOpenTextDocumentParams) {
         if let Some(contract_location) = utils::get_contract_location(&params.text_document.uri) {
             let _ = match self.notification_tx.lock() {
@@ -239,7 +273,7 @@ impl LanguageServer for LspNativeBridge {
                 notification = notification_response.notification.take();
             }
         }
-        for (location, mut diags) in aggregated_diagnostics.drain(..) {
+        for (location, mut diags) in aggregated_diagnostics.into_iter() {
             if let Ok(url) = location.to_url_string() {
                 self.client
                     .publish_diagnostics(
@@ -282,7 +316,7 @@ impl LanguageServer for LspNativeBridge {
             }
         }
 
-        for (location, mut diags) in aggregated_diagnostics.drain(..) {
+        for (location, mut diags) in aggregated_diagnostics.into_iter() {
             if let Ok(url) = location.to_url_string() {
                 self.client
                     .publish_diagnostics(

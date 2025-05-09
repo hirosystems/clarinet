@@ -1,139 +1,49 @@
-#[allow(unused_macros)]
 #[macro_export]
 macro_rules! green {
-    ($($arg:tt)*) => (
-        {
-            use atty::Stream;
-            use ansi_term::{Colour, Style};
-            if atty::is(Stream::Stdout) {
-                let colour = Colour::Green.bold();
-                format!(
-                    "{}",
-                    colour.paint($($arg)*)
-                )
-            } else {
-                format!(
-                    "{}",
-                    $($arg)*
-                )
-            }
-        }
-    )
+    ($($arg:tt)*) => ({
+        use colored::Colorize;
+        format!("{}", format!("{}", $($arg)*).green().bold())
+    })
 }
 
-#[allow(unused_macros)]
 #[macro_export]
 macro_rules! red {
-    ($($arg:tt)*) => (
-        {
-            use atty::Stream;
-            use ansi_term::{Colour, Style};
-            if atty::is(Stream::Stdout) {
-                let colour = Colour::Red.bold();
-                format!(
-                    "{}",
-                    colour.paint($($arg)*)
-                )
-            } else {
-                format!(
-                    "{}",
-                    $($arg)*
-                )
-            }
-        }
-    )
+    ($($arg:tt)*) => ({
+        use colored::Colorize;
+        format!("{}", format!("{}", $($arg)*).red().bold())
+    })
 }
 
-#[allow(unused_macros)]
 #[macro_export]
 macro_rules! yellow {
-    ($($arg:tt)*) => (
-        {
-            use atty::Stream;
-            use ansi_term::{Colour, Style};
-            if atty::is(Stream::Stdout) {
-                let colour = Colour::Yellow.bold();
-                format!(
-                    "{}",
-                    colour.paint($($arg)*)
-                )
-            } else {
-                format!(
-                    "{}",
-                    $($arg)*
-                )
-            }
-        }
-    )
+    ($($arg:tt)*) => ({
+        use colored::Colorize;
+        format!("{}", format!("{}", $($arg)*).yellow().bold())
+    })
 }
 
-#[allow(unused_macros)]
 #[macro_export]
 macro_rules! blue {
-    ($($arg:tt)*) => (
-        {
-            use atty::Stream;
-            use ansi_term::{Colour, Style};
-            if atty::is(Stream::Stdout) {
-                let colour = Colour::Cyan.bold();
-                format!(
-                    "{}",
-                    colour.paint($($arg)*)
-                )
-            } else {
-                format!(
-                    "{}",
-                    $($arg)*
-                )
-            }
-        }
-    )
+    ($($arg:tt)*) => ({
+        use colored::Colorize;
+        format!("{}", format!("{}", $($arg)*).blue().bold())
+    })
 }
 
-#[allow(unused_macros)]
 #[macro_export]
 macro_rules! purple {
-    ($($arg:tt)*) => (
-        {
-            use atty::Stream;
-            use ansi_term::{Colour, Style};
-            if atty::is(Stream::Stdout) {
-                let colour = Colour::Purple.bold();
-                format!(
-                    "{}",
-                    colour.paint($($arg)*)
-                )
-            } else {
-                format!(
-                    "{}",
-                    $($arg)*
-                )
-            }
-        }
-    )
+    ($($arg:tt)*) => ({
+        use colored::Colorize;
+        format!("{}", format!("{}", $($arg)*).purple().bold())
+    })
 }
 
-#[allow(unused_macros)]
 #[macro_export]
 macro_rules! black {
-    ($($arg:tt)*) => (
-        {
-            use atty::Stream;
-            use ansi_term::{Colour, Style};
-            if atty::is(Stream::Stdout) {
-                let colour = Colour::Fixed(244);
-                format!(
-                    "{}",
-                    colour.paint($($arg)*)
-                )
-            } else {
-                format!(
-                    "{}",
-                    $($arg)*
-                )
-            }
-        }
-    )
+    ($($arg:tt)*) => ({
+        use colored::Colorize;
+        format!("{}", format!("{}", $($arg)*).black().bold())
+    })
 }
 
 #[macro_export]
@@ -147,7 +57,6 @@ macro_rules! pluralize {
     };
 }
 
-#[allow(unused_macros)]
 #[macro_export]
 macro_rules! format_err {
     ($($arg:tt)*) => (
@@ -157,7 +66,6 @@ macro_rules! format_err {
     )
 }
 
-#[allow(unused_macros)]
 #[macro_export]
 macro_rules! format_warn {
     ($($arg:tt)*) => (
@@ -167,7 +75,6 @@ macro_rules! format_warn {
     )
 }
 
-#[allow(unused_macros)]
 #[macro_export]
 macro_rules! format_note {
     ($($arg:tt)*) => (

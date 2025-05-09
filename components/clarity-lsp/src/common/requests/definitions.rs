@@ -8,7 +8,7 @@ use clarity_repl::clarity::vm::types::{QualifiedContractIdentifier, StandardPrin
 use clarity_repl::clarity::{ClarityName, SymbolicExpression};
 use lsp_types::Range;
 
-#[cfg(feature = "wasm")]
+#[cfg(target_arch = "wasm32")]
 #[allow(unused_imports)]
 use crate::utils::log;
 
@@ -29,7 +29,7 @@ pub struct Definitions {
     deployer: Option<StandardPrincipalData>,
 }
 
-impl<'a> Definitions {
+impl Definitions {
     pub fn new(deployer: Option<StandardPrincipalData>) -> Self {
         Self {
             deployer,
@@ -37,7 +37,7 @@ impl<'a> Definitions {
         }
     }
 
-    pub fn run(&mut self, expressions: &'a [SymbolicExpression]) {
+    pub fn run(&mut self, expressions: &[SymbolicExpression]) {
         traverse(self, expressions);
     }
 

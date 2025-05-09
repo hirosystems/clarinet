@@ -2,15 +2,9 @@ import crypto from "crypto";
 import { describe, expect, it, beforeEach } from "vitest";
 
 import { Pox4SignatureTopic, StackingClient, poxAddressToTuple } from "@stacks/stacking";
-import { StacksDevnet } from "@stacks/network";
+import { STACKS_DEVNET } from "@stacks/network";
 import { getPublicKeyFromPrivate, publicKeyToBtcAddress } from "@stacks/encryption";
-import {
-  Cl,
-  ClarityType,
-  getAddressFromPrivateKey,
-  TransactionVersion,
-  createStacksPrivateKey,
-} from "@stacks/transactions";
+import { Cl, ClarityType, getAddressFromPrivateKey } from "@stacks/transactions";
 
 // test the built package and not the source code
 // makes it simpler to handle wasm build
@@ -151,28 +145,27 @@ describe("test pox-3", () => {
 describe("test pox-4", () => {
   const poxContract = `${poxDeployer}.pox-4`;
 
-  // wallet_1, wallet_2, wallet_3 private keys
+  // wallet_1 and wallet_2 private keys
   const stackingKeys = [
     "7287ba251d44a4d3fd9276c88ce34c5c52a038955511cccaf77e61068649c17801",
     "530d9f61984c888536871c6573073bdfc0058896dc1adfe9a6a10dfacadc209101",
   ];
 
   const accounts = stackingKeys.map((privKey) => {
-    const network = new StacksDevnet();
+    const network = STACKS_DEVNET;
 
     const pubKey = getPublicKeyFromPrivate(privKey);
-    const stxAddress = getAddressFromPrivateKey(privKey, TransactionVersion.Testnet);
-    const signerPrivKey = createStacksPrivateKey(privKey);
-    const signerPubKey = getPublicKeyFromPrivate(signerPrivKey.data);
+    const stxAddress = getAddressFromPrivateKey(privKey, network);
+    const signerPubKey = getPublicKeyFromPrivate(privKey);
 
     return {
       privKey,
       pubKey,
       stxAddress,
       btcAddr: publicKeyToBtcAddress(pubKey),
-      signerPrivKey: signerPrivKey,
+      signerPrivKey: privKey,
       signerPubKey: signerPubKey,
-      client: new StackingClient(stxAddress, network),
+      client: new StackingClient({ address: stxAddress, network }),
     };
   });
 
@@ -183,12 +176,12 @@ describe("test pox-4", () => {
     simnet.setEpoch("3.0");
   });
 
-  it("can call get-pox-info", async () => {
+  it("can call get-pox-info", () => {
     const poxInfo = simnet.callReadOnlyFn(poxContract, "get-pox-info", [], address1);
     expect(poxInfo.result.type).toBe(ClarityType.ResponseOk);
   });
 
-  it("can call get-pox-info", async () => {
+  it("can call get-pox-info", () => {
     const account = accounts[0];
     const rewardCycle = 0;
     const burnBlockHeight = 0;
@@ -198,8 +191,11 @@ describe("test pox-4", () => {
 
     expect(poxInfo.result.type).toBe(ClarityType.ResponseOk);
 
-    expect(poxInfo.result).toHaveProperty("value.data.min-amount-ustx", Cl.uint(stackingThreshold));
-    expect(poxInfo.result).toHaveProperty("value.data.reward-cycle-id", Cl.uint(rewardCycle));
+    expect(poxInfo.result).toHaveProperty(
+      "value.value.min-amount-ustx",
+      Cl.uint(stackingThreshold),
+    );
+    expect(poxInfo.result).toHaveProperty("value.value.reward-cycle-id", Cl.uint(rewardCycle));
 
     const sigArgs = {
       authId,

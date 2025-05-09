@@ -4,6 +4,7 @@ members = [
     "components/clarinet-cli",
     "components/clarinet-deployments",
     "components/clarinet-files",
+    "components/clarinet-format",
     "components/clarinet-utils",
     "components/clarinet-sdk-wasm",
     "components/clarity-lsp",
@@ -18,17 +19,31 @@ members = [
 default-members = ["components/clarinet-cli"]
 
 [workspace.package]
-version = "2.8.0"
+version = "3.0.1"
 
 [workspace.dependencies]
 clarity = { git = "https://github.com/stacks-network/stacks-core.git", branch="feat/clarity-wasm-develop", package = "clarity", default-features = false }
-lazy_static = { version = "1.5.0" }
+stacks-common = { git = "https://github.com/stacks-network/stacks-core.git", branch="feat/clarity-wasm-develop", package = "stacks-common", default-features = false }
+pox-locking = { git = "https://github.com/stacks-network/stacks-core.git", branch="feat/clarity-wasm-develop", package = "pox-locking", default-features = false }
+
+colored = { version = "3" }
+crossterm = { version = "0.28" }
+ratatui = { version = "0.29.0", default-features = false, features = ["crossterm"] }
 reqwest = { version = "0.12", default-features = false, features = [
     "json",
     "rustls-tls",
 ] }
+wasm-bindgen = { version = "=0.2.100" }
+wasm-bindgen-futures = { version = "=0.4.50" }
+web-sys = { version = "=0.3.77" }
 
 [patch.crates-io]
-chainhook-sdk = { git = "https://github.com/hirosystems/chainhook.git" }
-chainhook-types = { git = "https://github.com/hirosystems/chainhook.git" }
+chainhook-sdk = { git = "https://github.com/hirosystems/chainhook.git", branch = "chore/upgrade-clarinet" }
+chainhook-types = { git = "https://github.com/hirosystems/chainhook.git", branch = "chore/upgrade-clarinet" }
 stacks-codec = { path = "./components/stacks-codec" }
+hiro-system-kit = { path = "./components/hiro-system-kit" }
+
+# [patch.'https://github.com/stacks-network/stacks-core.git']
+# clarity = { path = "../stacks-core/clarity" }
+# stacks-common = { path = "../stacks-core/stacks-common" }
+# stackslib = { path = "../stacks-core/stackslib" }

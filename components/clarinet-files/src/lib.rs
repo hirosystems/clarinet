@@ -3,30 +3,29 @@ extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 
-pub extern crate bip39;
-pub extern crate url;
+pub mod clarinetrc;
 
 mod network_manifest;
 mod project_manifest;
 
-#[cfg(feature = "wasm")]
+pub use network_manifest::{BitcoinNetwork, StacksNetwork};
+
+#[cfg(target_arch = "wasm32")]
 mod wasm_fs_accessor;
-#[cfg(feature = "wasm")]
+#[cfg(target_arch = "wasm32")]
 pub use wasm_fs_accessor::WASMFileSystemAccessor;
 
-pub use chainhook_types;
-
-use chainhook_types::StacksNetwork;
 pub use network_manifest::{
     compute_addresses, AccountConfig, DevnetConfig, DevnetConfigFile, NetworkManifest,
     NetworkManifestFile, PoxStackingOrder, DEFAULT_BITCOIN_EXPLORER_IMAGE,
     DEFAULT_BITCOIN_NODE_IMAGE, DEFAULT_DERIVATION_PATH, DEFAULT_DOCKER_PLATFORM,
     DEFAULT_EPOCH_2_0, DEFAULT_EPOCH_2_05, DEFAULT_EPOCH_2_1, DEFAULT_EPOCH_2_2, DEFAULT_EPOCH_2_3,
-    DEFAULT_EPOCH_2_4, DEFAULT_EPOCH_2_5, DEFAULT_EPOCH_3_0, DEFAULT_FAUCET_MNEMONIC,
-    DEFAULT_FIRST_BURN_HEADER_HEIGHT, DEFAULT_POSTGRES_IMAGE, DEFAULT_STACKS_API_IMAGE,
-    DEFAULT_STACKS_EXPLORER_IMAGE, DEFAULT_STACKS_MINER_MNEMONIC, DEFAULT_STACKS_NODE_IMAGE,
-    DEFAULT_STACKS_SIGNER_IMAGE, DEFAULT_SUBNET_API_IMAGE, DEFAULT_SUBNET_CONTRACT_ID,
-    DEFAULT_SUBNET_MNEMONIC, DEFAULT_SUBNET_NODE_IMAGE,
+    DEFAULT_EPOCH_2_4, DEFAULT_EPOCH_2_5, DEFAULT_EPOCH_3_0, DEFAULT_EPOCH_3_1,
+    DEFAULT_FAUCET_MNEMONIC, DEFAULT_FIRST_BURN_HEADER_HEIGHT, DEFAULT_POSTGRES_IMAGE,
+    DEFAULT_STACKER_MNEMONIC, DEFAULT_STACKS_API_IMAGE, DEFAULT_STACKS_EXPLORER_IMAGE,
+    DEFAULT_STACKS_MINER_MNEMONIC, DEFAULT_STACKS_NODE_IMAGE, DEFAULT_STACKS_SIGNER_IMAGE,
+    DEFAULT_SUBNET_API_IMAGE, DEFAULT_SUBNET_CONTRACT_ID, DEFAULT_SUBNET_MNEMONIC,
+    DEFAULT_SUBNET_NODE_IMAGE,
 };
 pub use project_manifest::{
     ProjectManifest, ProjectManifestFile, RequirementConfig, INVALID_CLARITY_VERSION,
@@ -104,7 +103,7 @@ impl FileLocation {
         let url = Url::from_str(url_string)
             .map_err(|e| format!("unable to parse {} as a url\n{:?}", url_string, e))?;
 
-        #[cfg(not(feature = "wasm"))]
+        #[cfg(not(target_arch = "wasm32"))]
         if url.scheme() == "file" {
             let path = url
                 .to_file_path()
@@ -131,7 +130,7 @@ impl FileLocation {
             FileLocation::Url { url } => {
                 let mut paths_segments = url
                     .path_segments_mut()
-                    .map_err(|_| "unable to mutate url".to_string())?;
+                    .map_err(|_| "unable to mutate url")?;
                 for component in path_to_append.components() {
                     let segment = component
                         .as_os_str()
@@ -304,21 +303,19 @@ impl FileLocation {
     pub fn get_file_name(&self) -> Option<String> {
         match self {
             FileLocation::FileSystem { path } => {
-                path.file_name().and_then(|f| Some(f.to_str()?.to_string()))
+                path.file_name().and_then(|f| f.to_str().map(String::from))
             }
             FileLocation::Url { url } => url
                 .path_segments()
-                .and_then(|p| Some(p.last()?.to_string())),
+                .and_then(|mut segments| segments.next_back().map(String::from)),
         }
     }
-}
 
-impl FileLocation {
     pub fn read_content(&self) -> Result<Vec<u8>, String> {
         let bytes = match &self {
             FileLocation::FileSystem { path } => FileLocation::fs_read_content(path),
             FileLocation::Url { url } => match url.scheme() {
-                #[cfg(not(feature = "wasm"))]
+                #[cfg(not(target_arch = "wasm32"))]
                 "file" => {
                     let path = url
                         .to_file_path()
@@ -352,7 +349,7 @@ impl FileLocation {
 
     pub fn to_url_string(&self) -> Result<String, String> {
         match self {
-            #[cfg(not(feature = "wasm"))]
+            #[cfg(not(target_arch = "wasm32"))]
             FileLocation::FileSystem { path } => {
                 let file_path = self.to_string();
                 let url = Url::from_file_path(file_path)
@@ -362,6 +359,13 @@ impl FileLocation {
             FileLocation::Url { url } => Ok(url.to_string()),
             #[allow(unreachable_patterns)]
             _ => unreachable!(),
+        }
+    }
+
+    pub fn to_path_buf(&self) -> PathBuf {
+        match self {
+            FileLocation::FileSystem { path } => path.clone(),
+            FileLocation::Url { url } => PathBuf::from(url.to_string()),
         }
     }
 }

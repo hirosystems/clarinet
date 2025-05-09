@@ -6,12 +6,13 @@ use lsp_types::{
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", default)]
 pub struct InitializationOptions {
     completion: bool,
     pub completion_smart_parenthesis_wrap: bool,
     pub completion_include_native_placeholders: bool,
     document_symbols: bool,
+    formatting: bool,
     go_to_definition: bool,
     hover: bool,
     signature_help: bool,
@@ -24,6 +25,7 @@ impl InitializationOptions {
             completion_smart_parenthesis_wrap: true,
             completion_include_native_placeholders: true,
             document_symbols: false,
+            formatting: true,
             go_to_definition: true,
             hover: true,
             signature_help: true,
@@ -51,6 +53,14 @@ pub fn get_capabilities(initialization_options: &InitializationOptions) -> Serve
             false => None,
         },
         document_symbol_provider: match initialization_options.document_symbols {
+            true => Some(lsp_types::OneOf::Left(true)),
+            false => None,
+        },
+        document_formatting_provider: match initialization_options.formatting {
+            true => Some(lsp_types::OneOf::Left(true)),
+            false => None,
+        },
+        document_range_formatting_provider: match initialization_options.formatting {
             true => Some(lsp_types::OneOf::Left(true)),
             false => None,
         },

@@ -6,38 +6,27 @@ description = "Clarinet manifests files helpers"
 license = "GPL-3.0"
 
 [dependencies]
+dirs = "6.0"
+libsecp256k1 = "0.7.0"
 serde = "1"
 serde_derive = "1"
-chainhook-types = { version = "1.3" }
-bip39 = { version = "1.0.1", default-features = false }
-libsecp256k1 = "0.7.0"
+serde_json = "1.0.114"
 toml = { version = "0.5.6", features = ["preserve_order"] }
 url = { version = "2.2.2", features = ["serde"] }
-tiny-hderive = "0.3.0"
-bitcoin = { version = "0.29.2", optional = true }
 
 clarity = { workspace = true }
-
 clarinet-utils = { version = "1", path = "../clarinet-utils" }
-clarity-repl = { path = "../clarity-repl", default-features = false, optional = true }
+clarity-repl = { path = "../clarity-repl", default-features = false }
 
-# wasm
-js-sys = { version = "0.3", optional = true }
-serde-wasm-bindgen = { version = "0.6.4", optional = true }
-wasm-bindgen = { version = "0.2.91", optional = true }
-wasm-bindgen-futures = { version = "0.4.41", optional = true }
-serde_json = "1.0.114"
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+bitcoin = { version = "0.31.2" }
 
-[features]
-default = ["cli"]
-cli = ["bitcoin", "clarity-repl/cli"]
-wasm = [
-  "js-sys",
-  "serde-wasm-bindgen",
-  "wasm-bindgen",
-  "wasm-bindgen-futures",
-  "clarity-repl/wasm",
-]
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+js-sys = { version = "0.3" }
+serde-wasm-bindgen = { version = "0.6.4" }
+wasm-bindgen = { workspace = true }
+wasm-bindgen-futures = { workspace = true }
+web-sys = { workspace = true, features = ["console"] }
 
 [lib]
 name = "clarinet_files"

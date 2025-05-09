@@ -4,8 +4,8 @@ use clarity_repl::clarity::{
     variables::NativeVariables,
     ClarityVersion,
 };
-use lazy_static::lazy_static;
 use std::collections::HashMap;
+use std::sync::LazyLock;
 
 fn code(code: &str) -> String {
     ["```clarity", code.trim(), "```"].join("\n")
@@ -26,8 +26,8 @@ fn format_removed_in(max_version: Option<ClarityVersion>) -> String {
         .unwrap_or_default()
 }
 
-lazy_static! {
-    pub static ref API_REF: HashMap<String, (String, Option<FunctionAPI>)> = {
+pub static API_REF: LazyLock<HashMap<String, (String, Option<FunctionAPI>)>> =
+    LazyLock::new(|| {
         let mut api_references: HashMap<String, (String, Option<FunctionAPI>)> = HashMap::new();
         let separator = "- - -";
 
@@ -96,5 +96,4 @@ lazy_static! {
         }
 
         api_references
-    };
-}
+    });

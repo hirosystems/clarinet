@@ -1,6 +1,6 @@
 use crate::deployments::generate_default_deployment;
 use clarinet_deployments::setup_session_with_deployment;
-use clarinet_files::chainhook_types::StacksNetwork;
+use clarinet_files::StacksNetwork;
 use clarinet_files::{FileLocation, ProjectManifest};
 use clarity_repl::repl::debug::dap::DAPDebugger;
 use std::path::PathBuf;
@@ -13,7 +13,7 @@ pub fn run_dap() -> Result<(), String> {
     match dap.init() {
         Ok((manifest_location_str, expression)) => {
             let manifest_location = FileLocation::from_path_string(&manifest_location_str)?;
-            let project_manifest = ProjectManifest::from_location(&manifest_location)?;
+            let project_manifest = ProjectManifest::from_location(&manifest_location, false)?;
             let (deployment, artifacts) =
                 generate_default_deployment(&project_manifest, &StacksNetwork::Simnet, false)?;
             let mut session = setup_session_with_deployment(
@@ -41,7 +41,7 @@ pub fn run_dap() -> Result<(), String> {
             }
 
             // Begin execution of the expression in debug mode
-            match session.eval(expression.clone(), Some(vec![&mut dap]), false) {
+            match session.eval_with_hooks(expression, Some(vec![&mut dap]), false) {
                 Ok(_result) => Ok(()),
                 Err(_diagnostics) => Err("unable to interpret expression".to_string()),
             }

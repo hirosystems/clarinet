@@ -8,9 +8,9 @@ import path from "node:path";
 const rootDir = new URL(".", import.meta.url).pathname;
 
 /**
- * build
+ * build clarinet-sdk-wasm
  */
-async function build() {
+async function build_wasm_sdk() {
   console.log("Deleting pkg-node");
   await rmIfExists(path.join(rootDir, "pkg-node"));
   console.log("Deleting pkg-browser");
@@ -36,6 +36,8 @@ async function build() {
       "pkg-browser",
       "--target",
       "web",
+      "--features",
+      "web",
     ]),
   ]);
 
@@ -48,11 +50,10 @@ async function build() {
  * @param {string[]} args
  * @returns
  */
-export const execCommand = async (command, args) => {
-  console.log(`Building ${args[5]}`);
+export const execCommand = async (command, args, cwd = rootDir) => {
   return new Promise((resolve, reject) => {
     const childProcess = spawn(command, args, {
-      cwd: rootDir,
+      cwd,
     });
     childProcess.stdout.on("data", (data) => {
       process.stdout.write(data.toString());
@@ -99,11 +100,11 @@ async function updatePackageName() {
     '"name": "@hirosystems/clarinet-sdk-wasm-browser"',
   );
   await fs.writeFile(filePath, updatedData, "utf-8");
-  console.log("✅ Package name updated successfully.");
+  console.log("✅ pkg-browser/package.json name updated");
 }
 
 try {
-  await build();
+  await build_wasm_sdk();
   console.log("\n✅ Project successfully built.\n🚀 Ready to publish.");
   console.log("Run the following commands to publish");
   console.log("\n```");

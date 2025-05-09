@@ -16,36 +16,34 @@ categories = [
 ]
 
 [dependencies]
-ansi_term = "0.12.1"
-clap = { version = "4.4.8", features = ["derive"], optional = true }
-clap_complete = { version = "4.4.4", optional = true }
+colored = { workspace = true }
 toml = { version = "0.5.6", features = ["preserve_order"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1.0.79", features = ["preserve_order"] }
 serde_derive = "1"
 tokio = { version = "1.35.1", features = ["full"] }
-lazy_static = { workspace = true }
-atty = "0.2.14"
-dirs = { version = "4.0.0" }
-crossterm = "0.27.0"
-ratatui = { version = "0.27.0", default-features = false, features = ["crossterm"] }
-segment = { version = "0.2.4", optional = true }
-mac_address = { version = "1.1.2", optional = true }
-tower-lsp = { version = "0.19.0", optional = true }
+crossterm = { workspace = true }
+ratatui = { workspace = true }
 similar = "2.1.0"
 crossbeam-channel = "0.5.6"
 
-clarity_repl = { package = "clarity-repl", path = "../clarity-repl", features = [
-    "cli",
-] }
-clarinet-files = { path = "../clarinet-files", features = ["cli"] }
-clarity-lsp = { path = "../clarity-lsp", features = ["cli"] }
-clarinet-deployments = { path = "../clarinet-deployments", features = ["cli"] }
+clarity-repl = { package = "clarity-repl", path = "../clarity-repl" }
+clarinet-files = { path = "../clarinet-files" }
+clarity-lsp = { path = "../clarity-lsp" }
+clarinet-format = { path = "../clarinet-format" }
+clarinet-deployments = { path = "../clarinet-deployments" }
 hiro-system-kit = { path = "../hiro-system-kit" }
 stacks-network = { path = "../stacks-network" }
 
 [target.'cfg(unix)'.dependencies]
-nix = "=0.24.2"
+nix = "0.29.0"
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+clap = { version = "4.4.8", features = ["derive"] }
+clap_complete = { version = "4.4.4" }
+tower-lsp = { version = "0.19.0" }
+segment = { version = "0.2.4", optional = true }
+mac_address = { version = "1.1.2", optional = true }
 
 [target.'cfg(windows)'.dependencies]
 fwdansi = "1.1.0"
@@ -80,6 +78,5 @@ name = "clarinet"
 path = "src/bin.rs"
 
 [features]
-default = ["cli", "telemetry"]
-cli = ["clap", "clap_complete", "tower-lsp"]
+default = ["telemetry"]
 telemetry = ["segment", "mac_address"]

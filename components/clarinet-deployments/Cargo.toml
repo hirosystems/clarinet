@@ -4,44 +4,28 @@ version.workspace = true
 edition = "2021"
 
 [dependencies]
-colored = "2.1.0"
+colored = { workspace = true }
+base64 = "0.21.3"
 serde = "1"
-serde_json = "1"
+serde_json = "1.0.123"
 serde_derive = "1"
 serde_yaml = "0.8.23"
-
-clarity-repl = { path = "../clarity-repl", default-features = false, optional = true }
-clarinet-files = { path = "../clarinet-files", default-features = false }
-stacks-rpc-client = { path = "../stacks-rpc-client", optional = true }
-clarinet-utils = { path = "../clarinet-utils", optional = true }
-stacks-codec = { path = "../stacks-codec", optional = true }
-
-# CLI
+rand = "0.8.5"
 reqwest = { workspace = true }
-bitcoin = { version = "0.29.2", optional = true }
-bitcoincore-rpc = { version = "0.16.0", optional = true }
-bitcoincore-rpc-json = { version = "0.16.0", optional = true }
-base58 = { version = "0.2.0", optional = true }
-base64 = "0.21.3"
-tiny-hderive = { version = "0.3.0", optional = true }
-libsecp256k1 = { version = "0.7.0", optional = true }
-
 clarity = { workspace = true }
 
-[features]
-default = ["cli"]
-cli = ["clarity-repl/cli", "clarinet-files/cli", "stacks-codec", "onchain"]
-wasm = ["clarity-repl/wasm", "clarinet-files/wasm"]
-onchain = [
-    "stacks-rpc-client",
-    "bitcoin",
-    "bitcoincore-rpc",
-    "bitcoincore-rpc-json",
-    "base58",
-    "tiny-hderive",
-    "libsecp256k1",
-    "clarinet-utils",
-]
+clarity-repl = { path = "../clarity-repl", default-features = false }
+clarinet-files = { path = "../clarinet-files" }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+bitcoin = "0.31.2"
+bitcoincore-rpc = "0.18.0"
+bitcoincore-rpc-json = "0.18.0"
+base58 = "0.2.0"
+libsecp256k1 = "0.7.0"
+clarinet-utils = { path = "../clarinet-utils" }
+stacks-codec = { path = "../stacks-codec" }
+stacks-rpc-client = { path = "../stacks-rpc-client" }
 
 [lib]
 name = "clarinet_deployments"

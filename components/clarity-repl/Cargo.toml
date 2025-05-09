@@ -22,22 +22,24 @@ categories = [
 ]
 
 [dependencies]
-ansi_term = "0.12.1" # to be replaced with colored in the future
 chrono = "0.4.31"
-colored = "2.1.0"
-lazy_static = { workspace = true }
+colored = { workspace = true }
 regex = "1.7"
+reqwest = { workspace = true, features = ["blocking"] }
 serde = { version = "1", features = ["derive"] }
+serde_derive = "1.0"
 serde_json = { version = "1.0.47", features = ["unbounded_depth"] }
 sha2 = "0.10"
-serde_derive = "1.0"
-getrandom = { version = "0.2.3", features = ["js"] }
-atty = "0.2.14"
-clarity = { workspace = true }
-clar2wasm = { git = "https://github.com/stacks-network/clarity-wasm.git", branch = "main", optional = true }
-# clar2wasm = { path="../../../clarity-wasm/clar2wasm", optional = true }
-pox-locking = { git = "https://github.com/stacks-network/stacks-core.git", branch="feat/clarity-wasm-develop", optional = true, default-features = false }
-prettytable-rs = { version = "0.10.0" }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+clarity = { workspace = true, default-features = false, features = ["developer-mode", "devtools", "log"] }
+clar2wasm = { git = "https://github.com/stacks-network/clarity-wasm.git", branch = "main" }
+pox-locking = { workspace = true, default-features = true }
+
+comfy-table = "7.1.4"
+hiro-system-kit = { path = "../hiro-system-kit", default-features = false, features = ["tokio_helpers"] }
+pico-args = { version = "0.5.0" }
+rustyline = { version = "15.0.0" }
 
 # DAP Debugger
 tokio = { version = "1.35.1", features = ["full"], optional = true }
@@ -49,14 +51,23 @@ bytes = { version = "1.1.0", optional = true }
 log = { version = "0.4.16", optional = true }
 memchr = { version = "2.4.1", optional = true }
 
-# CLI
-pico-args = { version = "0.5.0", optional = true }
-rustyline = { version = "14.0.0", optional = true }
-hiro_system_kit = { version = "0.1.0", package = "hiro-system-kit", path = "../hiro-system-kit", default-features = false }
-reqwest = { workspace = true }
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+clarity = { workspace = true, features = ["wasm", "developer-mode", "devtools"] }
+pox-locking = { workspace = true, default-features = false, features = ["wasm"] }
+
+comfy-table = { version = "7.1.4", default-features = false }
+getrandom = { version = "0.2.3", features = ["js"] }
+js-sys = { version = "0.3" }
+hiro-system-kit = { path = "../hiro-system-kit", default-features = false }
+serde-wasm-bindgen = { version = "0.6.4" }
+wasm-bindgen = { workspace = true }
+web-sys = { workspace = true }
 
 [dev-dependencies]
 test-case = "*"
+divan = "0.1"
+mockito = { version = "1.6", default-features = false }
+tempfile = "3.19"
 
 [lib]
 name = "clarity_repl"
@@ -66,27 +77,12 @@ path = "src/lib.rs"
 name = "clarity-repl"
 path = "src/bin.rs"
 
+[[bench]]
+name = "simnet"
+harness = false
+
 [features]
-default = ["cli", "dap"]
-cli = [
-    "pico-args",
-    "rustyline",
-    "clarity/canonical",
-    "clarity/developer-mode",
-    "clarity/devtools",
-    "clarity/log",
-    "hiro_system_kit/tokio_helpers",
-    "clar2wasm",
-    "pox-locking/default"
-]
-sdk = [
-    "clarity/canonical",
-    "clarity/developer-mode",
-    "clarity/devtools",
-    "clarity/log",
-    "hiro_system_kit/tokio_helpers",
-    "pox-locking/default"
-]
+default = ["dap"]
 dap = [
     "tokio",
     "tokio-util",
@@ -97,9 +93,10 @@ dap = [
     "memchr",
     "log",
 ]
-wasm = [
-    "clarity/wasm",
-    "clarity/developer-mode",
-    "clarity/devtools",
-    "pox-locking/wasm"
+web = [
+    "web-sys/XmlHttpRequest",
+    "web-sys/Event",
 ]
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(wasm_bindgen_unstable_test_coverage)'] }

@@ -1,7 +1,7 @@
 use bitcoincore_rpc::{Auth, Client};
-use clarinet_files::chainhook_types::StacksNetwork;
+use clarinet_files::StacksNetwork;
 use clarinet_files::{AccountConfig, NetworkManifest};
-use clarinet_utils::get_bip39_seed_from_mnemonic;
+use clarinet_utils::get_bip32_keys_from_mnemonic;
 use clarity_repl::clarity::chainstate::StacksAddress;
 use clarity_repl::clarity::codec::StacksMessageCodec;
 use clarity_repl::clarity::util::secp256k1::{
@@ -12,9 +12,9 @@ use clarity_repl::clarity::vm::types::{
 };
 use clarity_repl::clarity::vm::{ClarityName, Value};
 use clarity_repl::clarity::{ClarityVersion, ContractName, EvaluationResult};
-use clarity_repl::repl::session::{
-    BOOT_MAINNET_ADDRESS, BOOT_TESTNET_ADDRESS, V1_BOOT_CONTRACTS, V2_BOOT_CONTRACTS,
-    V3_BOOT_CONTRACTS,
+use clarity_repl::repl::boot::{
+    BOOT_CONTRACTS_NAMES, BOOT_MAINNET_ADDRESS, BOOT_TESTNET_ADDRESS, SBTC_CONTRACTS_NAMES,
+    SBTC_MAINNET_ADDRESS, SBTC_TESTNET_ADDRESS,
 };
 use clarity_repl::repl::{Session, SessionSettings};
 use reqwest::Url;
@@ -29,45 +29,28 @@ use stacks_rpc_client::StacksRpc;
 use std::collections::{BTreeMap, HashSet, VecDeque};
 use std::str::FromStr;
 use std::sync::mpsc::{Receiver, Sender};
-use tiny_hderive::bip32::ExtendedPrivKey;
 
 use clarity_repl::clarity::address::{
     AddressHashMode, C32_ADDRESS_VERSION_MAINNET_SINGLESIG, C32_ADDRESS_VERSION_TESTNET_SINGLESIG,
 };
-use libsecp256k1::{PublicKey, SecretKey};
+use libsecp256k1::PublicKey;
 
 mod bitcoin_deployment;
 
 use crate::types::{DeploymentSpecification, EpochSpec, TransactionSpecification};
 
-fn get_btc_keypair(
-    account: &AccountConfig,
-) -> (
-    bitcoincore_rpc::bitcoin::secp256k1::SecretKey,
-    bitcoincore_rpc::bitcoin::secp256k1::PublicKey,
-) {
-    use bitcoincore_rpc::bitcoin::secp256k1::{PublicKey, Secp256k1, SecretKey};
-    let bip39_seed = match get_bip39_seed_from_mnemonic(&account.mnemonic, "") {
-        Ok(bip39_seed) => bip39_seed,
-        Err(_) => panic!(),
-    };
-    let secp = Secp256k1::new();
-    let ext = ExtendedPrivKey::derive(&bip39_seed[..], account.derivation.as_str()).unwrap();
-    let secret_key = SecretKey::from_slice(&ext.secret()).unwrap();
-    let public_key = PublicKey::from_secret_key(&secp, &secret_key);
-    (secret_key, public_key)
+fn get_btc_secret_key(account: &AccountConfig) -> bitcoincore_rpc::bitcoin::secp256k1::SecretKey {
+    use bitcoincore_rpc::bitcoin::secp256k1::SecretKey;
+    let (secret_bytes, _) =
+        get_bip32_keys_from_mnemonic(&account.mnemonic, "", &account.derivation).unwrap();
+    SecretKey::from_slice(&secret_bytes).unwrap()
 }
 
-fn get_keypair(account: &AccountConfig) -> (ExtendedPrivKey, Secp256k1PrivateKey, PublicKey) {
-    let bip39_seed = match get_bip39_seed_from_mnemonic(&account.mnemonic, "") {
-        Ok(bip39_seed) => bip39_seed,
-        Err(_) => panic!(),
-    };
-    let ext = ExtendedPrivKey::derive(&bip39_seed[..], account.derivation.as_str()).unwrap();
-    let wrapped_secret_key = Secp256k1PrivateKey::from_slice(&ext.secret()).unwrap();
-    let secret_key = SecretKey::parse_slice(&ext.secret()).unwrap();
-    let public_key = PublicKey::from_secret_key(&secret_key);
-    (ext, wrapped_secret_key, public_key)
+fn get_keypair(account: &AccountConfig) -> (Secp256k1PrivateKey, PublicKey) {
+    let (secret_bytes, public_key) =
+        get_bip32_keys_from_mnemonic(&account.mnemonic, "", &account.derivation).unwrap();
+    let wrapped_secret_key = Secp256k1PrivateKey::from_slice(&secret_bytes).unwrap();
+    (wrapped_secret_key, public_key)
 }
 
 fn get_stacks_address(public_key: &PublicKey, network: &StacksNetwork) -> StacksAddress {
@@ -94,11 +77,11 @@ fn sign_transaction_payload(
     anchor_mode: TransactionAnchorMode,
     network: &StacksNetwork,
 ) -> Result<StacksTransaction, String> {
-    let (_, secret_key, public_key) = get_keypair(account);
+    let (secret_key, public_key) = get_keypair(account);
     let signer_addr = get_stacks_address(&public_key, network);
 
     let spending_condition = TransactionSpendingCondition::Singlesig(SinglesigSpendingCondition {
-        signer: signer_addr.bytes,
+        signer: *signer_addr.bytes(),
         nonce,
         tx_fee,
         hash_mode: SinglesigHashMode::P2PKH,
@@ -147,8 +130,8 @@ pub fn encode_contract_call(
     let payload = TransactionContractCall {
         contract_name: contract_id.name.clone(),
         address: StacksAddress::from(contract_id.issuer.clone()),
-        function_name: function_name.clone(),
-        function_args: function_args.clone(),
+        function_name,
+        function_args,
     };
     sign_transaction_payload(
         account,
@@ -198,6 +181,7 @@ pub fn encode_contract_publish(
     )
 }
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug)]
 pub enum TransactionStatus {
     Queued,
@@ -221,6 +205,7 @@ pub enum TransactionCheck {
     BtcTransfer,
 }
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug)]
 pub enum DeploymentEvent {
     TransactionUpdate(TransactionTracker),
@@ -268,7 +253,7 @@ pub fn update_deployment_costs(
                         .parameters
                         .iter()
                         .map(|value| {
-                            let execution = session.eval(value.to_string(), None, false).unwrap();
+                            let execution = session.eval(value.to_string(), false).unwrap();
                             match execution.result {
                                 EvaluationResult::Snippet(result) => result.result,
                                 _ => unreachable!("Contract result from snippet"),
@@ -332,8 +317,12 @@ pub fn apply_on_chain_deployment(
     override_bitcoin_rpc_url: Option<String>,
     override_stacks_rpc_url: Option<String>,
 ) {
-    let network = deployment.network.get_networks();
-    let delay_between_checks: u64 = if network.1.is_devnet() { 1 } else { 10 };
+    let networks = deployment.network.get_networks();
+    let delay_between_checks: u64 = if matches!(networks.1, StacksNetwork::Devnet) {
+        1
+    } else {
+        10
+    };
     // Load deployers, deployment_fee_rate
     // Check fee, balances and deployers
 
@@ -382,22 +371,17 @@ pub fn apply_on_chain_deployment(
     let mut index = 0;
     let mut contracts_ids_to_remap: HashSet<(String, String)> = HashSet::new();
 
-    for contract in V1_BOOT_CONTRACTS {
+    for contract in BOOT_CONTRACTS_NAMES {
         contracts_ids_to_remap.insert((
             format!("{}:{}", BOOT_MAINNET_ADDRESS, contract),
             format!("{}:{}", BOOT_TESTNET_ADDRESS, contract),
         ));
     }
-    for contract in V2_BOOT_CONTRACTS {
+
+    for contract_name in SBTC_CONTRACTS_NAMES.iter() {
         contracts_ids_to_remap.insert((
-            format!("{}:{}", BOOT_MAINNET_ADDRESS, contract),
-            format!("{}:{}", BOOT_TESTNET_ADDRESS, contract),
-        ));
-    }
-    for contract in V3_BOOT_CONTRACTS {
-        contracts_ids_to_remap.insert((
-            format!("{}:{}", BOOT_MAINNET_ADDRESS, contract),
-            format!("{}:{}", BOOT_TESTNET_ADDRESS, contract),
+            format!("{}:{}", SBTC_MAINNET_ADDRESS, contract_name),
+            format!("{}:{}", SBTC_TESTNET_ADDRESS, contract_name),
         ));
     }
 
@@ -478,7 +462,7 @@ pub fn apply_on_chain_deployment(
                         Client::new(&bitcoin_node_wallet_rpc_url, auth).unwrap();
 
                     let account = btc_accounts_lookup.get(&tx.expected_sender).unwrap();
-                    let (secret_key, _public_key) = get_btc_keypair(account);
+                    let secret_key = get_btc_secret_key(account);
                     let _ = bitcoin_deployment::send_transaction_spec(
                         &bitcoin_rpc,
                         &bitcoin_node_wallet_rpc,
@@ -499,7 +483,7 @@ pub fn apply_on_chain_deployment(
 
                     let mut function_args = vec![];
                     for value in tx.parameters.iter() {
-                        let execution = match session.eval(value.to_string(), None, false) {
+                        let execution = match session.eval(value.to_string(), false) {
                             Ok(res) => res,
                             Err(_e) => {
                                 let _ = deployment_event_tx.send(DeploymentEvent::Interrupted(
@@ -567,7 +551,10 @@ pub fn apply_on_chain_deployment(
                             .expect("Unable to retrieve account"),
                     };
                     let account = stx_accounts_lookup.get(&issuer_address).unwrap();
-                    let source = if deployment.network.either_devnet_or_testnet() {
+                    let source = if matches!(
+                        deployment.network,
+                        StacksNetwork::Devnet | StacksNetwork::Testnet
+                    ) {
                         // Remapping - This is happening
                         let mut source = tx.source.clone();
                         for (old_contract_id, new_contract_id) in contracts_ids_to_remap.iter() {
@@ -633,7 +620,7 @@ pub fn apply_on_chain_deployment(
                     }
                 }
                 TransactionSpecification::RequirementPublish(tx) => {
-                    if deployment.network.is_mainnet() {
+                    if matches!(deployment.network, StacksNetwork::Mainnet) {
                         panic!("Deployment specification malformed - requirements publish not supported on mainnet");
                     }
                     let old_contract_id = tx.contract_id.to_string();
@@ -645,7 +632,7 @@ pub fn apply_on_chain_deployment(
                     contracts_ids_to_remap.insert((old_contract_id, new_contract_id));
 
                     // Testnet handling: don't re-deploy previously deployed contracts
-                    if deployment.network.is_testnet() {
+                    if matches!(deployment.network, StacksNetwork::Testnet) {
                         let res = stacks_rpc.get_contract_source(
                             &tx.remap_sender.to_address(),
                             &tx.contract_id.name.to_string(),
@@ -758,6 +745,7 @@ pub fn apply_on_chain_deployment(
                 EpochSpec::Epoch2_4 => network_manifest.devnet.as_ref().unwrap().epoch_2_4,
                 EpochSpec::Epoch2_5 => network_manifest.devnet.as_ref().unwrap().epoch_2_5,
                 EpochSpec::Epoch3_0 => network_manifest.devnet.as_ref().unwrap().epoch_3_0,
+                EpochSpec::Epoch3_1 => network_manifest.devnet.as_ref().unwrap().epoch_3_1,
             };
             let mut epoch_transition_successful =
                 current_bitcoin_block_height > after_bitcoin_block;
@@ -947,7 +935,10 @@ pub fn get_initial_transactions_trackers(
                     status: TransactionStatus::Queued,
                 },
                 TransactionSpecification::RequirementPublish(tx) => {
-                    if !deployment.network.either_devnet_or_testnet() {
+                    if !matches!(
+                        deployment.network,
+                        StacksNetwork::Devnet | StacksNetwork::Testnet
+                    ) {
                         panic!("Deployment specification malformed - requirements publish not supported on mainnet");
                     }
                     TransactionTracker {

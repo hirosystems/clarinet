@@ -8,7 +8,8 @@
   "homepage": "https://github.com/hirosystems/clarinet",
   "bugs": "https://github.com/hirosystems/clarinet/issues",
   "license": "GPL-3.0-only",
-  "version": "1.14.0",
+  "version": "3.0.1",
+  "private": true,
   "workspaces": [
     "client",
     "server",
@@ -22,11 +23,11 @@
     "clean": "rimraf .vscode-test-web ./debug/dist ./client/dist ./server/dist ./server/src/clarity-lsp-*",
     "pretest": "NODE_ENV=test concurrently \"webpack -c ./webpack.config.dev.js\" \"swc --config-file .runTests.swcrc ./client/tests/runTests.ts -o ./client/dist/tests/runTests.js\"",
     "test": "node client/dist/tests/runTests.js",
-    "lint": "eslint ./client/src ./server/src --ext .ts,.tsx",
+    "lint": "eslint ./client/src ./server/src",
     "dev:watch": "webpack -c ./webpack.config.dev.js -w",
     "dev:browser": "vscode-test-web --extensionDevelopmentPath=. ./test-data --open-devtools",
-    "dev": "webpack -c ./webpack.config.dev.js; concurrently \"npm:dev:*\"",
-    "vscode:prepublish": "npm run clean; NODE_ENV=production webpack",
+    "dev": "webpack -c ./webpack.config.dev.js && concurrently \"npm:dev:*\"",
+    "vscode:prepublish": "npm run clean && NODE_ENV=production webpack",
     "vsce:package": "vsce package",
     "vsce:publish": "vsce publish",
     "vsce:prerelease": "vsce publish --pre-release"
@@ -91,6 +92,12 @@
             "default": true,
             "order": 0,
             "description": "If set to true, the auto-completion of native functions will include placeholders for the arguments."
+          },
+          "clarity-lsp.formatting": {
+            "type": "boolean",
+            "default": true,
+            "order": 0,
+            "description": "If set to false, the Clarity formatter is fully disabled"
           },
           "clarity-lsp.hover": {
             "type": "boolean",
@@ -237,27 +244,29 @@
     ]
   },
   "devDependencies": {
-    "@swc/cli": "0.4.0",
-    "@swc/core": "^1.2.218",
-    "@types/chai": "^4.3.1",
+    "@eslint/eslintrc": "^3.1.0",
+    "@eslint/js": "^9.13.0",
+    "@swc/cli": "^0.7.5",
+    "@swc/core": "^1.7.40",
+    "@types/chai": "^5.0.0",
     "@types/mocha": "^10.0.0",
     "@types/webpack-env": "^1.17.0",
-    "@typescript-eslint/eslint-plugin": "^7.14.1",
-    "@typescript-eslint/parser": "^7.14.1",
-    "@vscode/test-web": "0.0.56",
-    "@vscode/vsce": "^2.19.0",
+    "@typescript-eslint/eslint-plugin": "^8.11.0",
+    "@typescript-eslint/parser": "^8.11.0",
+    "@vscode/test-web": "^0.0.69",
+    "@vscode/vsce": "^3.2.2",
     "@wasm-tool/wasm-pack-plugin": "^1.6.0",
     "chai": "^5.0.3",
-    "concurrently": "^8.2.0",
-    "copy-webpack-plugin": "^12.0.2",
-    "eslint": "^8.57.0",
-    "mocha": "^10.0.0",
+    "concurrently": "^9.1.2",
+    "copy-webpack-plugin": "^13.0.0",
+    "eslint": "^9.13.0",
+    "mocha": "^11.2.2",
     "path-browserify": "^1.0.1",
     "regenerator-runtime": "^0.14.0",
-    "rimraf": "^5.0.1",
+    "rimraf": "^6.0.1",
     "swc-loader": "^0.2.3",
     "typescript": "^5.0.2",
     "webpack": "^5.76.0",
-    "webpack-cli": "^5.0.1"
+    "webpack-cli": "^6.0.1"
   }
 }

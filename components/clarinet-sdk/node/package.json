@@ -1,6 +1,6 @@
 {
   "name": "@hirosystems/clarinet-sdk",
-  "version": "2.8.0",
+  "version": "3.0.1",
   "description": "A SDK to interact with Clarity Smart Contracts in node.js",
   "homepage": "https://www.hiro.so/clarinet",
   "repository": {
@@ -12,7 +12,6 @@
   },
   "files": [
     "dist",
-    "templates",
     "vitest-helpers/src"
   ],
   "main": "./dist/cjs/node/src/index.js",
@@ -40,16 +39,13 @@
       }
     }
   },
-  "bin": {
-    "clarinet-sdk": "dist/cjs/node/src/bin/index.js"
-  },
   "scripts": {
     "clean": "rimraf dist",
     "compile": "tsc -b ./tsconfig.json ./tsconfig.cjs.json",
-    "build": "npm run clean; npm run compile; node ./scripts/prepare-esm-package.js",
+    "build": "npm run clean && npm run compile && node ./scripts/prepare-esm-package.js",
     "prepare": "npm run build",
     "pretest": "tsc -b ./tsconfig.json",
-    "test": "vitest run"
+    "test": "vitest run --silent=passed-only"
   },
   "keywords": [
     "stacks",
@@ -61,16 +57,16 @@
   "license": "GPL-3.0",
   "readme": "./README.md",
   "dependencies": {
-    "@hirosystems/clarinet-sdk-wasm": "^2.8.0",
-    "@stacks/transactions": "^6.13.0",
+    "@hirosystems/clarinet-sdk-wasm": "3.0.1",
+    "@stacks/transactions": "^7.0.6",
     "kolorist": "^1.8.0",
     "prompts": "^2.4.2",
-    "vitest": "^1.0.4",
+    "vitest": "^3.0.5",
     "yargs": "^17.7.2"
   },
   "devDependencies": {
-    "@stacks/encryption": "^6.13.0",
-    "@stacks/network": "^6.13.0",
-    "@stacks/stacking": "^6.13.0"
+    "@stacks/encryption": "^7.0.0",
+    "@stacks/network": "^7.0.0",
+    "@stacks/stacking": "^7.0.0"
   }
 }

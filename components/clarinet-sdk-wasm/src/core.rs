@@ -7,13 +7,11 @@ use clarinet_deployments::{
     generate_default_deployment, initiate_session_from_manifest,
     update_session_with_deployment_plan,
 };
-use clarinet_files::chainhook_types::StacksNetwork;
+use clarinet_files::StacksNetwork;
 use clarinet_files::{FileAccessor, FileLocation, ProjectManifest, WASMFileSystemAccessor};
-use clarity_repl::analysis::coverage::CoverageReporter;
 use clarity_repl::clarity::analysis::contract_interface_builder::{
     ContractInterface, ContractInterfaceFunction, ContractInterfaceFunctionAccess,
 };
-use clarity_repl::clarity::ast::ContractAST;
 use clarity_repl::clarity::chainstate::StacksAddress;
 use clarity_repl::clarity::vm::types::{
     PrincipalData, QualifiedContractIdentifier, StandardPrincipalData,
@@ -22,7 +20,8 @@ use clarity_repl::clarity::{
     Address, ClarityVersion, EvaluationResult, ExecutionResult, StacksEpochId, SymbolicExpression,
 };
 use clarity_repl::repl::clarity_values::{uint8_to_string, uint8_to_value};
-use clarity_repl::repl::session::BOOT_CONTRACTS_DATA;
+use clarity_repl::repl::session::CostsReport;
+use clarity_repl::repl::settings::RemoteDataSettings;
 use clarity_repl::repl::{
     clarity_values, ClarityCodeSource, ClarityContract, ContractDeployer, Session, SessionSettings,
     DEFAULT_CLARITY_VERSION, DEFAULT_EPOCH,
@@ -37,7 +36,6 @@ use std::{panic, path::PathBuf};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsValue;
 
-use crate::utils::costs::SerializableCostsReport;
 use crate::utils::events::serialize_event;
 
 #[wasm_bindgen]
@@ -54,6 +52,14 @@ extern "C" {
     pub type IContractAST;
     #[wasm_bindgen(typescript_type = "Map<string, IContractInterface>")]
     pub type IContractInterfaces;
+}
+
+impl EpochString {
+    pub fn new(obj: &str) -> Self {
+        Self {
+            obj: JsValue::from_str(obj),
+        }
+    }
 }
 
 macro_rules! log {
@@ -91,7 +97,7 @@ impl CallFnArgs {
         Self {
             contract,
             method,
-            args: args.iter().map(|a| a.to_vec()).collect(),
+            args: args.into_iter().map(|a| a.to_vec()).collect(),
             sender,
         }
     }
@@ -101,27 +107,24 @@ impl CallFnArgs {
       Because it's JSON, the Uint8Array arguments are passed as Map<index, value> instead of Vec<u8>.
       This method transform the Map back into a Vec.
     */
-    fn from_json_args(
-        CallContractArgsJSON {
-            contract,
-            method,
-            args_maps,
-            sender,
-        }: CallContractArgsJSON,
-    ) -> Self {
-        let mut args: Vec<Vec<u8>> = vec![];
-        for arg in args_maps {
-            let mut parsed_arg: Vec<u8> = vec![0; arg.len()];
-            for (i, v) in arg.iter() {
-                parsed_arg[*i] = *v;
-            }
-            args.push(parsed_arg);
-        }
+    fn from_json_args(json_args: CallContractArgsJSON) -> Self {
+        let args = json_args
+            .args_maps
+            .into_iter()
+            .map(|arg| {
+                let mut parsed_arg = vec![0; arg.len()];
+                for (i, v) in arg {
+                    parsed_arg[i] = v;
+                }
+                parsed_arg
+            })
+            .collect();
+
         Self {
-            contract,
-            method,
+            contract: json_args.contract,
+            method: json_args.method,
             args,
-            sender,
+            sender: json_args.sender,
         }
     }
 }
@@ -161,7 +164,6 @@ pub struct DeployContractArgs {
     options: ContractOptions,
     sender: String,
 }
-
 #[wasm_bindgen]
 impl DeployContractArgs {
     #[wasm_bindgen(constructor)]
@@ -211,6 +213,7 @@ pub struct TxArgs {
 pub struct TransactionRes {
     pub result: String,
     pub events: String,
+    pub costs: String,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -242,6 +245,7 @@ pub fn execution_result_to_transaction_res(execution: &ExecutionResult) -> Trans
     TransactionRes {
         result,
         events: json!(events_as_strings).to_string(),
+        costs: json!(execution.cost).to_string(),
     }
 }
 
@@ -277,15 +281,14 @@ pub struct SDK {
     #[wasm_bindgen(getter_with_clone)]
     pub deployer: String,
     cache: HashMap<FileLocation, ProjectCache>,
-
     accounts: HashMap<String, String>,
     contracts_locations: HashMap<QualifiedContractIdentifier, FileLocation>,
     contracts_interfaces: HashMap<QualifiedContractIdentifier, ContractInterface>,
     session: Option<Session>,
-
     file_accessor: Box<dyn FileAccessor>,
     options: SDKOptions,
     current_test_name: String,
+    costs_reports: Vec<CostsReport>,
 }
 
 #[wasm_bindgen]
@@ -294,10 +297,10 @@ impl SDK {
     pub fn new(fs_request: JsFunction, options: Option<SDKOptions>) -> Self {
         panic::set_hook(Box::new(console_error_panic_hook::hook));
 
-        let fs = Box::new(WASMFileSystemAccessor::new(fs_request));
+        let file_accessor = Box::new(WASMFileSystemAccessor::new(fs_request));
 
-        let track_coverage = options.as_ref().map_or(false, |o| o.track_coverage);
-        let track_costs = options.as_ref().map_or(false, |o| o.track_costs);
+        let track_coverage = options.as_ref().is_some_and(|o| o.track_coverage);
+        let track_costs = options.as_ref().is_some_and(|o| o.track_costs);
 
         Self {
             deployer: String::new(),
@@ -306,12 +309,13 @@ impl SDK {
             contracts_interfaces: HashMap::new(),
             contracts_locations: HashMap::new(),
             session: None,
-            file_accessor: fs,
+            file_accessor,
             options: SDKOptions {
                 track_coverage,
                 track_costs,
             },
             current_test_name: String::new(),
+            costs_reports: vec![],
         }
     }
 
@@ -335,16 +339,27 @@ impl SDK {
     #[wasm_bindgen(js_name=getDefaultClarityVersionForCurrentEpoch)]
     pub fn default_clarity_version_for_current_epoch(&self) -> ClarityVersionString {
         let session = self.get_session();
+        let current_epoch = session.interpreter.datastore.get_current_epoch();
         ClarityVersionString {
-            obj: ClarityVersion::default_for_epoch(session.current_epoch)
+            obj: ClarityVersion::default_for_epoch(current_epoch)
                 .to_string()
                 .into(),
         }
     }
 
-    #[wasm_bindgen(js_name=initEmtpySession)]
-    pub async fn init_empty_session(&mut self) -> Result<(), String> {
-        let session = Session::new(SessionSettings::default());
+    #[wasm_bindgen(js_name=initEmptySession)]
+    pub async fn init_empty_session(
+        &mut self,
+        remote_data_settings: JsValue,
+    ) -> Result<(), String> {
+        let config: Option<RemoteDataSettings> =
+            serde_wasm_bindgen::from_value(remote_data_settings)
+                .map_err(|e| format!("Failed to parse remote data settings: {}", e))?;
+
+        let mut settings = SessionSettings::default();
+        settings.repl_settings.remote_data = config.unwrap_or_default();
+        let session = Session::new(settings);
+
         self.session = Some(session);
         Ok(())
     }
@@ -381,7 +396,8 @@ impl SDK {
         manifest_location: &FileLocation,
     ) -> Result<ProjectCache, String> {
         let manifest =
-            ProjectManifest::from_file_accessor(manifest_location, &*self.file_accessor).await?;
+            ProjectManifest::from_file_accessor(manifest_location, true, &*self.file_accessor)
+                .await?;
         let project_root = manifest_location.get_parent_location()?;
         let deployment_plan_location =
             FileLocation::try_parse("deployments/default.simnet-plan.yaml", Some(&project_root))
@@ -445,11 +461,13 @@ impl SDK {
         }
 
         let mut session = initiate_session_from_manifest(&manifest);
+        if self.options.track_coverage {
+            session.enable_coverage();
+        }
         let executed_contracts = update_session_with_deployment_plan(
             &mut session,
             &deployment,
             Some(&artifacts.asts),
-            false,
             Some(DEFAULT_EPOCH),
         );
 
@@ -591,11 +609,16 @@ impl SDK {
     #[wasm_bindgen(getter, js_name=currentEpoch)]
     pub fn current_epoch(&mut self) -> String {
         let session = self.get_session_mut();
-        session.current_epoch.to_string()
+        session
+            .interpreter
+            .datastore
+            .get_current_epoch()
+            .to_string()
     }
 
     #[wasm_bindgen(js_name=setEpoch)]
     pub fn set_epoch(&mut self, epoch: EpochString) {
+        // @todo: unwrap to default epoch?? DEFAULT_EPOCH.to_string()
         let epoch = epoch.as_string().unwrap_or("2.4".into());
         let epoch = match epoch.as_str() {
             "2.0" => StacksEpochId::Epoch20,
@@ -606,6 +629,7 @@ impl SDK {
             "2.4" => StacksEpochId::Epoch24,
             "2.5" => StacksEpochId::Epoch25,
             "3.0" => StacksEpochId::Epoch30,
+            "3.1" => StacksEpochId::Epoch31,
             _ => {
                 log!("Invalid epoch {epoch}. Using default epoch");
                 DEFAULT_EPOCH
@@ -666,6 +690,7 @@ impl SDK {
             .get_data_var(&contract_id, var_name)
             .ok_or("value not found".into())
     }
+
     #[wasm_bindgen(js_name=getBlockTime)]
     pub fn get_block_time(&mut self) -> u64 {
         self.get_session_mut().interpreter.get_block_time()
@@ -714,10 +739,7 @@ impl SDK {
         allow_private: bool,
     ) -> Result<TransactionRes, String> {
         let test_name = self.current_test_name.clone();
-        let SDKOptions {
-            track_costs,
-            track_coverage,
-        } = self.options;
+        let SDKOptions { track_costs, .. } = self.options;
 
         let parsed_args = args
             .iter()
@@ -733,8 +755,6 @@ impl SDK {
                 sender,
                 allow_private,
                 track_costs,
-                track_coverage,
-                test_name,
             )
             .map_err(|diagnostics| {
                 let mut message = format!(
@@ -753,14 +773,32 @@ impl SDK {
                 message
             })?;
 
+        if track_costs {
+            if let Some(ref cost) = execution.cost {
+                let contract_id = if contract.starts_with('S') {
+                    contract.to_string()
+                } else {
+                    format!("{}.{}", self.deployer, contract)
+                };
+                self.costs_reports.push(CostsReport {
+                    test_name,
+                    contract_id,
+                    method: method.to_string(),
+                    args: parsed_args.iter().map(|a| a.to_string()).collect(),
+                    cost_result: cost.clone(),
+                });
+            }
+        }
+
         Ok(execution_result_to_transaction_res(&execution))
     }
 
     #[wasm_bindgen(js_name=callReadOnlyFn)]
     pub fn call_read_only_fn(&mut self, args: &CallFnArgs) -> Result<TransactionRes, String> {
-        let interface = self.get_function_interface(&args.contract, &args.method)?;
-        if interface.access != ContractInterfaceFunctionAccess::read_only {
-            return Err(format!("{} is not a read-only function", &args.method));
+        if let Ok(interface) = self.get_function_interface(&args.contract, &args.method) {
+            if interface.access != ContractInterfaceFunctionAccess::read_only {
+                return Err(format!("{} is not a read-only function", &args.method));
+            }
         }
         self.call_contract_fn(args, false)
     }
@@ -770,9 +808,10 @@ impl SDK {
         args: &CallFnArgs,
         advance_chain_tip: bool,
     ) -> Result<TransactionRes, String> {
-        let interface = self.get_function_interface(&args.contract, &args.method)?;
-        if interface.access != ContractInterfaceFunctionAccess::public {
-            return Err(format!("{} is not a public function", &args.method));
+        if let Ok(interface) = self.get_function_interface(&args.contract, &args.method) {
+            if interface.access != ContractInterfaceFunctionAccess::public {
+                return Err(format!("{} is not a public function", &args.method));
+            }
         }
 
         if advance_chain_tip {
@@ -787,9 +826,10 @@ impl SDK {
         args: &CallFnArgs,
         advance_chain_tip: bool,
     ) -> Result<TransactionRes, String> {
-        let interface = self.get_function_interface(&args.contract, &args.method)?;
-        if interface.access != ContractInterfaceFunctionAccess::private {
-            return Err(format!("{} is not a private function", &args.method));
+        if let Ok(interface) = self.get_function_interface(&args.contract, &args.method) {
+            if interface.access != ContractInterfaceFunctionAccess::private {
+                return Err(format!("{} is not a private function", &args.method));
+            }
         }
         if advance_chain_tip {
             let session = self.get_session_mut();
@@ -835,16 +875,17 @@ impl SDK {
             if advance_chain_tip {
                 session.advance_chain_tip(1);
             }
+            let current_epoch = session.interpreter.datastore.get_current_epoch();
 
             let contract = ClarityContract {
                 code_source: ClarityCodeSource::ContractInMemory(args.content.clone()),
                 name: args.name.clone(),
                 deployer: ContractDeployer::Address(args.sender.to_string()),
                 clarity_version: args.options.clarity_version,
-                epoch: session.current_epoch,
+                epoch: current_epoch,
             };
 
-            match session.deploy_contract(&contract, None, false, Some(args.name.clone()), None) {
+            match session.deploy_contract(&contract, false, None) {
                 Ok(res) => res,
                 Err(diagnostics) => {
                     let mut message = format!(
@@ -961,7 +1002,7 @@ impl SDK {
     #[wasm_bindgen(js_name=runSnippet)]
     pub fn run_snippet(&mut self, snippet: String) -> String {
         let session = self.get_session_mut();
-        match session.eval(snippet.clone(), None, false) {
+        match session.eval(snippet.clone(), false) {
             Ok(res) => match res.result {
                 EvaluationResult::Snippet(result) => clarity_values::to_raw_value(&result.result),
                 EvaluationResult::Contract(_) => unreachable!(
@@ -981,7 +1022,7 @@ impl SDK {
     #[wasm_bindgen(js_name=execute)]
     pub fn execute(&mut self, snippet: String) -> Result<TransactionRes, String> {
         let session = self.get_session_mut();
-        match session.eval(snippet.clone(), None, false) {
+        match session.eval(snippet.clone(), false) {
             Ok(res) => Ok(execution_result_to_transaction_res(&res)),
             Err(diagnostics) => {
                 let message = diagnostics
@@ -1003,6 +1044,19 @@ impl SDK {
         session.handle_command(&snippet)
     }
 
+    #[wasm_bindgen(js_name=setLocalAccounts)]
+    pub fn set_local_accounts(&mut self, addresses: Vec<String>) {
+        let principals = addresses
+            .into_iter()
+            .map(|a| StandardPrincipalData::from(StacksAddress::from_string(&a).unwrap()))
+            .collect();
+        let session = self.get_session_mut();
+        session
+            .interpreter
+            .clarity_datastore
+            .save_local_account(principals);
+    }
+
     #[wasm_bindgen(js_name=mintSTX)]
     pub fn mint_stx(&mut self, recipient: String, amount: u64) -> Result<String, String> {
         let session = self.get_session_mut();
@@ -1017,6 +1071,8 @@ impl SDK {
 
     #[wasm_bindgen(js_name=setCurrentTestName)]
     pub fn set_current_test_name(&mut self, test_name: String) {
+        let session = self.get_session_mut();
+        session.set_test_name(test_name.clone());
         self.current_test_name = test_name;
     }
 
@@ -1030,43 +1086,31 @@ impl SDK {
     ) -> Result<SessionReport, String> {
         let contracts_locations = self.contracts_locations.clone();
         let session = self.get_session_mut();
-        let mut coverage_reporter = CoverageReporter::new();
-        let mut asts: BTreeMap<QualifiedContractIdentifier, ContractAST> = BTreeMap::new();
+
+        let mut asts = BTreeMap::new();
+        let mut contract_paths = BTreeMap::new();
+
         for (contract_id, contract) in session.contracts.iter() {
             asts.insert(contract_id.clone(), contract.ast.clone());
         }
-        coverage_reporter.asts.append(&mut asts);
-
         for (contract_id, contract_location) in contracts_locations.iter() {
-            coverage_reporter
-                .contract_paths
-                .insert(contract_id.name.to_string(), contract_location.to_string());
+            contract_paths.insert(contract_id.name.to_string(), contract_location.to_string());
         }
 
         if include_boot_contracts {
-            for (contract_id, (_, ast)) in BOOT_CONTRACTS_DATA.iter() {
-                coverage_reporter
-                    .asts
-                    .insert(contract_id.clone(), ast.clone());
-                coverage_reporter.contract_paths.insert(
+            for (contract_id, (_, ast)) in clarity_repl::repl::boot::BOOT_CONTRACTS_DATA.iter() {
+                asts.insert(contract_id.clone(), ast.clone());
+                contract_paths.insert(
                     contract_id.name.to_string(),
                     format!("{boot_contracts_path}/{}.clar", contract_id.name),
                 );
             }
         }
 
-        coverage_reporter
-            .reports
-            .append(&mut session.coverage_reports);
-        let coverage = coverage_reporter.build_lcov_content();
+        let coverage = session.collect_lcov_content(&asts, &contract_paths);
 
-        let mut costs_reports = Vec::new();
-        costs_reports.append(&mut session.costs_reports);
-        let costs_reports: Vec<SerializableCostsReport> = costs_reports
-            .iter()
-            .map(SerializableCostsReport::from_vm_costs_report)
-            .collect();
-        let costs = serde_json::to_string(&costs_reports).map_err(|e| e.to_string())?;
+        let costs = serde_json::to_string(&self.costs_reports).map_err(|e| e.to_string())?;
+        self.costs_reports.clear();
 
         Ok(SessionReport { coverage, costs })
     }

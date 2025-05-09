@@ -27,7 +27,7 @@ There are two ways to use the sdk in the browser:
 - With an empty clarinet session:
 ```js
 const simnet = await initSimnet();
-await simnet.initEmtpySession();
+await simnet.initEmptySession();
 simnet.runSnippet("(+ 1 2)")
 ```
 

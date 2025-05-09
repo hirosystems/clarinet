@@ -103,6 +103,7 @@ bitcoin_controller_block_time = 20_000
 disable_bitcoin_explorer = true
 disable_stacks_explorer = true
 disable_stacks_api = true
+disable_postgres = true
 # bind_containers_volumes = true
 # stacks_node_env_vars = ["STACKS_LOG_DEBUG=1"]
 enable_subnet_node = false

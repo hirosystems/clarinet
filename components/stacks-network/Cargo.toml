@@ -6,11 +6,9 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-atty = "0.2.14"
-ansi_term = "0.12.1"
-bollard = "0.16.0"
-bitcoin = "0.29.2"
-bitcoincore-rpc = "0.16.0"
+colored = { workspace = true }
+bollard = "0.17"
+bitcoincore-rpc = "0.18.0"
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1.0.79", features = ["preserve_order"] }
 serde_derive = "1"
@@ -20,25 +18,30 @@ tracing-appender = "0.2.0"
 ctrlc = "3.1.9"
 reqwest = { workspace = true, features = ["blocking"] }
 crossbeam-channel = "0.5.6"
-crossterm = { version = "0.27.0" }
-ratatui = { version = "0.27.0", default-features = false, features = ["crossterm"] }
+crossterm = { workspace = true }
+ratatui = { workspace = true }
 chrono = "0.4.31"
 futures = "0.3.12"
 base58 = "0.2.0"
 tokio = { version = "1.35.1", features = ["full"] }
-dirs = { version = "4.0.0" }
+dirs = { version = "6.0.0" }
 clap = { version = "4.4.8", features = ["derive"] }
 serde_yaml = "0.8.23"
+rand = "0.8.5"
 
 clarity = { workspace = true }
 stackslib = { git = "https://github.com/stacks-network/stacks-core.git", branch="feat/clarity-wasm-develop", package = "stackslib" }
 chainhook-sdk = { version = "0.12" }
+chainhook-types = { version = "1.3.7" }
 
 stacks-rpc-client = { path = "../stacks-rpc-client" }
-clarinet-files = { path = "../clarinet-files", features = ["cli"] }
-clarinet-deployments = { path = "../clarinet-deployments", features = ["cli"] }
+clarinet-files = { path = "../clarinet-files" }
+clarinet-deployments = { path = "../clarinet-deployments" }
 hiro-system-kit = { path = "../hiro-system-kit", features = ["log"] }
 stacks-codec = { path = "../stacks-codec" }
+
+[dev-dependencies]
+stacks-rpc-client = { path = "../stacks-rpc-client", features = ["test"] }
 
 [lib]
 name = "stacks_network"

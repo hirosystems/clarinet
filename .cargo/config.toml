@@ -1,5 +1,7 @@
 [alias]
 clarinet-install = "install --path components/clarinet-cli --locked --force"
-tst = "nextest run --workspace --locked --exclude clarinet-sdk-wasm --exclude clarity-jupyter-kernel"
-cov = "llvm-cov nextest --workspace --locked --exclude clarinet-sdk-wasm --exclude clarity-jupyter-kernel --lcov --output-path lcov.info"
-cov-dev = "llvm-cov nextest --workspace --locked --exclude clarinet-sdk-wasm --exclude clarity-jupyter-kernel --html"
+# clarity-sdk-wasm has its own test suite using wasm-pack-test
+# stacks-devnet-js is un tested and not actively maintained
+tst = "nextest run --workspace --no-fail-fast --locked --exclude clarinet-sdk-wasm --exclude stacks-devnet-js"
+cov = "llvm-cov nextest --workspace --locked --exclude clarinet-sdk-wasm --exclude stacks-devnet-js --lcov --output-path lcov.info"
+cov-dev = "llvm-cov nextest --workspace --locked --exclude clarinet-sdk-wasm --exclude stacks-devnet-js --html"

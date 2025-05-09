@@ -5,9 +5,9 @@ use clarinet_files::{FileAccessor, FileLocation, ProjectManifest};
 use clarity_repl::clarity::diagnostic::Diagnostic;
 use clarity_repl::repl::ContractDeployer;
 use lsp_types::{
-    CompletionItem, CompletionParams, DocumentSymbol, DocumentSymbolParams, GotoDefinitionParams,
-    Hover, HoverParams, InitializeParams, InitializeResult, Location, SignatureHelp,
-    SignatureHelpParams,
+    CompletionItem, CompletionParams, DocumentFormattingParams, DocumentRangeFormattingParams,
+    DocumentSymbol, DocumentSymbolParams, GotoDefinitionParams, Hover, HoverParams,
+    InitializeParams, InitializeResult, Location, SignatureHelp, SignatureHelpParams, TextEdit,
 };
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, RwLock};
@@ -80,7 +80,7 @@ pub async fn process_notification(
 ) -> Result<LspNotificationResponse, String> {
     match command {
         LspNotification::ManifestOpened(manifest_location) => {
-            // Only build the initial protocal state if it does not exist
+            // Only build the initial protocol state if it does not exist
             if editor_state.try_read(|es| es.protocols.contains_key(&manifest_location))? {
                 return Ok(LspNotificationResponse::default());
             }
@@ -145,10 +145,11 @@ pub async fn process_notification(
                     Some((clarity_version, _)) => clarity_version,
                     None => {
                         match file_accessor {
-                            None => ProjectManifest::from_location(&manifest_location),
+                            None => ProjectManifest::from_location(&manifest_location, false),
                             Some(file_accessor) => {
                                 ProjectManifest::from_file_accessor(
                                     &manifest_location,
+                                    false,
                                     file_accessor,
                                 )
                                 .await
@@ -166,7 +167,7 @@ pub async fn process_notification(
                 };
 
                 let issuer = metadata.and_then(|(_, deployer)| match deployer {
-                    ContractDeployer::ContractIdentifier(id) => Some(id.issuer.to_owned()),
+                    ContractDeployer::ContractIdentifier(id) => Some(id.issuer),
                     _ => None,
                 });
 
@@ -180,7 +181,7 @@ pub async fn process_notification(
                 })?;
             }
 
-            // Only build the initial protocal state if it does not exist
+            // Only build the initial protocol state if it does not exist
             if editor_state.try_read(|es| es.protocols.contains_key(&manifest_location))? {
                 return Ok(LspNotificationResponse::default());
             }
@@ -258,7 +259,9 @@ pub enum LspRequest {
     Definition(GotoDefinitionParams),
     Hover(HoverParams),
     DocumentSymbol(DocumentSymbolParams),
-    Initialize(InitializeParams),
+    DocumentFormatting(DocumentFormattingParams),
+    DocumentRangeFormatting(DocumentRangeFormattingParams),
+    Initialize(Box<InitializeParams>),
 }
 
 #[derive(Debug, PartialEq, Deserialize, Serialize)]
@@ -267,8 +270,10 @@ pub enum LspRequestResponse {
     SignatureHelp(Option<SignatureHelp>),
     Definition(Option<Location>),
     DocumentSymbol(Vec<DocumentSymbol>),
+    DocumentFormatting(Option<Vec<TextEdit>>),
+    DocumentRangeFormatting(Option<Vec<TextEdit>>),
     Hover(Option<Hover>),
-    Initialize(InitializeResult),
+    Initialize(Box<InitializeResult>),
 }
 
 pub fn process_request(
@@ -342,6 +347,168 @@ pub fn process_request(
                 .unwrap_or_default();
             Ok(LspRequestResponse::DocumentSymbol(document_symbols))
         }
+        LspRequest::DocumentFormatting(param) => {
+            let file_url = param.text_document.uri;
+            let contract_location = match get_contract_location(&file_url) {
+                Some(contract_location) => contract_location,
+                None => return Ok(LspRequestResponse::DocumentFormatting(None)),
+            };
+
+            let contract_data = match editor_state
+                .try_read(|es| es.active_contracts.get(&contract_location).cloned())
+            {
+                Ok(Some(data)) => data,
+                _ => return Ok(LspRequestResponse::DocumentFormatting(None)),
+            };
+            let source = &contract_data.source;
+
+            let tab_size = param.options.tab_size as usize;
+            let prefer_space = param.options.insert_spaces;
+            let props = param.options.properties;
+            let max_line_length = props
+                .get("maxLineLength")
+                .and_then(|value| {
+                    // FormattingProperty can be boolean, number, or string
+                    match value {
+                        lsp_types::FormattingProperty::Number(num) => Some(*num as usize),
+                        lsp_types::FormattingProperty::String(s) => s.parse::<usize>().ok(),
+                        _ => None,
+                    }
+                })
+                .unwrap_or(80);
+            let formatting_options = clarinet_format::formatter::Settings {
+                indentation: if !prefer_space {
+                    clarinet_format::formatter::Indentation::Tab
+                } else {
+                    clarinet_format::formatter::Indentation::Space(tab_size)
+                },
+                max_line_length,
+            };
+
+            let formatter = clarinet_format::formatter::ClarityFormatter::new(formatting_options);
+            let formatted_result = formatter.format_file(source);
+            let text_edit = lsp_types::TextEdit {
+                range: lsp_types::Range {
+                    start: lsp_types::Position {
+                        line: 0,
+                        character: 0,
+                    },
+                    end: lsp_types::Position {
+                        line: source.lines().count() as u32,
+                        character: 0,
+                    },
+                },
+                new_text: formatted_result,
+            };
+            Ok(LspRequestResponse::DocumentFormatting(Some(vec![
+                text_edit,
+            ])))
+        }
+        LspRequest::DocumentRangeFormatting(param) => {
+            let file_url = param.text_document.uri;
+            let contract_location = match get_contract_location(&file_url) {
+                Some(contract_location) => contract_location,
+                None => return Ok(LspRequestResponse::DocumentRangeFormatting(None)),
+            };
+
+            let contract_data = match editor_state
+                .try_read(|es| es.active_contracts.get(&contract_location).cloned())
+            {
+                Ok(Some(data)) => data,
+                _ => return Ok(LspRequestResponse::DocumentRangeFormatting(None)),
+            };
+
+            let source = &contract_data.source;
+
+            let tab_size = param.options.tab_size as usize;
+            let max_line_length = param
+                .options
+                .properties
+                .get("maxLineLength")
+                .and_then(|value| {
+                    // FormattingProperty can be boolean, number, or string
+                    match value {
+                        lsp_types::FormattingProperty::Number(num) => Some(*num as usize),
+                        lsp_types::FormattingProperty::String(s) => s.parse::<usize>().ok(),
+                        _ => None,
+                    }
+                })
+                .unwrap_or(80);
+            let prefer_space = param.options.insert_spaces;
+            let formatting_options = clarinet_format::formatter::Settings {
+                indentation: if !prefer_space {
+                    clarinet_format::formatter::Indentation::Tab
+                } else {
+                    clarinet_format::formatter::Indentation::Space(tab_size)
+                },
+                max_line_length,
+            };
+
+            // We need to extract the text of just this range to format it
+            let lines: Vec<&str> = source.lines().collect();
+            let start_line = param.range.start.line as usize;
+            let end_line = param.range.end.line as usize;
+
+            // Get the substring representing just the selected range
+            let range_text = if start_line == end_line {
+                // Single line selection
+                let line = lines.get(start_line).unwrap_or(&"");
+                let start_char = param.range.start.character as usize;
+                let end_char = param.range.end.character as usize;
+                let start_char = start_char.min(line.len());
+                let end_char = end_char.min(line.len());
+                line[start_char..end_char].to_string()
+            } else {
+                // Multiline selection
+                let mut result = String::new();
+
+                // First line (might be partial)
+                if let Some(first_line) = lines.get(start_line) {
+                    let start_char = (param.range.start.character as usize).min(first_line.len());
+                    result.push_str(&first_line[start_char..]);
+                }
+
+                // Middle lines (complete lines)
+                for line_idx in (start_line + 1)..end_line {
+                    if let Some(line) = lines.get(line_idx) {
+                        result.push_str(line);
+                    }
+                }
+
+                // Last line (might be partial)
+                if let Some(last_line) = lines.get(end_line) {
+                    let end_char = (param.range.end.character as usize).min(last_line.len());
+                    result.push_str(&last_line[..end_char]);
+                }
+
+                result
+            };
+
+            // Count the number of trailing newlines in the original selection
+            let mut trailing_newlines = 0;
+            let mut temp_text = range_text.clone();
+            while temp_text.ends_with('\n') {
+                trailing_newlines += 1;
+                temp_text.pop();
+            }
+            // Format just the selected text
+            let formatter = clarinet_format::formatter::ClarityFormatter::new(formatting_options);
+            let mut formatted_result = formatter.format_section(&range_text).trim_end().to_string();
+
+            // Add back exactly the same number of trailing newlines that were in the original
+            for _ in 0..trailing_newlines {
+                formatted_result.push('\n');
+            }
+
+            let text_edit = lsp_types::TextEdit {
+                range: param.range,
+                new_text: formatted_result,
+            };
+
+            Ok(LspRequestResponse::DocumentRangeFormatting(Some(vec![
+                text_edit,
+            ])))
+        }
 
         LspRequest::Hover(params) => {
             let file_url = params.text_document_position_params.text_document.uri;
@@ -370,21 +537,22 @@ pub fn process_mutating_request(
 ) -> Result<LspRequestResponse, String> {
     match command {
         LspRequest::Initialize(params) => {
-            let initialization_options = params
+            let initialization_options: InitializationOptions = params
                 .initialization_options
-                .and_then(|o| serde_json::from_str(o.as_str()?).ok())
-                .unwrap_or(InitializationOptions::default());
+                .and_then(|o| serde_json::from_value(o).ok())
+                .unwrap_or_default();
 
-            match editor_state.try_write(|es| es.settings = initialization_options.clone()) {
-                Ok(_) => Ok(LspRequestResponse::Initialize(InitializeResult {
-                    server_info: None,
-                    capabilities: get_capabilities(&initialization_options),
-                })),
-                Err(err) => Err(err),
-            }
+            editor_state
+                .try_write(|es| es.settings = initialization_options.clone())
+                .map(|_| {
+                    LspRequestResponse::Initialize(Box::new(InitializeResult {
+                        server_info: None,
+                        capabilities: get_capabilities(&initialization_options),
+                    }))
+                })
         }
         _ => Err(format!(
-            "Unexpected command: {:?}, should not not mutate state",
+            "Unexpected command: {:?}, should not mutate state",
             &command
         )),
     }

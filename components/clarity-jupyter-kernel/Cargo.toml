@@ -16,7 +16,6 @@ categories = [
 
 [dependencies]
 clarity-repl = { path = "../clarity-repl" }
-lazy_static = { workspace = true }
 regex = "1.7"
 sha2 = "0.8.1"
 sha3 = "0.8.2"
@@ -27,6 +26,6 @@ zmq = { version = "0.9.1", default-features = false }
 uuid = { version = "1.0.0", features = ["v4"] }
 hmac = { version = "0.7.1" }
 hex = { version = "0.3.2" }
-colored = { version = "1.8.0" }
-dirs = { version = "4.0.0" }
+colored = { workspace = true }
+dirs = { version = "6.0.0" }
 chrono = { version = "0.4.31" }

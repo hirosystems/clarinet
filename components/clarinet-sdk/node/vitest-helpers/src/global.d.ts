@@ -1,4 +1,4 @@
-import type { Simnet } from "../../dist/esm";
+import type { Simnet } from "../../dist/esm/node/src";
 
 declare global {
   var simnet: Simnet;

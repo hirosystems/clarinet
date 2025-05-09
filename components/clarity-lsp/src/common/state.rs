@@ -3,8 +3,8 @@ use clarinet_deployments::{
     generate_default_deployment, initiate_session_from_manifest,
     update_session_with_deployment_plan, UpdateSessionExecutionResult,
 };
-use clarinet_files::chainhook_types::StacksNetwork;
 use clarinet_files::ProjectManifest;
+use clarinet_files::StacksNetwork;
 use clarinet_files::{FileAccessor, FileLocation};
 use clarity_repl::analysis::ast_dependency_detector::DependencySet;
 use clarity_repl::clarity::analysis::ContractAnalysis;
@@ -43,7 +43,7 @@ pub struct ActiveContractData {
     pub expressions: Option<Vec<SymbolicExpression>>,
     pub definitions: Option<HashMap<(u32, u32), DefinitionLocation>>,
     pub diagnostic: Option<ClarityDiagnostic>,
-    source: String,
+    pub source: String,
 }
 
 impl ActiveContractData {
@@ -419,7 +419,7 @@ impl EditorState {
         Some(Hover {
             contents: lsp_types::HoverContents::Markup(lsp_types::MarkupContent {
                 kind: lsp_types::MarkupKind::Markdown,
-                value: documentation.to_string(),
+                value: documentation,
             }),
             range: None,
         })
@@ -634,9 +634,9 @@ pub async fn build_state(
     // A on-disk deployment could quickly lead to an outdated
     // view of the repo.
     let manifest = match file_accessor {
-        None => ProjectManifest::from_location(manifest_location)?,
+        None => ProjectManifest::from_location(manifest_location, false)?,
         Some(file_accessor) => {
-            ProjectManifest::from_file_accessor(manifest_location, file_accessor).await?
+            ProjectManifest::from_file_accessor(manifest_location, false, file_accessor).await?
         }
     };
 
@@ -654,7 +654,6 @@ pub async fn build_state(
         &mut session,
         &deployment,
         Some(&artifacts.asts),
-        false,
         Some(StacksEpochId::Epoch21),
     );
     for (contract_id, mut result) in contracts.into_iter() {

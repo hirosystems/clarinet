@@ -6,8 +6,7 @@ use std::path::PathBuf;
 pub use ui::start_ui;
 
 use clarinet_deployments::types::{DeploymentGenerationArtifacts, DeploymentSpecification};
-use clarinet_files::chainhook_types::StacksNetwork;
-use clarinet_files::{FileLocation, ProjectManifest};
+use clarinet_files::{FileLocation, ProjectManifest, StacksNetwork};
 
 pub fn get_absolute_deployment_path(
     manifest: &ProjectManifest,
@@ -42,7 +41,7 @@ pub fn check_deployments(manifest: &ProjectManifest) -> Result<(), String> {
                 continue;
             }
         };
-        println!("{} {} succesfully checked", green!("✔"), relative_path);
+        println!("{} {} successfully checked", green!("✔"), relative_path);
     }
     Ok(())
 }

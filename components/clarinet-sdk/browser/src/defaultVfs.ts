@@ -1,5 +1,8 @@
 export const defaultFileStore = new Map<string, string>();
 
+// @ts-ignore
+globalThis.fsStore = defaultFileStore;
+
 function fileArrayToString(bufferArray: Uint8Array) {
   return Array.from(bufferArray)
     .map((item) => String.fromCharCode(item))
@@ -15,20 +18,23 @@ function isValidReadManyEvent(e: any): e is { paths: string[] } {
 }
 
 function isValidWriteEvent(e: any): e is { path: string; content: number[] } {
-  return typeof e?.path === "string" && Array.isArray(e?.content);
+  return (
+    typeof e?.path === "string" && (Array.isArray(e?.content) || e?.content instanceof Uint8Array)
+  );
 }
 
-async function exists(event: unknown) {
+function exists(event: unknown) {
   if (!isValidReadEvent(event)) throw new Error("invalid read event");
   return defaultFileStore.has(event.path);
 }
 
-async function readFile(event: unknown) {
+function readFile(event: unknown) {
   if (!isValidReadEvent(event)) throw new Error("invalid read event");
-  return defaultFileStore.get(event.path) ?? null;
+  const content = defaultFileStore.get(event.path) ?? null;
+  return content;
 }
 
-async function readFiles(event: any) {
+function readFiles(event: any) {
   if (!isValidReadManyEvent(event)) throw new Error("invalid read event");
   const files = event.paths.map((p) => {
     try {
@@ -49,7 +55,7 @@ async function readFiles(event: any) {
   );
 }
 
-async function writeFile(event: unknown) {
+function writeFile(event: unknown) {
   if (!isValidWriteEvent(event)) throw new Error("invalid write event");
   return defaultFileStore.set(event.path, fileArrayToString(Uint8Array.from(event.content)));
 }

@@ -1,4 +1,4 @@
-use std::{collections::HashMap, vec};
+use std::{collections::HashMap, sync::LazyLock, vec};
 
 use clarity_repl::{
     analysis::ast_visitor::{traverse, ASTVisitor, TypedVar},
@@ -12,7 +12,6 @@ use clarity_repl::{
     },
     repl::DEFAULT_EPOCH,
 };
-use lazy_static::lazy_static;
 use lsp_types::{
     CompletionItem, CompletionItemKind, Documentation, InsertTextFormat, MarkupContent, MarkupKind,
     Position,
@@ -21,60 +20,68 @@ use regex::Regex;
 
 use super::helpers::{get_function_at_position, is_position_within_span};
 
-lazy_static! {
-    static ref COMPLETION_ITEMS_CLARITY_1: Vec<CompletionItem> =
-        build_default_native_keywords_list(ClarityVersion::Clarity1);
-    static ref COMPLETION_ITEMS_CLARITY_2: Vec<CompletionItem> =
-        build_default_native_keywords_list(ClarityVersion::Clarity2);
-    static ref COMPLETION_ITEMS_CLARITY_3: Vec<CompletionItem> =
-        build_default_native_keywords_list(ClarityVersion::Clarity3);
-    static ref VAR_FUNCTIONS: Vec<String> = vec![
+static COMPLETION_ITEMS_CLARITY_1: LazyLock<Vec<CompletionItem>> =
+    LazyLock::new(|| build_default_native_keywords_list(ClarityVersion::Clarity1));
+static COMPLETION_ITEMS_CLARITY_2: LazyLock<Vec<CompletionItem>> =
+    LazyLock::new(|| build_default_native_keywords_list(ClarityVersion::Clarity2));
+static COMPLETION_ITEMS_CLARITY_3: LazyLock<Vec<CompletionItem>> =
+    LazyLock::new(|| build_default_native_keywords_list(ClarityVersion::Clarity3));
+static VAR_FUNCTIONS: LazyLock<Vec<String>> = LazyLock::new(|| {
+    vec![
         NativeFunctions::SetVar.to_string(),
         NativeFunctions::FetchVar.to_string(),
-    ];
-    static ref MAP_FUNCTIONS: Vec<String> = vec![
+    ]
+});
+static MAP_FUNCTIONS: LazyLock<Vec<String>> = LazyLock::new(|| {
+    vec![
         NativeFunctions::InsertEntry.to_string(),
         NativeFunctions::FetchEntry.to_string(),
         NativeFunctions::SetEntry.to_string(),
         NativeFunctions::DeleteEntry.to_string(),
-    ];
-    static ref FT_FUNCTIONS: Vec<String> = vec![
+    ]
+});
+static FT_FUNCTIONS: LazyLock<Vec<String>> = LazyLock::new(|| {
+    vec![
         NativeFunctions::GetTokenBalance.to_string(),
         NativeFunctions::GetTokenSupply.to_string(),
         NativeFunctions::BurnToken.to_string(),
         NativeFunctions::MintToken.to_string(),
         NativeFunctions::TransferToken.to_string(),
-    ];
-    static ref NFT_FUNCTIONS: Vec<String> = vec![
+    ]
+});
+static NFT_FUNCTIONS: LazyLock<Vec<String>> = LazyLock::new(|| {
+    vec![
         NativeFunctions::GetAssetOwner.to_string(),
         NativeFunctions::BurnAsset.to_string(),
         NativeFunctions::MintAsset.to_string(),
         NativeFunctions::TransferAsset.to_string(),
-    ];
-    static ref ITERATOR_FUNCTIONS: Vec<String> = vec![
+    ]
+});
+static ITERATOR_FUNCTIONS: LazyLock<Vec<String>> = LazyLock::new(|| {
+    vec![
         NativeFunctions::Map.to_string(),
         NativeFunctions::Filter.to_string(),
         NativeFunctions::Fold.to_string(),
-    ];
-    static ref VALID_MAP_FUNCTIONS_CLARITY_1: Vec<CompletionItem> =
-        build_map_valid_cb_completion_items(ClarityVersion::Clarity1);
-    static ref VALID_MAP_FUNCTIONS_CLARITY_2: Vec<CompletionItem> =
-        build_map_valid_cb_completion_items(ClarityVersion::Clarity2);
-    static ref VALID_MAP_FUNCTIONS_CLARITY_3: Vec<CompletionItem> =
-        build_map_valid_cb_completion_items(ClarityVersion::Clarity3);
-    static ref VALID_FILTER_FUNCTIONS_CLARITY_1: Vec<CompletionItem> =
-        build_filter_valid_cb_completion_items(ClarityVersion::Clarity1);
-    static ref VALID_FILTER_FUNCTIONS_CLARITY_2: Vec<CompletionItem> =
-        build_filter_valid_cb_completion_items(ClarityVersion::Clarity2);
-    static ref VALID_FILTER_FUNCTIONS_CLARITY_3: Vec<CompletionItem> =
-        build_filter_valid_cb_completion_items(ClarityVersion::Clarity3);
-    static ref VALID_FOLD_FUNCTIONS_CLARITY_1: Vec<CompletionItem> =
-        build_fold_valid_cb_completion_items(ClarityVersion::Clarity1);
-    static ref VALID_FOLD_FUNCTIONS_CLARITY_2: Vec<CompletionItem> =
-        build_fold_valid_cb_completion_items(ClarityVersion::Clarity2);
-    static ref VALID_FOLD_FUNCTIONS_CLARITY_3: Vec<CompletionItem> =
-        build_fold_valid_cb_completion_items(ClarityVersion::Clarity3);
-}
+    ]
+});
+static VALID_MAP_FUNCTIONS_CLARITY_1: LazyLock<Vec<CompletionItem>> =
+    LazyLock::new(|| build_map_valid_cb_completion_items(ClarityVersion::Clarity1));
+static VALID_MAP_FUNCTIONS_CLARITY_2: LazyLock<Vec<CompletionItem>> =
+    LazyLock::new(|| build_map_valid_cb_completion_items(ClarityVersion::Clarity2));
+static VALID_MAP_FUNCTIONS_CLARITY_3: LazyLock<Vec<CompletionItem>> =
+    LazyLock::new(|| build_map_valid_cb_completion_items(ClarityVersion::Clarity3));
+static VALID_FILTER_FUNCTIONS_CLARITY_1: LazyLock<Vec<CompletionItem>> =
+    LazyLock::new(|| build_filter_valid_cb_completion_items(ClarityVersion::Clarity1));
+static VALID_FILTER_FUNCTIONS_CLARITY_2: LazyLock<Vec<CompletionItem>> =
+    LazyLock::new(|| build_filter_valid_cb_completion_items(ClarityVersion::Clarity2));
+static VALID_FILTER_FUNCTIONS_CLARITY_3: LazyLock<Vec<CompletionItem>> =
+    LazyLock::new(|| build_filter_valid_cb_completion_items(ClarityVersion::Clarity3));
+static VALID_FOLD_FUNCTIONS_CLARITY_1: LazyLock<Vec<CompletionItem>> =
+    LazyLock::new(|| build_fold_valid_cb_completion_items(ClarityVersion::Clarity1));
+static VALID_FOLD_FUNCTIONS_CLARITY_2: LazyLock<Vec<CompletionItem>> =
+    LazyLock::new(|| build_fold_valid_cb_completion_items(ClarityVersion::Clarity2));
+static VALID_FOLD_FUNCTIONS_CLARITY_3: LazyLock<Vec<CompletionItem>> =
+    LazyLock::new(|| build_fold_valid_cb_completion_items(ClarityVersion::Clarity3));
 
 #[derive(Clone, Debug, Default)]
 pub struct ContractDefinedData {
@@ -88,7 +95,7 @@ pub struct ContractDefinedData {
     pub functions_completion_items: Vec<CompletionItem>,
 }
 
-impl<'a> ContractDefinedData {
+impl ContractDefinedData {
     pub fn new(expressions: &[SymbolicExpression], position: &Position) -> Self {
         let mut defined_data = ContractDefinedData {
             position: *position,
@@ -105,7 +112,7 @@ impl<'a> ContractDefinedData {
         &mut self,
         expr: &SymbolicExpression,
         name: &ClarityName,
-        parameters: &[TypedVar<'a>],
+        parameters: &[TypedVar<'_>],
     ) {
         let mut completion_args: Vec<String> = vec![];
         for (i, typed_var) in parameters.iter().enumerate() {
@@ -534,7 +541,7 @@ pub fn build_default_native_keywords_list(version: ClarityVersion) -> Vec<Comple
                     kind: MarkupKind::Markdown,
                     value: api.description,
                 })),
-                insert_text: Some(api.snippet.clone()),
+                insert_text: Some(api.snippet),
                 insert_text_format: Some(InsertTextFormat::SNIPPET),
                 command: Some(command.clone()),
                 ..Default::default()
@@ -559,7 +566,7 @@ pub fn build_default_native_keywords_list(version: ClarityVersion) -> Vec<Comple
                     kind: MarkupKind::Markdown,
                     value: api.description,
                 })),
-                insert_text: Some(api.snippet.clone()),
+                insert_text: Some(api.snippet),
                 insert_text_format: Some(InsertTextFormat::SNIPPET),
                 command: Some(command.clone()),
                 ..Default::default()

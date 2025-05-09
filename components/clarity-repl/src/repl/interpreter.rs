@@ -1,16 +1,16 @@
 use std::collections::{btree_map::Entry, BTreeMap, BTreeSet};
+use std::path::PathBuf;
 
 use crate::analysis::annotation::{Annotation, AnnotationKind};
 use crate::analysis::ast_dependency_detector::{ASTDependencyDetector, Dependency};
 use crate::analysis::{self};
-use crate::repl::datastore::BurnDatastore;
-use crate::repl::datastore::Datastore;
+use crate::repl::datastore::{ClarityDatastore, Datastore};
 use crate::repl::Settings;
-use clarity::consts::CHAIN_ID_TESTNET;
+use clarity::consts::{CHAIN_ID_MAINNET, CHAIN_ID_TESTNET};
 use clarity::types::StacksEpochId;
 use clarity::vm::analysis::ContractAnalysis;
 use clarity::vm::ast::{build_ast_with_diagnostics, ContractAST};
-#[cfg(feature = "cli")]
+#[cfg(not(target_arch = "wasm32"))]
 use clarity::vm::clarity_wasm::{call_function, initialize_contract};
 use clarity::vm::contexts::{CallStack, ContractContext, Environment, GlobalContext, LocalContext};
 use clarity::vm::contracts::Contract;
@@ -29,6 +29,8 @@ use clarity::vm::{ContractEvaluationResult, EvalHook};
 use clarity::vm::{CostSynthesis, ExecutionResult, ParsedContract};
 
 use super::datastore::StacksConstants;
+use super::remote_data::HttpClient;
+use super::settings::{ApiUrl, RemoteNetworkInfo};
 use super::{ClarityContract, DEFAULT_EPOCH};
 
 pub const BLOCK_LIMIT_MAINNET: ExecutionCost = ExecutionCost {
@@ -39,11 +41,12 @@ pub const BLOCK_LIMIT_MAINNET: ExecutionCost = ExecutionCost {
     runtime: 5_000_000_000,
 };
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct ClarityInterpreter {
+    pub clarity_datastore: ClarityDatastore,
     pub datastore: Datastore,
-    pub burn_datastore: BurnDatastore,
     pub repl_settings: Settings,
+    remote_network_info: Option<RemoteNetworkInfo>,
     tx_sender: StandardPrincipalData,
     accounts: BTreeSet<String>,
     tokens: BTreeMap<String, BTreeMap<String, u128>>,
@@ -53,20 +56,35 @@ pub struct ClarityInterpreter {
 pub struct Txid(pub [u8; 32]);
 
 impl ClarityInterpreter {
-    pub fn new(tx_sender: StandardPrincipalData, repl_settings: Settings) -> Self {
-        let constants = StacksConstants {
-            burn_start_height: 0,
-            pox_prepare_length: 50,
-            pox_reward_cycle_length: 1050,
-            pox_rejection_fraction: 0,
+    pub fn new(
+        tx_sender: StandardPrincipalData,
+        repl_settings: Settings,
+        cache_location: Option<PathBuf>,
+    ) -> Self {
+        let remote_data_settings = repl_settings.remote_data.clone();
+
+        let client = HttpClient::new(ApiUrl(remote_data_settings.api_url.to_string()));
+        let remote_network_info = if remote_data_settings.enabled {
+            Some(
+                remote_data_settings
+                    .get_initial_remote_network_info(&client, cache_location)
+                    .unwrap(),
+            )
+        } else {
+            None
         };
+
+        let clarity_datastore = ClarityDatastore::new(remote_network_info.clone(), client.clone());
+        let datastore = Datastore::new(&clarity_datastore, StacksConstants::default(), client);
+
         Self {
             tx_sender,
             repl_settings,
-            datastore: Datastore::new(),
+            remote_network_info,
+            clarity_datastore,
+            datastore,
             accounts: BTreeSet::new(),
             tokens: BTreeMap::new(),
-            burn_datastore: BurnDatastore::new(constants),
         }
     }
 
@@ -77,13 +95,13 @@ impl ClarityInterpreter {
         cost_track: bool,
         eval_hooks: Option<Vec<&mut dyn EvalHook>>,
     ) -> Result<ExecutionResult, Vec<Diagnostic>> {
-        #[cfg(feature = "cli")]
+        #[cfg(not(target_arch = "wasm32"))]
         if self.repl_settings.clarity_wasm_mode {
             self.run_wasm(contract, ast, cost_track, None)
         } else {
             self.run_interpreter(contract, ast, cost_track, eval_hooks)
         }
-        #[cfg(not(feature = "cli"))]
+        #[cfg(target_arch = "wasm32")]
         self.run_interpreter(contract, ast, cost_track, eval_hooks)
     }
 
@@ -135,7 +153,7 @@ impl ClarityInterpreter {
         Ok(result)
     }
 
-    #[cfg(feature = "cli")]
+    #[cfg(not(target_arch = "wasm32"))]
     fn run_wasm(
         &mut self,
         contract: &ClarityContract,
@@ -297,7 +315,7 @@ impl ClarityInterpreter {
         contract_ast: &ContractAST,
         annotations: &Vec<Annotation>,
     ) -> Result<(ContractAnalysis, Vec<Diagnostic>), Diagnostic> {
-        let mut analysis_db = AnalysisDatabase::new(&mut self.datastore);
+        let mut analysis_db = AnalysisDatabase::new(&mut self.clarity_datastore);
 
         // Run standard clarity analyses
         let mut contract_analysis = clarity::vm::analysis::run_analysis(
@@ -327,9 +345,9 @@ impl ClarityInterpreter {
     pub fn get_block_time(&mut self) -> u64 {
         let block_height = self.get_block_height();
         let mut conn = ClarityDatabase::new(
-            &mut self.datastore,
-            &self.burn_datastore,
-            &self.burn_datastore,
+            &mut self.clarity_datastore,
+            &self.datastore,
+            &self.datastore,
         );
         conn.get_block_time(block_height)
             .expect("unable to get block time")
@@ -342,7 +360,7 @@ impl ClarityInterpreter {
     ) -> Option<String> {
         let key = ClarityDatabase::make_key_for_trip(contract_id, StoreType::Variable, var_name);
         let value_hex = self
-            .datastore
+            .clarity_datastore
             .get_data(&key)
             .expect("failed to get key from datastore")?;
         Some(format!("0x{value_hex}"))
@@ -357,10 +375,56 @@ impl ClarityInterpreter {
         let key =
             ClarityDatabase::make_key_for_data_map_entry(contract_id, map_name, map_key).unwrap();
         let value_hex = self
-            .datastore
+            .clarity_datastore
             .get_data(&key)
             .expect("failed to get map entry from datastore")?;
         Some(format!("0x{value_hex}"))
+    }
+
+    fn get_global_context(
+        &mut self,
+        epoch: StacksEpochId,
+        cost_track: bool,
+    ) -> Result<GlobalContext, String> {
+        let is_mainnet = self
+            .remote_network_info
+            .as_ref()
+            .is_some_and(|data| data.is_mainnet);
+        let chain_id = if is_mainnet {
+            CHAIN_ID_MAINNET
+        } else {
+            CHAIN_ID_TESTNET
+        };
+
+        let mut conn = ClarityDatabase::new(
+            &mut self.clarity_datastore,
+            &self.datastore,
+            &self.datastore,
+        );
+        conn.begin();
+        conn.set_clarity_epoch_version(epoch)
+            .map_err(|e| e.to_string())?;
+        conn.commit().map_err(|e| e.to_string())?;
+        let cost_tracker = if cost_track {
+            LimitedCostTracker::new(
+                is_mainnet,
+                chain_id,
+                BLOCK_LIMIT_MAINNET.clone(),
+                &mut conn,
+                epoch,
+            )
+            .map_err(|e| format!("failed to initialize cost tracker: {e}"))?
+        } else {
+            LimitedCostTracker::new_free()
+        };
+
+        Ok(GlobalContext::new(
+            is_mainnet,
+            chain_id,
+            conn,
+            cost_tracker,
+            epoch,
+        ))
     }
 
     fn execute(
@@ -376,30 +440,12 @@ impl ClarityInterpreter {
         let mut contract_context =
             ContractContext::new(contract_id.clone(), contract.clarity_version);
 
-        let mut conn = ClarityDatabase::new(
-            &mut self.datastore,
-            &self.burn_datastore,
-            &self.burn_datastore,
-        );
+        #[cfg(not(target_arch = "wasm32"))]
+        let show_timings = self.repl_settings.show_timings;
+
         let tx_sender: PrincipalData = self.tx_sender.clone().into();
-        conn.begin();
-        conn.set_clarity_epoch_version(contract.epoch)
-            .map_err(|e| e.to_string())?;
-        conn.commit().map_err(|e| e.to_string())?;
-        let cost_tracker = if cost_track {
-            LimitedCostTracker::new(
-                false,
-                CHAIN_ID_TESTNET,
-                BLOCK_LIMIT_MAINNET.clone(),
-                &mut conn,
-                contract.epoch,
-            )
-            .map_err(|e| format!("failed to initialize cost tracker: {e}"))?
-        } else {
-            LimitedCostTracker::new_free()
-        };
-        let mut global_context =
-            GlobalContext::new(false, CHAIN_ID_TESTNET, conn, cost_tracker, contract.epoch);
+
+        let mut global_context = self.get_global_context(contract.epoch, cost_track)?;
 
         if let Some(mut in_hooks) = eval_hooks {
             let mut hooks: Vec<&mut dyn EvalHook> = Vec::new();
@@ -408,9 +454,6 @@ impl ClarityInterpreter {
             }
             global_context.eval_hooks = Some(hooks);
         }
-
-        #[cfg(not(feature = "wasm"))]
-        let show_timings = self.repl_settings.show_timings;
 
         global_context.begin();
         let result = global_context.execute(|g| {
@@ -446,7 +489,7 @@ impl ClarityInterpreter {
                                 args.push(evaluated_arg);
                             }
 
-                            #[cfg(not(feature = "wasm"))]
+                            #[cfg(not(target_arch = "wasm32"))]
                             let start = std::time::Instant::now();
 
                             let args: Vec<SymbolicExpression> = args
@@ -455,9 +498,9 @@ impl ClarityInterpreter {
                                 .collect();
                             let res = env.execute_contract(&contract_id, &method, &args, false)?;
 
-                            #[cfg(not(feature = "wasm"))]
+                            #[cfg(not(target_arch = "wasm32"))]
                             if show_timings {
-                                println!("execution time: {:?}μs", start.elapsed().as_micros());
+                                println!("execution time: {:?}", start.elapsed());
                             }
 
                             return Ok(Some(res));
@@ -465,14 +508,14 @@ impl ClarityInterpreter {
                     }
                 };
 
-                #[cfg(not(feature = "wasm"))]
+                #[cfg(not(target_arch = "wasm32"))]
                 let start = std::time::Instant::now();
 
                 let result = eval(&contract_ast.expressions[0], &mut env, &context);
 
-                #[cfg(not(feature = "wasm"))]
+                #[cfg(not(target_arch = "wasm32"))]
                 if show_timings {
-                    println!("execution time: {:?}μs", start.elapsed().as_micros());
+                    println!("execution time: {:?}", start.elapsed());
                 }
 
                 return result.map(Some);
@@ -581,7 +624,7 @@ impl ClarityInterpreter {
         }
 
         if contract_saved {
-            let mut analysis_db = AnalysisDatabase::new(&mut self.datastore);
+            let mut analysis_db = AnalysisDatabase::new(&mut self.clarity_datastore);
             analysis_db
                 .execute(|db| db.insert_contract(&contract_id, &analysis))
                 .expect("Unable to save data");
@@ -590,7 +633,7 @@ impl ClarityInterpreter {
         Ok(execution_result)
     }
 
-    #[cfg(feature = "cli")]
+    #[cfg(not(target_arch = "wasm32"))]
     fn execute_wasm(
         &mut self,
         contract: &ClarityContract,
@@ -605,30 +648,10 @@ impl ClarityInterpreter {
         let mut contract_context =
             ContractContext::new(contract_id.clone(), contract.clarity_version);
 
-        let mut conn = ClarityDatabase::new(
-            &mut self.datastore,
-            &self.burn_datastore,
-            &self.burn_datastore,
-        );
+        let show_timings = self.repl_settings.show_timings;
         let tx_sender: PrincipalData = self.tx_sender.clone().into();
-        conn.begin();
-        conn.set_clarity_epoch_version(contract.epoch)
-            .expect("failed to set epoch");
-        conn.commit().expect("failed to commit");
-        let cost_tracker = if cost_track {
-            LimitedCostTracker::new(
-                false,
-                CHAIN_ID_TESTNET,
-                BLOCK_LIMIT_MAINNET.clone(),
-                &mut conn,
-                contract.epoch,
-            )
-            .map_err(|e| format!("failed to initialize cost tracker: {e}"))?
-        } else {
-            LimitedCostTracker::new_free()
-        };
-        let mut global_context =
-            GlobalContext::new(false, CHAIN_ID_TESTNET, conn, cost_tracker, contract.epoch);
+
+        let mut global_context = self.get_global_context(contract.epoch, cost_track)?;
 
         if let Some(mut in_hooks) = eval_hooks {
             let mut hooks: Vec<&mut dyn EvalHook> = Vec::new();
@@ -637,8 +660,6 @@ impl ClarityInterpreter {
             }
             global_context.eval_hooks = Some(hooks);
         }
-
-        let show_timings = self.repl_settings.show_timings;
 
         global_context.begin();
         let result = global_context.execute(|g| {
@@ -821,7 +842,7 @@ impl ClarityInterpreter {
         }
 
         if contract_saved {
-            let mut analysis_db = AnalysisDatabase::new(&mut self.datastore);
+            let mut analysis_db = AnalysisDatabase::new(&mut self.clarity_datastore);
             analysis_db
                 .execute(|db| db.insert_contract(&contract_id, &analysis))
                 .expect("Unable to save data");
@@ -839,39 +860,17 @@ impl ClarityInterpreter {
         clarity_version: ClarityVersion,
         track_costs: bool,
         allow_private: bool,
-        eval_hooks: Option<Vec<&mut dyn EvalHook>>,
+        mut eval_hooks: Vec<&mut dyn EvalHook>,
     ) -> Result<ExecutionResult, String> {
-        let mut conn = ClarityDatabase::new(
-            &mut self.datastore,
-            &self.burn_datastore,
-            &self.burn_datastore,
-        );
         let tx_sender: PrincipalData = self.tx_sender.clone().into();
-        conn.begin();
-        conn.set_clarity_epoch_version(epoch)
-            .map_err(|e| e.to_string())?;
-        conn.commit().map_err(|e| e.to_string())?;
-        let cost_tracker = if track_costs {
-            LimitedCostTracker::new(
-                false,
-                CHAIN_ID_TESTNET,
-                BLOCK_LIMIT_MAINNET.clone(),
-                &mut conn,
-                epoch,
-            )
-            .map_err(|e| format!("failed to initialize cost tracker: {e}"))?
-        } else {
-            LimitedCostTracker::new_free()
-        };
 
-        let mut global_context =
-            GlobalContext::new(false, CHAIN_ID_TESTNET, conn, cost_tracker, epoch);
+        let mut global_context = self.get_global_context(epoch, track_costs)?;
 
-        if let Some(mut in_hooks) = eval_hooks {
-            let mut hooks: Vec<&mut dyn EvalHook> = Vec::new();
-            for hook in in_hooks.drain(..) {
-                hooks.push(hook);
-            }
+        let mut hooks: Vec<&mut dyn EvalHook> = Vec::new();
+        for hook in eval_hooks.drain(..) {
+            hooks.push(hook);
+        }
+        if !hooks.is_empty() {
             global_context.eval_hooks = Some(hooks);
         }
 
@@ -1048,25 +1047,18 @@ impl ClarityInterpreter {
         (events, accounts_to_credit, accounts_to_debit)
     }
 
+    pub fn save_genesis_accounts(&mut self, addresses: Vec<StandardPrincipalData>) {
+        self.clarity_datastore.save_local_account(addresses);
+    }
+
     pub fn mint_stx_balance(
         &mut self,
         recipient: PrincipalData,
         amount: u64,
     ) -> Result<String, String> {
         let final_balance = {
-            let conn = ClarityDatabase::new(
-                &mut self.datastore,
-                &self.burn_datastore,
-                &self.burn_datastore,
-            );
+            let mut global_context = self.get_global_context(DEFAULT_EPOCH, false)?;
 
-            let mut global_context = GlobalContext::new(
-                false,
-                CHAIN_ID_TESTNET,
-                conn,
-                LimitedCostTracker::new_free(),
-                DEFAULT_EPOCH,
-            );
             global_context.begin();
             let mut cur_balance = global_context
                 .database
@@ -1098,39 +1090,36 @@ impl ClarityInterpreter {
         self.tx_sender.clone()
     }
 
-    pub fn advance_chain_tip(&mut self, count: u32) -> u32 {
-        let current_epoch = self.burn_datastore.get_current_epoch();
-        if current_epoch < StacksEpochId::Epoch30 {
-            self.advance_burn_chain_tip(count)
-        } else {
-            match self.advance_stacks_chain_tip(count) {
-                Ok(count) => count,
-                Err(_) => unreachable!("Epoch checked already"),
-            }
-        }
+    pub fn set_current_epoch(&mut self, epoch: StacksEpochId) {
+        self.datastore
+            .set_current_epoch(&mut self.clarity_datastore, epoch);
     }
 
     pub fn advance_burn_chain_tip(&mut self, count: u32) -> u32 {
-        let new_height = self.burn_datastore.advance_chain_tip(count);
-        let _ = self.datastore.advance_chain_tip(count);
+        let new_height = self
+            .datastore
+            .advance_burn_chain_tip(&mut self.clarity_datastore, count);
         self.set_tenure_height();
         new_height
     }
+
     pub fn advance_stacks_chain_tip(&mut self, count: u32) -> Result<u32, String> {
-        let current_epoch = self.burn_datastore.get_current_epoch();
+        let current_epoch = self.datastore.get_current_epoch();
         if current_epoch < StacksEpochId::Epoch30 {
             Err("only burn chain height can be advanced in epoch lower than 3.0".to_string())
         } else {
-            Ok(self.datastore.advance_chain_tip(count))
+            Ok(self
+                .datastore
+                .advance_stacks_chain_tip(&mut self.clarity_datastore, count))
         }
     }
 
     pub fn set_tenure_height(&mut self) {
         let burn_block_height = self.get_burn_block_height();
         let mut conn = ClarityDatabase::new(
-            &mut self.datastore,
-            &self.burn_datastore,
-            &self.burn_datastore,
+            &mut self.clarity_datastore,
+            &self.datastore,
+            &self.datastore,
         );
         conn.begin();
         conn.put_data("_stx-data::tenure_height", &burn_block_height)
@@ -1139,11 +1128,11 @@ impl ClarityInterpreter {
     }
 
     pub fn get_block_height(&mut self) -> u32 {
-        self.datastore.get_current_block_height()
+        self.datastore.get_current_stacks_block_height()
     }
 
     pub fn get_burn_block_height(&mut self) -> u32 {
-        self.burn_datastore.get_current_block_height()
+        self.datastore.get_current_burn_block_height()
     }
 
     fn credit_token(&mut self, account: String, token: String, value: u128) {
@@ -1209,13 +1198,21 @@ impl ClarityInterpreter {
 mod tests {
     use super::*;
     use crate::analysis::Settings as AnalysisSettings;
-    use crate::{
-        repl::session::BOOT_CONTRACTS_DATA, test_fixtures::clarity_contract::ClarityContractBuilder,
-    };
+    use crate::repl::settings::RemoteDataSettings;
+    use crate::test_fixtures::clarity_contract::ClarityContractBuilder;
     use clarity::{
         types::{chainstate::StacksAddress, Address},
         vm::{self, types::TupleData, ClarityVersion},
     };
+
+    #[track_caller]
+    fn get_interpreter(settings: Option<Settings>) -> ClarityInterpreter {
+        ClarityInterpreter::new(
+            StandardPrincipalData::transient(),
+            settings.unwrap_or_default(),
+            None,
+        )
+    }
 
     #[track_caller]
     fn deploy_contract(
@@ -1249,10 +1246,27 @@ mod tests {
         assert_eq!(result.result, expected_value);
     }
 
+    #[track_caller]
+    fn run_snippet(
+        interpreter: &mut ClarityInterpreter,
+        snippet: &str,
+        clarity_version: ClarityVersion,
+    ) -> Value {
+        let contract = ClarityContractBuilder::new()
+            .code_source(snippet.to_string())
+            .epoch(interpreter.datastore.get_current_epoch())
+            .clarity_version(clarity_version)
+            .build();
+        let deploy_result = deploy_contract(interpreter, &contract);
+        match deploy_result.unwrap().result {
+            EvaluationResult::Contract(_) => unreachable!(),
+            EvaluationResult::Snippet(res) => res.result,
+        }
+    }
+
     #[test]
     fn test_get_tx_sender() {
-        let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let mut interpreter = get_interpreter(None);
         let tx_sender = StandardPrincipalData::transient();
         interpreter.set_tx_sender(tx_sender.clone());
         assert_eq!(interpreter.get_tx_sender(), tx_sender);
@@ -1260,8 +1274,7 @@ mod tests {
 
     #[test]
     fn test_set_tx_sender() {
-        let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let mut interpreter = get_interpreter(None);
 
         let addr = StacksAddress::from_string("ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5").unwrap();
         let tx_sender = StandardPrincipalData::from(addr);
@@ -1271,57 +1284,53 @@ mod tests {
 
     #[test]
     fn test_get_block_time() {
-        let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let mut interpreter = get_interpreter(None);
         let bt = interpreter.get_block_time();
         assert_ne!(bt, 0); // TODO placeholder
     }
 
     #[test]
     fn test_get_block_height() {
-        let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let mut interpreter = get_interpreter(None);
         assert_eq!(interpreter.get_block_height(), 0);
     }
 
     #[test]
     fn test_advance_stacks_chain_tip_pre_epoch_3() {
-        let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
-        interpreter
-            .burn_datastore
-            .set_current_epoch(StacksEpochId::Epoch2_05);
+        let mut interpreter = get_interpreter(None);
+        interpreter.set_current_epoch(StacksEpochId::Epoch2_05);
         let count = 5;
         let initial_block_height = interpreter.get_burn_block_height();
         assert_ne!(interpreter.advance_stacks_chain_tip(count), Ok(count));
         assert_eq!(interpreter.get_burn_block_height(), initial_block_height);
         assert_eq!(interpreter.get_block_height(), initial_block_height);
     }
+
     #[test]
     fn test_advance_stacks_chain_tip() {
         let wasm_settings = Settings {
             analysis: AnalysisSettings::default(),
+            remote_data: RemoteDataSettings::default(),
             clarity_wasm_mode: true,
             show_timings: false,
         };
-        let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), wasm_settings);
-        interpreter
-            .burn_datastore
-            .set_current_epoch(StacksEpochId::Epoch30);
+        let mut interpreter = get_interpreter(Some(wasm_settings));
+        interpreter.set_current_epoch(StacksEpochId::Epoch30);
+        interpreter.advance_burn_chain_tip(1);
         let count = 5;
-        let initial_block_height = interpreter.get_burn_block_height();
-        assert_eq!(interpreter.advance_stacks_chain_tip(count), Ok(count));
+        let initial_block_height = interpreter.get_block_height();
+
+        let result = interpreter.advance_stacks_chain_tip(count);
+        assert_eq!(result, Ok(initial_block_height + count));
+
         assert_eq!(interpreter.get_burn_block_height(), initial_block_height);
         assert_eq!(interpreter.get_block_height(), initial_block_height + count);
     }
+
     #[test]
     fn test_advance_chain_tip_pre_epoch3() {
-        let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
-        interpreter
-            .burn_datastore
-            .set_current_epoch(StacksEpochId::Epoch2_05);
+        let mut interpreter = get_interpreter(None);
+        interpreter.set_current_epoch(StacksEpochId::Epoch2_05);
         let count = 5;
         let initial_block_height = interpreter.get_block_height();
         interpreter.advance_burn_chain_tip(count);
@@ -1331,13 +1340,11 @@ mod tests {
             initial_block_height + count
         );
     }
+
     #[test]
     fn test_advance_chain_tip() {
-        let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
-        interpreter
-            .burn_datastore
-            .set_current_epoch(StacksEpochId::Epoch30);
+        let mut interpreter = get_interpreter(None);
+        interpreter.set_current_epoch(StacksEpochId::Epoch30);
         let count = 5;
         let initial_block_height = interpreter.get_block_height();
         interpreter.advance_burn_chain_tip(count);
@@ -1350,8 +1357,7 @@ mod tests {
 
     #[test]
     fn test_get_assets_maps() {
-        let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let mut interpreter = get_interpreter(None);
         let addr = "ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5";
         let amount = 1000;
         interpreter.credit_token(addr.into(), "STX".into(), amount);
@@ -1368,8 +1374,7 @@ mod tests {
 
     #[test]
     fn test_get_tokens() {
-        let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let mut interpreter = get_interpreter(None);
         let addr = "ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5";
         interpreter.credit_token(addr.into(), "STX".into(), 1000);
 
@@ -1379,8 +1384,7 @@ mod tests {
 
     #[test]
     fn test_get_accounts() {
-        let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let mut interpreter = get_interpreter(None);
         let addr = "ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5";
         interpreter.credit_token(addr.into(), "STX".into(), 1000);
 
@@ -1390,8 +1394,7 @@ mod tests {
 
     #[test]
     fn test_get_balance_for_account() {
-        let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let mut interpreter = get_interpreter(None);
 
         let addr = "ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5";
         let amount = 1000;
@@ -1403,8 +1406,7 @@ mod tests {
 
     #[test]
     fn test_credit_any_token() {
-        let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let mut interpreter = get_interpreter(None);
 
         let addr = "ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5";
         let amount = 1000;
@@ -1416,8 +1418,7 @@ mod tests {
 
     #[test]
     fn test_mint_stx_balance() {
-        let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let mut interpreter = get_interpreter(None);
         let recipient = PrincipalData::Standard(StandardPrincipalData::transient());
         let amount = 1000;
 
@@ -1430,8 +1431,7 @@ mod tests {
 
     #[test]
     fn test_run_valid_contract() {
-        let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let mut interpreter = get_interpreter(None);
         let contract = ClarityContract::fixture();
         let result = interpreter.run_interpreter(&contract, None, false, None);
         assert!(result.is_ok());
@@ -1440,8 +1440,7 @@ mod tests {
 
     #[test]
     fn test_run_invalid_contract() {
-        let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let mut interpreter = get_interpreter(None);
 
         let snippet = "(define-public (add) (ok (+ u1 1)))";
         //                                            ^ should be uint
@@ -1456,8 +1455,7 @@ mod tests {
 
     #[test]
     fn test_run_runtime_error() {
-        let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let mut interpreter = get_interpreter(None);
 
         let snippet = "(/ u1 u0)";
         let contract = ClarityContractBuilder::default()
@@ -1483,8 +1481,7 @@ mod tests {
 
     #[test]
     fn test_build_ast() {
-        let interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let interpreter = get_interpreter(None);
         let contract = ClarityContract::fixture();
         let (_ast, diagnostics, success) = interpreter.build_ast(&contract);
         assert!(success);
@@ -1493,8 +1490,7 @@ mod tests {
 
     #[test]
     fn test_execute() {
-        let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let mut interpreter = get_interpreter(None);
 
         let contract = ClarityContract::fixture();
         let result = deploy_contract(&mut interpreter, &contract);
@@ -1510,8 +1506,7 @@ mod tests {
 
     #[test]
     fn test_call_contract_fn() {
-        let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let mut interpreter = get_interpreter(None);
 
         let contract = ClarityContract::fixture();
         let source = contract.expect_in_memory_code_source();
@@ -1535,8 +1530,7 @@ mod tests {
 
     #[test]
     fn test_run_both() {
-        let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let mut interpreter = get_interpreter(None);
 
         let contract = ClarityContract::fixture();
         let _ = deploy_contract(&mut interpreter, &contract);
@@ -1549,8 +1543,7 @@ mod tests {
 
     #[test]
     fn test_get_data_var() {
-        let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let mut interpreter = get_interpreter(None);
         let contract = ClarityContractBuilder::default()
             .code_source(["(define-data-var count uint u9)"].join("\n"))
             .build();
@@ -1572,8 +1565,7 @@ mod tests {
 
     #[test]
     fn test_get_map_entry() {
-        let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let mut interpreter = get_interpreter(None);
         let contract = ClarityContractBuilder::default()
             .code_source(
                 [
@@ -1599,8 +1591,7 @@ mod tests {
 
     #[test]
     fn test_execute_stx_events() {
-        let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let mut interpreter = get_interpreter(None);
         let account = PrincipalData::parse("S1G2081040G2081040G2081040G208105NK8PE5").unwrap();
         let _ = interpreter.mint_stx_balance(account, 100000);
 
@@ -1650,8 +1641,7 @@ mod tests {
 
     #[test]
     fn test_execute_ft_events() {
-        let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let mut interpreter = get_interpreter(None);
 
         let contract = ClarityContractBuilder::default()
             .code_source(
@@ -1696,8 +1686,7 @@ mod tests {
 
     #[test]
     fn test_execute_nft_events() {
-        let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let mut interpreter = get_interpreter(None);
 
         let contract = ClarityContractBuilder::default()
             .code_source(
@@ -1744,32 +1733,8 @@ mod tests {
     }
 
     #[test]
-    fn can_run_boot_contracts() {
-        let repl_settings = Settings {
-            clarity_wasm_mode: true,
-            ..Default::default()
-        };
-        let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), repl_settings);
-
-        let boot_contracts_data = BOOT_CONTRACTS_DATA.clone();
-
-        for (_, (boot_contract, ast)) in boot_contracts_data {
-            let res = interpreter
-                .run(&boot_contract, Some(&ast), false, None)
-                .unwrap_or_else(|err| {
-                    dbg!(&err);
-                    panic!("failed to interpret {} boot contract", &boot_contract.name)
-                });
-
-            assert!(res.diagnostics.is_empty());
-        }
-    }
-
-    #[test]
     fn block_height_support_in_clarity2_epoch2() {
-        let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let mut interpreter = get_interpreter(None);
 
         let snippet = [
             "(define-read-only (get-height)",
@@ -1800,7 +1765,7 @@ mod tests {
             ClarityVersion::Clarity2,
             false,
             false,
-            None,
+            vec![],
         );
         assert_execution_result_value(
             result,
@@ -1819,7 +1784,7 @@ mod tests {
             ClarityVersion::Clarity2,
             false,
             false,
-            None,
+            vec![],
         );
         assert_execution_result_value(
             result,
@@ -1838,8 +1803,7 @@ mod tests {
 
     #[test]
     fn block_height_support_in_clarity2_epoch3() {
-        let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let mut interpreter = get_interpreter(None);
 
         interpreter.advance_burn_chain_tip(1);
 
@@ -1872,7 +1836,7 @@ mod tests {
             ClarityVersion::Clarity2,
             false,
             false,
-            None,
+            vec![],
         );
         assert_execution_result_value(
             result,
@@ -1891,8 +1855,7 @@ mod tests {
 
     #[test]
     fn block_height_support_in_clarity3_epoch3() {
-        let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let mut interpreter = get_interpreter(None);
 
         interpreter.advance_burn_chain_tip(1);
 
@@ -1934,7 +1897,7 @@ mod tests {
             ClarityVersion::Clarity3,
             false,
             false,
-            None,
+            vec![],
         );
         assert_execution_result_value(
             result,
@@ -1957,7 +1920,7 @@ mod tests {
             ClarityVersion::Clarity3,
             false,
             false,
-            None,
+            vec![],
         );
         assert_execution_result_value(
             result,
@@ -1979,9 +1942,152 @@ mod tests {
     }
 
     #[test]
+    fn burn_block_time_is_realistic_in_epoch_3_0() {
+        let mut interpreter = get_interpreter(None);
+
+        interpreter.set_current_epoch(StacksEpochId::Epoch30);
+        interpreter.advance_burn_chain_tip(3);
+
+        let snippet_1 = run_snippet(
+            &mut interpreter,
+            "(get-tenure-info? time u2)",
+            ClarityVersion::Clarity3,
+        );
+        let time_block_1 = match snippet_1.expect_optional() {
+            Ok(Some(Value::UInt(time))) => time,
+            _ => panic!("Unexpected result"),
+        };
+
+        let snippet_2 = run_snippet(
+            &mut interpreter,
+            "(get-tenure-info? time u3)",
+            ClarityVersion::Clarity3,
+        );
+        let time_block_2 = match snippet_2.expect_optional() {
+            Ok(Some(Value::UInt(time))) => time,
+            _ => panic!("Unexpected result"),
+        };
+        assert_eq!(time_block_2 - time_block_1, 600);
+    }
+
+    #[test]
+    fn first_stacks_block_time_in_a_tenure() {
+        let mut interpreter = get_interpreter(None);
+
+        interpreter.set_current_epoch(StacksEpochId::Epoch30);
+        let _ = interpreter.advance_burn_chain_tip(2);
+
+        let snippet_1 = run_snippet(
+            &mut interpreter,
+            "(get-tenure-info? time (- stacks-block-height u1))",
+            ClarityVersion::Clarity3,
+        );
+        let last_tenure_time = match snippet_1.expect_optional() {
+            Ok(Some(Value::UInt(time))) => time,
+            _ => panic!("Unexpected result"),
+        };
+
+        let snippet_2 = run_snippet(
+            &mut interpreter,
+            "(get-stacks-block-info? time (- stacks-block-height u1))",
+            ClarityVersion::Clarity3,
+        );
+        let last_stacks_block_time = match snippet_2.expect_optional() {
+            Ok(Some(Value::UInt(time))) => time,
+            _ => panic!("Unexpected result"),
+        };
+        assert_eq!((last_stacks_block_time) - (last_tenure_time), 10);
+    }
+
+    #[test]
+    fn stacks_block_time_is_realistic_in_epoch_3_0() {
+        let mut interpreter = get_interpreter(None);
+
+        interpreter.set_current_epoch(StacksEpochId::Epoch30);
+        let _ = interpreter.advance_stacks_chain_tip(3);
+
+        let snippet_1 = run_snippet(
+            &mut interpreter,
+            "(get-stacks-block-info? time u2)",
+            ClarityVersion::Clarity3,
+        );
+        let time_block_1 = match snippet_1.expect_optional() {
+            Ok(Some(Value::UInt(time))) => time,
+            _ => panic!("Unexpected result"),
+        };
+
+        let snippet_2 = run_snippet(
+            &mut interpreter,
+            "(get-stacks-block-info? time u3)",
+            ClarityVersion::Clarity3,
+        );
+        let time_block_2 = match snippet_2.expect_optional() {
+            Ok(Some(Value::UInt(time))) => time,
+            _ => panic!("Unexpected result"),
+        };
+        assert_eq!(time_block_2 - time_block_1, 10);
+    }
+
+    #[test]
+    fn burn_block_time_after_many_stacks_blocks_is_realistic_in_epoch_3_0() {
+        let mut interpreter = get_interpreter(None);
+
+        interpreter.set_current_epoch(StacksEpochId::Epoch30);
+        // by advancing stacks_chain_tip by 101, we are getting a tenure of more than 600 seconds
+        // the next burn block should happen after the last stacks block
+        let stacks_block_height = interpreter.advance_stacks_chain_tip(101).unwrap();
+        assert_eq!(stacks_block_height, 102);
+
+        let snippet_1 = run_snippet(
+            &mut interpreter,
+            "(get-stacks-block-info? time u1)",
+            ClarityVersion::Clarity3,
+        );
+        let stacks_block_time_1 = match snippet_1.expect_optional() {
+            Ok(Some(Value::UInt(time))) => time,
+            _ => panic!("Unexpected result"),
+        };
+
+        let snippet_2 = run_snippet(
+            &mut interpreter,
+            "(get-stacks-block-info? time u101)",
+            ClarityVersion::Clarity3,
+        );
+        let stacks_block_time_2 = match snippet_2.expect_optional() {
+            Ok(Some(Value::UInt(time))) => time,
+            _ => panic!("Unexpected result"),
+        };
+        assert_eq!(stacks_block_time_2 - stacks_block_time_1, 1000);
+
+        let _ = interpreter.advance_burn_chain_tip(1);
+        let _ = interpreter.advance_stacks_chain_tip(1);
+
+        let snippet_3 = run_snippet(
+            &mut interpreter,
+            "(get-tenure-info? time u4)",
+            ClarityVersion::Clarity3,
+        );
+        let tenure_height_1 = match snippet_3.expect_optional() {
+            Ok(Some(Value::UInt(time))) => time,
+            _ => panic!("Unexpected result"),
+        };
+
+        let snippet_4 = run_snippet(
+            &mut interpreter,
+            "(get-tenure-info? time (- stacks-block-height u1))",
+            ClarityVersion::Clarity3,
+        );
+        let tenure_height_2 = match snippet_4.expect_optional() {
+            Ok(Some(Value::UInt(time))) => time,
+            _ => panic!("Unexpected result"),
+        };
+
+        assert_eq!(1030, tenure_height_2 - tenure_height_1);
+    }
+
+    #[test]
     fn can_call_a_public_function() {
-        let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let mut interpreter = get_interpreter(None);
 
         let contract = ClarityContractBuilder::default()
             .code_source("(define-public (public-func) (ok true))".into())
@@ -1998,7 +2104,7 @@ mod tests {
             ClarityVersion::Clarity2,
             false,
             allow_private,
-            None,
+            vec![],
         );
 
         assert!(result.is_ok());
@@ -2011,8 +2117,7 @@ mod tests {
 
     #[test]
     fn can_call_a_private_function() {
-        let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let mut interpreter = get_interpreter(None);
 
         let contract = ClarityContractBuilder::default()
             .code_source("(define-private (private-func) true)".into())
@@ -2029,7 +2134,7 @@ mod tests {
             ClarityVersion::Clarity2,
             false,
             allow_private,
-            None,
+            vec![],
         );
 
         assert!(result.is_ok());
@@ -2042,8 +2147,7 @@ mod tests {
 
     #[test]
     fn can_not_call_a_private_function_without_allow_private() {
-        let mut interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
+        let mut interpreter = get_interpreter(None);
 
         let contract = ClarityContractBuilder::default()
             .code_source("(define-private (private-func) true)".into())
@@ -2060,7 +2164,7 @@ mod tests {
             ClarityVersion::Clarity2,
             false,
             allow_private,
-            None,
+            vec![],
         );
 
         assert!(result.is_err());

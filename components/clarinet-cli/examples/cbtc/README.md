@@ -19,10 +19,9 @@ clarinet devnet start
 In another console, change the directory to `./serverless/` and run
 
 ```bash
-yarn                          # Install dependencies
-yarn start                    # Run the offline server
+npm install
+npm start
 ```
-*Note: this example requires using npm version <=16 or >=20.*
 
 Once the message `Server ready: http://localhost:3000 🚀` appears on the screen, transfers tokens back and forth between the Bitcoin Blockchain and the Stacks Blockchain can be performed
 thanks to the deployment plans:
@@ -69,7 +68,7 @@ the 2nd output of the transaction to a Stacks address, and sending the minted to
     cost: 5960
 ```
 
-Another chainhook predicate, specified in `chainhooks/unwrap-btc.json` is observing cBTC burn events occuring on the Stacks blockchain, thanks to the following configuration:
+Another chainhook predicate, specified in `chainhooks/unwrap-btc.json` is observing cBTC burn events occurring on the Stacks blockchain, thanks to the following configuration:
 
 ```json
 "if_this": {
@@ -87,7 +86,7 @@ Another chainhook predicate, specified in `chainhooks/unwrap-btc.json` is observ
 }
 ```
 
-When the authority process this chainhook occurences, it sends BTC from its reserve to `cBTC` burner, by assuming that a p2pkh is being used.
+When the authority process this chainhook occurrences, it sends BTC from its reserve to `cBTC` burner, by assuming that a p2pkh is being used.
 
 The wrap / unwrap deployment plans can both be respectively performed with the commands:
 

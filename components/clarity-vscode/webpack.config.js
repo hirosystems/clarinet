@@ -1,6 +1,4 @@
 // @ts-check
-/* eslint-disable no-undef */
-/* eslint-disable @typescript-eslint/no-var-requires */
 "use strict";
 /** @typedef {import('webpack').Configuration} WebpackConfig **/
 
@@ -101,7 +99,7 @@ const serverBrowserConfig = {
     new WasmPackPlugin({
       crateDirectory: path.resolve(__dirname, "../clarity-lsp"),
       forceMode: "production",
-      extraArgs: "--release --target=web --no-default-features --features=wasm",
+      extraArgs: "--release --target=web",
       outDir: path.resolve(__dirname, "server/src/clarity-lsp-browser"),
       outName: "lsp-browser",
     }),
@@ -130,8 +128,7 @@ const serverNodeConfig = {
     new WasmPackPlugin({
       crateDirectory: path.resolve(__dirname, "../clarity-lsp"),
       forceMode: "production",
-      extraArgs:
-        "--release --target=nodejs --no-default-features --features=wasm ",
+      extraArgs: "--release --target=nodejs",
       outDir: path.resolve(__dirname, "server/src/clarity-lsp-node"),
       outName: "lsp-node",
     }),

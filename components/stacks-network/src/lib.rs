@@ -202,8 +202,8 @@ async fn do_run_devnet(
         }
     } else {
         let moved_orchestrator_terminator_tx = orchestrator_terminator_tx.clone();
-        let moved_observer_command_tx = observer_command_tx.clone();
-        let moved_mining_command_tx = mining_command_tx.clone();
+        let moved_observer_command_tx = observer_command_tx;
+        let moved_mining_command_tx = mining_command_tx;
         let _ = ctrlc::set_handler(move || {
             let _ = moved_orchestrator_terminator_tx.send(true);
             let _ = moved_observer_command_tx.send(ObserverCommand::Terminate);

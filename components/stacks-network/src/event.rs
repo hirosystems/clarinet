@@ -4,6 +4,7 @@ use chainhook_sdk::{
     observer::MempoolAdmissionData,
     types::{BitcoinChainEvent, StacksChainEvent},
 };
+use hiro_system_kit::slog;
 
 use crate::{
     chains_coordinator::BitcoinMiningCommand,
@@ -73,33 +74,43 @@ impl DevnetEvent {
 pub fn send_status_update(
     event_tx: &Sender<DevnetEvent>,
     with_subnets: bool,
+    logger: &Option<slog::Logger>,
     name: &str,
     status: Status,
     comment: &str,
 ) {
-    // leaving it a variable in case we want to make it dynamic in the future
-    let signers_services = 2;
     let subnet_services = if with_subnets { 2 } else { 0 };
 
     let order = match name {
         "bitcoin-node" => 0,
         "stacks-node" => 1,
-        "stacks-signer-1" => 2,
-        "stacks-signer-2" => 3,
-        "stacks-api" => signers_services + 2,
-        "subnet-node" => signers_services + 3,
-        "subnet-api" => signers_services + 4,
-        "stacks-explorer" => signers_services + subnet_services + 3,
-        "bitcoin-explorer" => signers_services + subnet_services + 4,
+        "stacks-signers" => 2,
+        "stacks-api" => 3,
+        "subnet-node" => 4,
+        "subnet-api" => 5,
+        "stacks-explorer" => subnet_services + 4,
+        "bitcoin-explorer" => subnet_services + 5,
         _ => return,
     };
 
-    let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
-        order,
-        status,
-        name: name.into(),
-        comment: comment.into(),
-    }));
+    match logger {
+        None => {
+            let _ = event_tx.send(DevnetEvent::ServiceStatus(ServiceStatusData {
+                order,
+                status,
+                name: name.into(),
+                comment: comment.into(),
+            }));
+        }
+        Some(logger) => {
+            let msg = format!("{} - {}", name, comment);
+            match status {
+                Status::Green => slog::info!(logger, "{}", &msg),
+                Status::Yellow => slog::warn!(logger, "{}", &msg),
+                Status::Red => slog::error!(logger, "{}", &msg),
+            }
+        }
+    }
 }
 
 #[derive(Clone, Debug)]

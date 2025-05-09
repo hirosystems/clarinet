@@ -17,52 +17,85 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build_and_test_sdk:
-    name: Build and test clarinet-sdk packages
+  build_wasm:
+    name: Build and test Wasm packages
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Setup Rust toolchain
+        run: rustup toolchain install stable --profile minimal --component rustfmt --target wasm32-unknown-unknown
+
+      - name: Setup cache keys
         run: |
-          rustup toolchain install stable --profile minimal --component rustfmt
-          rustup target add wasm32-unknown-unknown
+          RUST_VERSION=$(rustc -vV | shasum -a 256 | cut -d ' ' -f1)
+          echo "RUST_VERSION=$RUST_VERSION" >> $GITHUB_ENV
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-
-      - name: Setup cache keys
-        run: |
-          echo "RUST_VERSION_HASH=$(rustc --version | sha256sum | awk '{print $1}')" >> $GITHUB_ENV
-          echo "NODE_VERSION_HASH=$(node --version | sha256sum | awk '{print $1}')" >> $GITHUB_ENV
+          node-version: '22'
 
       - name: Cache cargo
         uses: actions/cache@v4
         with:
           path: |
-            ~/.cargo/
-            ~/target/release/build/
-            ~/target/wasm32-unknown-unknown/build/
-          key: clarinet-sdk-cargo-${{ runner.os }}-${{ env.RUST_VERSION_HASH }}-${{ hashFiles('./Cargo.lock') }}
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-${{ github.job }}-${{ env.RUST_VERSION }}-${{ hashFiles('./Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ github.job }}-${{ env.RUST_VERSION }}-
+            ${{ runner.os }}-${{ github.job }}-
 
-      - name: Cache npm
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/node_modules/
-          key: clarinet-sdk-npm-${{ runner.os }}-${{ env.NODE_VERSION_HASH }}-${{ hashFiles('./package-lock.json') }}
-
-      - name: Install wasm-pack
-        run: npm install -g wasm-pack
+      - name: Install wasm-pack if not available
+        run: |
+          if ! command -v wasm-pack &> /dev/null; then
+            cargo install wasm-pack
+          fi
 
       - name: Build Wasm packages
         run: npm run build:sdk-wasm
+
+      - name: Run wasm-bindgen-test
+        run: wasm-pack test --node components/clarinet-sdk-wasm
+
+      - name: Upload Wasm artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: wasm-artifacts
+          path: components/clarinet-sdk-wasm/pkg-*
+
+  test:
+    name: Run clarinet-sdk tests
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        node-version: [20.x, 22.x]
+    needs: build_wasm
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Download Wasm artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: wasm-artifacts
+          path: components/clarinet-sdk-wasm
 
       - name: Install dependencies
         run: npm ci
 
       - name: Run tests
+        env:
+          HIRO_API_KEY: ${{ secrets.HIRO_API_KEY }}
         run: npm run test

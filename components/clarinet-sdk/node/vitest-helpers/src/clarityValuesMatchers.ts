@@ -16,10 +16,10 @@ import {
   ListCV,
   TupleCV,
   BufferCV,
-  principalToString,
   TrueCV,
   FalseCV,
   BooleanCV,
+  cvToString,
 } from "@stacks/transactions";
 
 import { MatcherState } from "@vitest/expect";
@@ -69,6 +69,8 @@ type ClarityTypetoValue = {
   [ClarityType.Buffer]: BufferCV;
 };
 
+const ClarityTypeReversed = Object.fromEntries(Object.entries(ClarityType).map(([k, v]) => [v, k]));
+
 // the "simple clarity values" are CVs that can't be nested and have `value` property
 type SimpleCV = BooleanCV | IntCV | UIntCV | StringAsciiCV | StringUtf8CV;
 type SimpleCVTypes =
@@ -79,11 +81,13 @@ type SimpleCVTypes =
   | ClarityType.StringASCII
   | ClarityType.StringUTF8;
 
-const validClarityTypes = Object.values(ClarityType).filter((t) => typeof t === "number");
+const validClarityTypes = Object.values(ClarityType).filter(
+  (t) => typeof t === "string",
+) as string[];
 
 function isClarityValue(input: unknown): input is ClarityValue {
   if (!input || typeof input !== "object") return false;
-  if (!("type" in input) || typeof input.type !== "number") return false;
+  if (!("type" in input) || typeof input.type !== "string") return false;
   if (!validClarityTypes.includes(input.type)) return false;
 
   return true;
@@ -109,7 +113,7 @@ function checkCVType<T extends ClarityType>(
   if (!isCV) {
     throw new ClarityTypeError({
       message: `actual value must ${notStr(isNot)}be a Clarity "${
-        ClarityType[expectedType]
+        ClarityTypeReversed[expectedType]
       }", received "${typeof actual}"`,
     });
   }
@@ -126,10 +130,10 @@ function checkCVType<T extends ClarityType>(
     throw new ClarityTypeError({
       // generic and short message
       message: `actual value must ${notStr(isNot)}be a Clarity "${
-        ClarityType[expectedType]
-      }", received "${ClarityType[actual.type]}"${errorCode}`,
-      actual: ClarityType[actual.type],
-      expected: ClarityType[expectedType],
+        ClarityTypeReversed[expectedType]
+      }", received "${ClarityTypeReversed[actual.type]}"${errorCode}`,
+      actual: ClarityTypeReversed[actual.type],
+      expected: ClarityTypeReversed[expectedType],
     });
   }
 
@@ -219,7 +223,7 @@ expect.extend({
     return {
       pass: true,
       message: () =>
-        `actual value must ${notStr(this.isNot)}be a Clarity "${ClarityType[expectedType]}"`,
+        `actual value must ${notStr(this.isNot)}be a Clarity "${ClarityTypeReversed[expectedType]}"`,
     };
   },
 
@@ -286,7 +290,7 @@ expect.extend({
       return errorToAssertionResult.call(this, e);
     }
 
-    const actualString = principalToString(actual);
+    const actualString = cvToString(actual, "tryAscii");
 
     try {
       expected = isStandard
@@ -341,7 +345,7 @@ expect.extend({
     const expected = isListArray ? Cl.prettyPrint(Cl.list(expectedItems), 2) : expectedItems;
 
     return {
-      pass: this.equals(actual.list, expectedItems, undefined, true),
+      pass: this.equals(actual.value, expectedItems, undefined, true),
       // note: throw a simple message and rely on `actual` and `expected` to display the diff
       message: () => `the received List does ${this.isNot ? "" : "not "}match the expected one`,
       actual: Cl.prettyPrint(actual, 2),
@@ -362,7 +366,7 @@ expect.extend({
     const expected = isTupleData ? Cl.prettyPrint(Cl.tuple(expectedData), 2) : expectedData;
 
     return {
-      pass: this.equals(actual.data, expectedData, undefined, true),
+      pass: this.equals(actual.value, expectedData, undefined, true),
       // note: throw a simple message and rely on `actual` and `expected` to display the diff
       message: () => `the received Tuple does ${this.isNot ? "" : "not "}match the expected one`,
       actual: Cl.prettyPrint(actual, 2),

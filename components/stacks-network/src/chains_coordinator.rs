@@ -8,6 +8,7 @@ use crate::orchestrator::ServicesMapHosts;
 use base58::FromBase58;
 use bitcoincore_rpc::bitcoin::Address;
 use chainhook_sdk::chainhooks::types::ChainhookStore;
+use chainhook_sdk::observer::PredicatesConfig;
 use chainhook_sdk::observer::{
     start_event_observer, EventObserverConfig, ObserverCommand, ObserverEvent,
     StacksChainMempoolEvent,
@@ -16,19 +17,21 @@ use chainhook_sdk::types::BitcoinBlockSignaling;
 use chainhook_sdk::types::BitcoinChainEvent;
 use chainhook_sdk::types::StacksChainEvent;
 use chainhook_sdk::types::StacksNodeConfig;
-use chainhook_sdk::types::{BitcoinNetwork, StacksNetwork};
 use chainhook_sdk::utils::Context;
+use chainhook_types::StacksTransactionKind;
 use clarinet_deployments::onchain::TransactionStatus;
 use clarinet_deployments::onchain::{
     apply_on_chain_deployment, DeploymentCommand, DeploymentEvent,
 };
 use clarinet_deployments::types::DeploymentSpecification;
 use clarinet_files::PoxStackingOrder;
+use clarinet_files::StacksNetwork;
 use clarinet_files::DEFAULT_FIRST_BURN_HEADER_HEIGHT;
 use clarinet_files::{self, AccountConfig, DevnetConfig, NetworkManifest, ProjectManifest};
 use clarity::address::AddressHashMode;
 use clarity::types::PublicKey;
 use clarity::util::hash::{hex_bytes, Hash160};
+use clarity::vm::types::PrincipalData;
 use clarity::vm::types::{BuffData, SequenceData, TupleData};
 use clarity::vm::ClarityName;
 use clarity::vm::Value as ClarityValue;
@@ -79,6 +82,14 @@ impl DevnetEventObserverConfig {
 
     pub fn consolidated_bitcoin_rpc_url(&self) -> String {
         format!("http://{}", self.services_map_hosts.bitcoin_node_host)
+    }
+
+    pub fn get_deployer(&self) -> AccountConfig {
+        self.accounts
+            .iter()
+            .find(|account| account.label == "deployer")
+            .expect("deployer not found")
+            .clone()
     }
 }
 
@@ -136,9 +147,10 @@ impl DevnetEventObserverConfig {
             }),
 
             display_stacks_ingestion_logs: true,
-            bitcoin_network: BitcoinNetwork::Regtest,
-            stacks_network: StacksNetwork::Devnet,
+            bitcoin_network: chainhook_types::BitcoinNetwork::Regtest,
+            stacks_network: chainhook_types::StacksNetwork::Devnet,
             prometheus_monitoring_port: None,
+            predicates_config: PredicatesConfig::default(),
         };
 
         DevnetEventObserverConfig {
@@ -172,6 +184,7 @@ pub async fn start_chains_coordinator(
 ) -> Result<(), String> {
     let mut should_deploy_protocol = true; // Will change when `stacks-network` components becomes compatible with Testnet / Mainnet setups
     let boot_completed = Arc::new(AtomicBool::new(false));
+    let mut current_burn_height = 0;
 
     let (deployment_commands_tx, deployments_command_rx) = channel();
     let (deployment_events_tx, deployment_events_rx) = channel();
@@ -253,9 +266,8 @@ pub async fn start_chains_coordinator(
     let chains_coordinator_commands_oper = sel.recv(&chains_coordinator_commands_rx);
     let observer_event_oper = sel.recv(&observer_event_rx);
 
-    let DevnetConfig {
-        enable_subnet_node, ..
-    } = config.devnet_config;
+    let enable_subnet_node = config.devnet_config.enable_subnet_node;
+    let stacks_signers_keys = config.devnet_config.stacks_signers_keys.clone();
 
     loop {
         let oper = sel.select();
@@ -311,12 +323,15 @@ pub async fn start_chains_coordinator(
                     BitcoinChainEvent::ChainUpdatedWithBlocks(event) => {
                         let tip = event.new_blocks.last().unwrap();
                         let bitcoin_block_height = tip.block_identifier.index;
+                        current_burn_height = bitcoin_block_height;
                         let log = format!("Bitcoin block #{} received", bitcoin_block_height);
                         let comment =
                             format!("mining blocks (chain_tip = #{})", bitcoin_block_height);
 
                         // Stacking orders can't be published until devnet is ready
-                        if bitcoin_block_height >= DEFAULT_FIRST_BURN_HEADER_HEIGHT + 10 {
+                        if !stacks_signers_keys.is_empty()
+                            && bitcoin_block_height >= DEFAULT_FIRST_BURN_HEADER_HEIGHT + 10
+                        {
                             let res = publish_stacking_orders(
                                 &config.devnet_config,
                                 &devnet_event_tx,
@@ -338,6 +353,8 @@ pub async fn start_chains_coordinator(
                     }
                     BitcoinChainEvent::ChainUpdatedWithReorg(events) => {
                         let tip = events.blocks_to_apply.last().unwrap();
+                        let bitcoin_block_height = tip.block_identifier.index;
+                        current_burn_height = bitcoin_block_height;
                         let log = format!(
                             "Bitcoin reorg received (new height: {})",
                             tip.block_identifier.index
@@ -355,6 +372,7 @@ pub async fn start_chains_coordinator(
                 send_status_update(
                     &devnet_event_tx,
                     enable_subnet_node,
+                    &None,
                     "bitcoin-node",
                     Status::Green,
                     &comment,
@@ -376,10 +394,10 @@ pub async fn start_chains_coordinator(
                     }
                 }
 
-                let known_tip = match &chain_event {
+                let stacks_block_update = match &chain_event {
                     StacksChainEvent::ChainUpdatedWithBlocks(block) => {
                         match block.new_blocks.last() {
-                            Some(known_tip) => known_tip.clone(),
+                            Some(block) => block.clone(),
                             None => unreachable!(),
                         }
                     }
@@ -391,44 +409,81 @@ pub async fn start_chains_coordinator(
                     StacksChainEvent::ChainUpdatedWithMicroblocksReorg(_) => {
                         unreachable!() // TODO(lgalabru): good enough for now - code path unreachable in the context of Devnet
                     }
-                    StacksChainEvent::ChainUpdatedWithReorg(_) => {
-                        unreachable!() // TODO(lgalabru): good enough for now - code path unreachable in the context of Devnet
+                    StacksChainEvent::ChainUpdatedWithReorg(data) => {
+                        // reorgs should not happen in devnet
+                        // tests showed that it can happen in epoch 3.0 but should not
+                        // this patch allows to handle it, but further investigation will be done
+                        // with blockchain team in order to avoid this
+                        devnet_event_tx
+                            .send(DevnetEvent::warning("Stacks reorg received".to_string()))
+                            .expect("Unable to send reorg event");
+                        match data.blocks_to_apply.last() {
+                            Some(block) => block.clone(),
+                            None => unreachable!(),
+                        }
+                    }
+                    StacksChainEvent::ChainUpdatedWithNonConsensusEvents(_) => {
+                        continue;
                     }
                 };
+
+                // if the sbtc-deposit contract is detected, fund the accounts with sBTC
+                stacks_block_update
+                    .block
+                    .transactions
+                    .iter()
+                    .for_each(|tx| {
+                        if let StacksTransactionKind::ContractDeployment(data) = &tx.metadata.kind {
+                            let contract_identifier = data.contract_identifier.clone();
+                            let deployer = config.get_deployer();
+                            if contract_identifier
+                                == format!("{}.sbtc-deposit", deployer.stx_address)
+                            {
+                                fund_genesis_account(
+                                    &devnet_event_tx,
+                                    &config.services_map_hosts,
+                                    &config.accounts,
+                                    config.deployment_fee_rate,
+                                    &boot_completed,
+                                );
+                            }
+                        }
+                    });
 
                 let _ = devnet_event_tx.send(DevnetEvent::StacksChainEvent(chain_event));
 
                 // Partially update the UI. With current approach a full update
-                // would requires either cloning the block, or passing ownership.
+                // would require either cloning the block, or passing ownership.
                 send_status_update(
                     &devnet_event_tx,
                     enable_subnet_node,
+                    &None,
                     "stacks-node",
                     Status::Green,
                     &format!(
                         "mining blocks (chain_tip = #{})",
-                        known_tip.block.block_identifier.index
+                        stacks_block_update.block.block_identifier.index
                     ),
                 );
 
                 // devnet_event_tx.send(DevnetEvent::send_status_update(status_update_data));
 
-                let message = if known_tip.block.block_identifier.index == 0 {
+                let message = if stacks_block_update.block.block_identifier.index == 0 {
                     format!(
                         "Genesis Stacks block anchored in Bitcoin block #{} includes {} transactions",
-                        known_tip
+                        stacks_block_update
                             .block
                             .metadata
                             .bitcoin_anchor_block_identifier
                             .index,
-                        known_tip.block.transactions.len(),
+                        stacks_block_update.block.transactions.len(),
                     )
                 } else {
                     format!(
                         "Stacks block #{} mined including {} transaction{}",
-                        known_tip.block.block_identifier.index,
-                        known_tip.block.transactions.len(),
-                        if known_tip.block.transactions.len() <= 1 {
+                        stacks_block_update.block.block_identifier.index,
+                        stacks_block_update.block.transactions.len(),
+                        if stacks_block_update.block.transactions.len() <= 1 {
                             ""
                         } else {
                             "s"
@@ -439,7 +494,17 @@ pub async fn start_chains_coordinator(
             }
             ObserverEvent::NotifyBitcoinTransactionProxied => {
                 if !boot_completed.load(Ordering::SeqCst) {
-                    std::thread::sleep(std::time::Duration::from_secs(1));
+                    if config
+                        .devnet_config
+                        .epoch_3_0
+                        .saturating_sub(current_burn_height)
+                        > 6
+                    {
+                        std::thread::sleep(std::time::Duration::from_millis(750));
+                    } else {
+                        // as epoch 3.0 gets closer, bitcoin blocks need to slow down
+                        std::thread::sleep(std::time::Duration::from_millis(4000));
+                    }
                     let res = mine_bitcoin_block(
                         &config.services_map_hosts.bitcoin_node_host,
                         config.devnet_config.bitcoin_node_username.as_str(),
@@ -475,6 +540,7 @@ pub async fn start_chains_coordinator(
                                 send_status_update(
                                     &devnet_event_tx,
                                     enable_subnet_node,
+                                    &None,
                                     "subnet-node",
                                     Status::Green,
                                     "⚡️",
@@ -582,63 +648,6 @@ fn should_publish_stacking_orders(
     true
 }
 
-#[allow(clippy::items_after_test_module)]
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn build_pox_stacking_order(duration: u32, start_at_cycle: u32) -> PoxStackingOrder {
-        PoxStackingOrder {
-            duration,
-            start_at_cycle,
-            wallet: "wallet_1".to_string(),
-            slots: 1,
-            btc_address: "address_1".to_string(),
-            auto_extend: Some(true),
-        }
-    }
-
-    #[test]
-    fn test_should_publish_stacking_orders_basic() {
-        let pox_stacking_order = build_pox_stacking_order(12, 6);
-
-        // cycle just before start_at_cycle
-        assert!(should_publish_stacking_orders(&5, &pox_stacking_order));
-
-        // cycle before start_at_cycle + duration
-        assert!(should_publish_stacking_orders(&17, &pox_stacking_order),);
-
-        // cycle before start_at_cycle + duration * 42
-        assert!(should_publish_stacking_orders(&509, &pox_stacking_order));
-
-        // cycle equal to start_at_cycle
-        assert!(!should_publish_stacking_orders(&6, &pox_stacking_order));
-
-        // cycle after to start_at_cycle
-        assert!(!should_publish_stacking_orders(&8, &pox_stacking_order));
-    }
-
-    #[test]
-    fn test_should_publish_stacking_orders_edge_cases() {
-        // duration is one cycle
-        let pox_stacking_order = build_pox_stacking_order(1, 4);
-        assert!(!should_publish_stacking_orders(&2, &pox_stacking_order));
-
-        for i in 3..=20 {
-            assert!(should_publish_stacking_orders(&i, &pox_stacking_order));
-        }
-
-        // duration is low and start_at_cycle is high
-        let pox_stacking_order = build_pox_stacking_order(2, 100);
-        for i in 0..=98 {
-            assert!(!should_publish_stacking_orders(&i, &pox_stacking_order));
-        }
-        assert!(should_publish_stacking_orders(&99, &pox_stacking_order));
-        assert!(!should_publish_stacking_orders(&100, &pox_stacking_order));
-        assert!(should_publish_stacking_orders(&101, &pox_stacking_order));
-    }
-}
-
 pub async fn publish_stacking_orders(
     devnet_config: &DevnetConfig,
     devnet_event_tx: &Sender<DevnetEvent>,
@@ -653,10 +662,9 @@ pub async fn publish_stacking_orders(
             Ok(pox_info) => Some(pox_info),
             Err(e) => {
                 let _ = devnet_event_tx.send(DevnetEvent::warning(format!(
-                    "Unable to parse pox info: {}",
+                    "unable to parse pox info: {}",
                     e
                 )));
-
                 None
             }
         },
@@ -686,17 +694,6 @@ pub async fn publish_stacking_orders(
         .next()
         .and_then(|version| version.parse().ok())
         .unwrap_or(1); // pox 1 contract is `pox.clar`
-
-    let default_signing_keys = [
-        StacksPrivateKey::from_hex(
-            "7287ba251d44a4d3fd9276c88ce34c5c52a038955511cccaf77e61068649c17801",
-        )
-        .unwrap(),
-        StacksPrivateKey::from_hex(
-            "530d9f61984c888536871c6573073bdfc0058896dc1adfe9a6a10dfacadc209101",
-        )
-        .unwrap(),
-    ];
 
     let mut transactions = 0;
     for (i, pox_stacking_order) in devnet_config.pox_stacking_orders.iter().enumerate() {
@@ -728,6 +725,9 @@ pub async fn publish_stacking_orders(
         let btc_address_moved = pox_stacking_order.btc_address.clone();
         let duration = pox_stacking_order.duration;
 
+        let signer_key =
+            devnet_config.stacks_signers_keys[i % devnet_config.stacks_signers_keys.len()];
+
         let stacking_result =
             hiro_system_kit::thread_named("Stacking orders handler").spawn(move || {
                 let default_fee = fee_rate * 1000;
@@ -744,7 +744,7 @@ pub async fn publish_stacking_orders(
                     pox_version,
                     bitcoin_block_height,
                     current_cycle.into(),
-                    &default_signing_keys[i % 2],
+                    &signer_key,
                     extend_stacking,
                     &btc_address_moved,
                     stx_amount,
@@ -791,6 +791,132 @@ pub async fn publish_stacking_orders(
     } else {
         None
     }
+}
+
+fn fund_genesis_account(
+    devnet_event_tx: &Sender<DevnetEvent>,
+    services_map_hosts: &ServicesMapHosts,
+    accounts: &[AccountConfig],
+    fee_rate: u64,
+    boot_completed: &Arc<AtomicBool>,
+) {
+    let deployer = accounts
+        .iter()
+        .find(|account| account.label == "deployer")
+        .unwrap()
+        .clone();
+    let (_, _, deployer_secret_key) = clarinet_files::compute_addresses(
+        &deployer.mnemonic,
+        &deployer.derivation,
+        &StacksNetwork::Devnet.get_networks(),
+    );
+
+    let accounts_moved = accounts.to_vec();
+    let devnet_event_tx_moved = devnet_event_tx.clone();
+    let stacks_api_host_moved = services_map_hosts.stacks_api_host.clone();
+    let boot_completed_moved = Arc::clone(boot_completed);
+
+    let _ = hiro_system_kit::thread_named("sBTC funding handler").spawn(move || {
+        while !boot_completed_moved.load(Ordering::SeqCst) {
+            std::thread::sleep(std::time::Duration::from_secs(3));
+        }
+        let node_rpc_url = format!("http://{}", &stacks_api_host_moved);
+        let stacks_rpc = StacksRpc::new(&node_rpc_url);
+
+        let info = match stacks_rpc.call_with_retry(|client| client.get_info(), 5) {
+            Ok(info) => info,
+            Err(e) => {
+                let _ = devnet_event_tx_moved.send(DevnetEvent::error(format!(
+                    "Failed to retrieve info: {}",
+                    e
+                )));
+                return;
+            }
+        };
+
+        let burn_height_number = info.burn_block_height as u32;
+        let burn_height = ClarityValue::UInt(burn_height_number.into());
+
+        let burn_block = match stacks_rpc
+            .call_with_retry(|client| client.get_burn_block(burn_height_number), 5)
+        {
+            Ok(b) => b,
+            Err(e) => {
+                let _ = devnet_event_tx_moved.send(DevnetEvent::error(format!(
+                    "Failed to retrieve burn block: {}",
+                    e
+                )));
+                return;
+            }
+        };
+
+        let mut deployer_nonce =
+            match stacks_rpc.call_with_retry(|client| client.get_nonce(&deployer.stx_address), 5) {
+                Ok(n) => n,
+                Err(e) => {
+                    let _ = devnet_event_tx_moved.send(DevnetEvent::error(format!(
+                        "Failed to retrieve nonce: {}",
+                        e
+                    )));
+                    return;
+                }
+            };
+
+        let burn_block_hash = ClarityValue::buff_from(
+            hex_bytes(&burn_block.burn_block_hash.replace("0x", "")).unwrap(),
+        )
+        .unwrap();
+
+        let contract_id = format!("{}.sbtc-deposit", deployer.stx_address);
+        let mut nb_of_founded_accounts = 0;
+
+        for account in accounts_moved {
+            if account.sbtc_balance == 0 {
+                continue;
+            }
+            let txid_buffer = std::array::from_fn::<_, 32, _>(|_| rand::random());
+            let txid = ClarityValue::buff_from(txid_buffer.to_vec()).unwrap();
+            let vout_index = ClarityValue::UInt(1);
+            let amount = ClarityValue::UInt(account.sbtc_balance.into());
+            let recipient =
+                ClarityValue::Principal(PrincipalData::parse(&account.stx_address).unwrap());
+            let sweep_txid_buffer = std::array::from_fn::<_, 32, _>(|_| rand::random());
+            let sweep_txid = ClarityValue::buff_from(sweep_txid_buffer.to_vec()).unwrap();
+            let args = vec![
+                txid,
+                vout_index,
+                amount,
+                recipient,
+                burn_block_hash.clone(),
+                burn_height.clone(),
+                sweep_txid,
+            ];
+            let tx = stacks_codec::codec::build_contract_call_transaction(
+                contract_id.clone(),
+                "complete-deposit-wrapper".to_string(),
+                args,
+                deployer_nonce,
+                fee_rate * 1000,
+                &hex_bytes(&deployer_secret_key).unwrap(),
+            );
+            let funding_result = stacks_rpc.post_transaction(&tx);
+            deployer_nonce += 1;
+
+            match funding_result {
+                Ok(_) => nb_of_founded_accounts += 1,
+                Err(e) => {
+                    let _ = devnet_event_tx_moved.send(DevnetEvent::error(format!(
+                        "Unable to fund {}: {}",
+                        account.stx_address, e
+                    )));
+                }
+            }
+        }
+        let _ = devnet_event_tx_moved.send(DevnetEvent::info(format!(
+            "Funded {} accounts with sBTC",
+            nb_of_founded_accounts
+        )));
+    });
 }
 
 pub fn invalidate_bitcoin_chain_tip(
@@ -987,4 +1113,155 @@ fn get_stacking_tx_method_and_args(
     };
 
     (method.to_string(), arguments)
+}
+
+#[cfg(test)]
+mod tests_stacking_orders {
+
+    use super::*;
+
+    fn build_pox_stacking_order(duration: u32, start_at_cycle: u32) -> PoxStackingOrder {
+        PoxStackingOrder {
+            duration,
+            start_at_cycle,
+            wallet: "wallet_1".to_string(),
+            slots: 1,
+            btc_address: "address_1".to_string(),
+            auto_extend: Some(true),
+        }
+    }
+
+    #[test]
+    fn test_should_publish_stacking_orders_basic() {
+        let pox_stacking_order = build_pox_stacking_order(12, 6);
+
+        // cycle just before start_at_cycle
+        assert!(should_publish_stacking_orders(&5, &pox_stacking_order));
+        // cycle before start_at_cycle + duration
+        assert!(should_publish_stacking_orders(&17, &pox_stacking_order),);
+        // cycle before start_at_cycle + duration * 42
+        assert!(should_publish_stacking_orders(&509, &pox_stacking_order));
+        // cycle equal to start_at_cycle
+        assert!(!should_publish_stacking_orders(&6, &pox_stacking_order));
+        // cycle after start_at_cycle
+        assert!(!should_publish_stacking_orders(&8, &pox_stacking_order));
+    }
+
+    #[test]
+    fn test_should_publish_stacking_orders_edge_cases() {
+        // duration is one cycle
+        let pox_stacking_order = build_pox_stacking_order(1, 4);
+        assert!(!should_publish_stacking_orders(&2, &pox_stacking_order));
+
+        for i in 3..=20 {
+            assert!(should_publish_stacking_orders(&i, &pox_stacking_order));
+        }
+        // duration is low and start_at_cycle is high
+        let pox_stacking_order = build_pox_stacking_order(2, 100);
+        for i in 0..=98 {
+            assert!(!should_publish_stacking_orders(&i, &pox_stacking_order));
+        }
+        assert!(should_publish_stacking_orders(&99, &pox_stacking_order));
+        assert!(!should_publish_stacking_orders(&100, &pox_stacking_order));
+        assert!(should_publish_stacking_orders(&101, &pox_stacking_order));
+    }
+}
+
+#[cfg(test)]
+mod test_rpc_client {
+    use clarinet_files::DEFAULT_DERIVATION_PATH;
+    use stacks_rpc_client::{mock_stacks_rpc::MockStacksRpc, rpc_client::NodeInfo};
+
+    use super::*;
+
+    #[test]
+    fn test_fund_genesis_account() {
+        let mut stacks_rpc = MockStacksRpc::new();
+        let info_mock = stacks_rpc.get_info_mock(NodeInfo {
+            peer_version: 4207599116,
+            pox_consensus: "4f4de3d4ab3246299c039084a12c801c9dc70323".to_string(),
+            burn_block_height: 100,
+            stable_pox_consensus: "a2c4972bf818f554809e25fa637b780c77c20b62".to_string(),
+            stable_burn_block_height: 99,
+            server_version: "stacks-node 0.0.1".to_string(),
+            network_id: 2147483648,
+            parent_network_id: 3669344250,
+            stacks_tip_height: 47,
+            stacks_tip: "6bb0e4706fdfb9624a23d9144f2161c61d5c58816643b48ffdb735887bdbf5fa"
+                .to_string(),
+            stacks_tip_consensus_hash: "4f4de3d4ab3246299c039084a12c801c9dc70323".to_string(),
+            genesis_chainstate_hash:
+                "74237aa39aa50a83de11a4f53e9d3bb7d43461d1de9873f402e5453ae60bc59b".to_string(),
+        });
+        let burn_block_mock = stacks_rpc.get_burn_block_mock(100);
+        let nonce_mock = stacks_rpc.get_nonce_mock("ST2JHG361ZXG51QTKY2NQCVBPPRRE2KZB1HR05NNC", 0);
+        let tx_mock = stacks_rpc
+            .get_tx_mock("0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef");
+
+        let deployer = AccountConfig {
+            label: "deployer".to_string(),
+            mnemonic: "cycle puppy glare enroll cost improve round trend wrist mushroom scorpion tower claim oppose clever elephant dinosaur eight problem before frozen dune wagon high".to_string(),
+            derivation: DEFAULT_DERIVATION_PATH.to_string(),
+            balance: 10000000,
+            sbtc_balance: 100000000,
+            stx_address: "ST2JHG361ZXG51QTKY2NQCVBPPRRE2KZB1HR05NNC".to_string(),
+            btc_address: "mvZtbibDAAA3WLpY7zXXFqRa3T4XSknBX7".to_string(),
+            is_mainnet: false,
+        };
+
+        let fee_rate = 10;
+        let (devnet_event_tx, devnet_event_rx) = channel();
+        let services_map_hosts = ServicesMapHosts {
+            stacks_api_host: stacks_rpc.url.replace("http://", ""),
+            // only stacks_node is called
+            stacks_node_host: stacks_rpc.url.clone(),
+            bitcoin_node_host: "localhost".to_string(),
+            bitcoin_explorer_host: "localhost".to_string(),
+            stacks_explorer_host: "localhost".to_string(),
+            subnet_node_host: "localhost".to_string(),
+            subnet_api_host: "localhost".to_string(),
+            postgres_host: "localhost".to_string(),
+        };
+        let accounts = vec![deployer];
+
+        let boot_completed = Arc::new(AtomicBool::new(true));
+
+        fund_genesis_account(
+            &devnet_event_tx,
+            &services_map_hosts,
+            &accounts,
+            fee_rate,
+            &boot_completed,
+        );
+
+        let timeout = Duration::from_secs(3);
+        let start = std::time::Instant::now();
+
+        let mut received_events = Vec::new();
+        while start.elapsed() < timeout {
+            match devnet_event_rx.recv_timeout(Duration::from_millis(100)) {
+                Ok(event) => {
+                    received_events.push(event);
+                }
+                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
+                Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+                    break;
+                }
+            }
+        }
+
+        assert_eq!(received_events.len(), 1);
+        assert!(received_events.iter().any(|event| {
+            if let DevnetEvent::Log(msg) = event {
+                msg.message.contains("Funded 1 accounts with sBTC")
+            } else {
+                false
+            }
+        }));
+
+        info_mock.assert();
+        nonce_mock.assert();
+        burn_block_mock.assert();
+        tx_mock.assert();
+    }
 }

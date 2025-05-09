@@ -1,10 +1,12 @@
-use super::boot::{STACKS_BOOT_CODE_MAINNET, STACKS_BOOT_CODE_TESTNET};
+use super::boot::{
+    BOOT_CODE_MAINNET, BOOT_CODE_TESTNET, BOOT_MAINNET_PRINCIPAL, BOOT_TESTNET_PRINCIPAL,
+};
 use super::diagnostic::output_diagnostic;
 use super::{ClarityCodeSource, ClarityContract, ClarityInterpreter, ContractDeployer};
-use crate::analysis::coverage::TestCoverageReport;
+use crate::analysis::coverage::CoverageHook;
 use crate::repl::clarity_values::value_to_string;
-use crate::repl::Settings;
-use crate::utils;
+use crate::utils::serialize_event;
+
 use clarity::codec::StacksMessageCodec;
 use clarity::types::chainstate::StacksAddress;
 use clarity::types::StacksEpochId;
@@ -13,78 +15,25 @@ use clarity::vm::diagnostic::{Diagnostic, Level};
 use clarity::vm::docs::{make_api_reference, make_define_reference, make_keyword_reference};
 use clarity::vm::functions::define::DefineFunctions;
 use clarity::vm::functions::NativeFunctions;
-use clarity::vm::types::{
-    PrincipalData, QualifiedContractIdentifier, StandardPrincipalData, Value,
-};
+use clarity::vm::types::{PrincipalData, QualifiedContractIdentifier, Value};
 use clarity::vm::variables::NativeVariables;
 use clarity::vm::{
     ClarityVersion, CostSynthesis, EvalHook, EvaluationResult, ExecutionResult, ParsedContract,
     SymbolicExpression,
 };
-use colored::*;
-use prettytable::{Cell, Row, Table};
+use colored::Colorize;
+use comfy_table::Table;
+
 use std::collections::{BTreeMap, HashMap};
 use std::fmt;
 use std::num::ParseIntError;
 
-#[cfg(feature = "cli")]
+#[cfg(not(target_arch = "wasm32"))]
 use clarity::vm::analysis::ContractAnalysis;
 
 use super::SessionSettings;
 
-pub static BOOT_TESTNET_ADDRESS: &str = "ST000000000000000000002AMW42H";
-pub static BOOT_MAINNET_ADDRESS: &str = "SP000000000000000000002Q6VF78";
-
-pub static V1_BOOT_CONTRACTS: &[&str] = &["bns"];
-pub static V2_BOOT_CONTRACTS: &[&str] = &["pox-2", "costs-3"];
-pub static V3_BOOT_CONTRACTS: &[&str] = &["pox-3"];
-pub static V4_BOOT_CONTRACTS: &[&str] = &["pox-4"];
-
-lazy_static! {
-    static ref BOOT_TESTNET_PRINCIPAL: StandardPrincipalData =
-        PrincipalData::parse_standard_principal(BOOT_TESTNET_ADDRESS).unwrap();
-    static ref BOOT_MAINNET_PRINCIPAL: StandardPrincipalData =
-        PrincipalData::parse_standard_principal(BOOT_MAINNET_ADDRESS).unwrap();
-    pub static ref BOOT_CONTRACTS_DATA: BTreeMap<QualifiedContractIdentifier, (ClarityContract, ContractAST)> = {
-        let mut result = BTreeMap::new();
-        let deploy: [(&StandardPrincipalData, [(&str, &str); 13]); 2] = [
-            (&*BOOT_TESTNET_PRINCIPAL, *STACKS_BOOT_CODE_TESTNET),
-            (&*BOOT_MAINNET_PRINCIPAL, *STACKS_BOOT_CODE_MAINNET),
-        ];
-
-        let interpreter =
-            ClarityInterpreter::new(StandardPrincipalData::transient(), Settings::default());
-        for (deployer, boot_code) in deploy.iter() {
-            for (name, code) in boot_code.iter() {
-                let (epoch, clarity_version) = match *name {
-                    "pox-4" | "signers" | "signers-voting" => {
-                        (StacksEpochId::Epoch25, ClarityVersion::Clarity2)
-                    }
-                    "pox-3" => (StacksEpochId::Epoch24, ClarityVersion::Clarity2),
-                    "pox-2" | "costs-3" => (StacksEpochId::Epoch21, ClarityVersion::Clarity2),
-                    "cost-2" => (StacksEpochId::Epoch2_05, ClarityVersion::Clarity1),
-                    _ => (StacksEpochId::Epoch20, ClarityVersion::Clarity1),
-                };
-
-                let boot_contract = ClarityContract {
-                    code_source: ClarityCodeSource::ContractInMemory(code.to_string()),
-                    deployer: ContractDeployer::Address(deployer.to_address()),
-                    name: name.to_string(),
-                    epoch,
-                    clarity_version,
-                };
-                let (ast, _, _) = interpreter.build_ast(&boot_contract);
-                result.insert(
-                    boot_contract.expect_resolved_contract_identifier(None),
-                    (boot_contract, ast),
-                );
-            }
-        }
-        result
-    };
-}
-
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
 pub struct CostsReport {
     pub test_name: String,
     pub contract_id: String,
@@ -93,18 +42,17 @@ pub struct CostsReport {
     pub cost_result: CostSynthesis,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Session {
     pub settings: SessionSettings,
-    pub current_epoch: StacksEpochId,
     pub contracts: BTreeMap<QualifiedContractIdentifier, ParsedContract>,
     pub interpreter: ClarityInterpreter,
     api_reference: HashMap<String, String>,
-    pub coverage_reports: Vec<TestCoverageReport>,
-    pub costs_reports: Vec<CostsReport>,
     pub show_costs: bool,
     pub executed: Vec<String>,
     keywords_reference: HashMap<String, String>,
+
+    coverage_hook: Option<CoverageHook>,
 }
 
 impl Session {
@@ -119,16 +67,42 @@ impl Session {
         };
 
         Self {
-            interpreter: ClarityInterpreter::new(tx_sender, settings.repl_settings.clone()),
-            current_epoch: settings.epoch_id.unwrap_or(StacksEpochId::Epoch2_05),
+            interpreter: ClarityInterpreter::new(
+                tx_sender,
+                settings.repl_settings.clone(),
+                settings.cache_location.clone(),
+            ),
             contracts: BTreeMap::new(),
             api_reference: build_api_reference(),
-            coverage_reports: vec![],
-            costs_reports: vec![],
             show_costs: false,
             settings,
             executed: Vec::new(),
             keywords_reference: clarity_keywords(),
+
+            coverage_hook: None,
+        }
+    }
+
+    pub fn enable_coverage(&mut self) {
+        self.coverage_hook = Some(CoverageHook::new());
+    }
+
+    pub fn set_test_name(&mut self, name: String) {
+        if let Some(coverage_hook) = &mut self.coverage_hook {
+            coverage_hook.set_current_test_name(name);
+        }
+    }
+
+    pub fn collect_lcov_content(
+        &mut self,
+        asts: &BTreeMap<QualifiedContractIdentifier, ContractAST>,
+        contract_paths: &BTreeMap<String, String>,
+    ) -> String {
+        if let Some(coverage_hook) = &mut self.coverage_hook {
+            println!("Collecting coverage data...");
+            coverage_hook.collect_lcov_content(asts, contract_paths)
+        } else {
+            "".to_string()
         }
     }
 
@@ -148,9 +122,9 @@ impl Session {
 
     fn deploy_boot_contracts(&mut self, mainnet: bool) {
         let boot_code = if mainnet {
-            *STACKS_BOOT_CODE_MAINNET
+            *BOOT_CODE_MAINNET
         } else {
-            *STACKS_BOOT_CODE_TESTNET
+            *BOOT_CODE_TESTNET
         };
 
         let tx_sender = self.interpreter.get_tx_sender();
@@ -183,12 +157,12 @@ impl Session {
                 };
 
                 // Result ignored, boot contracts are trusted to be valid
-                let _ = self.deploy_contract(&contract, None, false, None, None);
+                let _ = self.deploy_contract(&contract, false, None);
             }
         }
     }
 
-    #[cfg(feature = "cli")]
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn process_console_input(
         &mut self,
         command: &str,
@@ -201,15 +175,15 @@ impl Session {
 
         let mut reload = false;
         match command {
-            #[cfg(feature = "cli")]
+            #[cfg(not(target_arch = "wasm32"))]
             cmd if cmd.starts_with("::reload") => reload = true,
-            #[cfg(feature = "cli")]
+            #[cfg(not(target_arch = "wasm32"))]
             cmd if cmd.starts_with("::read") => self.read(&mut output, cmd),
-            #[cfg(feature = "cli")]
+            #[cfg(not(target_arch = "wasm32"))]
             cmd if cmd.starts_with("::debug") => self.debug(&mut output, cmd),
-            #[cfg(feature = "cli")]
+            #[cfg(not(target_arch = "wasm32"))]
             cmd if cmd.starts_with("::trace") => self.trace(&mut output, cmd),
-            #[cfg(feature = "cli")]
+            #[cfg(not(target_arch = "wasm32"))]
             cmd if cmd.starts_with("::get_costs") => self.get_costs(&mut output, cmd),
 
             cmd if cmd.starts_with("::") => {
@@ -229,15 +203,15 @@ impl Session {
         match command {
             "::help" => self.display_help(),
 
-            #[cfg(feature = "cli")]
+            #[cfg(not(target_arch = "wasm32"))]
             cmd if cmd.starts_with("::functions") => self.display_functions(),
-            #[cfg(feature = "cli")]
+            #[cfg(not(target_arch = "wasm32"))]
             cmd if cmd.starts_with("::keywords") => self.keywords(),
-            #[cfg(feature = "cli")]
+            #[cfg(not(target_arch = "wasm32"))]
             cmd if cmd.starts_with("::describe") => self.display_doc(cmd),
-            #[cfg(feature = "cli")]
+            #[cfg(not(target_arch = "wasm32"))]
             cmd if cmd.starts_with("::toggle_costs") => self.toggle_costs(),
-            #[cfg(feature = "cli")]
+            #[cfg(not(target_arch = "wasm32"))]
             cmd if cmd.starts_with("::toggle_timings") => self.toggle_timings(),
 
             cmd if cmd.starts_with("::mint_stx") => self.mint_stx(cmd),
@@ -267,7 +241,7 @@ impl Session {
         }
     }
 
-    #[cfg(feature = "cli")]
+    #[cfg(not(target_arch = "wasm32"))]
     fn run_snippet(
         &mut self,
         output: &mut Vec<String>,
@@ -282,7 +256,7 @@ impl Session {
         ) {
             Ok((mut output, result)) => {
                 if let EvaluationResult::Contract(contract_result) = result.result.clone() {
-                    let snippet = format!("→ .{} contract successfully stored. Use (contract-call? ...) for invoking the public functions:", contract_result.contract.contract_identifier.clone());
+                    let snippet = format!("→ .{} contract successfully stored. Use (contract-call? ...) for invoking the public functions:", contract_result.contract.contract_identifier);
                     output.push(green!(snippet));
                 };
                 (output, result.cost.clone(), Ok(result))
@@ -297,60 +271,46 @@ impl Session {
                 "Limit".to_string(),
                 "Percentage".to_string(),
             ];
-            let mut headers_cells = vec![];
-            for header in headers.iter() {
-                headers_cells.push(Cell::new(header));
-            }
-            let mut table = Table::new();
-            table.add_row(Row::new(headers_cells));
-            table.add_row(Row::new(vec![
-                Cell::new("Runtime"),
-                Cell::new(&cost.total.runtime.to_string()),
-                Cell::new(&cost.limit.runtime.to_string()),
-                Cell::new(&(Self::get_costs_percentage(&cost.total.runtime, &cost.limit.runtime))),
-            ]));
-            table.add_row(Row::new(vec![
-                Cell::new("Read count"),
-                Cell::new(&cost.total.read_count.to_string()),
-                Cell::new(&cost.limit.read_count.to_string()),
-                Cell::new(
-                    &(Self::get_costs_percentage(&cost.total.read_count, &cost.limit.read_count)),
-                ),
-            ]));
-            table.add_row(Row::new(vec![
-                Cell::new("Read length (bytes)"),
-                Cell::new(&cost.total.read_length.to_string()),
-                Cell::new(&cost.limit.read_length.to_string()),
-                Cell::new(
-                    &(Self::get_costs_percentage(&cost.total.read_length, &cost.limit.read_length)),
-                ),
-            ]));
-            table.add_row(Row::new(vec![
-                Cell::new("Write count"),
-                Cell::new(&cost.total.write_count.to_string()),
-                Cell::new(&cost.limit.write_count.to_string()),
-                Cell::new(
-                    &(Self::get_costs_percentage(&cost.total.write_count, &cost.limit.write_count)),
-                ),
-            ]));
-            table.add_row(Row::new(vec![
-                Cell::new("Write length (bytes)"),
-                Cell::new(&cost.total.write_length.to_string()),
-                Cell::new(&cost.limit.write_length.to_string()),
-                Cell::new(
-                    &(Self::get_costs_percentage(
-                        &cost.total.write_length,
-                        &cost.limit.write_length,
-                    )),
-                ),
-            ]));
+
+            let mut table = comfy_table::Table::new();
+            table.add_row(headers);
+            table.add_row(vec![
+                "Runtime",
+                &cost.total.runtime.to_string(),
+                &cost.limit.runtime.to_string(),
+                &(Self::get_costs_percentage(&cost.total.runtime, &cost.limit.runtime)),
+            ]);
+            table.add_row(vec![
+                "Read count",
+                &cost.total.read_count.to_string(),
+                &cost.limit.read_count.to_string(),
+                &Self::get_costs_percentage(&cost.total.read_count, &cost.limit.read_count),
+            ]);
+            table.add_row(vec![
+                "Read length (bytes)",
+                &cost.total.read_length.to_string(),
+                &cost.limit.read_length.to_string(),
+                &Self::get_costs_percentage(&cost.total.read_length, &cost.limit.read_length),
+            ]);
+            table.add_row(vec![
+                "Write count",
+                &cost.total.write_count.to_string(),
+                &cost.limit.write_count.to_string(),
+                &Self::get_costs_percentage(&cost.total.write_count, &cost.limit.write_count),
+            ]);
+            table.add_row(vec![
+                "Write length (bytes)",
+                &cost.total.write_length.to_string(),
+                &cost.limit.write_length.to_string(),
+                &(Self::get_costs_percentage(&cost.total.write_length, &cost.limit.write_length)),
+            ]);
             output.push(format!("{}", table));
         }
         output.append(&mut result);
         execution_result
     }
 
-    #[cfg(feature = "cli")]
+    #[cfg(not(target_arch = "wasm32"))]
     fn get_costs_percentage(consumed: &u64, limit: &u64) -> String {
         let calc = (*consumed as f64 / *limit as f64) * 100_f64;
 
@@ -359,13 +319,12 @@ impl Session {
 
     pub fn formatted_interpretation(
         &mut self,
-        // @TODO: should be &str, it implies 80+ changes in unit tests
         snippet: String,
         name: Option<String>,
         cost_track: bool,
         eval_hooks: Option<Vec<&mut dyn EvalHook>>,
     ) -> Result<(Vec<String>, ExecutionResult), (Vec<String>, Vec<Diagnostic>)> {
-        let result = self.eval(snippet.to_string(), eval_hooks, cost_track);
+        let result = self.eval_with_hooks(snippet.to_string(), eval_hooks, cost_track);
         let mut output = Vec::<String>::new();
         let formatted_lines: Vec<String> = snippet.lines().map(|l| l.to_string()).collect();
         let contract_name = name.unwrap_or("<stdin>".to_string());
@@ -382,7 +341,7 @@ impl Session {
                 if !result.events.is_empty() {
                     output.push(black!("Events emitted"));
                     for event in result.events.iter() {
-                        output.push(black!(format!("{}", utils::serialize_event(event))));
+                        output.push(black!(format!("{}", serialize_event(event))));
                     }
                 }
                 match &result.result {
@@ -392,7 +351,7 @@ impl Session {
                         }
                     }
                     EvaluationResult::Snippet(snippet_result) => {
-                        output.push(format!("{}", snippet_result.result).green().to_string())
+                        output.push(value_to_string(&snippet_result.result).green().to_string())
                     }
                 }
                 Ok((output, result))
@@ -406,7 +365,7 @@ impl Session {
         }
     }
 
-    #[cfg(feature = "cli")]
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn debug(&mut self, output: &mut Vec<String>, cmd: &str) {
         use crate::repl::debug::cli::CLIDebugger;
 
@@ -425,7 +384,7 @@ impl Session {
         ) {
             Ok((mut output, result)) => {
                 if let EvaluationResult::Contract(contract_result) = result.result {
-                    let snippet = format!("→ .{} contract successfully stored. Use (contract-call? ...) for invoking the public functions:", contract_result.contract.contract_identifier.clone());
+                    let snippet = format!("→ .{} contract successfully stored. Use (contract-call? ...) for invoking the public functions:", contract_result.contract.contract_identifier);
                     output.push(snippet.green().to_string());
                 };
                 output
@@ -435,7 +394,7 @@ impl Session {
         output.append(&mut result);
     }
 
-    #[cfg(feature = "cli")]
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn trace(&mut self, output: &mut Vec<String>, cmd: &str) {
         use super::tracer::Tracer;
 
@@ -446,7 +405,7 @@ impl Session {
 
         let mut tracer = Tracer::new(snippet.to_string());
 
-        match self.eval(snippet.to_string(), Some(vec![&mut tracer]), false) {
+        match self.eval_with_hooks(snippet.to_string(), Some(vec![&mut tracer]), false) {
             Ok(_) => (),
             Err(diagnostics) => {
                 let lines = snippet.lines();
@@ -458,7 +417,7 @@ impl Session {
         };
     }
 
-    #[cfg(feature = "cli")]
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn start(&mut self) -> Result<(String, Vec<(ContractAnalysis, String, String)>), String> {
         let mut output_err = Vec::<String>::new();
         let output = Vec::<String>::new();
@@ -495,7 +454,7 @@ impl Session {
         }
     }
 
-    #[cfg(feature = "cli")]
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn read(&mut self, output: &mut Vec<String>, cmd: &str) {
         let filename = match cmd.split_once(' ') {
             Some((_, filename)) => filename,
@@ -519,29 +478,33 @@ impl Session {
         amount: u64,
         recipient: &str,
     ) -> Result<ExecutionResult, Vec<Diagnostic>> {
-        let snippet = format!("(stx-transfer? u{} tx-sender '{})", amount, recipient);
-        self.eval(snippet.clone(), None, false)
+        let snippet = format!("(stx-transfer? u{amount} tx-sender '{recipient})");
+        self.eval(snippet, false)
     }
 
     pub fn deploy_contract(
         &mut self,
         contract: &ClarityContract,
-        eval_hooks: Option<Vec<&mut dyn EvalHook>>,
         cost_track: bool,
-        test_name: Option<String>,
         ast: Option<&ContractAST>,
     ) -> Result<ExecutionResult, Vec<Diagnostic>> {
-        if contract.epoch != self.current_epoch {
+        let current_epoch = self.interpreter.datastore.get_current_epoch();
+        if contract.epoch != current_epoch {
             let diagnostic = Diagnostic {
                 level: Level::Error,
                 message: format!(
                     "contract epoch ({}) does not match current epoch ({})",
-                    contract.epoch, self.current_epoch
+                    contract.epoch, current_epoch
                 ),
                 spans: vec![],
                 suggestion: None,
             };
             return Err(vec![diagnostic]);
+        }
+
+        let mut hooks: Vec<&mut dyn EvalHook> = vec![];
+        if let Some(ref mut coverage_hook) = self.coverage_hook {
+            hooks.push(coverage_hook);
         }
 
         if contract.clarity_version > ClarityVersion::default_for_epoch(contract.epoch) {
@@ -556,32 +519,17 @@ impl Session {
             };
             return Err(vec![diagnostic]);
         }
-        let mut hooks: Vec<&mut dyn EvalHook> = Vec::new();
-        let mut coverage = test_name.map(TestCoverageReport::new);
-        if let Some(coverage) = &mut coverage {
-            hooks.push(coverage);
-        };
-
-        if let Some(mut in_hooks) = eval_hooks {
-            for hook in in_hooks.drain(..) {
-                hooks.push(hook);
-            }
-        }
 
         let contract_id =
             contract.expect_resolved_contract_identifier(Some(&self.interpreter.get_tx_sender()));
 
         let result = self.interpreter.run(contract, ast, cost_track, Some(hooks));
 
-        result.map(|result| {
+        result.inspect(|result| {
             if let EvaluationResult::Contract(contract_result) = &result.result {
                 self.contracts
                     .insert(contract_id.clone(), contract_result.contract.clone());
             }
-            if let Some(coverage) = coverage {
-                self.coverage_reports.push(coverage);
-            }
-            result
         })
     }
 
@@ -593,36 +541,33 @@ impl Session {
         sender: &str,
         allow_private: bool,
         track_costs: bool,
-        track_coverage: bool,
-        test_name: String,
     ) -> Result<ExecutionResult, Vec<Diagnostic>> {
         let initial_tx_sender = self.get_tx_sender();
+
         // Handle fully qualified contract_id and sugared syntax
         let contract_id_str = if contract.starts_with('S') {
             contract.to_string()
         } else {
             format!("{}.{}", initial_tx_sender, contract)
         };
-        let contract_id = QualifiedContractIdentifier::parse(&contract_id_str).unwrap();
-
-        let mut hooks: Vec<&mut dyn EvalHook> = vec![];
-        let mut coverage = TestCoverageReport::new(test_name.clone());
-        if track_coverage {
-            hooks.push(&mut coverage);
-        }
-
-        let clarity_version = ClarityVersion::default_for_epoch(self.current_epoch);
 
         self.set_tx_sender(sender);
+
+        let mut hooks: Vec<&mut dyn EvalHook> = vec![];
+        if let Some(ref mut coverage_hook) = self.coverage_hook {
+            hooks.push(coverage_hook);
+        }
+
+        let current_epoch = self.interpreter.datastore.get_current_epoch();
         let execution = match self.interpreter.call_contract_fn(
-            &contract_id,
+            &QualifiedContractIdentifier::parse(&contract_id_str).unwrap(),
             method,
             args,
-            self.current_epoch,
-            clarity_version,
+            current_epoch,
+            ClarityVersion::default_for_epoch(current_epoch),
             track_costs,
             allow_private,
-            Some(hooks),
+            hooks,
         ) {
             Ok(result) => result,
             Err(e) => {
@@ -637,50 +582,83 @@ impl Session {
         };
         self.set_tx_sender(&initial_tx_sender);
 
-        if track_coverage {
-            self.coverage_reports.push(coverage);
-        }
-
-        if let Some(ref cost) = execution.cost {
-            self.costs_reports.push(CostsReport {
-                test_name,
-                contract_id: contract_id_str,
-                method: method.to_string(),
-                args: args.iter().map(|a| a.to_string()).collect(),
-                cost_result: cost.clone(),
-            });
-        }
-
         Ok(execution)
     }
 
+    /// Run a snippet as a contract deployment
     pub fn eval(
+        &mut self,
+        snippet: String,
+        cost_track: bool,
+    ) -> Result<ExecutionResult, Vec<Diagnostic>> {
+        let current_epoch = self.interpreter.datastore.get_current_epoch();
+        let contract = ClarityContract {
+            code_source: ClarityCodeSource::ContractInMemory(snippet),
+            name: format!("contract-{}", self.contracts.len()),
+            deployer: ContractDeployer::DefaultDeployer,
+            clarity_version: ClarityVersion::default_for_epoch(current_epoch),
+            epoch: current_epoch,
+        };
+        let contract_identifier =
+            contract.expect_resolved_contract_identifier(Some(&self.interpreter.get_tx_sender()));
+
+        let mut hooks: Vec<&mut dyn EvalHook> = vec![];
+        if let Some(ref mut coverage_hook) = self.coverage_hook {
+            hooks.push(coverage_hook);
+        }
+
+        let result = self
+            .interpreter
+            .run(&contract, None, cost_track, Some(hooks));
+
+        match result {
+            Ok(result) => {
+                if let EvaluationResult::Contract(contract_result) = &result.result {
+                    self.contracts
+                        .insert(contract_identifier, contract_result.contract.clone());
+                };
+                Ok(result)
+            }
+            Err(res) => Err(res),
+        }
+    }
+
+    /// Evaluate a Clarity snippet in order to use it as Clarity function arguments
+    pub fn eval_clarity_string(&mut self, snippet: &str) -> SymbolicExpression {
+        let eval_result = self.eval(snippet.to_string(), false);
+        let value = match eval_result.unwrap().result {
+            EvaluationResult::Contract(_) => unreachable!(),
+            EvaluationResult::Snippet(snippet_result) => snippet_result.result,
+        };
+        SymbolicExpression::atom_value(value)
+    }
+
+    pub fn eval_with_hooks(
         &mut self,
         snippet: String,
         eval_hooks: Option<Vec<&mut dyn EvalHook>>,
         cost_track: bool,
     ) -> Result<ExecutionResult, Vec<Diagnostic>> {
+        let current_epoch = self.interpreter.datastore.get_current_epoch();
         let contract = ClarityContract {
             code_source: ClarityCodeSource::ContractInMemory(snippet),
             name: format!("contract-{}", self.contracts.len()),
             deployer: ContractDeployer::DefaultDeployer,
-            clarity_version: ClarityVersion::default_for_epoch(self.current_epoch),
-            epoch: self.current_epoch,
+            clarity_version: ClarityVersion::default_for_epoch(current_epoch),
+            epoch: current_epoch,
         };
         let contract_identifier =
             contract.expect_resolved_contract_identifier(Some(&self.interpreter.get_tx_sender()));
 
         let result = self
             .interpreter
-            .run(&contract.clone(), None, cost_track, eval_hooks);
+            .run(&contract, None, cost_track, eval_hooks);
 
         match result {
             Ok(result) => {
                 if let EvaluationResult::Contract(contract_result) = &result.result {
-                    self.contracts.insert(
-                        contract_identifier.clone(),
-                        contract_result.contract.clone(),
-                    );
+                    self.contracts
+                        .insert(contract_identifier, contract_result.contract.clone());
                 };
                 Ok(result)
             }
@@ -700,7 +678,7 @@ impl Session {
         let mut keys = self
             .api_reference
             .keys()
-            .map(|k| k.to_string())
+            .map(String::from)
             .collect::<Vec<String>>();
         keys.sort();
         keys
@@ -710,7 +688,7 @@ impl Session {
         let mut keys = self
             .keywords_reference
             .keys()
-            .map(|k| k.to_string())
+            .map(String::from)
             .collect::<Vec<String>>();
         keys.sort();
         keys
@@ -719,27 +697,27 @@ impl Session {
     fn display_help(&self) -> String {
         let mut output: Vec<String> = vec![];
 
-        #[cfg(feature = "cli")]
+        #[cfg(not(target_arch = "wasm32"))]
         output.push(format!(
             "{}",
             "::functions\t\t\t\tDisplay all the native functions available in clarity".yellow()
         ));
-        #[cfg(feature = "cli")]
+        #[cfg(not(target_arch = "wasm32"))]
         output.push(format!(
             "{}",
             "::keywords\t\t\t\tDisplay all the native keywords available in clarity".yellow()
         ));
-        #[cfg(feature = "cli")]
+        #[cfg(not(target_arch = "wasm32"))]
         output.push(format!(
             "{}",
                 "::describe <function> | <keyword>\tDisplay documentation for a given native function or keyword".yellow()
         ));
-        #[cfg(feature = "cli")]
+        #[cfg(not(target_arch = "wasm32"))]
         output.push(format!(
             "{}",
             "::toggle_costs\t\t\t\tDisplay cost analysis after every expression".yellow()
         ));
-        #[cfg(feature = "cli")]
+        #[cfg(not(target_arch = "wasm32"))]
         output.push(format!(
             "{}",
             "::toggle_timings\t\t\tDisplay the execution duration".yellow()
@@ -787,27 +765,27 @@ impl Session {
             "::get_epoch\t\t\t\tGet current epoch".yellow()
         ));
 
-        #[cfg(feature = "cli")]
+        #[cfg(not(target_arch = "wasm32"))]
         output.push(format!(
             "{}",
             "::debug <expr>\t\t\t\tStart an interactive debug session executing <expr>".yellow()
         ));
-        #[cfg(feature = "cli")]
+        #[cfg(not(target_arch = "wasm32"))]
         output.push(format!(
             "{}",
             "::trace <expr>\t\t\t\tGenerate an execution trace for <expr>".yellow()
         ));
-        #[cfg(feature = "cli")]
+        #[cfg(not(target_arch = "wasm32"))]
         output.push(format!(
             "{}",
             "::get_costs <expr>\t\t\tDisplay the cost analysis".yellow()
         ));
-        #[cfg(feature = "cli")]
+        #[cfg(not(target_arch = "wasm32"))]
         output.push(format!(
             "{}",
             "::reload \t\t\t\tReload the existing contract(s) in the session".yellow()
         ));
-        #[cfg(feature = "cli")]
+        #[cfg(not(target_arch = "wasm32"))]
         output.push(format!(
             "{}",
             "::read <filename>\t\t\tRead expressions from a file".yellow()
@@ -826,24 +804,55 @@ impl Session {
         output.join("\n")
     }
 
-    fn parse_and_advance_stacks_chain_tip(&mut self, command: &str) -> String {
-        let args: Vec<_> = command.split(' ').collect();
-
-        if args.len() != 2 {
-            return format!("{}", "Usage: ::advance_stacks_chain_tip <count>".red());
-        }
-
-        let count = match args[1].parse::<u32>() {
+    fn parse_and_advance_chain_tip(&mut self, command: &str) -> String {
+        let args: Vec<_> = command.split(' ').skip(1).collect();
+        let count = match args.first().unwrap_or(&"1").parse::<u32>() {
             Ok(count) => count,
-            _ => {
-                return format!("{}", "Unable to parse count".red());
-            }
+            _ => return format!("{}", "Unable to parse count".red()),
+        };
+
+        let _ = self.advance_chain_tip(count);
+        format!(
+            "new burn height: {}\nnew stacks height: {}",
+            self.interpreter.datastore.get_current_burn_block_height(),
+            self.interpreter.datastore.get_current_stacks_block_height(),
+        )
+        .green()
+        .to_string()
+    }
+
+    fn parse_and_advance_burn_chain_tip(&mut self, command: &str) -> String {
+        let args: Vec<_> = command.split(' ').skip(1).collect();
+        let count = match args.first().unwrap_or(&"1").parse::<u32>() {
+            Ok(count) => count,
+            _ => return format!("{}", "Unable to parse count".red()),
+        };
+
+        let _ = self.advance_burn_chain_tip(count);
+        format!(
+            "new burn height: {}\nnew stacks height: {}",
+            self.interpreter.datastore.get_current_burn_block_height(),
+            self.interpreter.datastore.get_current_stacks_block_height(),
+        )
+        .green()
+        .to_string()
+    }
+
+    fn parse_and_advance_stacks_chain_tip(&mut self, command: &str) -> String {
+        let args: Vec<_> = command.split(' ').skip(1).collect();
+        let count = match args.first().unwrap_or(&"1").parse::<u32>() {
+            Ok(count) => count,
+            _ => return format!("{}", "Unable to parse count".red()),
         };
 
         match self.advance_stacks_chain_tip(count) {
-            Ok(new_height) => format!("{} blocks simulated, new height: {}", count, new_height)
-                .green()
-                .to_string(),
+            Ok(_) => format!(
+                "new burn height: {}\nnew stacks height: {}",
+                self.interpreter.datastore.get_current_burn_block_height(),
+                self.interpreter.datastore.get_current_stacks_block_height(),
+            )
+            .green()
+            .to_string(),
             Err(_) => format!(
                 "{}",
                 "advance_stacks_chain_tip can't be called in epoch lower than 3.0".red()
@@ -851,53 +860,24 @@ impl Session {
         }
     }
 
-    fn parse_and_advance_chain_tip(&mut self, command: &str) -> String {
-        let args: Vec<_> = command.split(' ').collect();
-
-        if args.len() != 2 {
-            return format!("{}", "Usage: ::advance_chain_tip <count>".red());
-        }
-
-        let count = match args[1].parse::<u32>() {
-            Ok(count) => count,
-            _ => {
-                return format!("{}", "Unable to parse count".red());
+    pub fn advance_chain_tip(&mut self, count: u32) -> u32 {
+        let current_epoch = self.interpreter.datastore.get_current_epoch();
+        if current_epoch < StacksEpochId::Epoch30 {
+            self.advance_burn_chain_tip(count)
+        } else {
+            match self.advance_stacks_chain_tip(count) {
+                Ok(count) => count,
+                Err(_) => unreachable!("Epoch checked already"),
             }
-        };
-
-        let new_height = self.advance_chain_tip(count);
-        format!("{} blocks simulated, new height: {}", count, new_height)
-            .green()
-            .to_string()
+        }
     }
-    fn parse_and_advance_burn_chain_tip(&mut self, command: &str) -> String {
-        let args: Vec<_> = command.split(' ').collect();
 
-        if args.len() != 2 {
-            return format!("{}", "Usage: ::advance_burn_chain_tip <count>".red());
-        }
-
-        let count = match args[1].parse::<u32>() {
-            Ok(count) => count,
-            _ => {
-                return format!("{}", "Unable to parse count".red());
-            }
-        };
-
-        let new_height = self.advance_burn_chain_tip(count);
-        format!("{} blocks simulated, new height: {}", count, new_height)
-            .green()
-            .to_string()
+    pub fn advance_burn_chain_tip(&mut self, count: u32) -> u32 {
+        self.interpreter.advance_burn_chain_tip(count)
     }
 
     pub fn advance_stacks_chain_tip(&mut self, count: u32) -> Result<u32, String> {
         self.interpreter.advance_stacks_chain_tip(count)
-    }
-    pub fn advance_burn_chain_tip(&mut self, count: u32) -> u32 {
-        self.interpreter.advance_burn_chain_tip(count)
-    }
-    pub fn advance_chain_tip(&mut self, count: u32) -> u32 {
-        self.interpreter.advance_chain_tip(count)
     }
 
     fn parse_and_set_tx_sender(&mut self, command: &str) -> String {
@@ -967,7 +947,8 @@ impl Session {
     }
 
     pub fn get_epoch(&mut self) -> String {
-        format!("Current epoch: {}", self.current_epoch)
+        let current_epoch = self.interpreter.datastore.get_current_epoch();
+        format!("Current epoch: {}", current_epoch)
     }
 
     pub fn set_epoch(&mut self, cmd: &str) -> String {
@@ -980,8 +961,9 @@ impl Session {
             Some("2.4") => StacksEpochId::Epoch24,
             Some("2.5") => StacksEpochId::Epoch25,
             Some("3.0") => StacksEpochId::Epoch30,
+            Some("3.1") => StacksEpochId::Epoch31,
             _ => {
-                return "Usage: ::set_epoch 2.0 | 2.05 | 2.1 | 2.2 | 2.3 | 2.4 | 2.5 | 3.0"
+                return "Usage: ::set_epoch 2.0 | 2.05 | 2.1 | 2.2 | 2.3 | 2.4 | 2.5 | 3.0 | 3.1"
                     .red()
                     .to_string()
             }
@@ -991,8 +973,7 @@ impl Session {
     }
 
     pub fn update_epoch(&mut self, epoch: StacksEpochId) {
-        self.current_epoch = epoch;
-        self.interpreter.burn_datastore.set_current_epoch(epoch);
+        self.interpreter.set_current_epoch(epoch);
         if epoch >= StacksEpochId::Epoch30 {
             self.interpreter.set_tenure_height();
         }
@@ -1004,7 +985,7 @@ impl Session {
             _ => return "Usage: ::encode <expr>".red().to_string(),
         };
 
-        let result = self.eval(snippet.to_string(), None, false);
+        let result = self.eval(snippet.to_string(), false);
         match result {
             Ok(result) => {
                 let mut tx_bytes = vec![];
@@ -1057,7 +1038,7 @@ impl Session {
         format!("{}", value_to_string(&value).green())
     }
 
-    #[cfg(feature = "cli")]
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn get_costs(&mut self, output: &mut Vec<String>, cmd: &str) {
         let expr = match cmd.split_once(' ') {
             Some((_, expr)) => expr,
@@ -1083,43 +1064,42 @@ impl Session {
             }
         }
 
-        let mut headers_cells = vec![];
-        for header in headers.iter() {
-            headers_cells.push(Cell::new(header));
-        }
         let mut table = Table::new();
-        table.add_row(Row::new(headers_cells));
+        table.add_row(headers);
         for account in accounts.iter() {
             let mut cells = vec![];
 
             if let Some(name) = self.get_account_name(account) {
-                cells.push(Cell::new(&format!("{} ({})", account, name)));
+                cells.push(format!("{} ({})", account, name));
             } else {
-                cells.push(Cell::new(account));
+                cells.push(account.to_string());
             }
 
             for token in tokens.iter() {
                 let balance = self.interpreter.get_balance_for_account(account, token);
-                cells.push(Cell::new(&format!("{}", balance)));
+                cells.push(format!("{}", balance));
             }
-            table.add_row(Row::new(cells));
+            table.add_row(cells);
         }
         Some(format!("{}", table))
     }
 
-    #[cfg(feature = "cli")]
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn get_contracts(&self) -> Option<String> {
+        use super::boot::{BOOT_MAINNET_ADDRESS, BOOT_TESTNET_ADDRESS, SBTC_MAINNET_ADDRESS};
+
         if self.contracts.is_empty() {
             return None;
         }
 
         let mut table = Table::new();
-        table.add_row(row!["Contract identifier", "Public functions"]);
+        table.add_row(["Contract identifier", "Public functions"]);
         let contracts = self.contracts.clone();
         for (contract_id, contract) in contracts.iter() {
             let contract_id_str = contract_id.to_string();
             if !contract_id_str.starts_with(BOOT_TESTNET_ADDRESS)
                 && !contract_id_str.starts_with(BOOT_MAINNET_ADDRESS)
+                && !contract_id_str.starts_with(SBTC_MAINNET_ADDRESS)
             {
                 let mut formatted_methods = vec![];
                 for (method_name, method_args) in contract.function_args.iter() {
@@ -1133,16 +1113,13 @@ impl Session {
                     formatted_methods.push(format!("({}{})", method_name, formatted_args));
                 }
                 let formatted_spec = formatted_methods.join("\n").to_string();
-                table.add_row(Row::new(vec![
-                    Cell::new(&contract_id_str),
-                    Cell::new(&formatted_spec),
-                ]));
+                table.add_row(vec![&contract_id_str, &formatted_spec]);
             }
         }
         Some(format!("{}", table))
     }
 
-    #[cfg(not(feature = "cli"))]
+    #[cfg(target_arch = "wasm32")]
     fn get_contracts(&self) -> Option<String> {
         if self.contracts.is_empty() {
             return None;
@@ -1181,13 +1158,13 @@ impl Session {
         }
     }
 
-    #[cfg(feature = "cli")]
+    #[cfg(not(target_arch = "wasm32"))]
     fn display_functions(&self) -> String {
         let api_reference_index = self.get_api_reference_index();
         format!("{}", api_reference_index.join("\n").yellow())
     }
 
-    #[cfg(feature = "cli")]
+    #[cfg(not(target_arch = "wasm32"))]
     fn display_doc(&self, command: &str) -> String {
         let keyword = {
             let mut s = command.to_string();
@@ -1205,7 +1182,7 @@ impl Session {
         }
     }
 
-    #[cfg(feature = "cli")]
+    #[cfg(not(target_arch = "wasm32"))]
     fn keywords(&self) -> String {
         let keywords = self.get_clarity_keywords();
         format!("{}", keywords.join("\n").yellow())
@@ -1307,10 +1284,27 @@ fn clarity_keywords() -> HashMap<String, String> {
 #[allow(clippy::items_after_test_module)]
 #[cfg(test)]
 mod tests {
-    use clarity::vm::types::TupleData;
+    use clarity::{util::hash::hex_bytes, vm::types::TupleData};
 
     use super::*;
-    use crate::{repl::settings::Account, test_fixtures::clarity_contract::ClarityContractBuilder};
+    use crate::{
+        repl::{
+            boot::{BOOT_MAINNET_ADDRESS, BOOT_TESTNET_ADDRESS},
+            settings::Account,
+            DEFAULT_EPOCH,
+        },
+        test_fixtures::clarity_contract::ClarityContractBuilder,
+    };
+
+    #[track_caller]
+    fn run_session_snippet(session: &mut Session, snippet: &str) -> Value {
+        let execution_res = session.eval(snippet.to_string(), false).unwrap();
+        let res = match execution_res.result {
+            EvaluationResult::Contract(_) => unreachable!(),
+            EvaluationResult::Snippet(res) => res,
+        };
+        res.result
+    }
 
     #[track_caller]
     fn assert_execution_result_value(
@@ -1347,7 +1341,7 @@ mod tests {
         let mut session = Session::new(SessionSettings::default());
         session.update_epoch(StacksEpochId::Epoch20);
         let diags = session
-            .eval("(slice? \"blockstack\" u5 u10)".into(), None, false)
+            .eval("(slice? \"blockstack\" u5 u10)".into(), false)
             .unwrap_err();
         assert_eq!(
             diags[0].message,
@@ -1355,7 +1349,7 @@ mod tests {
         );
         session.update_epoch(StacksEpochId::Epoch21);
         let res = session
-            .eval("(slice? \"blockstack\" u5 u10)".into(), None, false)
+            .eval("(slice? \"blockstack\" u5 u10)".into(), false)
             .unwrap();
         let res = match res.result {
             EvaluationResult::Contract(_) => unreachable!(),
@@ -1382,7 +1376,7 @@ mod tests {
         session.handle_command("::set_epoch 3.0");
         let _ = session.handle_command("::advance_stacks_chain_tip 1");
         let new_height = session.handle_command("::get_stacks_block_height");
-        assert_eq!(new_height, "Current height: 1");
+        assert_eq!(new_height, "Current height: 2");
     }
 
     #[test]
@@ -1391,7 +1385,7 @@ mod tests {
         let result = session.handle_command("::advance_burn_chain_tip 1");
         assert_eq!(
             result,
-            "1 blocks simulated, new height: 1"
+            "new burn height: 1\nnew stacks height: 1"
                 .to_string()
                 .green()
                 .to_string()
@@ -1400,7 +1394,7 @@ mod tests {
         let result = session.handle_command("::advance_chain_tip 1");
         assert_eq!(
             result,
-            "1 blocks simulated, new height: 2"
+            "new burn height: 2\nnew stacks height: 2"
                 .to_string()
                 .green()
                 .to_string()
@@ -1414,23 +1408,25 @@ mod tests {
         let result = session.handle_command("::advance_burn_chain_tip 1");
         assert_eq!(
             result,
-            "1 blocks simulated, new height: 1"
+            "new burn height: 2\nnew stacks height: 2"
                 .to_string()
                 .green()
                 .to_string()
         );
         let new_height = session.handle_command("::get_stacks_block_height");
-        assert_eq!(new_height, "Current height: 1");
+        assert_eq!(new_height, "Current height: 2");
         // advance_chain_tip will only affect stacks height in epoch 3 or greater
         let _ = session.handle_command("::advance_chain_tip 1");
         let new_height = session.handle_command("::get_stacks_block_height");
-        assert_eq!(new_height, "Current height: 2");
+        assert_eq!(new_height, "Current height: 3");
         let new_height = session.handle_command("::get_burn_block_height");
-        assert_eq!(new_height, "Current height: 1");
+        assert_eq!(new_height, "Current height: 2");
     }
+
     #[test]
     fn set_epoch_command() {
         let mut session = Session::new(SessionSettings::default());
+        let initial_block_height = session.interpreter.get_block_height();
         let initial_epoch = session.handle_command("::get_epoch");
         // initial epoch is 2.05
         assert_eq!(initial_epoch, "Current epoch: 2.05");
@@ -1446,9 +1442,18 @@ mod tests {
         let current_epoch = session.handle_command("::get_epoch");
         assert_eq!(current_epoch, "Current epoch: 2.4");
 
+        // changing epoch in 2.x does not impact the block height
+        assert_eq!(session.interpreter.get_block_height(), initial_block_height);
+
         session.handle_command("::set_epoch 3.0");
         let current_epoch = session.handle_command("::get_epoch");
         assert_eq!(current_epoch, "Current epoch: 3.0");
+
+        // changing epoch in 3.x increments the block height
+        assert_eq!(
+            session.interpreter.get_block_height(),
+            initial_block_height + 1
+        );
     }
 
     #[test]
@@ -1465,7 +1470,7 @@ mod tests {
             result.split('\n').next().unwrap(),
             format!(
                 "encode:1:1: {} use of unresolved function 'foo'",
-                "error:".red()
+                "error:".red().bold()
             )
         );
     }
@@ -1520,7 +1525,7 @@ mod tests {
             epoch: StacksEpochId::Epoch2_05,
         };
 
-        let result = session.deploy_contract(&contract, None, false, None, None);
+        let result = session.deploy_contract(&contract, false, None);
         assert!(result.is_err(), "Expected error for clarity mismatch");
     }
 
@@ -1538,13 +1543,40 @@ mod tests {
             .clarity_version(ClarityVersion::Clarity2)
             .build();
 
-        let result = session.deploy_contract(&contract, None, false, None, None);
+        let result = session.deploy_contract(&contract, false, None);
         assert!(result.is_err());
         let err = result.unwrap_err();
         assert!(err.len() == 1);
         assert_eq!(
             err.first().unwrap().message,
             "contract epoch (2.5) does not match current epoch (2.4)"
+        );
+    }
+
+    #[test]
+    fn test_eval_clarity_string() {
+        let mut session = Session::new(SessionSettings::default());
+        let epoch = StacksEpochId::Epoch25;
+        session.update_epoch(epoch);
+
+        let result = session.eval_clarity_string("u1");
+        assert_eq!(result, SymbolicExpression::atom_value(Value::UInt(1)));
+
+        let result = session.eval_clarity_string("(+ 1 2)");
+        assert_eq!(result, SymbolicExpression::atom_value(Value::Int(3)));
+
+        let result = session.eval_clarity_string("(list u1 u2)");
+        assert_eq!(
+            result,
+            SymbolicExpression::atom_value(
+                Value::cons_list_unsanitized(vec![Value::UInt(1), Value::UInt(2)]).unwrap()
+            )
+        );
+
+        let result = session.eval_clarity_string("0x01");
+        assert_eq!(
+            result,
+            SymbolicExpression::atom_value(Value::buff_from_byte(0x01))
         );
     }
 
@@ -1578,7 +1610,7 @@ mod tests {
             epoch: StacksEpochId::Epoch25,
         };
 
-        let _ = session.deploy_contract(&contract, None, false, None, None);
+        let _ = session.deploy_contract(&contract, false, None);
 
         // assert data-var is set to 0
         assert_eq!(
@@ -1603,6 +1635,10 @@ mod tests {
                 .1[0],
             "u1".green().to_string()
         );
+
+        assert_eq!(session.process_console_input("(at-block (unwrap-panic (get-block-info? id-header-hash u0)) burn-block-height)").1[0], "u0".green().to_string());
+        assert_eq!(session.process_console_input("(at-block (unwrap-panic (get-block-info? id-header-hash u5000)) burn-block-height)").1[0], "u4999".green().to_string());
+
         assert_eq!(session.process_console_input("(at-block (unwrap-panic (get-block-info? id-header-hash u0)) (contract-call? .contract get-x))").1[0], "u0".green().to_string());
         assert_eq!(session.process_console_input("(at-block (unwrap-panic (get-block-info? id-header-hash u5000)) (contract-call? .contract get-x))").1[0], "u0".green().to_string());
 
@@ -1625,6 +1661,12 @@ mod tests {
             "u2".green().to_string()
         );
         assert_eq!(session.process_console_input("(at-block (unwrap-panic (get-block-info? id-header-hash u10000)) (contract-call? .contract get-x))").1[0], "u1".green().to_string());
+
+        session.handle_command("::set_epoch 3.1");
+
+        let _ = session.advance_burn_chain_tip(10000);
+
+        assert_eq!(session.process_console_input("(at-block (unwrap-panic (get-stacks-block-info? id-header-hash u19000)) burn-block-height)").1[0], "u20021".green().to_string());
     }
 
     #[test]
@@ -1632,11 +1674,11 @@ mod tests {
         let settings = SessionSettings::default();
         let mut session = Session::new(settings);
         session.start().expect("session could not start");
-        session.update_epoch(StacksEpochId::Epoch25);
+        session.update_epoch(DEFAULT_EPOCH);
 
         // deploy default contract
         let contract = ClarityContractBuilder::default().build();
-        let result = session.deploy_contract(&contract, None, false, None, None);
+        let result = session.deploy_contract(&contract, false, None);
         assert!(result.is_ok());
     }
 
@@ -1658,8 +1700,6 @@ mod tests {
             BOOT_TESTNET_ADDRESS,
             false,
             false,
-            false,
-            "test".to_string(),
         );
         assert_execution_result_value(
             &result,
@@ -1683,13 +1723,11 @@ mod tests {
         let settings = SessionSettings::default();
         let mut session = Session::new(settings);
         session.start().expect("session could not start");
-        session.update_epoch(StacksEpochId::Epoch25);
+        session.update_epoch(DEFAULT_EPOCH);
 
         // deploy default contract
         let contract = ClarityContractBuilder::default().build();
-        let _ = session.deploy_contract(&contract, None, false, None, None);
-
-        dbg!(&contract);
+        let _ = session.deploy_contract(&contract, false, None);
 
         let result = session.call_contract_fn(
             "contract",
@@ -1698,8 +1736,6 @@ mod tests {
             &session.get_tx_sender(),
             false,
             false,
-            false,
-            "test".to_owned(),
         );
         assert_execution_result_value(&result, Value::okay(Value::UInt(1)).unwrap());
 
@@ -1710,9 +1746,184 @@ mod tests {
             &session.get_tx_sender(),
             false,
             false,
-            false,
-            "test".to_owned(),
         );
         assert_execution_result_value(&result, Value::UInt(1));
+    }
+
+    #[test]
+    fn current_block_info_is_none() {
+        let settings = SessionSettings::default();
+        let mut session = Session::new(settings);
+        session.start().expect("session could not start");
+        session.update_epoch(StacksEpochId::Epoch25);
+
+        session.advance_chain_tip(5);
+        let result = run_session_snippet(&mut session, "(get-block-info? time block-height)");
+        assert_eq!(result, Value::none());
+    }
+
+    #[test]
+    fn block_time_is_realistic_in_epoch_2_5() {
+        let settings = SessionSettings::default();
+        let mut session = Session::new(settings);
+        session.start().expect("session could not start");
+        session.update_epoch(StacksEpochId::Epoch25);
+
+        session.advance_chain_tip(4);
+
+        let result = run_session_snippet(&mut session, "(get-block-info? time u2)");
+        let time_block_1 = match result.expect_optional() {
+            Ok(Some(Value::UInt(time))) => time,
+            _ => panic!("Unexpected result"),
+        };
+
+        let result = run_session_snippet(&mut session, "(get-block-info? time u3)");
+        let time_block_2 = match result.expect_optional() {
+            Ok(Some(Value::UInt(time))) => time,
+            _ => panic!("Unexpected result"),
+        };
+
+        assert!(time_block_2 - time_block_1 == 600);
+    }
+
+    #[test]
+    fn burn_block_height_behavior_epoch2_5() {
+        let settings = SessionSettings::default();
+        let mut session = Session::new(settings);
+        session.start().expect("session could not start");
+        session.update_epoch(StacksEpochId::Epoch25);
+
+        let snippet = [
+            "(define-read-only (get-burn (height uint))",
+            "  (let ((id (unwrap-panic (get-block-info? id-header-hash height))))",
+            "    (at-block id burn-block-height)))",
+        ]
+        .join("\n");
+
+        let contract = ClarityContractBuilder::new()
+            .code_source(snippet)
+            .clarity_version(ClarityVersion::Clarity2)
+            .epoch(StacksEpochId::Epoch25)
+            .build();
+
+        session.deploy_contract(&contract, false, None).unwrap();
+        session.advance_burn_chain_tip(10);
+
+        let result = run_session_snippet(&mut session, "block-height");
+        assert_eq!(result, Value::UInt(10));
+        let result = run_session_snippet(&mut session, "burn-block-height");
+        assert_eq!(result, Value::UInt(9));
+        let result = run_session_snippet(
+            &mut session,
+            format!("(contract-call? .{} get-burn u6)", contract.name).as_str(),
+        );
+        assert_eq!(result, Value::UInt(5));
+    }
+
+    #[test]
+    fn get_burn_block_info_past() {
+        let settings = SessionSettings::default();
+        let mut session = Session::new(settings);
+        session.start().expect("session could not start");
+        session.update_epoch(StacksEpochId::Epoch30);
+
+        session.advance_burn_chain_tip(10);
+
+        let result = run_session_snippet(&mut session, "(get-burn-block-info? header-hash u10)");
+        let expected_header_hash =
+            hex_bytes("02e51c71171ecd6467c472e11374c5a5ae882f8591c8d2b8ba24d916680f3e8a").unwrap();
+        assert_eq!(
+            result,
+            Value::some(Value::buff_from(expected_header_hash).unwrap()).unwrap()
+        );
+        let result = run_session_snippet(&mut session, "(get-burn-block-info? header-hash u9)");
+        let expected_header_hash =
+            hex_bytes("02128940fbe65bd02156e79e09b8f84cf889c7353c9cd16e7f43a3f60902ca90").unwrap();
+        assert_eq!(
+            result,
+            Value::some(Value::buff_from(expected_header_hash).unwrap()).unwrap()
+        );
+    }
+
+    #[test]
+    fn burn_block_height_behavior_epoch3_0() {
+        // test that clarinet preserves the 3.0 and 3.1 special behavior of burn-block-height
+        // https://github.com/stacks-network/stacks-core/pull/5524
+        let settings = SessionSettings::default();
+        let mut session = Session::new(settings);
+        session.start().expect("session could not start");
+        session.update_epoch(StacksEpochId::Epoch30);
+
+        let snippet = [
+            "(define-read-only (get-burn (height uint))",
+            "  (let ((id (unwrap-panic (get-stacks-block-info? id-header-hash height))))",
+            "    (at-block id burn-block-height)))",
+        ]
+        .join("\n");
+
+        let contract = ClarityContractBuilder::new()
+            .code_source(snippet)
+            .clarity_version(ClarityVersion::Clarity3)
+            .epoch(StacksEpochId::Epoch30)
+            .build();
+
+        session.deploy_contract(&contract, false, None).unwrap();
+        session.advance_burn_chain_tip(10);
+
+        let result = run_session_snippet(&mut session, "stacks-block-height");
+        assert_eq!(result, Value::UInt(11));
+        let result = run_session_snippet(&mut session, "burn-block-height");
+        assert_eq!(result, Value::UInt(11));
+        let result = run_session_snippet(
+            &mut session,
+            format!("(contract-call? .{} get-burn u8)", contract.name).as_str(),
+        );
+        assert_eq!(result, Value::UInt(11));
+    }
+
+    #[test]
+    fn burn_block_height_behavior_epoch3_0_contract_in_2_5() {
+        let settings = SessionSettings::default();
+        let mut session = Session::new(settings);
+        session.start().expect("session could not start");
+        session.update_epoch(StacksEpochId::Epoch25);
+
+        let snippet = [
+            "(define-read-only (get-burn (height uint))",
+            "  (let ((id (unwrap-panic (get-block-info? id-header-hash height))))",
+            "    (at-block id burn-block-height)))",
+        ]
+        .join("\n");
+
+        let contract = ClarityContractBuilder::new()
+            .name("contract-2-5")
+            .code_source(snippet.clone())
+            .clarity_version(ClarityVersion::Clarity2)
+            .epoch(StacksEpochId::Epoch25)
+            .build();
+
+        session.deploy_contract(&contract, false, None).unwrap();
+        session.advance_burn_chain_tip(10);
+
+        session.update_epoch(StacksEpochId::Epoch30);
+
+        session.advance_burn_chain_tip(10);
+
+        let result = run_session_snippet(&mut session, "stacks-block-height");
+        assert_eq!(result, Value::UInt(21));
+
+        // calling a 2.5 contract in epoch 3.0 has the same behavior as epoch 2.5
+
+        let result = run_session_snippet(
+            &mut session,
+            format!("(contract-call? .{} get-burn u8)", contract.name).as_str(),
+        );
+        assert_eq!(result, Value::UInt(7));
+
+        let result = run_session_snippet(
+            &mut session,
+            format!("(contract-call? .{} get-burn u18)", contract.name).as_str(),
+        );
+        assert_eq!(result, Value::UInt(21));
     }
 }

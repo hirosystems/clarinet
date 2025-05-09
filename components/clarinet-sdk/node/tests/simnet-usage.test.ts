@@ -28,7 +28,10 @@ function deleteExistingDeploymentPlan() {
 
 beforeEach(async () => {
   deleteExistingDeploymentPlan();
-  simnet = await initSimnet("tests/fixtures/Clarinet.toml");
+  simnet = await initSimnet("tests/fixtures/Clarinet.toml", false, {
+    trackCosts: true,
+    trackCoverage: false,
+  });
 });
 
 afterEach(() => {
@@ -40,6 +43,11 @@ describe("basic simnet interactions", () => {
     expect(simnet.blockHeight).toBe(1);
   });
 
+  it("can run command", () => {
+    const r = simnet.executeCommand("::set_epoch 3.1");
+    expect(r).toBe("Epoch updated to: 3.1");
+  });
+
   it("can mine empty blocks", () => {
     const blockHeight = simnet.blockHeight;
     simnet.mineEmptyBlock();
@@ -47,11 +55,12 @@ describe("basic simnet interactions", () => {
     simnet.mineEmptyBlocks(4);
     expect(simnet.blockHeight).toBe(blockHeight + 5);
   });
+
   it("can not mine empty stacks block in pre-3.0", () => {
     expect(() => simnet.mineEmptyStacksBlock()).toThrowError(
-      "use mineEmptyBurnBlock in epoch lower than 3.0"
+      "use mineEmptyBurnBlock in epoch lower than 3.0",
     );
-  })
+  });
 
   it("exposes devnet stacks accounts", () => {
     const accounts = simnet.getAccounts();
@@ -77,9 +86,9 @@ describe("basic simnet interactions", () => {
 
     // @ts-ignore
     // "0" is an invalid epoch
-    // it logs that 0 is invalid and defaults to 2.5
+    // it logs that 0 is invalid and defaults to 3.1
     simnet.setEpoch("0");
-    expect(simnet.currentEpoch).toBe("2.5");
+    expect(simnet.currentEpoch).toBe("3.1");
   });
 
   it("can get default clarity version for current epoch", () => {
@@ -101,8 +110,8 @@ describe("simnet epoch 3", () => {
     simnet.mineEmptyBurnBlocks(4);
     expect(simnet.burnBlockHeight).toBe(burnBlockHeight + 4);
     expect(simnet.stacksBlockHeight).toBe(blockHeight + 9);
-  })
-})
+  });
+});
 describe("simnet can run arbitrary snippets", () => {
   it("can run simple snippets", () => {
     const res = simnet.execute("(+ 1 2)");
@@ -146,12 +155,49 @@ describe("simnet can call contracts function", () => {
     expect(printEvent.data.value).toStrictEqual(Cl.stringAscii("call increment"));
   });
 
+  it("reports costs", () => {
+    const res = simnet.callPublicFn("counter", "increment", [], address1);
+
+    expect(res).toHaveProperty("costs");
+    expect(res.costs).toStrictEqual({
+      memory: 417,
+      memory_limit: 100000000,
+      total: {
+        writeLength: 44,
+        writeCount: 3,
+        readLength: 1466,
+        readCount: 8,
+        runtime: 15630,
+      },
+      limit: {
+        writeLength: 15000000,
+        writeCount: 15000,
+        readLength: 100000000,
+        readCount: 15000,
+        runtime: 5000000000,
+      },
+    });
+  });
+
   it("can call public functions with arguments", () => {
     const res = simnet.callPublicFn("counter", "add", [Cl.uint(2)], address1);
 
     expect(res).toHaveProperty("result");
     expect(res).toHaveProperty("events");
     expect(res.result).toStrictEqual(Cl.ok(Cl.bool(true)));
+  });
+
+  it("can call public functions in mineBlock", () => {
+    const res = simnet.mineBlock([
+      tx.callPublicFn("counter", "add", [Cl.uint(2)], address1),
+      tx.callPublicFn("counter", "add", [Cl.uint(3)], address1),
+    ]);
+
+    for (const tx of res) {
+      expect(tx.result).toStrictEqual(Cl.ok(Cl.bool(true)));
+    }
+    const count = simnet.getDataVar("counter", "count");
+    expect(count).toStrictEqual(Cl.uint(5));
   });
 
   it("increases block height when calling public functions", () => {
@@ -210,13 +256,13 @@ describe("simnet can call contracts function", () => {
   it("can not call a public function with callPrivateFn", () => {
     expect(() => {
       simnet.callPrivateFn("counter", "increment", [], address1);
-    }).toThrow("increment is not a private function");
+    }).toThrow(/^increment is not a private function$/);
   });
 
   it("can not call a private function with callPublicFn", () => {
     expect(() => {
       simnet.callPublicFn("counter", "inner-increment", [], address1);
-    }).toThrow("increment is not a public function");
+    }).toThrow(/^inner-increment is not a public function$/);
   });
 
   it("can get updated assets map", () => {
@@ -292,7 +338,7 @@ describe("simnet can get contracts info and deploy contracts", () => {
 
   it("can get contract source", () => {
     const counterSource = simnet.getContractSource(`${deployerAddr}.counter`);
-    expect(counterSource?.startsWith("(define-data-var count")).toBe(true);
+    expect(counterSource?.startsWith(";; counter contract")).toBe(true);
 
     const counterSourceShortAddr = simnet.getContractSource("counter");
     expect(counterSourceShortAddr).toBe(counterSource);
@@ -311,7 +357,18 @@ describe("simnet can get contracts info and deploy contracts", () => {
     expect(getWithShortAddr).toBeDefined();
   });
 
+  it("can get commets in ast", () => {
+    const counterAst = simnet.getContractAST(`${deployerAddr}.counter`);
+
+    expect(counterAst).toBeDefined();
+    expect(counterAst.expressions).toHaveLength(11);
+
+    // @ts-ignore
+    expect(counterAst.expressions[0].pre_comments[0][0]).toBe("counter contract");
+  });
+
   it("can deploy contracts as snippets", () => {
+    simnet.setEpoch("3.0");
     const res = simnet.deployContract("temp", "(+ 24 18)", null, deployerAddr);
     expect(res.result).toStrictEqual(Cl.int(42));
 
@@ -320,6 +377,7 @@ describe("simnet can get contracts info and deploy contracts", () => {
   });
 
   it("can deploy contracts", () => {
+    simnet.setEpoch("3.0");
     const source = "(define-public (add (a uint) (b uint)) (ok (+ a b)))\n";
     const deployRes = simnet.deployContract("op", source, null, deployerAddr);
     expect(deployRes.result).toStrictEqual(Cl.bool(true));
@@ -384,26 +442,35 @@ describe("the simnet can execute commands", () => {
     const expected = [
       "+-------------------------------------------+-----------------+",
       "| Address                                   | uSTX            |",
-      "+-------------------------------------------+-----------------+",
+      "|-------------------------------------------+-----------------|",
       "| ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM | 100000000001000 |",
-      "+-------------------------------------------+-----------------+",
+      "|-------------------------------------------+-----------------|",
       "| ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5 | 100000000000000 |",
-      "+-------------------------------------------+-----------------+",
+      "|-------------------------------------------+-----------------|",
       "| ST2CY5V39NHDPWSXMW9QDT3HC3GD6Q6XX4CFRK9AG | 100000000000000 |",
-      "+-------------------------------------------+-----------------+",
+      "|-------------------------------------------+-----------------|",
       "| STNHKEPYEPJ8ET55ZZ0M5A34J0R3N5FM2CMMMAZ6  | 100000000000000 |",
-      "+-------------------------------------------+-----------------+\n",
+      "+-------------------------------------------+-----------------+",
     ].join("\n");
     expect(result).toBe(expected);
   });
 });
 
+// describe("custom manifest path", () => {
+//   it("initSimnet handles absolute path", async () => {
+//     const manifestPath = path.join(process.cwd(), "tests/fixtures/Clarinet.toml");
+//     const simnet = await initSimnet(manifestPath);
+//     expect(simnet.blockHeight).toBe(1);
+//   });
+// });
+
 describe("the sdk handles multiple manifests project", () => {
-  it("handle invalid project", () => {
-    const manifestPath = path.join(process.cwd(), "tests/fixtures/contracts/invalid.clar");
+  it("handle invalid project", async () => {
+    // the lsp displays paths with the unix notation, hence why we are hardcoding the contract path with `/`
+    const manifestPath = `${process.cwd()}/tests/fixtures/contracts/invalid.clar`;
     const expectedErr = `error: unexpected ')'\n--> ${manifestPath}:5:2\n)) ;; extra \`)\`\n`;
 
-    expect(async () => {
+    await expect(async () => {
       await initSimnet("tests/fixtures/InvalidManifest.toml");
     }).rejects.toThrow(expectedErr);
   });

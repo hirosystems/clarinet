@@ -1,21 +1,21 @@
 use std::collections::BTreeMap;
+use std::sync::LazyLock;
 
-use super::{FileAccessor, FileLocation};
-use bip39::{Language, Mnemonic};
-use chainhook_types::{BitcoinNetwork, StacksNetwork};
-use clarinet_utils::get_bip39_seed_from_mnemonic;
+use clarinet_utils::{get_bip32_keys_from_mnemonic, mnemonic_from_phrase, random_mnemonic};
 use clarity::address::AddressHashMode;
-use clarity::types::chainstate::StacksAddress;
+use clarity::types::chainstate::{StacksAddress, StacksPrivateKey};
 use clarity::util::{hash::bytes_to_hex, secp256k1::Secp256k1PublicKey};
 use clarity::vm::types::QualifiedContractIdentifier;
-use libsecp256k1::{PublicKey, SecretKey};
-use tiny_hderive::bip32::ExtendedPrivKey;
+use libsecp256k1::PublicKey;
+use serde::Serialize;
 use toml::value::Value;
+
+use super::{FileAccessor, FileLocation};
 
 pub const DEFAULT_DERIVATION_PATH: &str = "m/44'/5757'/0'/0/0";
 
-pub const DEFAULT_STACKS_NODE_IMAGE: &str = "quay.io/hirosystems/stacks-node:devnet-2.5";
-pub const DEFAULT_STACKS_SIGNER_IMAGE: &str = "quay.io/hirosystems/stacks-signer:devnet-2.5";
+pub const DEFAULT_STACKS_NODE_IMAGE: &str = "quay.io/hirosystems/stacks-node:devnet-3.1";
+pub const DEFAULT_STACKS_SIGNER_IMAGE: &str = "quay.io/hirosystems/stacks-signer:devnet-3.1";
 pub const DEFAULT_STACKS_API_IMAGE: &str = "hirosystems/stacks-blockchain-api:master";
 
 pub const DEFAULT_BITCOIN_NODE_IMAGE: &str = "quay.io/hirosystems/bitcoind:26.0";
@@ -28,12 +28,13 @@ pub const DEFAULT_SUBNET_CONTRACT_ID: &str =
     "ST173JK7NZBA4BS05ZRATQH1K89YJMTGEH1Z5J52E.subnet-v3-0-1";
 pub const DEFAULT_STACKS_MINER_MNEMONIC: &str = "fragile loan twenty basic net assault jazz absorb diet talk art shock innocent float punch travel gadget embrace caught blossom hockey surround initial reduce";
 pub const DEFAULT_FAUCET_MNEMONIC: &str = "shadow private easily thought say logic fault paddle word top book during ignore notable orange flight clock image wealth health outside kitten belt reform";
+pub const DEFAULT_STACKER_MNEMONIC: &str = "empty lens any direct brother then drop fury rule pole win claim scissors list rescue horn rent inform relief jump sword weekend half legend";
 pub const DEFAULT_SUBNET_MNEMONIC: &str = "twice kind fence tip hidden tilt action fragile skin nothing glory cousin green tomorrow spring wrist shed math olympic multiply hip blue scout claw";
 #[cfg(unix)]
 pub const DEFAULT_DOCKER_SOCKET: &str = "unix:///var/run/docker.sock";
 #[cfg(windows)]
 pub const DEFAULT_DOCKER_SOCKET: &str = "npipe:////./pipe/docker_engine";
-#[cfg(target_family = "wasm")]
+#[cfg(target_arch = "wasm32")]
 pub const DEFAULT_DOCKER_SOCKET: &str = "/var/run/docker.sock";
 pub const DEFAULT_DOCKER_PLATFORM: &str = "linux/amd64";
 
@@ -44,8 +45,8 @@ pub const DEFAULT_EPOCH_2_2: u64 = 102;
 pub const DEFAULT_EPOCH_2_3: u64 = 103;
 pub const DEFAULT_EPOCH_2_4: u64 = 104;
 pub const DEFAULT_EPOCH_2_5: u64 = 108;
-// Epoch 3.0 isn't stable for now, let's focus on running 2.5
-pub const DEFAULT_EPOCH_3_0: u64 = 100001;
+pub const DEFAULT_EPOCH_3_0: u64 = 142;
+pub const DEFAULT_EPOCH_3_1: u64 = 144;
 
 // Currently, the pox-4 contract has these values hardcoded:
 // https://github.com/stacks-network/stacks-core/blob/e09ab931e2f15ff70f3bb5c2f4d7afb[…]42bd7bec6/stackslib/src/chainstate/stacks/boot/pox-testnet.clar
@@ -53,6 +54,42 @@ pub const DEFAULT_EPOCH_3_0: u64 = 100001;
 pub const DEFAULT_POX_PREPARE_LENGTH: u64 = 4;
 pub const DEFAULT_POX_REWARD_LENGTH: u64 = 10;
 pub const DEFAULT_FIRST_BURN_HEADER_HEIGHT: u64 = 100;
+
+pub static DEFAULT_PRIVATE_KEYS: LazyLock<[StacksPrivateKey; 1]> = LazyLock::new(|| {
+    [StacksPrivateKey::from_hex(
+        "7287ba251d44a4d3fd9276c88ce34c5c52a038955511cccaf77e61068649c17801",
+    )
+    .unwrap()]
+});
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum StacksNetwork {
+    Simnet,
+    Devnet,
+    Testnet,
+    Mainnet,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BitcoinNetwork {
+    Regtest,
+    Testnet,
+    Signet,
+    Mainnet,
+}
+
+impl StacksNetwork {
+    pub fn get_networks(&self) -> (BitcoinNetwork, StacksNetwork) {
+        match &self {
+            StacksNetwork::Simnet => (BitcoinNetwork::Regtest, StacksNetwork::Simnet),
+            StacksNetwork::Devnet => (BitcoinNetwork::Testnet, StacksNetwork::Devnet),
+            StacksNetwork::Testnet => (BitcoinNetwork::Testnet, StacksNetwork::Testnet),
+            StacksNetwork::Mainnet => (BitcoinNetwork::Mainnet, StacksNetwork::Mainnet),
+        }
+    }
+}
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct NetworkManifestFile {
@@ -84,9 +121,10 @@ pub struct DevnetConfigFile {
     pub stacks_node_events_observers: Option<Vec<String>>,
     pub stacks_node_wait_time_for_microblocks: Option<u32>,
     pub stacks_node_first_attempt_time_ms: Option<u32>,
-    pub stacks_node_subsequent_attempt_time_ms: Option<u32>,
     pub stacks_node_env_vars: Option<Vec<String>>,
     pub stacks_node_next_initiative_delay: Option<u16>,
+    pub stacks_signers_keys: Option<Vec<String>>,
+    pub stacks_signers_env_vars: Option<Vec<String>>,
     pub stacks_api_env_vars: Option<Vec<String>>,
     pub stacks_explorer_env_vars: Option<Vec<String>>,
     pub subnet_node_env_vars: Option<Vec<String>>,
@@ -102,8 +140,11 @@ pub struct DevnetConfigFile {
     pub miner_wallet_name: Option<String>,
     pub faucet_mnemonic: Option<String>,
     pub faucet_derivation_path: Option<String>,
+    pub stacker_mnemonic: Option<String>,
+    pub stacker_derivation_path: Option<String>,
     pub bitcoin_controller_block_time: Option<u32>,
     pub bitcoin_controller_automining_disabled: Option<bool>,
+    pub pre_nakamoto_mock_signing: Option<bool>,
     pub working_dir: Option<String>,
     pub postgres_port: Option<u16>,
     pub postgres_username: Option<String>,
@@ -122,6 +163,7 @@ pub struct DevnetConfigFile {
     pub disable_bitcoin_explorer: Option<bool>,
     pub disable_stacks_explorer: Option<bool>,
     pub disable_stacks_api: Option<bool>,
+    pub disable_postgres: Option<bool>,
     pub bind_containers_volumes: Option<bool>,
     pub enable_subnet_node: Option<bool>,
     pub subnet_node_image_url: Option<String>,
@@ -147,6 +189,7 @@ pub struct DevnetConfigFile {
     pub epoch_2_4: Option<u64>,
     pub epoch_2_5: Option<u64>,
     pub epoch_3_0: Option<u64>,
+    pub epoch_3_1: Option<u64>,
     pub use_docker_gateway_routing: Option<bool>,
     pub docker_platform: Option<String>,
 }
@@ -257,13 +300,14 @@ pub struct DevnetConfig {
     pub stacks_node_rpc_port: u16,
     pub stacks_node_wait_time_for_microblocks: u32,
     pub stacks_node_first_attempt_time_ms: u32,
-    pub stacks_node_subsequent_attempt_time_ms: u32,
     pub stacks_node_events_observers: Vec<String>,
     pub stacks_node_env_vars: Vec<String>,
     pub stacks_node_next_initiative_delay: u16,
     pub stacks_api_port: u16,
     pub stacks_api_events_port: u16,
     pub stacks_api_env_vars: Vec<String>,
+    pub stacks_signers_keys: Vec<StacksPrivateKey>,
+    pub stacks_signers_env_vars: Vec<String>,
     pub stacks_explorer_port: u16,
     pub stacks_explorer_env_vars: Vec<String>,
     pub bitcoin_explorer_port: u16,
@@ -281,6 +325,9 @@ pub struct DevnetConfig {
     pub faucet_btc_address: String,
     pub faucet_mnemonic: String,
     pub faucet_derivation_path: String,
+    pub stacker_mnemonic: String,
+    pub stacker_derivation_path: String,
+    pub pre_nakamoto_mock_signing: bool,
     pub working_dir: String,
     pub postgres_port: u16,
     pub postgres_username: String,
@@ -299,6 +346,7 @@ pub struct DevnetConfig {
     pub disable_bitcoin_explorer: bool,
     pub disable_stacks_explorer: bool,
     pub disable_stacks_api: bool,
+    pub disable_postgres: bool,
     pub bind_containers_volumes: bool,
     pub enable_subnet_node: bool,
     pub subnet_node_image_url: String,
@@ -329,6 +377,7 @@ pub struct DevnetConfig {
     pub epoch_2_4: u64,
     pub epoch_2_5: u64,
     pub epoch_3_0: u64,
+    pub epoch_3_1: u64,
     pub use_docker_gateway_routing: bool,
     pub docker_platform: String,
 }
@@ -358,7 +407,13 @@ impl Default for DevnetConfig {
             stacks_node_rpc_port: 18445,
             stacks_node_wait_time_for_microblocks: 50,
             stacks_node_first_attempt_time_ms: 500,
-            stacks_node_subsequent_attempt_time_ms: 1_000,
+            disable_postgres: false,
+            epoch_3_1: DEFAULT_EPOCH_3_1,
+            pre_nakamoto_mock_signing: false,
+            stacker_derivation_path: DEFAULT_DERIVATION_PATH.to_string(),
+            stacker_mnemonic: DEFAULT_STACKER_MNEMONIC.to_string(),
+            stacks_signers_env_vars: vec![],
+            stacks_signers_keys: vec![],
             stacks_node_events_observers: vec![],
             stacks_node_env_vars: vec![],
             stacks_api_port: 3999,
@@ -452,6 +507,7 @@ pub struct AccountConfig {
     pub mnemonic: String,
     pub derivation: String,
     pub balance: u64,
+    pub sbtc_balance: u64,
     pub stx_address: String,
     pub btc_address: String,
     pub is_mainnet: bool,
@@ -540,7 +596,7 @@ impl NetworkManifest {
         };
 
         let mut accounts = BTreeMap::new();
-        let is_mainnet = networks.1.is_mainnet();
+        let is_mainnet = matches!(networks.1, StacksNetwork::Mainnet);
 
         if let Some(Value::Table(entries)) = &network_manifest_file.accounts {
             for (account_name, account_settings) in entries.iter() {
@@ -549,26 +605,22 @@ impl NetworkManifest {
                         Some(Value::Integer(balance)) => *balance as u64,
                         _ => 0,
                     };
+                    let sbtc_balance = match account_settings.get("sbtc_balance") {
+                        Some(Value::Integer(balance)) => *balance as u64,
+                        _ => 1_000_000_000, // mint 10 sBTC by default
+                    };
 
                     let mnemonic = match account_settings.get("mnemonic") {
-                        Some(Value::String(words)) => {
-                            match Mnemonic::parse_in_normalized(Language::English, words) {
-                                Ok(result) => result.to_string(),
-                                Err(e) => {
-                                    return Err(format!(
+                        Some(Value::String(phrase)) => match mnemonic_from_phrase(phrase) {
+                            Ok(result) => result.phrase().to_string(),
+                            Err(e) => {
+                                return Err(format!(
                                         "mnemonic (located in ./settings/{:?}.toml) for deploying address is invalid: {}",
                                         networks.1 , e
                                     ));
-                                }
                             }
-                        }
-                        _ => {
-                            let entropy = &[
-                                0x33, 0xE4, 0x6B, 0xB1, 0x3A, 0x74, 0x6E, 0xA4, 0x1C, 0xDD, 0xE4,
-                                0x5C, 0x90, 0x84, 0x6A, 0x79,
-                            ]; // TODO(lgalabru): rand
-                            Mnemonic::from_entropy(entropy).unwrap().to_string()
-                        }
+                        },
+                        _ => random_mnemonic().phrase().to_string(),
                     };
 
                     let derivation = match account_settings.get("derivation") {
@@ -586,6 +638,7 @@ impl NetworkManifest {
                             mnemonic: mnemonic.to_string(),
                             derivation,
                             balance,
+                            sbtc_balance,
                             stx_address,
                             btc_address,
                             is_mainnet,
@@ -595,7 +648,7 @@ impl NetworkManifest {
             }
         };
 
-        let devnet = if networks.1.is_devnet() {
+        let devnet = if matches!(networks.1, StacksNetwork::Devnet) {
             let mut devnet_config = network_manifest_file.devnet.take().unwrap_or_default();
 
             if let Some(ref devnet_override) = devnet_override {
@@ -739,6 +792,10 @@ impl NetworkManifest {
                     devnet_config.disable_stacks_api = Some(val);
                 }
 
+                if let Some(val) = devnet_override.disable_postgres {
+                    devnet_config.disable_postgres = Some(val);
+                }
+
                 if let Some(val) = devnet_override.bitcoin_controller_automining_disabled {
                     devnet_config.bitcoin_controller_automining_disabled = Some(val);
                 }
@@ -809,6 +866,10 @@ impl NetworkManifest {
 
                 if let Some(ref val) = devnet_override.epoch_3_0 {
                     devnet_config.epoch_3_0 = Some(*val);
+                }
+
+                if let Some(ref val) = devnet_override.epoch_3_1 {
+                    devnet_config.epoch_3_1 = Some(*val);
                 }
 
                 if let Some(val) = devnet_override.network_id {
@@ -913,10 +974,43 @@ impl NetworkManifest {
                 ));
             }
 
+            let stacker_mnemonic = devnet_config
+                .stacker_mnemonic
+                .take()
+                .unwrap_or(DEFAULT_STACKER_MNEMONIC.to_string());
+            let stacker_derivation_path = devnet_config
+                .stacker_derivation_path
+                .take()
+                .unwrap_or(DEFAULT_DERIVATION_PATH.to_string());
+            let (stx_address, btc_address, _) =
+                compute_addresses(&stacker_mnemonic, &stacker_derivation_path, networks);
+
+            accounts.insert(
+                "stacker".to_string(),
+                AccountConfig {
+                    label: "stacker".to_string(),
+                    mnemonic: stacker_mnemonic.clone(),
+                    derivation: stacker_derivation_path.clone(),
+                    balance: 100_000_000_000_000,
+                    sbtc_balance: 1_000_000_000,
+                    stx_address,
+                    btc_address,
+                    is_mainnet: false,
+                },
+            );
+
+            let mut stacking_orders = vec![];
+            let mut add_default_stacking_order = true;
             // for stacking orders, we validate that wallet names match one of the provided accounts
-            if let Some(ref val) = devnet_config.pox_stacking_orders {
+            if let Some(mut val) = devnet_config.pox_stacking_orders {
                 for (i, stacking_order) in val.iter().enumerate() {
                     let wallet_name = &stacking_order.wallet;
+
+                    // if the project already set a stacking order for the stacker, do not override it
+                    if wallet_name == "stacker" {
+                        add_default_stacking_order = false;
+                    }
+
                     let wallet_is_in_accounts = accounts
                         .iter()
                         .any(|(account_name, _)| wallet_name == account_name);
@@ -925,8 +1019,27 @@ impl NetworkManifest {
                     };
                 }
 
-                devnet_config.pox_stacking_orders = Some(val.clone());
+                stacking_orders.append(&mut val);
             }
+
+            // to ensure that the network stacks enough STXs to reach epoch 3.0
+            // add a default stacking order for deployer wallet in cycle 1
+            if add_default_stacking_order {
+                if let Some((_, account_config)) = accounts
+                    .iter()
+                    .find(|(account_name, _)| *account_name == "stacker")
+                {
+                    stacking_orders.push(PoxStackingOrder {
+                        auto_extend: Some(true),
+                        duration: 10,
+                        start_at_cycle: 1,
+                        wallet: "stacker".into(),
+                        slots: 10,
+                        btc_address: account_config.btc_address.clone(),
+                    })
+                }
+            }
+
             let config = DevnetConfig {
                 name: devnet_config.name.take().unwrap_or("devnet".into()),
                 network_id: devnet_config.network_id,
@@ -957,12 +1070,9 @@ impl NetworkManifest {
                 stacks_node_first_attempt_time_ms: devnet_config
                     .stacks_node_first_attempt_time_ms
                     .unwrap_or(500),
-                stacks_node_subsequent_attempt_time_ms: devnet_config
-                    .stacks_node_subsequent_attempt_time_ms
-                    .unwrap_or(1_000),
                 stacks_node_next_initiative_delay: devnet_config
                     .stacks_node_next_initiative_delay
-                    .unwrap_or(4000),
+                    .unwrap_or(3000),
                 stacks_api_port: devnet_config.stacks_api_port.unwrap_or(3999),
                 stacks_api_events_port: devnet_config.stacks_api_events_port.unwrap_or(3700),
                 stacks_explorer_port: devnet_config.stacks_explorer_port.unwrap_or(8000),
@@ -976,11 +1086,16 @@ impl NetworkManifest {
                     .miner_coinbase_recipient
                     .unwrap_or(miner_stx_address),
                 miner_wallet_name: devnet_config.miner_wallet_name.unwrap_or("".to_string()),
+                pre_nakamoto_mock_signing: devnet_config
+                    .pre_nakamoto_mock_signing
+                    .unwrap_or_default(),
                 faucet_btc_address,
                 faucet_stx_address,
                 faucet_mnemonic,
                 faucet_secret_key_hex,
                 faucet_derivation_path,
+                stacker_mnemonic,
+                stacker_derivation_path,
                 working_dir: devnet_config
                     .working_dir
                     .take()
@@ -1031,9 +1146,10 @@ impl NetworkManifest {
                     .bitcoin_explorer_image_url
                     .take()
                     .unwrap_or(DEFAULT_BITCOIN_EXPLORER_IMAGE.to_string()),
-                pox_stacking_orders: devnet_config.pox_stacking_orders.take().unwrap_or_default(),
+                pox_stacking_orders: stacking_orders,
                 disable_bitcoin_explorer: devnet_config.disable_bitcoin_explorer.unwrap_or(false),
                 disable_stacks_api: devnet_config.disable_stacks_api.unwrap_or(false),
+                disable_postgres: devnet_config.disable_postgres.unwrap_or(false),
                 disable_stacks_explorer: devnet_config.disable_stacks_explorer.unwrap_or(false),
                 bind_containers_volumes: devnet_config.bind_containers_volumes.unwrap_or(false),
                 enable_subnet_node,
@@ -1076,8 +1192,22 @@ impl NetworkManifest {
                 epoch_2_4: devnet_config.epoch_2_4.unwrap_or(DEFAULT_EPOCH_2_4),
                 epoch_2_5: devnet_config.epoch_2_5.unwrap_or(DEFAULT_EPOCH_2_5),
                 epoch_3_0: devnet_config.epoch_3_0.unwrap_or(DEFAULT_EPOCH_3_0),
+                epoch_3_1: devnet_config.epoch_3_1.unwrap_or(DEFAULT_EPOCH_3_1),
                 stacks_node_env_vars: devnet_config
                     .stacks_node_env_vars
+                    .take()
+                    .unwrap_or_default(),
+                stacks_signers_keys: devnet_config
+                    .stacks_signers_keys
+                    .take()
+                    .map(|keys| {
+                        keys.into_iter()
+                            .map(|key| StacksPrivateKey::from_hex(&key).unwrap())
+                            .collect::<Vec<clarity::util::secp256k1::Secp256k1PrivateKey>>()
+                    })
+                    .unwrap_or(DEFAULT_PRIVATE_KEYS.to_vec()),
+                stacks_signers_env_vars: devnet_config
+                    .stacks_signers_env_vars
                     .take()
                     .unwrap_or_default(),
                 stacks_api_env_vars: devnet_config.stacks_api_env_vars.take().unwrap_or_default(),
@@ -1127,23 +1257,16 @@ pub fn compute_addresses(
     derivation_path: &str,
     networks: &(BitcoinNetwork, StacksNetwork),
 ) -> (String, String, String) {
-    let bip39_seed = match get_bip39_seed_from_mnemonic(mnemonic, "") {
-        Ok(bip39_seed) => bip39_seed,
-        Err(_) => panic!(),
-    };
-
-    let ext = ExtendedPrivKey::derive(&bip39_seed[..], derivation_path).unwrap();
-
-    let secret_key = SecretKey::parse_slice(&ext.secret()).unwrap();
+    let (secret_bytes, public_key) =
+        get_bip32_keys_from_mnemonic(mnemonic, "", derivation_path).unwrap();
 
     // Enforce a 33 bytes secret key format, expected by Stacks
-    let mut secret_key_bytes = secret_key.serialize().to_vec();
+    let mut secret_key_bytes = secret_bytes.clone();
     secret_key_bytes.push(1);
     let miner_secret_key_hex = bytes_to_hex(&secret_key_bytes);
 
-    let public_key = PublicKey::from_secret_key(&secret_key);
     let pub_key = Secp256k1PublicKey::from_slice(&public_key.serialize_compressed()).unwrap();
-    let version = if networks.1.is_mainnet() {
+    let version = if matches!(networks.1, StacksNetwork::Mainnet) {
         clarity::address::C32_ADDRESS_VERSION_MAINNET_SINGLESIG
     } else {
         clarity::address::C32_ADDRESS_VERSION_TESTNET_SINGLESIG
@@ -1162,7 +1285,7 @@ pub fn compute_addresses(
     (stx_address.to_string(), btc_address, miner_secret_key_hex)
 }
 
-#[cfg(not(feature = "wasm"))]
+#[cfg(not(target_arch = "wasm32"))]
 fn compute_btc_address(public_key: &PublicKey, network: &BitcoinNetwork) -> String {
     let public_key = bitcoin::PublicKey::from_slice(&public_key.serialize_compressed())
         .expect("Unable to recreate public key");
@@ -1199,7 +1322,7 @@ pub fn is_in_reward_phase(
     }
 }
 
-#[cfg(feature = "wasm")]
+#[cfg(target_arch = "wasm32")]
 fn compute_btc_address(_public_key: &PublicKey, _network: &BitcoinNetwork) -> String {
     "__not_implemented__".to_string()
 }

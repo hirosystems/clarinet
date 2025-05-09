@@ -1,8 +1,10 @@
 {
   "rust-analyzer.check.command": "clippy",
-  "rust-analyzer.check.workspace": true,
+  // rust-analyzer hack:
+  // manually set --workspace in extraArgs so that it's always set only one time
+  "rust-analyzer.check.workspace": false,
   "rust-analyzer.check.extraArgs": [
-    "--exclude=clarinet-sdk-wasm",
-    "--exclude=clarity-jupyter-kernel"
+    "--workspace",
+    "--exclude=clarinet-sdk-wasm"
   ]
 }

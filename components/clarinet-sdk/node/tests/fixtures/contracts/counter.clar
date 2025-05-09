@@ -1,3 +1,4 @@
+;; counter contract
 (define-data-var count uint u0)
 (define-map participants principal bool)
 

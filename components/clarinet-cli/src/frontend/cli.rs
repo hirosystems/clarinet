@@ -22,11 +22,13 @@ use clarinet_deployments::types::{DeploymentGenerationArtifacts, DeploymentSpeci
 use clarinet_deployments::{
     get_default_deployment_path, load_deployment, setup_session_with_deployment,
 };
-use clarinet_files::chainhook_types::StacksNetwork;
+use clarinet_files::clarinetrc::ClarinetRC;
+use clarinet_files::StacksNetwork;
 use clarinet_files::{
     get_manifest_location, FileLocation, NetworkManifest, ProjectManifest, ProjectManifestFile,
     RequirementConfig,
 };
+use clarinet_format::formatter::{self, ClarityFormatter};
 use clarity_repl::analysis::call_checker::ContractAnalysis;
 use clarity_repl::clarity::vm::analysis::AnalysisDatabase;
 use clarity_repl::clarity::vm::costs::LimitedCostTracker;
@@ -34,16 +36,15 @@ use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
 use clarity_repl::clarity::ClarityVersion;
 use clarity_repl::frontend::terminal::print_clarity_wasm_warning;
 use clarity_repl::repl::diagnostic::output_diagnostic;
+use clarity_repl::repl::settings::{ApiUrl, RemoteDataSettings};
 use clarity_repl::repl::{ClarityCodeSource, ClarityContract, ContractDeployer, DEFAULT_EPOCH};
 use clarity_repl::{analysis, repl, Terminal};
 use stacks_network::{self, DevnetOrchestrator};
 use std::collections::HashMap;
 use std::fs::{self, File};
-use std::io::prelude::*;
+use std::io::{self, prelude::*};
 use std::{env, process};
 use toml;
-
-use super::clarinetrc::GlobalSettings;
 
 #[cfg(feature = "telemetry")]
 use super::telemetry::{telemetry_report_event, DeveloperUsageDigest, DeveloperUsageEvent};
@@ -94,9 +95,35 @@ enum Command {
     /// Get Clarity autocompletion and inline errors from your code editor (VSCode, vim, emacs, etc)
     #[clap(name = "lsp", bin_name = "lsp")]
     LSP,
+    /// Format clarity code files
+    #[clap(name = "format", aliases = &["fmt"], bin_name = "format")]
+    Formatter(Formatter),
     /// Step by step debugging and breakpoints from your code editor (VSCode, vim, emacs, etc)
     #[clap(name = "dap", bin_name = "dap")]
     DAP,
+}
+
+#[derive(Parser, PartialEq, Clone, Debug)]
+struct Formatter {
+    #[clap(long = "manifest-path", short = 'm')]
+    pub manifest_path: Option<String>,
+    /// If specified, format only this file
+    #[clap(long = "file", short = 'f')]
+    pub file: Option<String>,
+    #[clap(long = "max-line-length", short = 'l')]
+    pub max_line_length: Option<usize>,
+    #[clap(long = "indent", short = 'i', conflicts_with = "use_tabs")]
+    /// indentation size, e.g. 2
+    pub indentation: Option<usize>,
+    #[clap(long = "tabs", short = 't', conflicts_with = "indentation", action = clap::ArgAction::SetTrue)]
+    /// use tabs instead of spaces
+    pub use_tabs: bool,
+    #[clap(long = "dry-run", conflicts_with = "in_place")]
+    /// Only echo the result of formatting
+    pub dry_run: bool,
+    #[clap(long = "in-place", conflicts_with = "dry_run")]
+    /// Replace the contents of a file with the formatted code
+    pub in_place: bool,
 }
 
 #[derive(Subcommand, PartialEq, Clone, Debug)]
@@ -334,6 +361,7 @@ struct Console {
     /// Path to Clarinet.toml
     #[clap(long = "manifest-path", short = 'm')]
     pub manifest_path: Option<String>,
+
     /// If specified, use this deployment file
     #[clap(long = "deployment-plan-path", short = 'p')]
     pub deployment_plan_path: Option<String>,
@@ -351,6 +379,17 @@ struct Console {
         conflicts_with = "use_on_disk_deployment_plan"
     )]
     pub use_computed_deployment_plan: bool,
+
+    /// Enable remote data fetching from mainnet or a testnet
+    #[clap(long = "enable-remote-data", short = 'r')]
+    pub enable_remote_data: bool,
+    /// Set a custom Stacks Blockchain API URL for remote data fetching
+    #[clap(long = "remote-data-api-url", short = 'a')]
+    pub remote_data_api_url: Option<ApiUrl>,
+    /// Initial remote Stacks block height
+    #[clap(long = "remote-data-initial-height", short = 'b')]
+    pub remote_data_initial_height: Option<u32>,
+
     /// Allow the Clarity Wasm preview to run in parallel with the Clarity interpreter (beta)
     #[clap(long = "enable-clarity-wasm")]
     pub enable_clarity_wasm: bool,
@@ -434,7 +473,7 @@ pub fn main() {
         Ok(opts) => opts,
         Err(e) => {
             if e.kind() == clap::error::ErrorKind::UnknownArgument {
-                let manifest = load_manifest_or_exit(None);
+                let manifest = load_manifest_or_exit(None, false);
                 if manifest.project.telemetry {
                     #[cfg(feature = "telemetry")]
                     telemetry_report_event(DeveloperUsageEvent::UnknownCommand(
@@ -457,7 +496,7 @@ pub fn main() {
         }
     };
 
-    let global_settings = GlobalSettings::from_global_file();
+    let clarinetrc = ClarinetRC::from_rc_file();
 
     match opts.command {
         Command::Completions(cmd) => {
@@ -476,7 +515,7 @@ pub fn main() {
                 }
             };
             clap_complete::generate(cmd.shell, &mut app, "clarinet", &mut file);
-            println!("{} {}", green!("Created file"), file_name.clone());
+            println!("{} {}", green!("Created file"), file_name);
             println!("Check your shell's documentation for details about using this file to enable completions for clarinet");
         }
         Command::New(project_opts) => {
@@ -523,7 +562,7 @@ pub fn main() {
                 if project_opts.disable_telemetry {
                     false
                 } else {
-                    match global_settings.enable_telemetry {
+                    match clarinetrc.enable_telemetry {
                         Some(enable) => enable,
                         _ => {
                             println!("{}", yellow!("Send usage data to Hiro."));
@@ -536,7 +575,7 @@ pub fn main() {
                                 "{}",
                                 blue!(format!(
                                     "  $ mkdir -p ~/.clarinet; echo \"enable_telemetry = true\" >> {}",
-                                    GlobalSettings::get_settings_file_path()
+                                    ClarinetRC::get_settings_file_path()
                                 ))
                             );
                             // TODO(lgalabru): once we have a privacy policy available, add a link
@@ -581,7 +620,7 @@ pub fn main() {
             if !execute_changes(changes) {
                 std::process::exit(1);
             }
-            if global_settings.enable_hints.unwrap_or(true) {
+            if clarinetrc.enable_hints.unwrap_or(true) {
                 display_contract_new_hint(Some(project_opts.name.as_str()));
             }
             if telemetry_enabled {
@@ -594,7 +633,7 @@ pub fn main() {
         }
         Command::Deployments(subcommand) => match subcommand {
             Deployments::CheckDeployments(cmd) => {
-                let manifest = load_manifest_or_exit(cmd.manifest_path);
+                let manifest = load_manifest_or_exit(cmd.manifest_path, true);
                 // Ensure that all the deployments can correctly be deserialized.
                 println!("Checking deployments");
                 let res = check_deployments(&manifest);
@@ -604,7 +643,7 @@ pub fn main() {
                 }
             }
             Deployments::GenerateDeployment(cmd) => {
-                let manifest = load_manifest_or_exit(cmd.manifest_path);
+                let manifest = load_manifest_or_exit(cmd.manifest_path, true);
 
                 let network = if cmd.devnet {
                     StacksNetwork::Devnet
@@ -627,7 +666,9 @@ pub fn main() {
                         }
                     };
 
-                if !cmd.manual_cost && network.either_testnet_or_mainnet() {
+                if !cmd.manual_cost
+                    && matches!(network, StacksNetwork::Testnet | StacksNetwork::Mainnet)
+                {
                     let priority = match (cmd.low_cost, cmd.medium_cost, cmd.high_cost) {
                         (_, _, true) => 2,
                         (_, true, _) => 1,
@@ -680,7 +721,7 @@ pub fn main() {
                 }
             }
             Deployments::ApplyDeployment(cmd) => {
-                let manifest = load_manifest_or_exit(cmd.manifest_path);
+                let manifest = load_manifest_or_exit(cmd.manifest_path, true);
 
                 let network = if cmd.devnet {
                     Some(StacksNetwork::Devnet)
@@ -862,7 +903,7 @@ pub fn main() {
         }
         Command::Contracts(subcommand) => match subcommand {
             Contracts::NewContract(cmd) => {
-                let manifest = load_manifest_or_exit(cmd.manifest_path);
+                let manifest = load_manifest_or_exit(cmd.manifest_path, true);
 
                 let changes = match generate::get_changes_for_new_contract(
                     &manifest.location,
@@ -880,12 +921,12 @@ pub fn main() {
                 if !execute_changes(changes) {
                     std::process::exit(1);
                 }
-                if global_settings.enable_hints.unwrap_or(true) {
+                if clarinetrc.enable_hints.unwrap_or(true) {
                     display_post_check_hint();
                 }
             }
             Contracts::RemoveContract(cmd) => {
-                let manifest = load_manifest_or_exit(cmd.manifest_path);
+                let manifest = load_manifest_or_exit(cmd.manifest_path, true);
                 let contract_name = cmd.name.clone();
                 let changes =
                     match generate::get_changes_for_rm_contract(&manifest.location, cmd.name) {
@@ -911,14 +952,14 @@ pub fn main() {
                 if !execute_changes(changes) {
                     std::process::exit(1);
                 }
-                if global_settings.enable_hints.unwrap_or(true) {
+                if clarinetrc.enable_hints.unwrap_or(true) {
                     display_post_check_hint();
                 }
             }
         },
         Command::Requirements(subcommand) => match subcommand {
             Requirements::AddRequirement(cmd) => {
-                let manifest = load_manifest_or_exit(cmd.manifest_path);
+                let manifest = load_manifest_or_exit(cmd.manifest_path, true);
 
                 let change = TOMLEdition {
                     comment: format!(
@@ -926,22 +967,28 @@ pub fn main() {
                         yellow!("Updated Clarinet.toml"),
                         green!(format!("{}", cmd.contract_id))
                     ),
-                    manifest_location: manifest.location.clone(),
+                    manifest_location: manifest.location,
                     contracts_to_rm: vec![],
                     contracts_to_add: HashMap::new(),
                     requirements_to_add: vec![RequirementConfig {
-                        contract_id: cmd.contract_id.clone(),
+                        contract_id: cmd.contract_id,
                     }],
                 };
                 if !execute_changes(vec![Changes::EditTOML(change)]) {
                     std::process::exit(1);
                 }
-                if global_settings.enable_hints.unwrap_or(true) {
+                if clarinetrc.enable_hints.unwrap_or(true) {
                     display_post_check_hint();
                 }
             }
         },
         Command::Console(cmd) => {
+            let remote_data_settings = RemoteDataSettings {
+                enabled: cmd.enable_remote_data,
+                api_url: cmd.remote_data_api_url.unwrap_or_default(),
+                initial_height: cmd.remote_data_initial_height,
+            };
+
             // Loop to handle `::reload` command
             loop {
                 let manifest = load_manifest_or_warn(cmd.manifest_path.clone());
@@ -989,7 +1036,8 @@ pub fn main() {
                         }
                     }
                     None => {
-                        let settings = repl::SessionSettings::default();
+                        let mut settings = repl::SessionSettings::default();
+                        settings.repl_settings.remote_data = remote_data_settings.clone();
                         if cmd.enable_clarity_wasm {
                             let mut settings_wasm = repl::SessionSettings::default();
                             settings_wasm.repl_settings.clarity_wasm_mode = true;
@@ -1036,7 +1084,7 @@ pub fn main() {
                 }
             }
 
-            if global_settings.enable_hints.unwrap_or(true) {
+            if clarinetrc.enable_hints.unwrap_or(true) {
                 display_contract_new_hint(None);
             }
         }
@@ -1075,7 +1123,7 @@ pub fn main() {
                 contract.epoch,
                 contract.clarity_version,
             );
-            let mut analysis_db = AnalysisDatabase::new(&mut session.interpreter.datastore);
+            let mut analysis_db = AnalysisDatabase::new(&mut session.interpreter.clarity_datastore);
             let mut analysis_diagnostics = match analysis::run_analysis(
                 &mut contract_analysis,
                 &mut analysis_db,
@@ -1105,7 +1153,7 @@ pub fn main() {
             }
         }
         Command::Check(cmd) => {
-            let manifest = load_manifest_or_exit(cmd.manifest_path);
+            let manifest = load_manifest_or_exit(cmd.manifest_path, false);
             let (deployment, _, artifacts) = load_deployment_and_artifacts_or_exit(
                 &manifest,
                 &cmd.deployment_plan_path,
@@ -1155,7 +1203,7 @@ pub fn main() {
                 false => 1,
             };
 
-            if global_settings.enable_hints.unwrap_or(true) {
+            if clarinetrc.enable_hints.unwrap_or(true) {
                 display_post_check_hint();
             }
             if manifest.project.telemetry {
@@ -1171,7 +1219,7 @@ pub fn main() {
                 "{}",
                 format_warn!("This command is deprecated. Use 'clarinet devnet start' instead"),
             );
-            devnet_start(cmd, global_settings)
+            devnet_start(cmd, clarinetrc)
         }
         Command::LSP => run_lsp(),
         Command::DAP => match super::dap::run_dap() {
@@ -1181,17 +1229,90 @@ pub fn main() {
                 process::exit(1);
             }
         },
+        Command::Formatter(cmd) => {
+            eprintln!(
+                "{}",
+                format_warn!("This command is in beta. Feedback is welcome!"),
+            );
+            let sources = get_sources_to_format(cmd.manifest_path, cmd.file);
+            let mut settings = formatter::Settings::default();
+
+            if let Some(max_line_length) = cmd.max_line_length {
+                settings.max_line_length = max_line_length;
+            }
+
+            if let Some(indentation) = cmd.indentation {
+                settings.indentation = formatter::Indentation::Space(indentation);
+            }
+            if cmd.use_tabs {
+                settings.indentation = formatter::Indentation::Tab;
+            }
+            let formatter = ClarityFormatter::new(settings);
+
+            for (file_path, source) in &sources {
+                let output = formatter.format(source);
+                if cmd.in_place {
+                    let _ = overwrite_formatted(file_path, output);
+                } else if cmd.dry_run {
+                    println!("{}", output);
+                } else {
+                    eprintln!("required flags: in-place or dry-run");
+                }
+            }
+        }
         Command::Devnet(subcommand) => match subcommand {
             Devnet::Package(cmd) => {
-                let manifest = load_manifest_or_exit(cmd.manifest_path);
+                let manifest = load_manifest_or_exit(cmd.manifest_path, false);
                 if let Err(e) = Package::pack(cmd.package_file_name, manifest) {
                     eprintln!("Could not execute the package command. {}", format_err!(e));
                     process::exit(1);
                 }
             }
-            Devnet::DevnetStart(cmd) => devnet_start(cmd, global_settings),
+            Devnet::DevnetStart(cmd) => devnet_start(cmd, clarinetrc),
         },
     };
+}
+
+fn overwrite_formatted(file_path: &String, output: String) -> io::Result<()> {
+    let mut file = fs::File::create(file_path)?;
+
+    file.write_all(output.as_bytes())?;
+    Ok(())
+}
+
+fn from_code_source(src: ClarityCodeSource) -> String {
+    match src {
+        ClarityCodeSource::ContractOnDisk(path_buf) => {
+            path_buf.as_path().to_str().unwrap().to_owned()
+        }
+        _ => panic!("invalid code source"), // TODO
+    }
+}
+// look for files at the default code path (./contracts/) if
+// cmd.manifest_path is not specified OR if cmd.file is not specified
+fn get_sources_from_manifest(manifest_path: Option<String>) -> Vec<String> {
+    let manifest = load_manifest_or_exit(manifest_path, true);
+    let contracts = manifest.contracts.values().cloned();
+    contracts.map(|c| from_code_source(c.code_source)).collect()
+}
+
+fn get_sources_to_format(
+    manifest_path: Option<String>,
+    file: Option<String>,
+) -> Vec<(String, String)> {
+    let files: Vec<String> = match file {
+        Some(file_name) => vec![format!("{}", file_name)],
+        None => get_sources_from_manifest(manifest_path),
+    };
+    // Map each file to its source code
+    files
+        .into_iter()
+        .map(|file_path| {
+            let source = fs::read_to_string(&file_path)
+                .unwrap_or_else(|_| "Failed to read file".to_string());
+            (file_path, source)
+        })
+        .collect()
 }
 
 fn get_manifest_location_or_exit(path: Option<String>) -> FileLocation {
@@ -1217,9 +1338,12 @@ fn get_manifest_location_or_warn(path: Option<String>) -> Option<FileLocation> {
     }
 }
 
-fn load_manifest_or_exit(path: Option<String>) -> ProjectManifest {
+fn load_manifest_or_exit(
+    path: Option<String>,
+    allow_remote_data_fetching: bool,
+) -> ProjectManifest {
     let manifest_location = get_manifest_location_or_exit(path);
-    match ProjectManifest::from_location(&manifest_location) {
+    match ProjectManifest::from_location(&manifest_location, allow_remote_data_fetching) {
         Ok(manifest) => manifest,
         Err(message) => {
             eprintln!(
@@ -1234,7 +1358,7 @@ fn load_manifest_or_exit(path: Option<String>) -> ProjectManifest {
 
 fn load_manifest_or_warn(path: Option<String>) -> Option<ProjectManifest> {
     if let Some(manifest_location) = get_manifest_location_or_warn(path) {
-        let manifest = match ProjectManifest::from_location(&manifest_location) {
+        let manifest = match ProjectManifest::from_location(&manifest_location, true) {
             Ok(manifest) => manifest,
             Err(message) => {
                 eprintln!(
@@ -1593,6 +1717,7 @@ fn execute_changes(changes: Vec<Changes>) -> bool {
                         match ProjectManifest::from_project_manifest_file(
                             project_manifest_file,
                             &manifest_location,
+                            true,
                         ) {
                             Ok(content) => content,
                             Err(message) => {
@@ -1696,14 +1821,14 @@ fn display_hint_footer() {
         "{}",
         yellow!(format!(
             "These hints can be disabled in the {} file.",
-            GlobalSettings::get_settings_file_path()
+            ClarinetRC::get_settings_file_path()
         ))
     );
     println!(
         "{}",
         blue!(format!(
             "  $ mkdir -p ~/.clarinet; echo \"enable_hints = false\" >> {}",
-            GlobalSettings::get_settings_file_path()
+            ClarinetRC::get_settings_file_path()
         ))
     );
     display_separator();
@@ -1722,7 +1847,7 @@ fn display_post_check_hint() {
         "{}",
         yellow!("    Run all run tests in the ./tests folder.\n")
     );
-    println!("{}", yellow!("Find more information on testing with Clarinet here: https://docs.hiro.so/stacks/clarinet-js-sdkk"));
+    println!("{}", yellow!("Find more information on testing with Clarinet here: https://docs.hiro.so/stacks/clarinet-js-sdk"));
     display_hint_footer();
 }
 
@@ -1787,18 +1912,18 @@ fn display_deploy_hint() {
     display_hint_footer();
 }
 
-fn devnet_start(cmd: DevnetStart, global_settings: GlobalSettings) {
+fn devnet_start(cmd: DevnetStart, clarinetrc: ClarinetRC) {
     let manifest = if cmd.default_settings {
         let project_root_location = FileLocation::from_path(
             std::env::current_dir().expect("Failed to get current directory"),
         );
         println!("Using default project manifest");
         ProjectManifest::default_project_manifest(
-            global_settings.enable_telemetry.unwrap_or(false),
+            clarinetrc.enable_telemetry.unwrap_or(false),
             project_root_location,
         )
     } else {
-        load_manifest_or_exit(cmd.manifest_path)
+        load_manifest_or_exit(cmd.manifest_path, true)
     };
     println!("Computing deployment plan");
     let result = match cmd.deployment_plan_path {
@@ -1877,14 +2002,19 @@ fn devnet_start(cmd: DevnetStart, global_settings: GlobalSettings) {
         }
     };
 
-    let orchestrator =
-        match DevnetOrchestrator::new(manifest, Some(NetworkManifest::default()), None, true) {
-            Ok(orchestrator) => orchestrator,
-            Err(e) => {
-                eprintln!("{}", format_err!(e));
-                process::exit(1);
-            }
-        };
+    let orchestrator = match DevnetOrchestrator::new(
+        manifest,
+        Some(NetworkManifest::default()),
+        None,
+        true,
+        cmd.no_dashboard,
+    ) {
+        Ok(orchestrator) => orchestrator,
+        Err(e) => {
+            eprintln!("{}", format_err!(e));
+            process::exit(1);
+        }
+    };
 
     if orchestrator.manifest.project.telemetry {
         #[cfg(feature = "telemetry")]
@@ -1907,7 +2037,7 @@ fn devnet_start(cmd: DevnetStart, global_settings: GlobalSettings) {
             process::exit(1);
         }
         Ok(_) => {
-            if global_settings.enable_hints.unwrap_or(true) {
+            if clarinetrc.enable_hints.unwrap_or(true) {
                 display_deploy_hint();
             }
             process::exit(0);

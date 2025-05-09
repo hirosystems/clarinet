@@ -1,10 +1,9 @@
 {
-  "name": "clarinet-sdk-workspace",
+  "name": "@hirosystems/clarinet-sdk-workspace",
   "private": true,
   "description": "Workspace hosting the Clarinet SDK for Node.js and Browser",
   "author": "hirosystems",
   "license": "GPL-3.0",
-  "type": "module",
   "workspaces": [
     "components/clarinet-sdk-wasm/pkg-node",
     "components/clarinet-sdk-wasm/pkg-browser",
@@ -20,12 +19,12 @@
     "publish:sdk": "npm publish -w components/clarinet-sdk/node -w components/clarinet-sdk/browser --tag beta"
   },
   "devDependencies": {
-    "@types/node": "^20.4.5",
+    "@types/node": "^22.12.0",
     "@types/prompts": "^2.4.5",
     "@types/yargs": "^17.0.24",
     "prettier": "^3.3.3",
     "rimraf": "^6.0.1",
     "ts-loader": "^9.4.4",
-    "typescript": "^5.1.6"
+    "typescript": "^5.6.2"
   }
 }

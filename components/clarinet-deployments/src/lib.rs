@@ -1,7 +1,5 @@
-use clarity_repl::clarity::vm::SymbolicExpression;
-use clarity_repl::clarity::StacksEpochId;
-use clarity_repl::repl::{ClarityCodeSource, ClarityContract, ContractDeployer};
-use clarity_repl::repl::{DEFAULT_CLARITY_VERSION, DEFAULT_EPOCH};
+use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
+use std::fmt::Write;
 
 extern crate serde;
 
@@ -9,19 +7,16 @@ extern crate serde;
 extern crate serde_derive;
 
 pub mod diagnostic_digest;
-#[cfg(feature = "onchain")]
+#[cfg(not(target_arch = "wasm32"))]
 pub mod onchain;
 pub mod requirements;
 pub mod types;
-
-#[cfg(test)]
-mod deployment_plan_test;
 
 use self::types::{
     DeploymentSpecification, EmulatedContractPublishSpecification, GenesisSpecification,
     TransactionPlanSpecification, TransactionsBatchSpecification, WalletSpecification,
 };
-use clarinet_files::chainhook_types::StacksNetwork;
+use clarinet_files::StacksNetwork;
 use clarinet_files::{FileAccessor, FileLocation};
 use clarinet_files::{NetworkManifest, ProjectManifest};
 use clarity_repl::analysis::ast_dependency_detector::{ASTDependencyDetector, DependencySet};
@@ -32,10 +27,16 @@ use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
 use clarity_repl::clarity::vm::ContractName;
 use clarity_repl::clarity::vm::EvaluationResult;
 use clarity_repl::clarity::vm::ExecutionResult;
-use clarity_repl::repl::session::BOOT_CONTRACTS_DATA;
+use clarity_repl::clarity::vm::SymbolicExpression;
+use clarity_repl::clarity::StacksEpochId;
+use clarity_repl::repl::boot::{
+    BOOT_CONTRACTS_DATA, SBTC_DEPOSIT_MAINNET_ADDRESS, SBTC_MAINNET_ADDRESS,
+    SBTC_TESTNET_ADDRESS_PRINCIPAL, SBTC_TOKEN_MAINNET_ADDRESS,
+};
 use clarity_repl::repl::Session;
 use clarity_repl::repl::SessionSettings;
-use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
+use clarity_repl::repl::{ClarityCodeSource, ClarityContract, ContractDeployer};
+use clarity_repl::repl::{DEFAULT_CLARITY_VERSION, DEFAULT_EPOCH};
 use types::TransactionSpecification;
 use types::{ContractPublishSpecification, EpochSpec};
 use types::{DeploymentGenerationArtifacts, StxTransferSpecification};
@@ -56,7 +57,7 @@ pub fn setup_session_with_deployment(
 ) -> DeploymentGenerationArtifacts {
     let mut session = initiate_session_from_manifest(manifest);
     let UpdateSessionExecutionResult { contracts, .. } =
-        update_session_with_deployment_plan(&mut session, deployment, contracts_asts, false, None);
+        update_session_with_deployment_plan(&mut session, deployment, contracts_asts, None);
 
     let deps = BTreeMap::new();
     let mut diags = HashMap::new();
@@ -96,6 +97,7 @@ pub fn initiate_session_from_manifest(manifest: &ProjectManifest) -> Session {
     let settings = SessionSettings {
         repl_settings: manifest.repl_settings.clone(),
         disk_cache_enabled: true,
+        cache_location: Some(manifest.project.cache_location.to_path_buf()),
         ..Default::default()
     };
     Session::new(settings)
@@ -106,6 +108,9 @@ fn update_session_with_genesis_accounts(
     deployment: &DeploymentSpecification,
 ) {
     if let Some(ref spec) = deployment.genesis {
+        let addresses: Vec<_> = spec.wallets.iter().map(|w| w.address.clone()).collect();
+        session.interpreter.save_genesis_accounts(addresses);
+
         for wallet in spec.wallets.iter() {
             let _ = session.interpreter.mint_stx_balance(
                 wallet.address.clone().into(),
@@ -118,23 +123,73 @@ fn update_session_with_genesis_accounts(
     }
 }
 
+fn fund_genesis_account_with_sbtc(session: &mut Session, deployment: &DeploymentSpecification) {
+    if let Some(ref spec) = deployment.genesis {
+        let block_height = session.interpreter.get_burn_block_height() - 1;
+        let height = session.eval_clarity_string(&format!("u{}", block_height));
+        let hash = session.eval_clarity_string(&format!(
+            "(unwrap-panic (get-burn-block-info? header-hash u{}))",
+            block_height
+        ));
+        let vout_index = session.eval_clarity_string("u1");
+
+        for wallet in spec.wallets.iter() {
+            if wallet.sbtc_balance == 0 {
+                continue;
+            }
+
+            let mut random_tx_id = String::with_capacity(64);
+            for _ in 0..32 {
+                write!(&mut random_tx_id, "{:02x}", rand::random::<u8>()).unwrap();
+            }
+            let tx_id = session.eval_clarity_string(&format!("0x{}", random_tx_id));
+            let mut random_sweep_txid = String::with_capacity(64);
+            for _ in 0..32 {
+                write!(&mut random_sweep_txid, "{:02x}", rand::random::<u8>()).unwrap();
+            }
+            let sweep_tx_id = session.eval_clarity_string(&format!("0x{}", random_sweep_txid));
+            let amount = session.eval_clarity_string(&format!("u{}", wallet.sbtc_balance));
+            let recipient = session.eval_clarity_string(&format!("'{}", wallet.address));
+
+            let args = vec![
+                tx_id,
+                vout_index.clone(),
+                amount,
+                recipient,
+                hash.clone(),
+                height.clone(),
+                sweep_tx_id,
+            ];
+            let _ = session.call_contract_fn(
+                &SBTC_DEPOSIT_MAINNET_ADDRESS.to_string(),
+                "complete-deposit-wrapper",
+                &args,
+                SBTC_MAINNET_ADDRESS,
+                false,
+                false,
+            );
+        }
+    }
+}
+
 pub fn update_session_with_deployment_plan(
     session: &mut Session,
     deployment: &DeploymentSpecification,
     contracts_asts: Option<&BTreeMap<QualifiedContractIdentifier, ContractAST>>,
-    code_coverage_enabled: bool,
     forced_min_epoch: Option<StacksEpochId>,
 ) -> UpdateSessionExecutionResult {
     update_session_with_genesis_accounts(session, deployment);
 
-    let boot_contracts_data = BOOT_CONTRACTS_DATA.clone();
+    let mut should_mint_sbtc = false;
 
     let mut boot_contracts = BTreeMap::new();
-    for (contract_id, (boot_contract, ast)) in boot_contracts_data {
-        let result = session
-            .interpreter
-            .run(&boot_contract, Some(&ast), false, None);
-        boot_contracts.insert(contract_id, result);
+    if !session.settings.repl_settings.remote_data.enabled {
+        let boot_contracts_data = BOOT_CONTRACTS_DATA.clone();
+
+        for (contract_id, (contract, ast)) in boot_contracts_data {
+            let result = session.interpreter.run(&contract, Some(&ast), false, None);
+            boot_contracts.insert(contract_id, result);
+        }
     }
 
     let mut contracts = BTreeMap::new();
@@ -159,14 +214,11 @@ pub fn update_session_with_deployment_plan(
                         tx.emulated_sender.clone(),
                         tx.contract_name.clone(),
                     );
+                    if !should_mint_sbtc && contract_id == *SBTC_DEPOSIT_MAINNET_ADDRESS {
+                        should_mint_sbtc = true;
+                    }
                     let contract_ast = contracts_asts.as_ref().and_then(|m| m.get(&contract_id));
-                    let result = handle_emulated_contract_publish(
-                        session,
-                        tx,
-                        contract_ast,
-                        epoch,
-                        code_coverage_enabled,
-                    );
+                    let result = handle_emulated_contract_publish(session, tx, contract_ast, epoch);
                     contracts.insert(contract_id, result);
                 }
                 TransactionSpecification::EmulatedContractCall(tx) => {
@@ -178,6 +230,11 @@ pub fn update_session_with_deployment_plan(
             }
         }
     }
+
+    if should_mint_sbtc {
+        fund_genesis_account_with_sbtc(session, deployment);
+    }
+
     UpdateSessionExecutionResult {
         boot_contracts,
         contracts,
@@ -198,7 +255,6 @@ fn handle_emulated_contract_publish(
     tx: &EmulatedContractPublishSpecification,
     contract_ast: Option<&ContractAST>,
     epoch: StacksEpochId,
-    code_coverage_enabled: bool,
 ) -> Result<ExecutionResult, Vec<Diagnostic>> {
     let default_tx_sender = session.get_tx_sender();
     session.set_tx_sender(&tx.emulated_sender.to_string());
@@ -210,25 +266,11 @@ fn handle_emulated_contract_publish(
         clarity_version: tx.clarity_version,
         epoch,
     };
-    let test_name = if code_coverage_enabled {
-        Some("__analysis__".to_string())
-    } else {
-        None
-    };
-    let result = session.deploy_contract(&contract, None, false, test_name, contract_ast);
+
+    let result = session.deploy_contract(&contract, false, contract_ast);
 
     session.set_tx_sender(&default_tx_sender);
     result
-}
-
-/// Used to evalutate function arguments passed in deployment plans
-fn eval_clarity_string(session: &mut Session, snippet: &str) -> SymbolicExpression {
-    let eval_result = session.eval(snippet.to_string(), None, false);
-    let value = match eval_result.unwrap().result {
-        EvaluationResult::Contract(_) => unreachable!(),
-        EvaluationResult::Snippet(snippet_result) => snippet_result.result,
-    };
-    SymbolicExpression::atom_value(value)
 }
 
 fn handle_emulated_contract_call(
@@ -241,7 +283,7 @@ fn handle_emulated_contract_call(
     let params: Vec<SymbolicExpression> = tx
         .parameters
         .iter()
-        .map(|p| eval_clarity_string(session, p))
+        .map(|p| session.eval_clarity_string(p))
         .collect();
     let result = session.call_contract_fn(
         &tx.contract_id.to_string(),
@@ -250,8 +292,6 @@ fn handle_emulated_contract_call(
         &tx.emulated_sender.to_string(),
         true,
         false,
-        false,
-        "deployment".to_string(),
     );
     if let Err(errors) = &result {
         println!("error: {:?}", errors.first().unwrap().message);
@@ -353,21 +393,28 @@ pub async fn generate_default_deployment(
     let mut requirements_data = BTreeMap::new();
     let mut requirements_deps = BTreeMap::new();
 
+    let mut repl_settings = manifest.repl_settings.clone();
+    repl_settings.remote_data.enabled = false;
     let settings = SessionSettings {
-        repl_settings: manifest.repl_settings.clone(),
+        repl_settings,
         ..Default::default()
     };
-
     let session = Session::new(settings.clone());
 
-    let boot_contracts_data = BOOT_CONTRACTS_DATA.clone();
+    let simnet_remote_data =
+        matches!(network, StacksNetwork::Simnet) && manifest.repl_settings.remote_data.enabled;
+
     let mut boot_contracts_ids = BTreeSet::new();
-    let mut boot_contracts_asts = BTreeMap::new();
-    for (id, (contract, ast)) in boot_contracts_data {
-        boot_contracts_ids.insert(id.clone());
-        boot_contracts_asts.insert(id, (contract.clarity_version, ast));
+
+    if !simnet_remote_data {
+        let boot_contracts_data = BOOT_CONTRACTS_DATA.clone();
+        let mut boot_contracts_asts = BTreeMap::new();
+        for (id, (contract, ast)) in boot_contracts_data {
+            boot_contracts_ids.insert(id.clone());
+            boot_contracts_asts.insert(id, (contract.clarity_version, ast));
+        }
+        requirements_data.append(&mut boot_contracts_asts);
     }
-    requirements_data.append(&mut boot_contracts_asts);
 
     let mut queue = VecDeque::new();
 
@@ -393,6 +440,21 @@ pub async fn generate_default_deployment(
         let cache_location = &manifest.project.cache_location;
         let mut emulated_contracts_publish = HashMap::new();
         let mut requirements_publish = HashMap::new();
+
+        // automatically add sbtc-deposit if only sbtc-token is present
+        if requirements
+            .iter()
+            .any(|r| r.contract_id == SBTC_TOKEN_MAINNET_ADDRESS.to_string())
+            && !requirements
+                .iter()
+                .any(|r| r.contract_id == SBTC_DEPOSIT_MAINNET_ADDRESS.to_string())
+        {
+            queue.push_front((
+                QualifiedContractIdentifier::parse(&SBTC_DEPOSIT_MAINNET_ADDRESS.to_string())
+                    .unwrap(),
+                None,
+            ));
+        }
 
         // Load all the requirements
         // Some requirements are explicitly listed, some are discovered as we compute the ASTs.
@@ -435,16 +497,19 @@ pub async fn generate_default_deployment(
                     contract_epochs.insert(contract_id.clone(), epoch);
 
                     // Build the struct representing the requirement in the deployment
-                    if network.is_simnet() {
-                        let data = EmulatedContractPublishSpecification {
-                            contract_name: contract_id.name.clone(),
-                            emulated_sender: contract_id.issuer.clone(),
-                            source: source.clone(),
-                            location: contract_location,
-                            clarity_version,
-                        };
-                        emulated_contracts_publish.insert(contract_id.clone(), data);
-                    } else if network.either_devnet_or_testnet() {
+                    if matches!(network, StacksNetwork::Simnet) {
+                        if !simnet_remote_data {
+                            let data = EmulatedContractPublishSpecification {
+                                contract_name: contract_id.name.clone(),
+                                emulated_sender: contract_id.issuer.clone(),
+                                source: source.clone(),
+                                location: contract_location,
+                                clarity_version,
+                            };
+
+                            emulated_contracts_publish.insert(contract_id.clone(), data);
+                        }
+                    } else if matches!(network, StacksNetwork::Devnet) {
                         let mut remap_principals = BTreeMap::new();
                         remap_principals
                             .insert(contract_id.issuer.clone(), default_deployer_address.clone());
@@ -462,9 +527,35 @@ pub async fn generate_default_deployment(
                             }
                             _ => {}
                         }
+
                         let data = RequirementPublishSpecification {
                             contract_id: contract_id.clone(),
                             remap_sender: default_deployer_address.clone(),
+                            source: source.clone(),
+                            location: contract_location,
+                            cost: deployment_fee_rate * source.len() as u64,
+                            remap_principals,
+                            clarity_version,
+                        };
+                        requirements_publish.insert(contract_id.clone(), data);
+                    } else if matches!(network, StacksNetwork::Testnet) {
+                        let mut remap_sender = default_deployer_address.clone();
+                        let mut remap_principals = BTreeMap::new();
+                        remap_principals
+                            .insert(contract_id.issuer.clone(), default_deployer_address.clone());
+
+                        // Remap sBTC mainnet address to testnet address
+                        if contract_id.issuer.to_string() == SBTC_MAINNET_ADDRESS {
+                            remap_sender = SBTC_TESTNET_ADDRESS_PRINCIPAL.clone();
+                            remap_principals.insert(
+                                contract_id.issuer.clone(),
+                                SBTC_TESTNET_ADDRESS_PRINCIPAL.clone(),
+                            );
+                        }
+
+                        let data = RequirementPublishSpecification {
+                            contract_id: contract_id.clone(),
+                            remap_sender,
                             source: source.clone(),
                             location: contract_location,
                             cost: deployment_fee_rate * source.len() as u64,
@@ -547,7 +638,7 @@ pub async fn generate_default_deployment(
         }
 
         // Avoid listing requirements as deployment transactions to the deployment specification on Mainnet
-        if !network.is_mainnet() {
+        if !matches!(network, StacksNetwork::Mainnet) && !simnet_remote_data {
             let mut ordered_contracts_ids = match ASTDependencyDetector::order_contracts(
                 &requirements_deps,
                 &contract_epochs,
@@ -559,11 +650,11 @@ pub async fn generate_default_deployment(
             // Filter out boot contracts from requirement dependencies
             ordered_contracts_ids.retain(|contract_id| !boot_contracts_ids.contains(contract_id));
 
-            if network.is_simnet() {
+            if matches!(network, StacksNetwork::Simnet) {
                 for contract_id in ordered_contracts_ids.iter() {
                     let data = emulated_contracts_publish
                         .remove(contract_id)
-                        .expect("unable to retrieve contract");
+                        .unwrap_or_else(|| panic!("unable to retrieve contract: {}", contract_id));
                     let tx = TransactionSpecification::EmulatedContractPublish(data);
                     add_transaction_to_epoch(
                         &mut transactions,
@@ -571,11 +662,11 @@ pub async fn generate_default_deployment(
                         &contract_epochs[contract_id].into(),
                     );
                 }
-            } else if network.either_devnet_or_testnet() {
+            } else if matches!(network, StacksNetwork::Devnet | StacksNetwork::Testnet) {
                 for contract_id in ordered_contracts_ids.iter() {
                     let data = requirements_publish
                         .remove(contract_id)
-                        .expect("unable to retrieve contract");
+                        .unwrap_or_else(|| panic!("unable to retrieve contract: {}", contract_id));
                     let tx = TransactionSpecification::RequirementPublish(data);
                     add_transaction_to_epoch(
                         &mut transactions,
@@ -687,7 +778,7 @@ pub async fn generate_default_deployment(
             },
         );
 
-        let contract_spec = if network.is_simnet() {
+        let contract_spec = if matches!(network, StacksNetwork::Simnet) {
             TransactionSpecification::EmulatedContractPublish(
                 EmulatedContractPublishSpecification {
                     contract_name,
@@ -702,8 +793,7 @@ pub async fn generate_default_deployment(
                 contract_name,
                 expected_sender: sender,
                 location: contract_location,
-                cost: deployment_fee_rate
-                    .saturating_mul(source.as_bytes().len().try_into().unwrap()),
+                cost: deployment_fee_rate.saturating_mul(source.len().try_into().unwrap()),
                 source,
                 anchor_block_only: true,
                 clarity_version: contract_config.clarity_version,
@@ -791,32 +881,27 @@ pub async fn generate_default_deployment(
     let mut batch_count = 0;
     for (epoch, epoch_transactions) in transactions {
         for txs in epoch_transactions.chunks(tx_chain_limit) {
-            batches.push(TransactionsBatchSpecification {
-                id: batch_count,
-                transactions: txs.to_vec(),
-                epoch: Some(epoch),
-            });
-            batch_count += 1;
+            if !txs.is_empty() {
+                batches.push(TransactionsBatchSpecification {
+                    id: batch_count,
+                    transactions: txs.to_vec(),
+                    epoch: Some(epoch),
+                });
+                batch_count += 1;
+            }
         }
     }
 
     let mut wallets = vec![];
-    if network.is_simnet() {
-        for (name, account) in network_manifest.accounts.into_iter() {
-            let address = match PrincipalData::parse_standard_principal(&account.stx_address) {
-                Ok(res) => res,
-                Err(_) => {
-                    return Err(format!(
-                        "unable to parse wallet {} in a valid Stacks address",
-                        account.stx_address
-                    ))
-                }
-            };
-
+    if matches!(network, StacksNetwork::Simnet) {
+        for (name, account) in network_manifest.accounts {
+            let address = PrincipalData::parse_standard_principal(&account.stx_address)
+                .map_err(|_| format!("unable to parse address {}", account.stx_address))?;
             wallets.push(WalletSpecification {
                 name,
                 address,
                 balance: account.balance.into(),
+                sbtc_balance: account.sbtc_balance.into(),
             });
         }
     }
@@ -832,7 +917,7 @@ pub async fn generate_default_deployment(
         stacks_node,
         bitcoin_node,
         network: network.clone(),
-        genesis: if network.is_simnet() {
+        genesis: if matches!(network, StacksNetwork::Simnet) {
             Some(GenesisSpecification {
                 wallets,
                 contracts: manifest.project.boot_contracts.clone(),
@@ -930,34 +1015,7 @@ mod tests {
             location: FileLocation::from_path_string("/contracts/contract_1.clar").unwrap(),
         };
 
-        handle_emulated_contract_publish(session, &emulated_publish_spec, None, epoch, false)
-    }
-
-    #[test]
-    fn test_eval_clarity_string() {
-        let mut session = Session::new(SessionSettings::default());
-        let epoch = StacksEpochId::Epoch25;
-        session.update_epoch(epoch);
-
-        let result = eval_clarity_string(&mut session, "u1");
-        assert_eq!(result, SymbolicExpression::atom_value(Value::UInt(1)));
-
-        let result = eval_clarity_string(&mut session, "(+ 1 2)");
-        assert_eq!(result, SymbolicExpression::atom_value(Value::Int(3)));
-
-        let result = eval_clarity_string(&mut session, "(list u1 u2)");
-        assert_eq!(
-            result,
-            SymbolicExpression::atom_value(
-                Value::cons_list_unsanitized(vec![Value::UInt(1), Value::UInt(2)]).unwrap()
-            )
-        );
-
-        let result = eval_clarity_string(&mut session, "0x01");
-        assert_eq!(
-            result,
-            SymbolicExpression::atom_value(Value::buff_from_byte(0x01))
-        );
+        handle_emulated_contract_publish(session, &emulated_publish_spec, None, epoch)
     }
 
     #[test]

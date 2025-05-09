@@ -3,35 +3,25 @@ on:
   pull_request:
     branches:
       - main
-      - develop
-      - rc/next
     paths-ignore:
       - "**/CHANGELOG.md"
   push:
     branches:
       - main
-      - develop
-      - rc/next
     paths-ignore:
       - "**/CHANGELOG.md"
 
   workflow_dispatch:
 
-jobs:
-  pre_run:
-    name: Cancel previous runs
-    runs-on: ubuntu-latest
-    steps:
-      - name: Cancel Previous Runs
-        uses: styfle/cancel-workflow-action@ad6cb1b847ffb509a69b745b6ee2f1d14dfe14b8
-        with:
-          access_token: ${{ github.token }}
-          persist-credentials: false
+# Cancel previous runs for the same workflow
+concurrency:
+  group: "${{ github.workflow }} @ ${{ github.event.pull_request.head.label || github.head_ref || github.ref }}"
+  cancel-in-progress: true
 
+jobs:
   get_release_info:
     name: Get Release Info
     runs-on: ubuntu-latest
-    needs: pre_run
     outputs:
       tag: ${{ steps.new_release_tag.outputs.TAG }}
     steps:
@@ -60,65 +50,132 @@ jobs:
             echo "::warning::Will not create a release"
           fi
 
-  audit:
-    name: Audit and format
+  sanity_check:
+    name: Sanity checks
     runs-on: ubuntu-latest
-    needs: pre_run
+    env:
+      RUSTFLAGS: "-Dwarnings"
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Install Rust toolchain
+        run: rustup toolchain install stable --profile minimal
+
+      - name: Setup cache keys
+        shell: bash
         run: |
-          rustup toolchain install stable --profile minimal --component rustfmt
-          echo "RUST_VERSION_HASH=$(rustc --version | sha256sum | awk '{print $1}')" >> $GITHUB_ENV
+          RUST_VERSION=$(rustc -vV | shasum -a 256 | cut -d ' ' -f1)
+          echo "RUST_VERSION=$RUST_VERSION" >> $GITHUB_ENV
 
       - name: Cache cargo
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
-            ~/.cargo/
-            ./target/debug/build/
-          key: ${{ runner.os }}-rust-${{ env.RUST_VERSION_HASH }}-${{ hashFiles('./Cargo.lock') }}
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-${{ github.job }}-${{ env.RUST_VERSION }}-${{ hashFiles('./Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ github.job }}-${{ env.RUST_VERSION }}-
+            ${{ runner.os }}-${{ github.job }}-
 
       - name: Install dependencies
-        run: cargo install cargo-audit
+        run: cargo install cargo-audit || true
 
       - name: Run audit
-        run: cargo audit --ignore RUSTSEC-2022-0093 --ignore RUSTSEC-2021-0076 --ignore RUSTSEC-2022-0090 --ignore RUSTSEC-2022-002 --ignore RUSTSEC-2022-0028 --ignore RUSTSEC-2024-0344
+        run: cargo audit --ignore RUSTSEC-2024-0344 --ignore RUSTSEC-2022-0028 --ignore RUSTSEC-2024-0438
 
       - name: Run rustfmt
         run: cargo fmt --all -- --check
 
-  test_coverage_cargo:
-    name: Generate test coverage
-    runs-on: ubuntu-latest
+      - name: Run clippy
+        run: cargo clippy --workspace --exclude clarinet-sdk-wasm
+
+  cargo_test:
+    name: Run cargo tests
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            platform: linux
+            target: x86_64-unknown-linux-gnu
+            architecture: x64
+            libc: glibc
+          - os: windows-latest
+            platform: windows
+            target: x86_64-pc-windows-msvc
+            architecture: x64
+          - os: macos-latest
+            platform: darwin
+            target: aarch64-apple-darwin
+            architecture: arm64
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Install Rust toolchain
+        run: rustup toolchain install stable --profile minimal --target ${{ matrix.target }}
+
+      - name: Setup cache keys
+        shell: bash
         run: |
-          rustup toolchain install stable --profile minimal
-          echo "RUST_VERSION_HASH=$(rustc --version | sha256sum | awk '{print $1}')" >> $GITHUB_ENV
+          if [ "$RUNNER_OS" == "Windows" ]; then
+            RUST_VERSION=$(rustc -vV | sha256sum | cut -d ' ' -f1)
+          else
+            RUST_VERSION=$(rustc -vV | shasum -a 256 | cut -d ' ' -f1)
+          fi
+          echo "RUST_VERSION=$RUST_VERSION" >> $GITHUB_ENV
 
       - name: Cache cargo
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
-            ~/.cargo/
-            ./target/debug/build/
-          key: ${{ runner.os }}-rust-${{ env.RUST_VERSION_HASH }}-${{ hashFiles('./Cargo.lock') }}
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/debug/.fingerprint/
+            target/debug/build/
+            target/debug/deps/
+          key: ${{ matrix.os }}-${{ matrix.target }}-${{ github.job }}-${{ env.RUST_VERSION }}-${{ hashFiles('./Cargo.lock') }}
+          restore-keys: |
+            ${{ matrix.os }}-${{ matrix.target }}-${{ github.job }}-${{ env.RUST_VERSION }}-
+            ${{ matrix.os }}-${{ matrix.target }}-${{ github.job }}-
 
-      - name: install dependencies
+      - name: Install dependencies
         uses: taiki-e/install-action@v2
         with:
           tool: cargo-llvm-cov,nextest
 
+      - name: Run unit test
+        if: matrix.target != 'x86_64-unknown-linux-gnu'
+        env:
+          HIRO_API_KEY: ${{ secrets.HIRO_API_KEY }}
+          CARGO_INCREMENTAL: 0
+          RUSTFLAGS: "-C debuginfo=0"
+        run: cargo tst
+
+      - name: Install llvm-cov
+        if: matrix.target == 'x86_64-unknown-linux-gnu'
+        run: rustup component add llvm-tools-preview --toolchain stable-x86_64-unknown-linux-gnu
+
       - name: Run unit test with coverage
+        if: matrix.target == 'x86_64-unknown-linux-gnu'
+        env:
+          HIRO_API_KEY: ${{ secrets.HIRO_API_KEY }}
+          CARGO_INCREMENTAL: 0
+          # prevents linux from recompiling dependencies when cache is hit
+          CARGO_BUILD_DEP_INFO_BASEDIR: "."
+          RUSTFLAGS: "-C debuginfo=0"
         run: cargo cov
 
       - name: Upload coverage data to codecov
+        if: matrix.target == 'x86_64-unknown-linux-gnu'
         uses: codecov/codecov-action@v4
         with:
           files: lcov.info
@@ -127,13 +184,11 @@ jobs:
   dist_clarinet:
     name: Build Clarinet Distributions
     runs-on: ${{ matrix.os }}
-    needs: pre_run
-
     strategy:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-latest
+          - os: ubuntu-22.04
             platform: linux
             target: x86_64-unknown-linux-gnu
             architecture: x64
@@ -164,26 +219,33 @@ jobs:
       - name: Install Rust toolchain
         run: rustup toolchain install stable --profile minimal --target ${{ matrix.target }}
 
-      - name: "Get Rust version (unix)"
-        if: matrix.os != 'windows-latest'
-        run: echo "RUST_VERSION_HASH=$(rustc --version | shasum -a 256 | awk '{print $1}')" >> $GITHUB_ENV
-
-      - name: "Get Rust version (windows)"
-        if: matrix.os == 'windows-latest'
+      - name: Setup cache keys
         shell: bash
-        run: echo "RUST_VERSION_HASH=$(rustc --version | sha256sum | awk '{print $1}')" >> $GITHUB_ENV
+        run: |
+          if [ "$RUNNER_OS" == "Windows" ]; then
+            RUST_VERSION=$(rustc -vV | sha256sum | cut -d ' ' -f1)
+          else
+            RUST_VERSION=$(rustc -vV | shasum -a 256 | cut -d ' ' -f1)
+          fi
+          echo "RUST_VERSION=$RUST_VERSION" >> $GITHUB_ENV
 
       - name: Cache cargo
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
-            ~/.cargo/
-            ./target/${{ matrix.target }}/release/
-          key: ${{ runner.os }}-rust-${{ env.RUST_VERSION_HASH }}-cargo-${{ hashFiles('./Cargo.lock') }}
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ matrix.os }}-${{ matrix.target }}-${{ github.job }}-${{ env.RUST_VERSION }}-${{ hashFiles('./Cargo.lock') }}
+          restore-keys: |
+            ${{ matrix.os }}-${{ matrix.target }}-${{ github.job }}-${{ env.RUST_VERSION }}-
+            ${{ matrix.os }}-${{ matrix.target }}-${{ github.job }}-
 
       - name: Install wix (Windows)
         if: matrix.os == 'windows-latest' && steps.cache-cargo.outputs.cache-hit != 'true'
-        run: cargo install cargo-wix
+        run: cargo install cargo-wix || true
 
       # Set environment variables required from cross compiling from macos-x86_64 to macos-arm64
       - name: Configure macos-arm64 cross compile config
@@ -302,30 +364,23 @@ jobs:
       # Separate uploads to prevent paths from being preserved
       - name: Upload cargo artifacts (Linux)
         if: matrix.os != 'windows-latest'
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: clarinet-${{ env.SHORT_TARGET_NAME }}
           path: clarinet-${{ env.SHORT_TARGET_NAME }}.tar.gz
 
       - name: Upload cargo artifact (Windows)
         if: matrix.os == 'windows-latest'
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: clarinet-${{ env.SHORT_TARGET_NAME }}
           path: clarinet-${{ env.SHORT_TARGET_NAME }}.msi
-
-      - name: Unit Tests - Cargo
-        # can't easily run mac-arm64 tests in GH without native runners for that arch
-        if: matrix.target != 'aarch64-apple-darwin'
-        run: cargo test --workspace --release --locked --exclude clarinet-sdk-wasm --exclude clarity-jupyter-kernel --target ${{ matrix.target }}
 
   dist_stacks_devnet_js:
     name: Build Stacks Devnet JS Distributions
     runs-on: ${{ matrix.os }}
     needs:
-      - pre_run
       - get_release_info
-
     strategy:
       fail-fast: false
       matrix:
@@ -352,7 +407,6 @@ jobs:
             target: x86_64-unknown-linux-musl
             architecture: x64
             libc: musl
-
     steps:
       - name: Configure git to use LF (Windows)
         if: matrix.os == 'windows-latest'
@@ -366,14 +420,15 @@ jobs:
       - name: Install Rust toolchain
         run: rustup toolchain install stable --profile minimal --target ${{ matrix.target }}
 
-      - name: "Get Rust version (unix)"
-        if: matrix.os != 'windows-latest'
-        run: echo "RUST_VERSION_HASH=$(rustc --version | shasum -a 256 | awk '{print $1}')" >> $GITHUB_ENV
-
-      - name: "Get Rust version (windows)"
-        if: matrix.os == 'windows-latest'
+      - name: Setup cache keys
         shell: bash
-        run: echo "RUST_VERSION_HASH=$(rustc --version | sha256sum | awk '{print $1}')" >> $GITHUB_ENV
+        run: |
+          if [ "$RUNNER_OS" == "Windows" ]; then
+            RUST_VERSION=$(rustc -vV | sha256sum | cut -d ' ' -f1)
+          else
+            RUST_VERSION=$(rustc -vV | shasum -a 256 | cut -d ' ' -f1)
+          fi
+          echo "RUST_VERSION=$RUST_VERSION" >> $GITHUB_ENV
 
       - name: Install and cache Node
         if: matrix.target != 'x86_64-unknown-linux-musl'
@@ -387,12 +442,18 @@ jobs:
           cache-dependency-path: components/stacks-devnet-js/package-lock.json
 
       - name: Cache cargo
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
-            ~/.cargo/
-            ./target/${{ matrix.target }}/release/
-          key: ${{ runner.os }}-rust-${{ env.RUST_VERSION_HASH }}-cargo-${{ hashFiles('./Cargo.lock') }}
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ matrix.os }}-${{ matrix.target }}-${{ github.job }}-${{ env.RUST_VERSION }}-${{ hashFiles('./Cargo.lock') }}
+          restore-keys: |
+            ${{ matrix.os }}-${{ matrix.target }}-${{ github.job }}-${{ env.RUST_VERSION }}-
+            ${{ matrix.os }}-${{ matrix.target }}-${{ github.job }}-
 
       # Set environment variables required from cross compiling from macos-x86_64 to macos-arm64
       - name: Configure macos-arm64 cross compile config
@@ -442,14 +503,10 @@ jobs:
 
       - name: Upload node artifact
         if: github.event_name != 'pull_request' || matrix.target == 'x86_64-unknown-linux-gnu'
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: stacks-devnet-js-${{ env.PRE_GYP_TARGET_NAME }}
           path: stacks-devnet-js-${{ env.PRE_GYP_TARGET_NAME }}.tar.gz
-
-      # - name: Unit Tests - Node
-      #   working-directory: node-bindings
-      #   run: npm run spec
 
       - name: NPM Publish
         uses: JS-DevTools/npm-publish@v1
@@ -463,27 +520,35 @@ jobs:
   dist_clarity_repl:
     name: Build Clarity REPL Distribution
     runs-on: ubuntu-latest
-    needs: pre_run
     defaults:
       run:
         working-directory: components/clarity-repl
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Install Rust toolchain
+        run: rustup toolchain install stable --profile minimal
+
+      - name: Setup cache keys
+        shell: bash
         run: |
-          rustup toolchain install stable --profile minimal
-          echo "RUST_VERSION_HASH=$(rustc --version | sha256sum | awk '{print $1}')" >> $GITHUB_ENV
+          RUST_VERSION=$(rustc -vV | shasum -a 256 | cut -d ' ' -f1)
+          echo "RUST_VERSION=$RUST_VERSION" >> $GITHUB_ENV
 
       - name: Cache cargo
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
-            ~/.cargo/
-            ./target/x86_64-unknown-linux-gnu/release/
-          key: ${{ runner.os }}-rust-${{ env.RUST_VERSION_HASH }}-cargo-${{ hashFiles('./Cargo.lock') }}
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-${{ github.job }}-${{ env.RUST_VERSION }}-${{ hashFiles('./Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ github.job }}-${{ env.RUST_VERSION }}-
+            ${{ runner.os }}-${{ github.job }}-
 
       - name: Configure artifact names
         run: |
@@ -498,14 +563,14 @@ jobs:
         run: tar -C target/x86_64-unknown-linux-gnu/release -zcvf clarity-repl-${{ env.SHORT_TARGET_NAME }}.tar.gz clarity-repl
 
       - name: Upload cargo artifact
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: clarity-repl-${{ env.SHORT_TARGET_NAME }}
           path: clarity-repl-${{ env.SHORT_TARGET_NAME }}.tar.gz
 
       - name: Publish clarity-repl to crates.io
         if: startsWith(github.ref, 'refs/heads/main') && needs.get_release_info.outputs.tag != ''
-        run: |
+        run: 4
           cargo login ${{ secrets.CARGO_CRATES_IO_API_KEY }}
           cargo publish
 
@@ -514,6 +579,8 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - get_release_info
+      - sanity_check
+      - cargo_test
       - dist_clarinet
     outputs:
       version: ${{ steps.docker_meta.outputs.version }}
@@ -552,7 +619,7 @@ jobs:
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
 
       - name: Download pre-built dist
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: ${{ matrix.artifact }}
 
@@ -574,8 +641,8 @@ jobs:
     if: startsWith(github.ref, 'refs/heads/main') && needs.get_release_info.outputs.tag != ''
     needs:
       - get_release_info
-      - audit
-      - test_coverage_cargo
+      - sanity_check
+      - cargo_test
       - dist_stacks_devnet_js
       - dist_clarity_repl
       - docker_images
@@ -587,7 +654,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Download pre-built dists
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
 
       - name: Tag and Release
         uses: ncipollo/release-action@v1

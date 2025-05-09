@@ -5,16 +5,16 @@ extern crate error_chain;
 mod serde;
 
 use clarinet_deployments::{get_default_deployment_path, load_deployment};
-use clarinet_files::bip39::{Language, Mnemonic};
 use clarinet_files::{
     compute_addresses, AccountConfig, DevnetConfigFile, FileLocation, PoxStackingOrder,
-    ProjectManifest, DEFAULT_DERIVATION_PATH,
+    ProjectManifest, StacksNetwork, DEFAULT_DERIVATION_PATH,
 };
+use clarinet_utils::mnemonic_from_phrase;
 use hiro_system_kit::{o, slog, slog_async, slog_term, Drain};
 use neon::context::Context as NeonContext;
 use stacks_network::chainhook_sdk::types::{
     BitcoinChainEvent, BitcoinChainUpdatedWithBlocksData, StacksChainEvent,
-    StacksChainUpdatedWithBlocksData, StacksNetwork,
+    StacksChainUpdatedWithBlocksData,
 };
 use stacks_network::chains_coordinator::BitcoinMiningCommand;
 use stacks_network::{self, Context, DevnetEvent, DevnetOrchestrator, LogLevel};
@@ -109,21 +109,22 @@ impl StacksDevnet {
         let channel = cx.channel();
 
         let manifest_location = get_manifest_location_or_exit(Some(manifest_location));
-        let manifest = ProjectManifest::from_location(&manifest_location)
+        let manifest = ProjectManifest::from_location(&manifest_location, false)
             .expect("Syntax error in Clarinet.toml.");
         let (deployment, _) =
             read_deployment_or_generate_default(&manifest, &StacksNetwork::Devnet)
                 .expect("Unable to generate deployment");
         let working_dir = devnet_overrides.working_dir.clone();
-        let devnet = match DevnetOrchestrator::new(manifest, None, Some(devnet_overrides), true) {
-            Ok(devnet) => devnet,
-            Err(message) => {
-                if logs_enabled {
-                    println!("Fatal error: {}", message);
+        let devnet =
+            match DevnetOrchestrator::new(manifest, None, Some(devnet_overrides), true, false) {
+                Ok(devnet) => devnet,
+                Err(message) => {
+                    if logs_enabled {
+                        println!("Fatal error: {}", message);
+                    }
+                    std::process::exit(1);
                 }
-                std::process::exit(1);
-            }
-        };
+            };
         let ctx: Option<Context> = match working_dir {
             Some(working_dir) => match PathBuf::from_str(&working_dir) {
                 Ok(mut log_path) => {
@@ -396,14 +397,12 @@ impl StacksDevnet {
                 .downcast_or_throw::<JsString, _>(&mut cx)?
                 .value(&mut cx);
 
-            let words = account_settings
+            let phrase = account_settings
                 .get(&mut cx, "mnemonic")?
                 .downcast_or_throw::<JsString, _>(&mut cx)?
                 .value(&mut cx);
 
-            let mnemonic = Mnemonic::parse_in_normalized(Language::English, &words)
-                .unwrap()
-                .to_string();
+            let mnemonic = mnemonic_from_phrase(&phrase).unwrap().phrase().to_string();
 
             let balance = match account_settings
                 .get(&mut cx, "balance")?
@@ -411,6 +410,14 @@ impl StacksDevnet {
             {
                 Ok(res) => res.value(&mut cx),
                 _ => 0.0,
+            };
+
+            let sbtc_balance = match account_settings
+                .get(&mut cx, "sbtc_balance")?
+                .downcast::<JsNumber, _>(&mut cx)
+            {
+                Ok(res) => res.value(&mut cx),
+                _ => 1000000000.0, // 10 sBTC by default
             };
 
             let is_mainnet = match account_settings
@@ -443,6 +450,7 @@ impl StacksDevnet {
                 derivation,
                 is_mainnet,
                 balance: balance as u64,
+                sbtc_balance: sbtc_balance as u64,
             };
             genesis_accounts.insert(label, account);
         }

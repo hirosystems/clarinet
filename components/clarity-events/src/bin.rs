@@ -50,7 +50,7 @@ pub fn main() {
             let file = FileLocation::from_path_string(&cmd.file_path).unwrap();
             let snippet = file.read_content_as_utf8().unwrap();
             let mut session = Session::new(SessionSettings::default());
-            let mut contract_analysis = match session.eval(snippet, None, false) {
+            let mut contract_analysis = match session.eval(snippet, false) {
                 Ok(execution) => match execution.result {
                     EvaluationResult::Contract(evaluation) => evaluation.contract.analysis,
                     _ => {
@@ -65,7 +65,7 @@ pub fn main() {
             };
 
             {
-                let mut analysis_db = session.interpreter.datastore.as_analysis_db();
+                let mut analysis_db = session.interpreter.clarity_datastore.as_analysis_db();
                 let cost_track = LimitedCostTracker::new_free();
                 let type_checker = TypeChecker::new(&mut analysis_db, cost_track, true);
                 let settings = Settings::default();
