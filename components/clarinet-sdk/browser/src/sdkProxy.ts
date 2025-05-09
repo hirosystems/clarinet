@@ -1,4 +1,4 @@
-import { Cl } from "@stacks/transactions";
+import { Cl, serializeCVBytes } from "@stacks/transactions";
 import {
   CallFnArgs,
   DeployContractArgs,
@@ -63,12 +63,7 @@ export function getSessionProxy() {
       if (prop === "callReadOnlyFn" || prop === "callPublicFn" || prop === "callPrivateFn") {
         const callFn: CallFn = (contract, method, args, sender) => {
           const response = session[prop](
-            new CallFnArgs(
-              contract,
-              method,
-              args.map((a) => Cl.serialize(a)),
-              sender,
-            ),
+            new CallFnArgs(contract, method, args.map(serializeCVBytes), sender),
           );
           return parseTxResponse(response);
         };
@@ -112,7 +107,7 @@ export function getSessionProxy() {
               return {
                 callPublicFn: {
                   ...tx.callPublicFn,
-                  args_maps: tx.callPublicFn.args.map(Cl.serialize),
+                  args_maps: tx.callPublicFn.args.map(serializeCVBytes),
                 },
               };
             }
@@ -120,7 +115,7 @@ export function getSessionProxy() {
               return {
                 callPrivateFn: {
                   ...tx.callPrivateFn,
-                  args_maps: tx.callPrivateFn.args.map(Cl.serialize),
+                  args_maps: tx.callPrivateFn.args.map(serializeCVBytes),
                 },
               };
             }
@@ -144,7 +139,7 @@ export function getSessionProxy() {
 
       if (prop === "getMapEntry") {
         const getMapEntry: GetMapEntry = (contract, mapName, mapKey) => {
-          const response = session.getMapEntry(contract, mapName, Cl.serialize(mapKey));
+          const response = session.getMapEntry(contract, mapName, serializeCVBytes(mapKey));
           const result = Cl.deserialize(response);
           return result;
         };

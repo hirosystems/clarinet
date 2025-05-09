@@ -16,12 +16,6 @@ fi
 NEW_VERSION=$1
 ROOT_DIR=$(pwd)
 
-get_package_version() {
-    local file=$1
-    local version=$(grep '"version":' "$file" | cut -d'"' -f4)
-    echo "$version"
-}
-
 # Function to update version in package.json
 update_package_json() {
     local file=$1
@@ -66,14 +60,6 @@ npm run build:sdk-wasm
 
 # Update Clarinet SDK packages
 echo "Updating Clarinet SDK packages..."
-SDK_DIRS=("components/clarinet-sdk/node" "components/clarinet-sdk/browser")
-for dir in "${SDK_DIRS[@]}"; do
-    echo "Processing $dir..."
-    update_package_json "$dir/package.json" "$NEW_VERSION"
-    cd "$dir"
-    npm i
-    cd "$ROOT_DIR"
-done
 
 # Update stacks-devnet-js
 echo "Updating stacks-devnet-js..."
@@ -82,13 +68,31 @@ update_package_json "package.json" "$NEW_VERSION"
 npm i
 cd "$ROOT_DIR"
 
-# Handle clarity-vscode version separately
+# SDK wasm
+echo "Updating SDK wasm"
+cd components/clarinet-sdk/node
+update_package_json "package.json" "$NEW_VERSION"
+npm install "@hirosystems/clarinet-sdk-wasm@$NEW_VERSION" --save
+npm i
+cd "$ROOT_DIR"
+
+echo "Updating SDK wasm browser"
+cd components/clarinet-sdk/browser
+update_package_json "package.json" "$NEW_VERSION"
+npm install "@hirosystems/clarinet-sdk-wasm-browser@$NEW_VERSION" --save
+npm i
+cd "$ROOT_DIR"
+
+# Update stacks-devnet-js
+echo "Updating stacks-devnet-js..."
+cd components/stacks-devnet-js
+update_package_json "package.json" "$NEW_VERSION"
+npm i
+cd "$ROOT_DIR"
+
 echo "Updating clarity-vscode..."
 cd components/clarity-vscode
-CURRENT_VERSION=$(get_package_version "package.json")
-echo "The current version is $CURRENT_VERSION"
-read -p "What would you like to update it to? " VSCODE_VERSION
-update_package_json "package.json" "$VSCODE_VERSION"
+update_package_json "package.json" "$NEW_VERSION"
 npm i
 cd "$ROOT_DIR"
 

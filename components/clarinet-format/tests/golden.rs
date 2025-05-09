@@ -69,8 +69,14 @@ fn test_irl_contracts() {
             let result = format_file_with_metadata(&src);
             pretty_assertions::assert_eq!(result, intended, "Mismatch in file: {:?}", file_name);
             // parse resulting contract
-            let pse = clarity::vm::ast::parser::v2::parse(&result);
-            assert!(pse.is_ok());
+            let (_statements, diagnostics, success) =
+                clarity::vm::ast::parser::v2::parse_collect_diagnostics(&result);
+
+            if !diagnostics.is_empty() {
+                println!("Result of re-parsing file: {}", file_name.to_str().unwrap());
+                println!("Message: {:?}", diagnostics[0].message);
+            }
+            assert!(success);
         }
     }
 }

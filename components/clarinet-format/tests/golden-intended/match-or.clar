@@ -13,8 +13,7 @@
 ;; pre comment
 (define-private (something)
   (match opt
-    value
-    (ok (handle-new-value value))
+    value (ok (handle-new-value value))
     (ok 1)
   )
 )

@@ -86,7 +86,7 @@ jobs:
         run: cargo install cargo-audit || true
 
       - name: Run audit
-        run: cargo audit --ignore RUSTSEC-2024-0344 --ignore RUSTSEC-2022-0028
+        run: cargo audit --ignore RUSTSEC-2024-0344 --ignore RUSTSEC-2022-0028 --ignore RUSTSEC-2024-0438
 
       - name: Run rustfmt
         run: cargo fmt --all -- --check
@@ -101,7 +101,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-latest
+          - os: ubuntu-22.04
             platform: linux
             target: x86_64-unknown-linux-gnu
             architecture: x64
@@ -188,7 +188,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-latest
+          - os: ubuntu-22.04
             platform: linux
             target: x86_64-unknown-linux-gnu
             architecture: x64

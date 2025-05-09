@@ -5,6 +5,7 @@ use clarity::{
         chainstate::{BlockHeaderHash, StacksBlockId},
         StacksEpochId,
     },
+    util::hash::hex_bytes,
     vm::{EvaluationResult, Value},
 };
 use clarity_repl::repl::{
@@ -165,6 +166,28 @@ fn it_can_get_heights() {
 }
 
 #[test]
+fn it_can_fetch_burn_chain_info() {
+    let mut session = init_session(800000);
+
+    let result = eval_snippet(&mut session, "burn-block-height");
+    assert_eq!(result, Value::UInt(30850));
+    let result = eval_snippet(&mut session, "(get-burn-block-info? header-hash u30850)");
+    let expected_header_hash =
+        hex_bytes("0bf01726f390e2d61d22ac1b8468a33b7802966efbdb7c85861763ca0d9e29b8").unwrap();
+    assert_eq!(
+        result,
+        Value::some(Value::buff_from(expected_header_hash).unwrap()).unwrap()
+    );
+    let result = eval_snippet(&mut session, "(get-burn-block-info? header-hash u30849)");
+    let expected_header_hash =
+        hex_bytes("7593042f0e4229276f7d5a71c86b5c7f59db7cef106d29f2542b0ec1461bba15").unwrap();
+    assert_eq!(
+        result,
+        Value::some(Value::buff_from(expected_header_hash).unwrap()).unwrap()
+    );
+}
+
+#[test]
 fn it_keeps_track_of_historical_data() {
     let mut session = init_session(57000);
 
@@ -178,6 +201,56 @@ fn it_keeps_track_of_historical_data() {
     let snippet = format!("(contract-call? '{} get-count)", COUNTER_ADDR);
     let result = eval_snippet(&mut session, &snippet);
     assert_eq!(result, Value::UInt(1));
+}
+
+#[test]
+fn it_can_get_tenure_info_time() {
+    let mut session = init_session(57000);
+    let result = eval_snippet(&mut session, "(get-tenure-info? time u56999)");
+    assert_eq!(result, Value::some(Value::UInt(1737053962)).unwrap());
+    let result = eval_snippet(&mut session, "(get-tenure-info? time u50999)");
+    assert_eq!(result, Value::some(Value::UInt(1736980481)).unwrap());
+}
+
+#[test]
+fn it_can_get_tenure_info_bhh() {
+    let mut session = init_session(57000);
+    let result = eval_snippet(
+        &mut session,
+        "(get-tenure-info? burnchain-header-hash u56888)",
+    );
+    let expected_header_hash =
+        hex_bytes("026c12afb50b4baabb5cac8b940eda8b437f979b9819eef4cdd14c9f1a78133c").unwrap();
+    assert_eq!(
+        result,
+        Value::some(Value::buff_from(expected_header_hash).unwrap()).unwrap()
+    );
+}
+
+#[test]
+fn it_can_get_tenure_info_vrf_seed() {
+    let mut session = init_session(57000);
+    let result = eval_snippet(&mut session, "(get-tenure-info? vrf-seed u51897)");
+    let expected_vrf_seed =
+        hex_bytes("5b2e70683c3d155621ce0f12fc905f571fc8ce487f3ffa0e9c7e75cea10b0990").unwrap();
+    assert_eq!(
+        result,
+        Value::some(Value::buff_from(expected_vrf_seed).unwrap()).unwrap()
+    );
+    let result = eval_snippet(&mut session, "(get-tenure-info? vrf-seed u51896)");
+    let expected_vrf_seed =
+        hex_bytes("5b2e70683c3d155621ce0f12fc905f571fc8ce487f3ffa0e9c7e75cea10b0990").unwrap();
+    assert_eq!(
+        result,
+        Value::some(Value::buff_from(expected_vrf_seed).unwrap()).unwrap()
+    );
+    let result = eval_snippet(&mut session, "(get-tenure-info? vrf-seed u50896)");
+    let expected_vrf_seed =
+        hex_bytes("33d5f1e379fc9779933f6b8a6d242b520103ceb1d71a75864665d0e036934df3").unwrap();
+    assert_eq!(
+        result,
+        Value::some(Value::buff_from(expected_vrf_seed).unwrap()).unwrap()
+    );
 }
 
 #[test]

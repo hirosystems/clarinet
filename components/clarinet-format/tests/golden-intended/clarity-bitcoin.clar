@@ -1,7 +1,10 @@
 ;; source: https://github.com/hirosystems/clarity-examples/blob/main/examples/clarity-bitcoin/contracts/clarity-bitcoin.clar
+
 ;; @contract stateless contract to verify bitcoin transaction
 ;; @version 5
+
 ;; version 5 adds support for txid generation and improves security
+
 ;; Error codes
 (define-constant ERR-OUT-OF-BOUNDS u1)
 (define-constant ERR-TOO-MANY-TXINS u2)
@@ -16,9 +19,11 @@
 (define-constant ERR-WITNESS-TX-NOT-IN-COMMITMENT u11)
 (define-constant ERR-NOT-SEGWIT-TRANSACTION u12)
 (define-constant ERR-LEFTOVER-DATA u13)
+
 ;;
 ;; Helper functions to parse bitcoin transactions
 ;;
+
 ;; Create a list with n elments `true`. n must be smaller than 9.
 (define-private (bool-list-of-len (n uint))
   (unwrap-panic (slice? (list true true true true true true true true) u0 n))
@@ -32,9 +37,9 @@
   index: uint,
 }))
   (let (
-    (data (get txbuff ctx))
-    (base (get index ctx))
-  )
+      (data (get txbuff ctx))
+      (base (get index ctx))
+    )
     (ok {
       uint8: (buff-to-uint-le (unwrap-panic (as-max-len?
         (unwrap! (slice? data base (+ base u1)) (err ERR-OUT-OF-BOUNDS)) u1
@@ -55,9 +60,9 @@
   index: uint,
 }))
   (let (
-    (data (get txbuff ctx))
-    (base (get index ctx))
-  )
+      (data (get txbuff ctx))
+      (base (get index ctx))
+    )
     (ok {
       uint16: (buff-to-uint-le (unwrap-panic (as-max-len?
         (unwrap! (slice? data base (+ base u2)) (err ERR-OUT-OF-BOUNDS)) u2
@@ -78,9 +83,9 @@
   index: uint,
 }))
   (let (
-    (data (get txbuff ctx))
-    (base (get index ctx))
-  )
+      (data (get txbuff ctx))
+      (base (get index ctx))
+    )
     (ok {
       uint32: (buff-to-uint-le (unwrap-panic (as-max-len?
         (unwrap! (slice? data base (+ base u4)) (err ERR-OUT-OF-BOUNDS)) u4
@@ -101,9 +106,9 @@
   index: uint,
 }))
   (let (
-    (data (get txbuff ctx))
-    (base (get index ctx))
-  )
+      (data (get txbuff ctx))
+      (base (get index ctx))
+    )
     (ok {
       uint64: (buff-to-uint-le (unwrap-panic (as-max-len?
         (unwrap! (slice? data base (+ base u8)) (err ERR-OUT-OF-BOUNDS)) u8
@@ -124,10 +129,10 @@
   index: uint,
 }))
   (let (
-    (ptr (get index ctx))
-    (tx (get txbuff ctx))
-    (byte (buff-to-uint-le (unwrap! (element-at tx ptr) (err ERR-OUT-OF-BOUNDS))))
-  )
+      (ptr (get index ctx))
+      (tx (get txbuff ctx))
+      (byte (buff-to-uint-le (unwrap! (element-at tx ptr) (err ERR-OUT-OF-BOUNDS))))
+    )
     (if (<= byte u252)
       ;; given byte is the varint
       (ok {
@@ -139,12 +144,12 @@
       })
       (if (is-eq byte u253)
         (let (
-          ;; next two bytes is the varint
-          (parsed-u16 (try! (read-uint16 {
-            txbuff: tx,
-            index: (+ u1 ptr),
-          })))
-        )
+            ;; next two bytes is the varint
+            (parsed-u16 (try! (read-uint16 {
+              txbuff: tx,
+              index: (+ u1 ptr),
+            })))
+          )
           (ok {
             varint: (get uint16 parsed-u16),
             ctx: (get ctx parsed-u16),
@@ -152,24 +157,24 @@
         )
         (if (is-eq byte u254)
           (let (
-            ;; next four bytes is the varint
-            (parsed-u32 (try! (read-uint32 {
-              txbuff: tx,
-              index: (+ u1 ptr),
-            })))
-          )
+              ;; next four bytes is the varint
+              (parsed-u32 (try! (read-uint32 {
+                txbuff: tx,
+                index: (+ u1 ptr),
+              })))
+            )
             (ok {
               varint: (get uint32 parsed-u32),
               ctx: (get ctx parsed-u32),
             })
           )
           (let (
-            ;; next eight bytes is the varint
-            (parsed-u64 (try! (read-uint64 {
-              txbuff: tx,
-              index: (+ u1 ptr),
-            })))
-          )
+              ;; next eight bytes is the varint
+              (parsed-u64 (try! (read-uint64 {
+                txbuff: tx,
+                index: (+ u1 ptr),
+              })))
+            )
             (ok {
               varint: (get uint64 parsed-u64),
               ctx: (get ctx parsed-u64),
@@ -189,12 +194,12 @@
   index: uint,
 }))
   (let (
-    (parsed (try! (read-varint old-ctx)))
-    (ctx (get ctx parsed))
-    (slice-start (get index ctx))
-    (target-index (+ slice-start (get varint parsed)))
-    (txbuff (get txbuff ctx))
-  )
+      (parsed (try! (read-varint old-ctx)))
+      (ctx (get ctx parsed))
+      (slice-start (get index ctx))
+      (target-index (+ slice-start (get varint parsed)))
+      (txbuff (get txbuff ctx))
+    )
     (ok {
       varslice: (unwrap! (slice? txbuff slice-start target-index) (err ERR-OUT-OF-BOUNDS)),
       ctx: {
@@ -227,14 +232,14 @@
   index: uint,
 }))
   (let (
-    (slice-start (get index old-ctx))
-    (target-index (+ u32 slice-start))
-    (txbuff (get txbuff old-ctx))
-    (hash-le (unwrap-panic (as-max-len?
-      (unwrap! (slice? txbuff slice-start target-index) (err ERR-OUT-OF-BOUNDS))
-      u32
-    )))
-  )
+      (slice-start (get index old-ctx))
+      (target-index (+ u32 slice-start))
+      (txbuff (get txbuff old-ctx))
+      (hash-le (unwrap-panic (as-max-len?
+        (unwrap! (slice? txbuff slice-start target-index) (err ERR-OUT-OF-BOUNDS))
+        u32
+      )))
+    )
     (ok {
       hashslice: (reverse-buff32 hash-le),
       ctx: {
@@ -273,14 +278,14 @@
   )
   (let ((state (unwrap! result result)))
     (let (
-      (remaining (get remaining state))
-      (ctx (get ctx state))
-      (parsed-hash (try! (read-hashslice ctx)))
-      (parsed-index (try! (read-uint32 (get ctx parsed-hash))))
-      (parsed-scriptSig (try! (read-varslice (get ctx parsed-index))))
-      (parsed-sequence (try! (read-uint32 (get ctx parsed-scriptSig))))
-      (new-ctx (get ctx parsed-sequence))
-    )
+        (remaining (get remaining state))
+        (ctx (get ctx state))
+        (parsed-hash (try! (read-hashslice ctx)))
+        (parsed-index (try! (read-uint32 (get ctx parsed-hash))))
+        (parsed-scriptSig (try! (read-varslice (get ctx parsed-index))))
+        (parsed-sequence (try! (read-uint32 (get ctx parsed-scriptSig))))
+        (new-ctx (get ctx parsed-sequence))
+      )
       (ok {
         ctx: new-ctx,
         remaining: (- remaining u1),
@@ -315,10 +320,10 @@
   index: uint,
 }))
   (let (
-    (parsed-num-txins (try! (read-varint ctx)))
-    (num-txins (get varint parsed-num-txins))
-    (new-ctx (get ctx parsed-num-txins))
-  )
+      (parsed-num-txins (try! (read-varint ctx)))
+      (num-txins (get varint parsed-num-txins))
+      (new-ctx (get ctx parsed-num-txins))
+    )
     (if (> num-txins u8)
       (err ERR-TOO-MANY-TXINS)
       (fold read-next-txin (bool-list-of-len num-txins)
@@ -353,11 +358,11 @@
     ))
   )
   (let (
-    (state (unwrap! result result))
-    (parsed-value (try! (read-uint64 (get ctx state))))
-    (parsed-script (try! (read-varslice (get ctx parsed-value))))
-    (new-ctx (get ctx parsed-script))
-  )
+      (state (unwrap! result result))
+      (parsed-value (try! (read-uint64 (get ctx state))))
+      (parsed-script (try! (read-varslice (get ctx parsed-value))))
+      (new-ctx (get ctx parsed-script))
+    )
     (ok {
       ctx: new-ctx,
       txouts: (unwrap!
@@ -386,10 +391,10 @@
   index: uint,
 }))
   (let (
-    (parsed-num-txouts (try! (read-varint ctx)))
-    (num-txouts (get varint parsed-num-txouts))
-    (new-ctx (get ctx parsed-num-txouts))
-  )
+      (parsed-num-txouts (try! (read-varint ctx)))
+      (num-txouts (get varint parsed-num-txouts))
+      (new-ctx (get ctx parsed-num-txouts))
+    )
     (if (> num-txouts u8)
       (err ERR-TOO-MANY-TXOUTS)
       (fold read-next-txout (bool-list-of-len num-txouts)
@@ -416,10 +421,10 @@
     ))
   )
   (let (
-    (state (unwrap! result result))
-    (parsed-item (try! (read-varslice (get ctx state))))
-    (new-ctx (get ctx parsed-item))
-  )
+      (state (unwrap! result result))
+      (parsed-item (try! (read-varslice (get ctx state))))
+      (new-ctx (get ctx parsed-item))
+    )
     (ok {
       ctx: new-ctx,
       items: (unwrap!
@@ -450,11 +455,11 @@
     ))
   )
   (let (
-    (state (unwrap! result result))
-    (parsed-num-items (try! (read-varint (get ctx state))))
-    (ctx (get ctx parsed-num-items))
-    (varint (get varint parsed-num-items))
-  )
+      (state (unwrap! result result))
+      (parsed-num-items (try! (read-varint (get ctx state))))
+      (ctx (get ctx parsed-num-items))
+      (varint (get varint parsed-num-items))
+    )
     (if (> varint u0)
       ;; read all stack items for current txin and add to witnesses.
       (let ((parsed-items (try! (fold read-next-item (bool-list-of-len varint)
@@ -502,26 +507,26 @@
 ;; It will also calculate and return the TXID if calculate-txid is set to true.
 ;; Returns a tuple structured as follows on success:
 ;; (ok {
-;; version: uint,                      ;; tx version
-;; segwit-marker: uint,
-;; segwit-version: uint,
-;; txid: (optional (buff 32))
-;; ins: (list 8
-;; {
-;; outpoint: {                 ;; pointer to the utxo this input consumes
-;; hash: (buff 32),
-;; index: uint
-;; },
-;; scriptSig: (buff 256),      ;; spending condition script
-;; sequence: uint
-;; }),
-;; outs: (list 8
-;; {
-;; value: uint,                ;; satoshis sent
-;; scriptPubKey: (buff 128)    ;; parse this to get an address
-;; }),
-;; witnesses: (list 8 (list 8 (buff 128))),
-;; locktime: uint
+;;      version: uint,                      ;; tx version
+;;      segwit-marker: uint,
+;;      segwit-version: uint,
+;;      txid: (optional (buff 32))
+;;      ins: (list 8
+;;          {
+;;              outpoint: {                 ;; pointer to the utxo this input consumes
+;;                  hash: (buff 32),
+;;                  index: uint
+;;              },
+;;              scriptSig: (buff 256),      ;; spending condition script
+;;              sequence: uint
+;;          }),
+;;      outs: (list 8
+;;          {
+;;              value: uint,                ;; satoshis sent
+;;              scriptPubKey: (buff 128)    ;; parse this to get an address
+;;          }),
+;;      witnesses: (list 8 (list 8 (buff 128))),
+;;      locktime: uint
 ;; })
 ;; Returns (err ERR-OUT-OF-BOUNDS) if we read past the end of txbuff.
 ;; Returns (err ERR-VARSLICE-TOO-LONG) if we find a scriptPubKey or scriptSig that's too long to parse.
@@ -534,18 +539,18 @@
     (calculate-txid bool)
   )
   (let (
-    (ctx {
-      txbuff: tx,
-      index: u0,
-    })
-    (parsed-version (try! (read-uint32 ctx)))
-    (parsed-segwit-marker (try! (read-uint8 (get ctx parsed-version))))
-    (parsed-segwit-version (try! (read-uint8 (get ctx parsed-segwit-marker))))
-    (parsed-txins (try! (read-txins (get ctx parsed-segwit-version))))
-    (parsed-txouts (try! (read-txouts (get ctx parsed-txins))))
-    (parsed-witnesses (try! (read-witnesses (get ctx parsed-txouts) (len (get txins parsed-txins)))))
-    (parsed-locktime (try! (read-uint32 (get ctx parsed-witnesses))))
-  )
+      (ctx {
+        txbuff: tx,
+        index: u0,
+      })
+      (parsed-version (try! (read-uint32 ctx)))
+      (parsed-segwit-marker (try! (read-uint8 (get ctx parsed-version))))
+      (parsed-segwit-version (try! (read-uint8 (get ctx parsed-segwit-marker))))
+      (parsed-txins (try! (read-txins (get ctx parsed-segwit-version))))
+      (parsed-txouts (try! (read-txouts (get ctx parsed-txins))))
+      (parsed-witnesses (try! (read-witnesses (get ctx parsed-txouts) (len (get txins parsed-txins)))))
+      (parsed-locktime (try! (read-uint32 (get ctx parsed-witnesses))))
+    )
     (asserts!
       (and (is-eq (get uint8 parsed-segwit-marker) u0) (is-eq (get uint8 parsed-segwit-version) u1))
       (err ERR-NOT-SEGWIT-TRANSACTION)
@@ -579,22 +584,22 @@
 ;; Parses a Bitcoin transaction, with up to 8 inputs and 8 outputs, with scriptSigs of up to 256 bytes each, and with scriptPubKeys up to 128 bytes.
 ;; Returns a tuple structured as follows on success:
 ;; (ok {
-;; version: uint,                      ;; tx version
-;; ins: (list 8
-;; {
-;; outpoint: {                 ;; pointer to the utxo this input consumes
-;; hash: (buff 32),
-;; index: uint
-;; },
-;; scriptSig: (buff 256),      ;; spending condition script
-;; sequence: uint
-;; }),
-;; outs: (list 8
-;; {
-;; value: uint,                ;; satoshis sent
-;; scriptPubKey: (buff 128)    ;; parse this to get an address
-;; }),
-;; locktime: uint
+;;      version: uint,                      ;; tx version
+;;      ins: (list 8
+;;          {
+;;              outpoint: {                 ;; pointer to the utxo this input consumes
+;;                  hash: (buff 32),
+;;                  index: uint
+;;              },
+;;              scriptSig: (buff 256),      ;; spending condition script
+;;              sequence: uint
+;;          }),
+;;      outs: (list 8
+;;          {
+;;              value: uint,                ;; satoshis sent
+;;              scriptPubKey: (buff 128)    ;; parse this to get an address
+;;          }),
+;;      locktime: uint
 ;; })
 ;; Returns (err ERR-OUT-OF-BOUNDS) if we read past the end of txbuff.
 ;; Returns (err ERR-VARSLICE-TOO-LONG) if we find a scriptPubKey or scriptSig that's too long to parse.
@@ -603,15 +608,15 @@
 ;; Returns (err ERR-LEFTOVER-DATA) if the tx buffer contains leftover data at the end.
 (define-read-only (parse-tx (tx (buff 4096)))
   (let (
-    (ctx {
-      txbuff: tx,
-      index: u0,
-    })
-    (parsed-version (try! (read-uint32 ctx)))
-    (parsed-txins (try! (read-txins (get ctx parsed-version))))
-    (parsed-txouts (try! (read-txouts (get ctx parsed-txins))))
-    (parsed-locktime (try! (read-uint32 (get ctx parsed-txouts))))
-  )
+      (ctx {
+        txbuff: tx,
+        index: u0,
+      })
+      (parsed-version (try! (read-uint32 ctx)))
+      (parsed-txins (try! (read-txins (get ctx parsed-version))))
+      (parsed-txouts (try! (read-txouts (get ctx parsed-txins))))
+      (parsed-locktime (try! (read-uint32 (get ctx parsed-txouts))))
+    )
     ;; check if it is a non-segwit transaction?
     ;; at least check what happens
     (asserts! (is-eq (len tx) (get index (get ctx parsed-locktime)))
@@ -629,26 +634,26 @@
 ;; Parse a Bitcoin block header.
 ;; Returns a tuple structured as folowed on success:
 ;; (ok {
-;; version: uint,                  ;; block version,
-;; parent: (buff 32),              ;; parent block hash,
-;; merkle-root: (buff 32),         ;; merkle root for all this block's transactions
-;; timestamp: uint,                ;; UNIX epoch timestamp of this block, in seconds
-;; nbits: uint,                    ;; compact block difficulty representation
-;; nonce: uint                     ;; PoW solution
+;;      version: uint,                  ;; block version,
+;;      parent: (buff 32),              ;; parent block hash,
+;;      merkle-root: (buff 32),         ;; merkle root for all this block's transactions
+;;      timestamp: uint,                ;; UNIX epoch timestamp of this block, in seconds
+;;      nbits: uint,                    ;; compact block difficulty representation
+;;      nonce: uint                     ;; PoW solution
 ;; })
 (define-read-only (parse-block-header (headerbuff (buff 80)))
   (let (
-    (ctx {
-      txbuff: headerbuff,
-      index: u0,
-    })
-    (parsed-version (try! (read-uint32 ctx)))
-    (parsed-parent-hash (try! (read-hashslice (get ctx parsed-version))))
-    (parsed-merkle-root (try! (read-hashslice (get ctx parsed-parent-hash))))
-    (parsed-timestamp (try! (read-uint32 (get ctx parsed-merkle-root))))
-    (parsed-nbits (try! (read-uint32 (get ctx parsed-timestamp))))
-    (parsed-nonce (try! (read-uint32 (get ctx parsed-nbits))))
-  )
+      (ctx {
+        txbuff: headerbuff,
+        index: u0,
+      })
+      (parsed-version (try! (read-uint32 ctx)))
+      (parsed-parent-hash (try! (read-hashslice (get ctx parsed-version))))
+      (parsed-merkle-root (try! (read-hashslice (get ctx parsed-parent-hash))))
+      (parsed-timestamp (try! (read-uint32 (get ctx parsed-merkle-root))))
+      (parsed-nbits (try! (read-uint32 (get ctx parsed-timestamp))))
+      (parsed-nonce (try! (read-uint32 (get ctx parsed-nbits))))
+    )
     (ok {
       version: (get uint32 parsed-version),
       parent: (get hashslice parsed-parent-hash),
@@ -662,10 +667,12 @@
 
 ;; MOCK section
 (define-constant DEBUG-MODE true)
+
 (define-map mock-burnchain-header-hashes
   uint
   (buff 32)
 )
+
 (define-public (mock-add-burnchain-block-header-hash
     (burn-height uint)
     (hash (buff 32))
@@ -681,6 +688,7 @@
 )
 
 ;; END MOCK section
+
 ;; Verify that a block header hashes to a burnchain header hash at a given height.
 ;; Returns true if so; false if not.
 (define-read-only (verify-block-header
@@ -688,8 +696,7 @@
     (expected-block-height uint)
   )
   (match (get-bc-h-hash expected-block-height)
-    bhh
-    (is-eq bhh (reverse-buff32 (sha256 (sha256 headerbuff))))
+    bhh (is-eq bhh (reverse-buff32 (sha256 (sha256 headerbuff))))
     false
   )
 )
@@ -733,22 +740,22 @@
     })
   )
   (let (
-    (path (get path state))
-    (is-left (is-bit-set path ctr))
-    (proof-hashes (get proof-hashes state))
-    (cur-hash (get cur-hash state))
-    (root-hash (get root-hash state))
-    (h1 (if is-left
-      (unwrap-panic (element-at proof-hashes ctr))
-      cur-hash
-    ))
-    (h2 (if is-left
-      cur-hash
-      (unwrap-panic (element-at proof-hashes ctr))
-    ))
-    (next-hash (sha256 (sha256 (concat h1 h2))))
-    (is-verified (and (is-eq (+ u1 ctr) (len proof-hashes)) (is-eq next-hash root-hash)))
-  )
+      (path (get path state))
+      (is-left (is-bit-set path ctr))
+      (proof-hashes (get proof-hashes state))
+      (cur-hash (get cur-hash state))
+      (root-hash (get root-hash state))
+      (h1 (if is-left
+        (unwrap-panic (element-at proof-hashes ctr))
+        cur-hash
+      ))
+      (h2 (if is-left
+        cur-hash
+        (unwrap-panic (element-at proof-hashes ctr))
+      ))
+      (next-hash (sha256 (sha256 (concat h1 h2))))
+      (is-verified (and (is-eq (+ u1 ctr) (len proof-hashes)) (is-eq next-hash root-hash)))
+    )
     (merge state {
       cur-hash: next-hash,
       verified: is-verified,
@@ -794,6 +801,7 @@
 )
 
 ;; Helper for wtxid commitments
+
 ;; Gets the scriptPubKey in the last output that follows the 0x6a24aa21a9ed pattern regardless of its content
 ;; as per BIP-0141 (https://github.com/bitcoin/bips/blob/master/bip-0141.mediawiki#commitment-structure)
 (define-read-only (get-commitment-scriptPubKey (outs (list 8 {
@@ -828,11 +836,13 @@
 ;;
 ;; Top-level verification functions
 ;;
+
 ;; Determine whether or not a Bitcoin transaction without witnesses
 ;; was mined in a prior Bitcoin block.
 ;; It takes the block height, the transaction, the block header and a merkle proof, and determines that:
 ;; * the block header corresponds to the block that was mined at the given Bitcoin height
 ;; * the transaction's merkle proof links it to the block header's merkle root.
+
 ;; To verify that the merkle root is part of the block header there are two options:
 ;; a) read the merkle root from the header buffer
 ;; b) build the header buffer from its parts including the merkle root
@@ -881,9 +891,9 @@
   )
   (if (verify-block-header header height)
     (let (
-      (reversed-txid (get-reversed-txid tx))
-      (txid (reverse-buff32 reversed-txid))
-    )
+        (reversed-txid (get-reversed-txid tx))
+        (txid (reverse-buff32 reversed-txid))
+      )
       ;; verify merkle proof
       (asserts!
         (or
@@ -902,10 +912,10 @@
 ;; with witnesses was mined in a prior Bitcoin block.
 ;; It takes
 ;; a) the bitcoin block height, the transaction "tx" with witness data,
-;; the bitcoin block header, the tx index in the block and
+;;    the bitcoin block header, the tx index in the block and
 ;; b) the depth of merkle proof of the block and
 ;; c) the merkle proof of the wtxid "wproof", its root "witness-merkle-proof",
-;; the witness reserved value and
+;;    the witness reserved value and
 ;; d) the coinbase transaction "ctx" without witnesses (non-segwit) and its merkle proof "cproof".
 ;;
 ;; It determines that:
@@ -937,11 +947,11 @@
       tree-depth: tree-depth,
     }))
     (let (
-      (witness-out (get-commitment-scriptPubKey (get outs (try! (parse-tx ctx)))))
-      (final-hash (sha256 (sha256 (concat witness-merkle-root witness-reserved-value))))
-      (reversed-wtxid (get-reversed-txid wtx))
-      (wtxid (reverse-buff32 reversed-wtxid))
-    )
+        (witness-out (get-commitment-scriptPubKey (get outs (try! (parse-tx ctx)))))
+        (final-hash (sha256 (sha256 (concat witness-merkle-root witness-reserved-value))))
+        (reversed-wtxid (get-reversed-txid wtx))
+        (wtxid (reverse-buff32 reversed-wtxid))
+      )
       ;; verify wtxid commitment
       (asserts! (is-eq witness-out (concat 0x6a24aa21a9ed final-hash))
         (err ERR-INVALID-COMMITMENT)

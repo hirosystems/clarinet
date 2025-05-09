@@ -22,7 +22,7 @@ export { init, SDK, getSessionProxy, type Simnet };
 export { defaultVfs, defaultFileStore } from "./defaultVfs.js";
 
 // @ts-ignore
-window.vfs = defaultVfs;
+globalThis.vfs = defaultVfs;
 
 export const initSimnet = async (virtualFileSystem?: Function) => {
   await init();
