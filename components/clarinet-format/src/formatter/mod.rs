@@ -313,7 +313,7 @@ impl<'a> Aggregator<'a> {
                                     inner_content,
                                     if let Some(comment) = trailing_comment {
                                         format!(
-                                            " {}",
+                                            " {}\n",
                                             &self.display_pse(comment, previous_indentation)
                                         )
                                     } else if iter.peek().is_some() {
@@ -1263,7 +1263,7 @@ mod tests_formatter {
         let result = format_with_default(&String::from(src));
         assert_eq!(src, result);
 
-        let src = "(ok true) ;;     spaced";
+        let src = "(ok true) ;;     spaced\n";
         let result = format_with_default(&String::from(src));
         assert_eq!(src, result);
     }
@@ -1313,7 +1313,7 @@ mod tests_formatter {
 
     #[test]
     fn test_inline_comments_included() {
-        let src = "(ok true) ;; this is an inline comment";
+        let src = "(ok true) ;; this is an inline comment\n";
         let result = format_with_default(&String::from(src));
         assert_eq!(src, result);
     }
@@ -1767,6 +1767,47 @@ mod tests_formatter {
         assert_eq!(src, result);
     }
 
+    #[test]
+    fn inner_list_with_maps() {
+        let src = r#"(list
+  { extension: .ccd001-direct-execute,
+    enabled: true
+  }
+  ;; {extension: .ccd008-city-activation, enabled: true}
+  { extension: .ccd009-auth-v2-adapter,
+    enabled: true
+  }
+)"#;
+        let result = format_with_default(src);
+        assert_eq!(src, result);
+    }
+
+    #[test]
+    fn asdf() {
+        let src = r#"(var-set voteStart block-height) ;; vote tracking
+(define-data-var yesVotes uint u0)
+"#;
+        let result = format_with_default(src);
+        assert_eq!(src, result);
+    }
+    #[test]
+    fn significant_newline_preserving_inner() {
+        let src = r#";; comment
+
+;; another
+;; more
+
+
+;; after 2 spaces, now it's 1"#;
+        let result = format_with_default(src);
+        let expected = r#";; comment
+
+;; another
+;; more
+
+;; after 2 spaces, now it's 1"#;
+        assert_eq!(expected, result);
+    }
     #[test]
     fn significant_newline_preserving() {
         let src = r#";; comment
