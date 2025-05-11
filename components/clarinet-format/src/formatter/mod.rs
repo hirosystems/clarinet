@@ -342,6 +342,7 @@ impl<'a> Aggregator<'a> {
                         };
                         let result = &formatted.to_string();
                         if let Some(comment) = trailing_comment {
+                            println!("COMMENT: {:?}", comment);
                             let mut result_with_comment = result.to_string();
                             result_with_comment.push(' ');
                             result_with_comment
@@ -476,6 +477,7 @@ impl<'a> Aggregator<'a> {
         let func_type = self.display_pse(exprs.first().unwrap(), "");
         let mut acc = format!("({func_type} ");
         let mut iter = exprs[1..].iter().peekable();
+        println!("ASDFASDFASDF: {:?}", exprs);
         while let Some(expr) = iter.next() {
             let trailing = get_trailing_comment(expr, &mut iter);
             acc.push_str(&self.format_source_exprs(slice::from_ref(expr), previous_indentation));
@@ -738,25 +740,44 @@ impl<'a> Aggregator<'a> {
     fn format_list(&self, exprs: &[PreSymbolicExpression], previous_indentation: &str) -> String {
         let indentation = &self.settings.indentation.to_string();
         let space = format!("{}{}", previous_indentation, indentation);
+        let mut start_index = 0;
         let mut acc = "(".to_string();
-
-        if differing_lines(exprs) {
-            acc.push('\n');
+        println!("expr: {:?}", exprs);
+        println!("{:?}", self.display_pse(&exprs[0], previous_indentation));
+        if self.display_pse(&exprs[0], previous_indentation) == "list" {
+            start_index = 1;
         }
-        let mut iter = exprs[0..].iter().peekable();
+
+        // Check if items are on different lines
+        let is_multiline = differing_lines(exprs);
+
+        if start_index > 0 {
+            acc.push_str("list");
+            if is_multiline {
+                acc.push('\n');
+            }
+        }
+        // For multiline lists, always add a newline after "list"
+        let mut iter = exprs[start_index..].iter().peekable();
         while let Some(item) = iter.next() {
             let trailing = get_trailing_comment(item, &mut iter);
-            if differing_lines(exprs) {
+            if is_multiline {
+                acc.push('\n');
                 acc.push_str(&space)
             }
             let value = self.format_source_exprs(slice::from_ref(item), previous_indentation);
+            println!("value: {:?}", item);
             let start_line = item.span().start_line;
             acc.push_str(&value.to_string());
+            if is_comment(item) {
+                acc.push('\n');
+            }
             if let Some(comment) = trailing {
                 let count = comment.span().start_column - item.span().end_column - 1;
                 let spaces = " ".repeat(count as usize);
                 acc.push_str(&spaces);
                 acc.push_str(&self.display_pse(comment, previous_indentation));
+                acc.push('\n');
             }
             if let Some(next) = iter.peek() {
                 if start_line != next.span().start_line {
@@ -766,7 +787,7 @@ impl<'a> Aggregator<'a> {
                 }
             }
         }
-        if differing_lines(exprs) {
+        if is_multiline {
             acc.push('\n');
             acc.push_str(previous_indentation);
         }
@@ -783,7 +804,7 @@ impl<'a> Aggregator<'a> {
         let indentation = &self.settings.indentation.to_string();
         let space = format!("{}{}", previous_indentation, indentation);
         let over_2_kvs = without_comments_len(exprs) > 2;
-        let mut acc = "{".to_string();
+        let mut acc = format!("{}{}", previous_indentation, "{");
 
         // differing_lines breaks determinism but is a good way to break up
         // complex values in maps
@@ -1771,11 +1792,11 @@ mod tests_formatter {
     fn inner_list_with_maps() {
         let src = r#"(list
   { extension: .ccd001-direct-execute,
-    enabled: true
+    enabled: true,
   }
   ;; {extension: .ccd008-city-activation, enabled: true}
   { extension: .ccd009-auth-v2-adapter,
-    enabled: true
+    enabled: true,
   }
 )"#;
         let result = format_with_default(src);
