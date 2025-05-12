@@ -428,7 +428,7 @@ impl<'a> Aggregator<'a> {
                         // Found either args or return type
                         acc.push('\n');
                         acc.push_str(&double_indent);
-                        acc.push_str(&self.format_list(element_list, &double_indent));
+                        acc.push_str(&self.display_list(element_list, &double_indent));
 
                         if let Some(next_item) = items_iter.peek() {
                             if is_comment(next_item) {
@@ -738,20 +738,53 @@ impl<'a> Aggregator<'a> {
 
     fn needs_break(
         &self,
-        start_column: usize,
+        current_column: usize,
         acc: &str,
         next_expr: &PreSymbolicExpression,
     ) -> bool {
-        let length = if let Some(last_newline_pos) = acc.rfind('\n') {
-            acc.len() - last_newline_pos - 1
-        } else {
-            acc.len()
-        };
-        println!("Length: {}", length);
-        println!("acc: {}", acc);
+        let length = chars_since_last_newline(acc);
         let next_expr_len = self.display_pse(next_expr, "").len();
-        println!("next: {}", next_expr_len);
-        (start_column + length + next_expr_len) > self.settings.max_line_length
+        (current_column + length + next_expr_len) > self.settings.max_line_length
+    }
+
+    // strictly used for display_pse. Sort of a dumbed down version of format_list
+    fn display_list(&self, exprs: &[PreSymbolicExpression], previous_indentation: &str) -> String {
+        let indentation = &self.settings.indentation.to_string();
+        let space = format!("{}{}", previous_indentation, indentation);
+        let mut acc = "(".to_string();
+
+        if differing_lines(exprs) {
+            acc.push('\n');
+        }
+        let mut iter = exprs[0..].iter().peekable();
+        while let Some(item) = iter.next() {
+            let trailing = get_trailing_comment(item, &mut iter);
+            if differing_lines(exprs) {
+                acc.push_str(&space)
+            }
+            let value = self.format_source_exprs(slice::from_ref(item), previous_indentation);
+            let start_line = item.span().start_line;
+            acc.push_str(&value.to_string());
+            if let Some(comment) = trailing {
+                let count = comment.span().start_column - item.span().end_column - 1;
+                let spaces = " ".repeat(count as usize);
+                acc.push_str(&spaces);
+                acc.push_str(&self.display_pse(comment, previous_indentation));
+            }
+            if let Some(next) = iter.peek() {
+                if start_line != next.span().start_line {
+                    acc.push('\n')
+                } else {
+                    acc.push(' ')
+                }
+            }
+        }
+        if differing_lines(exprs) {
+            acc.push('\n');
+            acc.push_str(previous_indentation);
+        }
+        acc.push(')');
+        t(&acc).to_string()
     }
     fn format_list(&self, exprs: &[PreSymbolicExpression], previous_indentation: &str) -> String {
         let indentation = &self.settings.indentation.to_string();
@@ -785,8 +818,6 @@ impl<'a> Aggregator<'a> {
             };
             let value = self.format_source_exprs(slice::from_ref(item), spacing);
             let start_line = item.span().start_line;
-            // used to break lines further down
-            let expr_start_column = exprs[0].span().start_column as usize;
             acc.push_str(&value.to_string());
 
             if let Some(comment) = trailing {
@@ -795,14 +826,20 @@ impl<'a> Aggregator<'a> {
                 acc.push_str(&spaces);
                 acc.push_str(&self.display_pse(comment, previous_indentation));
             }
-            let padding = if first_break { expr_start_column } else { 0 };
+            let padding = if first_break {
+                // ideally we'd be able to inspect the previously formatted accumulator value
+                // TODO this is slightly wrong. We probably need a 2-pass formatter to handle these breaks better
+                previous_indentation.len()
+            } else {
+                0
+            };
             if let Some(next) = iter.peek() {
                 if start_line != next.span().start_line {
                     acc.push('\n')
                 } else if self.needs_break(padding, &acc, next) {
                     first_break = false;
                     acc.push('\n');
-                    acc.push_str(&format!("{}{}", &space, indentation));
+                    acc.push_str(&space);
                 } else {
                     acc.push(' ')
                 }
@@ -813,7 +850,7 @@ impl<'a> Aggregator<'a> {
             acc.push_str(previous_indentation);
         }
         acc.push(')');
-        acc
+        t(&acc).to_string()
     }
 
     // used for { n1: 1 } syntax
@@ -983,7 +1020,7 @@ impl<'a> Aggregator<'a> {
                 _ => value.to_string(),
             },
             PreSymbolicExpressionType::List(ref items) => {
-                self.format_list(items, previous_indentation)
+                self.display_list(items, previous_indentation)
             }
             PreSymbolicExpressionType::Tuple(ref items) => {
                 self.format_key_value_sugar(items, previous_indentation)
@@ -1086,6 +1123,7 @@ impl<'a> Aggregator<'a> {
 
     // This code handles the line width wrapping and happens near the bottom of the
     // traversal
+    // TODO: Fix this horrible abomination
     fn to_inner_content(
         &self,
         list: &[PreSymbolicExpression],
@@ -1244,6 +1282,14 @@ fn comment_piece(text: &str, pse: &PreSymbolicExpression) -> String {
         if rest.starts_with(' ') { "" } else { " " }.to_string()
     };
     format!(";;{}{}{}", comment_part, spaces, rest)
+}
+
+fn chars_since_last_newline(acc: &str) -> usize {
+    if let Some(last_newline_pos) = acc.rfind('\n') {
+        acc.len() - last_newline_pos - 1
+    } else {
+        acc.len()
+    }
 }
 
 #[cfg(test)]
@@ -1733,7 +1779,6 @@ mod tests_formatter {
 ))"#;
         assert_eq!(expected, result);
     }
-
     #[test]
     fn ok_map() {
         let src = "(ok { a: b, c: d })";
@@ -1916,10 +1961,12 @@ mod tests_formatter {
 
     #[test]
     fn wrapped_list() {
-        let src = r#"{ buckets: (list p-func-b1 p-func-b2 p-func-b3 p-func-b4 p-func-b5 p-func-b6 p-func-b7 p-func-b8 p-func-b9 p-func-b10 p-func-b11 p-func-b12 p-func-b13 p-func-b14 p-func-b15 p-func-b16) }"#;
-        let expected = r#"{ buckets: (list p-func-b1 p-func-b2 p-func-b3 p-func-b4 p-func-b5 p-func-b6
-    p-func-b7 p-func-b8 p-func-b9 p-func-b10 p-func-b11 p-func-b12 p-func-b13
-    p-func-b14 p-func-b15 p-func-b16)
+        let src = r#"{ buckets: (list p-func-b1 p-func-b2 p-func-b3 p-func-b4 p-func-b5 p-func-b6 p-func-b7 p-func-b8 p-func-b9 p-func-b10 p-func-b11 p-func-b12 p-func-b13 p-func-b14 p-func-b15 p-func-b16), something: u1 }"#;
+        let expected = r#"{
+  buckets: (list p-func-b1 p-func-b2 p-func-b3 p-func-b4 p-func-b5 p-func-b6 p-func-b7
+    p-func-b8 p-func-b9 p-func-b10 p-func-b11 p-func-b12 p-func-b13 p-func-b14
+    p-func-b15 p-func-b16),
+  something: u1,
 }"#;
         let result = format_with_default(src);
         assert_eq!(expected, result);
