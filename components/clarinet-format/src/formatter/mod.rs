@@ -201,6 +201,8 @@ impl<'a> Aggregator<'a> {
                                 self.format_booleans(list, previous_indentation)
                             }
 
+                            NativeFunctions::ListCons => self.format_list(list, previous_indentation),
+
                             // everything else that's not special cased
                             NativeFunctions::Add
                             | NativeFunctions::Subtract
@@ -240,7 +242,6 @@ impl<'a> Aggregator<'a> {
                             | NativeFunctions::StringToUInt
                             | NativeFunctions::IntToAscii
                             | NativeFunctions::IntToUtf8
-                            | NativeFunctions::ListCons
                             | NativeFunctions::FetchVar
                             | NativeFunctions::FetchEntry // map-get?
                             | NativeFunctions::SetEntry // map-set?
@@ -342,7 +343,6 @@ impl<'a> Aggregator<'a> {
                         };
                         let result = &formatted.to_string();
                         if let Some(comment) = trailing_comment {
-                            println!("COMMENT: {:?}", comment);
                             let mut result_with_comment = result.to_string();
                             result_with_comment.push(' ');
                             result_with_comment
@@ -477,7 +477,6 @@ impl<'a> Aggregator<'a> {
         let func_type = self.display_pse(exprs.first().unwrap(), "");
         let mut acc = format!("({func_type} ");
         let mut iter = exprs[1..].iter().peekable();
-        println!("ASDFASDFASDF: {:?}", exprs);
         while let Some(expr) = iter.next() {
             let trailing = get_trailing_comment(expr, &mut iter);
             acc.push_str(&self.format_source_exprs(slice::from_ref(expr), previous_indentation));
@@ -737,51 +736,73 @@ impl<'a> Aggregator<'a> {
         acc
     }
 
+    fn needs_break(
+        &self,
+        start_column: usize,
+        acc: &str,
+        next_expr: &PreSymbolicExpression,
+    ) -> bool {
+        let length = if let Some(last_newline_pos) = acc.rfind('\n') {
+            acc.len() - last_newline_pos - 1
+        } else {
+            acc.len()
+        };
+        println!("Length: {}", length);
+        println!("acc: {}", acc);
+        let next_expr_len = self.display_pse(next_expr, "").len();
+        println!("next: {}", next_expr_len);
+        (start_column + length + next_expr_len) > self.settings.max_line_length
+    }
     fn format_list(&self, exprs: &[PreSymbolicExpression], previous_indentation: &str) -> String {
         let indentation = &self.settings.indentation.to_string();
         let space = format!("{}{}", previous_indentation, indentation);
         let mut start_index = 0;
         let mut acc = "(".to_string();
-        println!("expr: {:?}", exprs);
-        println!("{:?}", self.display_pse(&exprs[0], previous_indentation));
+        let is_multiline = differing_lines(exprs);
+        let mut first_break = true; // hack to account for accumulation before the list
+                                    // used for breaking lines over max length
         if self.display_pse(&exprs[0], previous_indentation) == "list" {
             start_index = 1;
-        }
-
-        // Check if items are on different lines
-        let is_multiline = differing_lines(exprs);
-
-        if start_index > 0 {
             acc.push_str("list");
-            if is_multiline {
-                acc.push('\n');
+            if !is_multiline && exprs.len() > 1 {
+                acc.push(' ');
             }
         }
-        // For multiline lists, always add a newline after "list"
+
+        if is_multiline {
+            acc.push('\n');
+        }
         let mut iter = exprs[start_index..].iter().peekable();
         while let Some(item) = iter.next() {
             let trailing = get_trailing_comment(item, &mut iter);
             if is_multiline {
-                acc.push('\n');
                 acc.push_str(&space)
             }
-            let value = self.format_source_exprs(slice::from_ref(item), previous_indentation);
-            println!("value: {:?}", item);
+            let spacing = if is_multiline {
+                &space
+            } else {
+                previous_indentation
+            };
+            let value = self.format_source_exprs(slice::from_ref(item), spacing);
             let start_line = item.span().start_line;
+            // used to break lines further down
+            let expr_start_column = exprs[0].span().start_column as usize;
             acc.push_str(&value.to_string());
-            if is_comment(item) {
-                acc.push('\n');
-            }
+
             if let Some(comment) = trailing {
                 let count = comment.span().start_column - item.span().end_column - 1;
                 let spaces = " ".repeat(count as usize);
                 acc.push_str(&spaces);
                 acc.push_str(&self.display_pse(comment, previous_indentation));
-                acc.push('\n');
             }
+            let padding = if first_break { expr_start_column } else { 0 };
             if let Some(next) = iter.peek() {
                 if start_line != next.span().start_line {
                     acc.push('\n')
+                } else if self.needs_break(padding, &acc, next) {
+                    first_break = false;
+                    acc.push('\n');
+                    acc.push_str(&format!("{}{}", &space, indentation));
                 } else {
                     acc.push(' ')
                 }
@@ -792,7 +813,7 @@ impl<'a> Aggregator<'a> {
             acc.push_str(previous_indentation);
         }
         acc.push(')');
-        t(&acc).to_string()
+        acc
     }
 
     // used for { n1: 1 } syntax
@@ -804,7 +825,7 @@ impl<'a> Aggregator<'a> {
         let indentation = &self.settings.indentation.to_string();
         let space = format!("{}{}", previous_indentation, indentation);
         let over_2_kvs = without_comments_len(exprs) > 2;
-        let mut acc = format!("{}{}", previous_indentation, "{");
+        let mut acc = "{".to_string();
 
         // differing_lines breaks determinism but is a good way to break up
         // complex values in maps
@@ -1807,11 +1828,14 @@ mod tests_formatter {
     #[test]
     fn inner_list_with_maps() {
         let src = r#"(list
-  { extension: .ccd001-direct-execute,
+  u1
+  {
+    extension: .ccd001-direct-execute,
     enabled: true,
   }
   ;; {extension: .ccd008-city-activation, enabled: true}
-  { extension: .ccd009-auth-v2-adapter,
+  {
+    extension: .ccd009-auth-v2-adapter,
     enabled: true,
   }
 )"#;
@@ -1820,7 +1844,7 @@ mod tests_formatter {
     }
 
     #[test]
-    fn asdf() {
+    fn valid_comment_breaking() {
         let src = r#"(var-set voteStart block-height) ;; vote tracking
 (define-data-var yesVotes uint u0)
 "#;
@@ -1888,5 +1912,16 @@ mod tests_formatter {
 ))"#;
         let result = format_with_default(src);
         assert_eq!(src, result);
+    }
+
+    #[test]
+    fn wrapped_list() {
+        let src = r#"{ buckets: (list p-func-b1 p-func-b2 p-func-b3 p-func-b4 p-func-b5 p-func-b6 p-func-b7 p-func-b8 p-func-b9 p-func-b10 p-func-b11 p-func-b12 p-func-b13 p-func-b14 p-func-b15 p-func-b16) }"#;
+        let expected = r#"{ buckets: (list p-func-b1 p-func-b2 p-func-b3 p-func-b4 p-func-b5 p-func-b6
+    p-func-b7 p-func-b8 p-func-b9 p-func-b10 p-func-b11 p-func-b12 p-func-b13
+    p-func-b14 p-func-b15 p-func-b16)
+}"#;
+        let result = format_with_default(src);
+        assert_eq!(expected, result);
     }
 }
