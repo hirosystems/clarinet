@@ -1216,7 +1216,12 @@ fn comment_piece(text: &str, pse: &PreSymbolicExpression) -> String {
         .map_or((text, ""), |idx| (&text[..idx], &text[idx..]));
     let comment_length = text.len() as u32;
     let space_count = pse.span().end_column - comment_length - pse.span().start_column - 1; // 1 to account for span starting at 1 instead of 0
-    let spaces = " ".repeat(space_count as usize);
+    let spaces = if space_count > 0 {
+        " ".repeat(space_count as usize)
+    } else {
+        // remove the spaces if the comment has its own
+        if rest.starts_with(' ') { "" } else { " " }.to_string()
+    };
     format!(";;{}{}{}", comment_part, spaces, rest)
 }
 
@@ -1454,6 +1459,17 @@ mod tests_formatter {
         assert_eq!(result, expected);
     }
 
+    #[test]
+    fn test_comment_spacing() {
+        let src = r#";;comment
+;;    comment
+;;;comment"#;
+        let result = format_with_default(&String::from(src));
+        let expected = r#";; comment
+;;    comment
+;;; comment"#;
+        assert_eq!(expected, result);
+    }
     #[test]
     fn test_commented_match() {
         let src = r#"(match x
