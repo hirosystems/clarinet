@@ -264,7 +264,8 @@
         index: uint,
       },
       remaining: uint,
-      txins: (list 8 {
+      txins: (list 8
+        {
         outpoint: {
           hash: (buff 32),
           index: uint,
