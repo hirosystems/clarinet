@@ -2843,7 +2843,7 @@ events_keys = ["*"]
                                     let msg = format!("{:?}", err);
                                     println!("{}", msg);
                                     // if it returns "Wallet is already loaded" we break out
-                                    if err.unwrap().contains("Wallet is already loaded") {
+                                    if err.unwrap().contains("is already loaded") {
                                         break;
                                     } else {
                                         let _ = devnet_event_tx.send(DevnetEvent::error(msg));
@@ -3225,10 +3225,8 @@ pub fn copy_directory(source: &PathBuf, destination: &PathBuf) -> Result<(), Str
         let destination_path = destination.join(entry.file_name());
 
         if entry_path.is_dir() {
-            // Recursively copy subdirectories
             copy_directory(&entry_path, &destination_path)?;
         } else {
-            // Copy files
             fs::copy(&entry_path, &destination_path).map_err(|e| {
                 format!(
                     "Failed to copy {} to {}: {}",
