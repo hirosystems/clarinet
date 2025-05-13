@@ -79,7 +79,7 @@ async fn do_run_devnet(
 
     // Check for and potentially copy cached data
     if start_local_devnet_services {
-        let using_cache = match setup_cache_directories(&devnet_config, &devnet_events_tx) {
+        match setup_cache_directories(&devnet_config, &devnet_events_tx) {
             Ok(using_cache) => {
                 if using_cache {
                     let _ = devnet_events_tx.send(DevnetEvent::info(
