@@ -12,6 +12,7 @@ pub fn http_request<T: DeserializeOwned>(url: &str) -> Result<T, String> {
 
     if let Some(api_key) = API_KEY.as_ref() {
         request = request.header("x-api-key", api_key);
+        println!("request: {:#?}", request);
     }
     let response = request.send().map_err(|e| e.to_string())?;
     if response.status() != 200 {

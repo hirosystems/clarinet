@@ -1163,22 +1163,22 @@ impl BurnStateDB for Datastore {
     /// Returns Some if `self.get_burn_start_height() <= height < self.get_burn_block_height(sortition_id)`, and None otherwise.
     fn get_burn_header_hash(
         &self,
-        height: u32,
+        burn_height: u32,
         _sortition_id: &SortitionId,
     ) -> Option<BurnchainHeaderHash> {
-        if height > self.burn_chain_height {
+        if burn_height > self.burn_chain_height {
             return None;
         }
 
         if let Some(remote_info) = &self.remote_network_info {
-            if height <= remote_info.initial_height {
-                let sortition = self.client.fetch_sortition(height);
+            if burn_height <= remote_info.initial_burn_height {
+                let sortition = self.client.fetch_sortition(burn_height);
                 return Some(sortition.burn_block_hash);
             }
         }
 
         // Otherwise, generate the burn block hashes locally
-        let burn_block_hashes = BurnBlockHashes::from_height(height);
+        let burn_block_hashes = BurnBlockHashes::from_height(burn_height);
         Some(burn_block_hashes.header_hash)
     }
 
@@ -1288,10 +1288,10 @@ mod tests {
         let clarity_datastore = ClarityDatastore::new(
             Some(RemoteNetworkInfo {
                 initial_height: 10,
+                initial_burn_height: 798,
                 is_mainnet: false,
                 api_url: ApiUrl(server.url().to_string()),
                 network_id: 2147483648,
-                stacks_tip_height: 10,
                 cache_location: Some(PathBuf::from("./.cache")),
             }),
             client.clone(),
