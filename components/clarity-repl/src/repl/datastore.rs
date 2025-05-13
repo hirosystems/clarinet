@@ -148,6 +148,7 @@ pub struct Datastore {
     current_epoch_start_height: u32,
     constants: StacksConstants,
     remote_network_info: Option<RemoteNetworkInfo>,
+    initial_burn_height: u32,
     client: HttpClient,
 }
 
@@ -656,6 +657,7 @@ impl Datastore {
             current_epoch_start_height: stacks_chain_height,
             constants,
             remote_network_info: None,
+            initial_burn_height: 0,
             client,
         }
     }
@@ -736,6 +738,7 @@ impl Datastore {
             current_epoch_start_height: *stacks_chain_height,
             constants,
             remote_network_info: clarity_datastore.remote_network_info.clone(),
+            initial_burn_height: burn_chain_height,
             client,
         }
     }
@@ -1163,22 +1166,20 @@ impl BurnStateDB for Datastore {
     /// Returns Some if `self.get_burn_start_height() <= height < self.get_burn_block_height(sortition_id)`, and None otherwise.
     fn get_burn_header_hash(
         &self,
-        height: u32,
+        burn_height: u32,
         _sortition_id: &SortitionId,
     ) -> Option<BurnchainHeaderHash> {
-        if height > self.burn_chain_height {
+        if burn_height > self.burn_chain_height {
             return None;
         }
 
-        if let Some(remote_info) = &self.remote_network_info {
-            if height <= remote_info.initial_height {
-                let sortition = self.client.fetch_sortition(height);
-                return Some(sortition.burn_block_hash);
-            }
+        if self.remote_network_info.is_some() && burn_height <= self.initial_burn_height {
+            let sortition = self.client.fetch_sortition(burn_height);
+            return Some(sortition.burn_block_hash);
         }
 
         // Otherwise, generate the burn block hashes locally
-        let burn_block_hashes = BurnBlockHashes::from_height(height);
+        let burn_block_hashes = BurnBlockHashes::from_height(burn_height);
         Some(burn_block_hashes.header_hash)
     }
 
@@ -1291,7 +1292,6 @@ mod tests {
                 is_mainnet: false,
                 api_url: ApiUrl(server.url().to_string()),
                 network_id: 2147483648,
-                stacks_tip_height: 10,
                 cache_location: Some(PathBuf::from("./.cache")),
             }),
             client.clone(),
