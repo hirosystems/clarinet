@@ -3,6 +3,14 @@ use serde::de::DeserializeOwned;
 use std::sync::LazyLock;
 use wasm_bindgen::prelude::*;
 
+#[wasm_bindgen]
+extern "C" {
+    // Use `js_namespace` here to bind `console.log(..)` instead of just
+    // `log(..)`
+    #[wasm_bindgen(js_namespace = console)]
+    fn log(s: &str);
+}
+
 #[wasm_bindgen(module = "child_process")]
 extern "C" {
     #[wasm_bindgen(js_name = execSync)]
@@ -47,6 +55,7 @@ pub fn http_request<T: DeserializeOwned>(url: &str) -> Result<T, String> {
     }
     curl_command.push(format!("\"{}\"", url));
     let command = curl_command.join(" ");
+    log(&format!("command: {}", command));
 
     let result = std::panic::catch_unwind(|| {
         let output = exec_sync(&command);

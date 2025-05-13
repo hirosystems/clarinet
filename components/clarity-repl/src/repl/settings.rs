@@ -129,7 +129,7 @@ pub struct RemoteDataSettings {
     pub initial_height: Option<u32>,
 }
 
-#[derive(Debug, Default, Clone, Deserialize, Serialize)]
+#[derive(Debug, Default, Clone, Deserialize)]
 pub struct RemoteNetworkInfo {
     pub api_url: ApiUrl,
     pub initial_height: u32,
@@ -167,11 +167,11 @@ impl RemoteDataSettings {
             None => info.stacks_tip_height,
         };
 
-        let block = client.fetch_block(&format!("/extended/v2/blocks/{}", initial_height));
+        let initial_block = client.fetch_block(&format!("/extended/v2/blocks/{}", initial_height));
         Ok(RemoteNetworkInfo {
             api_url: self.api_url.clone(),
             initial_height,
-            initial_burn_height: block.burn_block_height,
+            initial_burn_height: initial_block.burn_block_height,
             network_id: info.network_id,
             is_mainnet: info.network_id == 1,
             cache_location,
