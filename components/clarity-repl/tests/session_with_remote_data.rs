@@ -185,6 +185,30 @@ fn it_can_fetch_burn_chain_info() {
         result,
         Value::some(Value::buff_from(expected_header_hash).unwrap()).unwrap()
     );
+
+    // test for a bug where a burn block height higher than the current stacks block height would return invalid data
+    let mut session = init_session(2000);
+    let result = eval_snippet(&mut session, "burn-block-height");
+    assert_eq!(result, Value::UInt(2836));
+    let result = eval_snippet(&mut session, "(get-burn-block-info? header-hash u2832)");
+    let expected_header_hash =
+        hex_bytes("088722e90bf5c04639aa91cc30585b068883693a8ecc95a12aab71be2c7252ed").unwrap();
+    assert_eq!(
+        result,
+        Value::some(Value::buff_from(expected_header_hash).unwrap()).unwrap()
+    );
+
+    // advance the burn chain tip will result in a fork, bitcoin data is now mocked
+    session.advance_burn_chain_tip(10);
+    let result = eval_snippet(&mut session, "burn-block-height");
+    assert_eq!(result, Value::UInt(2846));
+    let result = eval_snippet(&mut session, "(get-burn-block-info? header-hash u2840)");
+    let expected_mocked_header_hash =
+        hex_bytes("0224cd36a1bb63d40c62a249d8e05153ba4f6411e3024ad569ac28e0b50b41f2").unwrap();
+    assert_eq!(
+        result,
+        Value::some(Value::buff_from(expected_mocked_header_hash).unwrap()).unwrap()
+    );
 }
 
 #[test]

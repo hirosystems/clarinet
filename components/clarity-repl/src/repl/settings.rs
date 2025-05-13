@@ -134,7 +134,6 @@ pub struct RemoteNetworkInfo {
     pub api_url: ApiUrl,
     pub initial_height: u32,
     pub network_id: u32,
-    pub stacks_tip_height: u32,
     pub is_mainnet: bool,
     pub cache_location: Option<PathBuf>,
 }
@@ -171,7 +170,6 @@ impl RemoteDataSettings {
             api_url: self.api_url.clone(),
             initial_height,
             network_id: info.network_id,
-            stacks_tip_height: info.stacks_tip_height,
             is_mainnet: info.network_id == 1,
             cache_location,
         })
