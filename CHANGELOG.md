@@ -8,7 +8,7 @@
 
 - Formatter:
   - List formatting breakage (#1806) (e2fa2e0f)
-  - comment spacing (#1802) (095b8101)
+  - Comment spacing (#1802) (095b8101)
 - MXS burn chain hash data (#1808) (70dd652a)
 
 # [3.0.1](https://github.com/hirosystems/clarinet/compare/v3.0.0...v3.0.1) (2025-05-07)
