@@ -1,3 +1,16 @@
+# [3.0.2](https://github.com/hirosystems/clarinet/compare/v3.0.1...v3.0.2) (2025-05-14)
+
+##### Chores
+
+- Upgrade sdk version in examples (#1798) (0a5f9792)
+
+##### Bug Fixes
+
+- Formatter:
+  - List formatting breakage (#1806) (e2fa2e0f)
+  - Comment spacing (#1802) (095b8101)
+- MXS burn chain hash data (#1808) (70dd652a)
+
 # [3.0.1](https://github.com/hirosystems/clarinet/compare/v3.0.0...v3.0.1) (2025-05-07)
 
 ##### Bug Fixes
