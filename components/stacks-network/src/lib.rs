@@ -19,7 +19,7 @@ use clarinet_files::NetworkManifest;
 pub use event::DevnetEvent;
 pub use log::{LogData, LogLevel};
 pub use orchestrator::DevnetOrchestrator;
-use orchestrator::ServicesMapHosts;
+use orchestrator::{setup_cache_directories, ServicesMapHosts};
 use std::{
     sync::mpsc::{self, channel, Receiver, Sender},
     thread::sleep,
@@ -51,6 +51,7 @@ async fn do_run_devnet(
     chainhooks: &mut Option<ChainhookStore>,
     log_tx: Option<Sender<LogData>>,
     display_dashboard: bool,
+    no_cache: bool,
     ctx: Context,
     orchestrator_terminated_tx: Sender<bool>,
     orchestrator_terminated_rx: Option<Receiver<bool>>,
@@ -76,6 +77,33 @@ async fn do_run_devnet(
         },
         _ => Err("Unable to retrieve config"),
     }?;
+
+    // Check for and potentially copy cached data
+    if start_local_devnet_services && !no_cache {
+        match setup_cache_directories(&devnet_config, &devnet_events_tx) {
+            Ok(using_cache) => {
+                if using_cache {
+                    let _ = devnet_events_tx.send(DevnetEvent::info(
+                        "Using cached blockchain data up to epoch 3.0. Startup will be faster."
+                            .to_string(),
+                    ));
+                } else {
+                    let _ = devnet_events_tx.send(DevnetEvent::info(
+                        "No cached blockchain data found. Initial startup may take longer."
+                            .to_string(),
+                    ));
+                }
+                using_cache
+            }
+            Err(e) => {
+                let _ = devnet_events_tx.send(DevnetEvent::warning(format!(
+                    "Error setting up cache directories: {}. Continuing without cache.",
+                    e
+                )));
+                false
+            }
+        };
+    }
     // if we're starting all services, all trace logs go to networking.log
     if start_local_devnet_services {
         let file_appender =
@@ -262,6 +290,7 @@ pub async fn do_run_chain_coordinator(
     deployment: DeploymentSpecification,
     chainhooks: &mut Option<ChainhookStore>,
     log_tx: Option<Sender<LogData>>,
+    no_cache: bool,
     ctx: Context,
     orchestrator_terminated_tx: Sender<bool>,
     namespace: &str,
@@ -281,6 +310,7 @@ pub async fn do_run_chain_coordinator(
         chainhooks,
         log_tx,
         false,
+        no_cache,
         ctx,
         orchestrator_terminated_tx,
         None,
@@ -297,6 +327,7 @@ pub async fn do_run_local_devnet(
     chainhooks: &mut Option<ChainhookStore>,
     log_tx: Option<Sender<LogData>>,
     display_dashboard: bool,
+    no_cache: bool,
     ctx: Context,
     orchestrator_terminated_tx: Sender<bool>,
     orchestrator_terminated_rx: Option<Receiver<bool>>,
@@ -315,6 +346,7 @@ pub async fn do_run_local_devnet(
         chainhooks,
         log_tx,
         display_dashboard,
+        no_cache,
         ctx,
         orchestrator_terminated_tx,
         orchestrator_terminated_rx,

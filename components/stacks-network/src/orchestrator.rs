@@ -11,7 +11,7 @@ use bollard::service::Ipam;
 use bollard::Docker;
 use chainhook_sdk::bitcoin::hex::DisplayHex;
 use chainhook_sdk::utils::Context;
-use clarinet_files::StacksNetwork;
+use clarinet_files::{DevnetConfig, StacksNetwork};
 use clarinet_files::{DevnetConfigFile, NetworkManifest, ProjectManifest};
 use clarity::types::chainstate::StacksPrivateKey;
 use clarity::types::PrivateKey;
@@ -883,7 +883,8 @@ rpcport={bitcoin_node_rpc_port}
                 "-conf=/etc/bitcoin/bitcoin.conf".into(),
                 "-nodebuglogfile".into(),
                 "-pid=/run/bitcoind.pid".into(),
-                // "-datadir=/root/.bitcoin".into(),
+                "-reindex".into(), // TODO make this only for cached startups
+                "-datadir=/root/.bitcoin".into(),
             ]),
             ..Default::default()
         };
@@ -1054,7 +1055,7 @@ microblock_frequency = 1000
 # inv_sync_interval = 10
 # download_interval = 10
 # walk_interval = 10
-disable_block_download = true
+disable_block_download = false
 disable_inbound_handshakes = true
 disable_inbound_walks = true
 public_ip_address = "1.1.1.1:1234"
@@ -2644,6 +2645,11 @@ events_keys = ["*"]
             },
             _ => return Err("unable to initialize bitcoin node".to_string()),
         };
+        // Check if we have cached data
+        let project_cache_dir = get_project_cache_dir(devnet_config);
+        let cache_ready_marker = project_cache_dir.join("epoch_3_ready");
+        let use_existing_cache = cache_ready_marker.exists();
+        println!("{}", use_existing_cache);
 
         let miner_address = Address::from_str(&devnet_config.miner_btc_address)
             .map_err(|e| format!("unable to create miner address: {:?}", e))?;
@@ -2674,6 +2680,7 @@ events_keys = ["*"]
         let max_errors = 30;
 
         let mut error_count = 0;
+        // Wait for the bitcoin node to be responsive
         loop {
             let network_info = base_builder(
                 &bitcoin_node_url,
@@ -2734,6 +2741,7 @@ events_keys = ["*"]
                 }
             }
             std::thread::sleep(std::time::Duration::from_secs(1));
+
             let _ = devnet_event_tx.send(DevnetEvent::info("Waiting for bitcoin-node".to_string()));
         }
 
@@ -2803,7 +2811,22 @@ events_keys = ["*"]
 
         let mut error_count = 0;
         loop {
-            let rpc_call = base_builder(
+            let rpc_load_call = base_builder(
+                &bitcoin_node_url,
+                &devnet_config.bitcoin_node_username,
+                &devnet_config.bitcoin_node_password,
+            )
+            .json(&json!({
+                "jsonrpc": "1.0",
+                "id": "stacks-network",
+                "method": "loadwallet",
+                "params": json!(vec![&devnet_config.miner_wallet_name])
+            }))
+            .send()
+            .await
+            .map_err(|e| format!("unable to send 'loadwallet' request ({})", e));
+
+            let rpc_create_call = base_builder(
                 &bitcoin_node_url,
                 &devnet_config.bitcoin_node_username,
                 &devnet_config.bitcoin_node_password,
@@ -2818,14 +2841,42 @@ events_keys = ["*"]
             .await
             .map_err(|e| format!("unable to send 'createwallet' request ({})", e));
 
-            match rpc_call {
+            match rpc_create_call {
                 Ok(r) => {
                     if r.status().is_success() {
                         break;
                     } else {
-                        let err = r.text().await;
-                        let msg = format!("{:?}", err);
-                        let _ = devnet_event_tx.send(DevnetEvent::error(msg));
+                        // if createwallet fails it likely means we need to load the existing wallet
+                        match rpc_load_call {
+                            Ok(r) => {
+                                if r.status().is_success() {
+                                    break;
+                                } else {
+                                    let err = r.text().await;
+                                    let msg = format!("{:?}", err);
+                                    println!("{}", msg);
+                                    // if it returns "Wallet is already loaded" we break out
+                                    if err.unwrap().contains("is already loaded") {
+                                        break;
+                                    } else {
+                                        let _ = devnet_event_tx.send(DevnetEvent::error(msg));
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                let err = r.text().await;
+                                let msg = format!("{:?}", err);
+                                println!("msg: {}", msg);
+                                let _ = devnet_event_tx.send(DevnetEvent::error(msg));
+
+                                error_count += 1;
+                                if error_count > max_errors {
+                                    return Err(e);
+                                } else if error_count > 1 {
+                                    let _ = devnet_event_tx.send(DevnetEvent::error(e));
+                                }
+                            }
+                        }
                     }
                 }
                 Err(e) => {
@@ -3090,4 +3141,115 @@ fn formatted_docker_error(message: &str, error: DockerError) -> String {
         _ => format!("{:?}", error),
     };
     format!("{}: {}", message, error)
+}
+
+pub fn get_global_cache_dir() -> std::path::PathBuf {
+    let home_dir = dirs::home_dir().expect("Unable to retrieve home dir");
+    home_dir.join(".clarinet").join("cache").join("devnet")
+}
+
+pub fn get_project_cache_dir(devnet_config: &DevnetConfig) -> std::path::PathBuf {
+    PathBuf::from(&devnet_config.working_dir)
+        .join("data")
+        .join("1")
+}
+
+pub fn setup_cache_directories(
+    devnet_config: &DevnetConfig,
+    devnet_event_tx: &Sender<DevnetEvent>,
+) -> Result<bool, String> {
+    // Get global and project cache directories
+    let global_cache_dir = get_global_cache_dir();
+    let project_cache_dir = get_project_cache_dir(devnet_config);
+
+    // Check if we have template data and project doesn't have a cache yet
+    let global_cache_ready = global_cache_dir.join("epoch_3_ready").exists();
+    let project_cache_exists = project_cache_dir.exists();
+    let project_cache_ready = project_cache_dir.join("epoch_3_ready").exists();
+
+    // Create project cache directory if it doesn't exist
+    if !project_cache_exists {
+        fs::create_dir_all(&project_cache_dir)
+            .map_err(|e| format!("unable to create project cache directory: {:?}", e))?;
+    }
+
+    // If global cache exists but project cache doesn't have the marker, copy the template
+    if global_cache_ready && !project_cache_ready && global_cache_dir != project_cache_dir {
+        let _ = devnet_event_tx.send(DevnetEvent::info(
+            "Copying blockchain template data to project cache. This will speed up future starts."
+                .to_string(),
+        ));
+
+        // Copy bitcoin data
+        let global_bitcoin_cache = global_cache_dir.join("bitcoin");
+        let project_bitcoin_cache = project_cache_dir.join("bitcoin");
+        if global_bitcoin_cache.exists() && !project_bitcoin_cache.exists() {
+            println!(
+                "copying bitcoin cache to project {}",
+                project_bitcoin_cache.display()
+            );
+            copy_directory(&global_bitcoin_cache, &project_bitcoin_cache)
+                .map_err(|e| format!("Failed to copy Bitcoin template cache: {}", e))?;
+        }
+
+        // Copy stacks data
+        let global_stacks_cache = global_cache_dir.join("stacks");
+        let project_stacks_cache = project_cache_dir.join("stacks");
+        if global_stacks_cache.exists() && !project_stacks_cache.exists() {
+            println!("copying stacks cache to project");
+            copy_directory(&global_stacks_cache, &project_stacks_cache)
+                .map_err(|e| format!("Failed to copy Stacks template cache: {}", e))?;
+        }
+
+        // Copy signer data
+        let global_signer_cache = global_cache_dir.join("signer");
+        let project_signer_cache = project_cache_dir.join("signer");
+        if global_signer_cache.exists() && !project_signer_cache.exists() {
+            println!("copying signer cache to project");
+            copy_directory(&global_signer_cache, &project_signer_cache)
+                .map_err(|e| format!("Failed to copy Signer template cache: {}", e))?;
+        }
+
+        // Copy the marker file too
+        let _ = fs::copy(
+            global_cache_dir.join("epoch_3_ready"),
+            project_cache_dir.join("epoch_3_ready"),
+        );
+    }
+
+    Ok(project_cache_ready || (global_cache_ready && !project_cache_exists))
+}
+
+pub fn copy_directory(source: &PathBuf, destination: &PathBuf) -> Result<(), String> {
+    // Create the destination directory
+    fs::create_dir_all(destination).map_err(|e| {
+        format!(
+            "Failed to create directory {}: {}",
+            destination.display(),
+            e
+        )
+    })?;
+
+    for entry in fs::read_dir(source)
+        .map_err(|e| format!("Failed to read directory {}: {}", source.display(), e))?
+    {
+        let entry = entry.map_err(|e| format!("Failed to read directory entry: {}", e))?;
+        let entry_path = entry.path();
+        let destination_path = destination.join(entry.file_name());
+
+        if entry_path.is_dir() {
+            copy_directory(&entry_path, &destination_path)?;
+        } else {
+            fs::copy(&entry_path, &destination_path).map_err(|e| {
+                format!(
+                    "Failed to copy {} to {}: {}",
+                    entry_path.display(),
+                    destination_path.display(),
+                    e
+                )
+            })?;
+        }
+    }
+
+    Ok(())
 }
