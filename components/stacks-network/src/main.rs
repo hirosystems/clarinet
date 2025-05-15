@@ -28,6 +28,7 @@ struct Args {
     /// Path of the project's root
     #[clap(short, long)]
     project_root_path: Option<String>,
+    no_cache: bool,
 }
 
 fn main() {
@@ -51,9 +52,15 @@ fn main() {
         serde_yaml::from_slice(&network_manifest_file_content[..])
             .unwrap_or_else(|e| panic!("Devnet.toml file malformatted {:?}", e));
 
-    let orchestrator =
-        DevnetOrchestrator::new(manifest, Some(network_manifest.clone()), None, false, false)
-            .unwrap();
+    let orchestrator = DevnetOrchestrator::new(
+        manifest,
+        Some(network_manifest.clone()),
+        None,
+        false,
+        false,
+        args.no_cache,
+    )
+    .unwrap();
 
     let deployment_specification_file_content = deployment_location
         .read_content()
@@ -85,6 +92,7 @@ fn main() {
         deployment,
         &mut Some(chainhooks),
         None,
+        args.no_cache,
         ctx,
         orchestrator_terminated_tx,
         &args.namespace,

@@ -456,6 +456,9 @@ struct DevnetStart {
     /// Display streams of logs instead of terminal UI dashboard
     #[clap(long = "no-dashboard")]
     pub no_dashboard: bool,
+    /// Don't use cached data on startup
+    #[clap(long = "no-cache")]
+    pub no_cache: bool,
     /// If specified, use this deployment file
     #[clap(long = "deployment-plan-path", short = 'p')]
     pub deployment_plan_path: Option<String>,
@@ -2013,7 +2016,13 @@ fn devnet_start(cmd: DevnetStart, clarinetrc: ClarinetRC) {
             ),
         ));
     }
-    match start(orchestrator, deployment, None, !cmd.no_dashboard) {
+    match start(
+        orchestrator,
+        deployment,
+        None,
+        !cmd.no_dashboard,
+        cmd.no_cache,
+    ) {
         Err(e) => {
             eprintln!("{}", format_err!(e));
             process::exit(1);
