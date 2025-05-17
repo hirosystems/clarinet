@@ -211,6 +211,7 @@ impl HttpClient {
         self.get::<Block>(url).unwrap()
     }
 
+    #[allow(clippy::result_large_err)]
     pub fn fetch_clarity_data(&self, path: &str) -> InterpreterResult<Option<String>> {
         match self.get::<ClarityDataResponse>(path) {
             Ok(data) => Ok(Some(data.data.trim_start_matches("0x").to_string())),

@@ -367,6 +367,7 @@ impl ClarityDatastore {
         block_info.index_block_hash.to_string()
     }
 
+    #[allow(clippy::result_large_err)]
     fn fetch_clarity_marf_value(&mut self, key: &str) -> Result<Option<String>> {
         let key_hash = TrieHash::from_key(key);
         let tip = self.get_remote_chaintip();
@@ -374,6 +375,7 @@ impl ClarityDatastore {
         self.client.fetch_clarity_data(&url)
     }
 
+    #[allow(clippy::result_large_err)]
     fn fetch_clarity_metadata(
         &mut self,
         contract: &QualifiedContractIdentifier,
