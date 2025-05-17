@@ -317,8 +317,12 @@ impl<'a> Aggregator<'a> {
                                             " {}\n",
                                             &self.display_pse(comment, previous_indentation)
                                         )
-                                    } else if iter.peek().is_some() {
-                                        " ".to_string()
+                                    } else if let Some(next) = iter.peek() {
+                                        if list[0].span().end_line != next.span().end_line {
+                                            "\n".to_string()
+                                        } else {
+                                            " ".to_string()
+                                        }
                                     } else {
                                         "".to_string()
                                     }
@@ -357,10 +361,7 @@ impl<'a> Aggregator<'a> {
                         self.to_inner_content(list, previous_indentation)
                     };
                     // if it's a top level expression, newline it
-                    if previous_indentation.is_empty()
-                        && result.ends_with(")")
-                        && !result.ends_with(")\n")
-                    {
+                    if previous_indentation.is_empty() && (result.ends_with(")")) {
                         result.push('\n');
                     }
                     result.push_str(&formatted);
@@ -1607,6 +1608,15 @@ mod tests_formatter {
   (ok (map-get? ns u2))
 )
 "#;
+        let result = format_with_default(src);
+        assert_eq!(result, src);
+
+        let src = r#"(print {
+  notification: "format-me",
+  payload: { message: "Hello, World!" },
+})
+(var-set test-var 1)
+(var-set test-var 2)"#;
         let result = format_with_default(src);
         assert_eq!(result, src);
     }
