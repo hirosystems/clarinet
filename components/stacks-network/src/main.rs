@@ -28,7 +28,7 @@ struct Args {
     /// Path of the project's root
     #[clap(short, long)]
     project_root_path: Option<String>,
-    no_cache: bool,
+    no_snapshot: bool,
 }
 
 fn main() {
@@ -58,7 +58,7 @@ fn main() {
         None,
         false,
         false,
-        args.no_cache,
+        args.no_snapshot,
     )
     .unwrap();
 
@@ -92,7 +92,7 @@ fn main() {
         deployment,
         &mut Some(chainhooks),
         None,
-        args.no_cache,
+        args.no_snapshot,
         ctx,
         orchestrator_terminated_tx,
         &args.namespace,
