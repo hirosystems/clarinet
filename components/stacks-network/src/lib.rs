@@ -51,7 +51,7 @@ async fn do_run_devnet(
     chainhooks: &mut Option<ChainhookStore>,
     log_tx: Option<Sender<LogData>>,
     display_dashboard: bool,
-    no_cache: bool,
+    no_snapshot: bool,
     ctx: Context,
     orchestrator_terminated_tx: Sender<bool>,
     orchestrator_terminated_rx: Option<Receiver<bool>>,
@@ -79,7 +79,7 @@ async fn do_run_devnet(
     }?;
 
     // Check for and potentially copy cached data
-    if start_local_devnet_services && !no_cache {
+    if start_local_devnet_services && !no_snapshot {
         match setup_cache_directories(&devnet_config, &devnet_events_tx) {
             Ok(using_cache) => {
                 if using_cache {
@@ -290,7 +290,7 @@ pub async fn do_run_chain_coordinator(
     deployment: DeploymentSpecification,
     chainhooks: &mut Option<ChainhookStore>,
     log_tx: Option<Sender<LogData>>,
-    no_cache: bool,
+    no_snapshot: bool,
     ctx: Context,
     orchestrator_terminated_tx: Sender<bool>,
     namespace: &str,
@@ -310,7 +310,7 @@ pub async fn do_run_chain_coordinator(
         chainhooks,
         log_tx,
         false,
-        no_cache,
+        no_snapshot,
         ctx,
         orchestrator_terminated_tx,
         None,
@@ -327,7 +327,7 @@ pub async fn do_run_local_devnet(
     chainhooks: &mut Option<ChainhookStore>,
     log_tx: Option<Sender<LogData>>,
     display_dashboard: bool,
-    no_cache: bool,
+    no_snapshot: bool,
     ctx: Context,
     orchestrator_terminated_tx: Sender<bool>,
     orchestrator_terminated_rx: Option<Receiver<bool>>,
@@ -346,7 +346,7 @@ pub async fn do_run_local_devnet(
         chainhooks,
         log_tx,
         display_dashboard,
-        no_cache,
+        no_snapshot,
         ctx,
         orchestrator_terminated_tx,
         orchestrator_terminated_rx,

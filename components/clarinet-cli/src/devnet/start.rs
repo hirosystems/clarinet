@@ -21,7 +21,7 @@ pub fn start(
     deployment: DeploymentSpecification,
     log_tx: Option<Sender<LogData>>,
     display_dashboard: bool,
-    no_cache: bool,
+    no_snapshot: bool,
 ) -> Result<
     (
         Option<mpsc::Receiver<DevnetEvent>>,
@@ -77,7 +77,7 @@ pub fn start(
         &mut Some(hooks),
         log_tx,
         display_dashboard,
-        no_cache,
+        no_snapshot,
         ctx,
         orchestrator_terminated_tx,
         Some(orchestrator_terminated_rx),

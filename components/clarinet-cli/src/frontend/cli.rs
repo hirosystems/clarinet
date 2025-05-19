@@ -456,9 +456,9 @@ struct DevnetStart {
     /// Display streams of logs instead of terminal UI dashboard
     #[clap(long = "no-dashboard")]
     pub no_dashboard: bool,
-    /// Don't use cached data on startup
-    #[clap(long = "no-cache")]
-    pub no_cache: bool,
+    /// Don't use snapshot data on startup
+    #[clap(long = "no-snapshot")]
+    pub no_snapshot: bool,
     /// If specified, use this deployment file
     #[clap(long = "deployment-plan-path", short = 'p')]
     pub deployment_plan_path: Option<String>,
@@ -2021,7 +2021,7 @@ fn devnet_start(cmd: DevnetStart, clarinetrc: ClarinetRC) {
         deployment,
         None,
         !cmd.no_dashboard,
-        cmd.no_cache,
+        cmd.no_snapshot,
     ) {
         Err(e) => {
             eprintln!("{}", format_err!(e));
