@@ -124,6 +124,59 @@ struct Formatter {
     #[clap(long = "in-place", conflicts_with = "dry_run")]
     /// Replace the contents of a file with the formatted code
     pub in_place: bool,
+    #[clap(long = "stdin", conflicts_with_all = ["in_place", "file"])]
+    /// Read from stdin (and output to stdout)
+    pub stdin: bool,
+}
+
+impl Formatter {
+    fn get_input_sources(&self) -> Vec<FormatterInputSource> {
+        if self.stdin {
+            vec![FormatterInputSource::Stdin]
+        } else if let Some(file) = &self.file {
+            vec![FormatterInputSource::File(file.clone())]
+        } else {
+            // look for files at the default code path (./contracts/) if
+            // cmd.manifest_path is not specified OR if cmd.file is not specified
+            let manifest = load_manifest_or_exit(self.manifest_path.clone(), true);
+            let contracts = manifest.contracts.values().cloned();
+            contracts
+                .map(|c| from_code_source(c.code_source))
+                .map(FormatterInputSource::File)
+                .collect()
+        }
+    }
+}
+
+enum FormatterInputSource {
+    File(String),
+    Stdin,
+}
+
+impl FormatterInputSource {
+    fn get_input(&self) -> String {
+        match self {
+            FormatterInputSource::File(path) => {
+                fs::read_to_string(path).unwrap_or_else(|e| panic!("Failed to read file: {e}"))
+            }
+            FormatterInputSource::Stdin => io::stdin()
+                .lines()
+                .map_while(Result::ok)
+                .collect::<Vec<_>>()
+                .join("\n"),
+        }
+    }
+
+    fn filename(&self) -> Option<&str> {
+        match self {
+            FormatterInputSource::File(path) => Some(path),
+            FormatterInputSource::Stdin => None,
+        }
+    }
+
+    fn is_stdin(&self) -> bool {
+        matches!(self, FormatterInputSource::Stdin)
+    }
 }
 
 #[derive(Subcommand, PartialEq, Clone, Debug)]
@@ -1231,7 +1284,7 @@ pub fn main() {
                 "{}",
                 format_warn!("This command is in beta. Feedback is welcome!"),
             );
-            let sources = get_sources_to_format(cmd.manifest_path, cmd.file);
+            let sources = cmd.get_input_sources();
             let mut settings = formatter::Settings::default();
 
             if let Some(max_line_length) = cmd.max_line_length {
@@ -1246,12 +1299,16 @@ pub fn main() {
             }
             let formatter = ClarityFormatter::new(settings);
 
-            for (file_path, source) in &sources {
-                let output = formatter.format(source);
+            for source in sources {
+                let input = source.get_input();
+                let output = formatter.format(&input);
                 if cmd.in_place {
-                    let _ = overwrite_formatted(file_path, output);
-                } else if cmd.dry_run {
-                    println!("{}", output);
+                    let file_path = source
+                        .filename()
+                        .expect("No file path for in-place formatting");
+                    let _ = overwrite_formatted(file_path, &output);
+                } else if cmd.dry_run || source.is_stdin() {
+                    println!("{output}");
                 } else {
                     eprintln!("required flags: in-place or dry-run");
                 }
@@ -1270,7 +1327,7 @@ pub fn main() {
     };
 }
 
-fn overwrite_formatted(file_path: &String, output: String) -> io::Result<()> {
+fn overwrite_formatted(file_path: &str, output: &str) -> io::Result<()> {
     let mut file = fs::File::create(file_path)?;
 
     file.write_all(output.as_bytes())?;
@@ -1285,41 +1342,12 @@ fn from_code_source(src: ClarityCodeSource) -> String {
         _ => panic!("invalid code source"), // TODO
     }
 }
-// look for files at the default code path (./contracts/) if
-// cmd.manifest_path is not specified OR if cmd.file is not specified
-fn get_sources_from_manifest(manifest_path: Option<String>) -> Vec<String> {
-    let manifest = load_manifest_or_exit(manifest_path, true);
-    let contracts = manifest.contracts.values().cloned();
-    contracts.map(|c| from_code_source(c.code_source)).collect()
-}
-
-fn get_sources_to_format(
-    manifest_path: Option<String>,
-    file: Option<String>,
-) -> Vec<(String, String)> {
-    let files: Vec<String> = match file {
-        Some(file_name) => vec![format!("{}", file_name)],
-        None => get_sources_from_manifest(manifest_path),
-    };
-    // Map each file to its source code
-    files
-        .into_iter()
-        .map(|file_path| {
-            let source = fs::read_to_string(&file_path)
-                .unwrap_or_else(|_| "Failed to read file".to_string());
-            (file_path, source)
-        })
-        .collect()
-}
 
 fn get_manifest_location_or_exit(path: Option<String>) -> FileLocation {
-    match get_manifest_location(path) {
-        Some(manifest_location) => manifest_location,
-        None => {
-            eprintln!("Could not find Clarinet.toml");
-            process::exit(1);
-        }
-    }
+    get_manifest_location(path).unwrap_or_else(|| {
+        eprintln!("Could not find Clarinet.toml");
+        process::exit(1);
+    })
 }
 
 fn get_manifest_location_or_warn(path: Option<String>) -> Option<FileLocation> {
@@ -1340,36 +1368,25 @@ fn load_manifest_or_exit(
     allow_remote_data_fetching: bool,
 ) -> ProjectManifest {
     let manifest_location = get_manifest_location_or_exit(path);
-    match ProjectManifest::from_location(&manifest_location, allow_remote_data_fetching) {
-        Ok(manifest) => manifest,
-        Err(message) => {
-            eprintln!(
-                "{} syntax errors in Clarinet.toml\n{}",
-                red!("error:"),
-                message,
-            );
+    ProjectManifest::from_location(&manifest_location, allow_remote_data_fetching).unwrap_or_else(
+        |message| {
+            eprintln!("{} syntax errors in Clarinet.toml", red!("error:"));
+            eprintln!("{message}");
             process::exit(1);
-        }
-    }
+        },
+    )
 }
 
 fn load_manifest_or_warn(path: Option<String>) -> Option<ProjectManifest> {
-    if let Some(manifest_location) = get_manifest_location_or_warn(path) {
-        let manifest = match ProjectManifest::from_location(&manifest_location, true) {
-            Ok(manifest) => manifest,
-            Err(message) => {
-                eprintln!(
-                    "{} syntax errors in Clarinet.toml\n{}",
-                    red!("error:"),
-                    message,
-                );
-                process::exit(1);
-            }
-        };
-        Some(manifest)
-    } else {
-        None
-    }
+    let manifest_location = get_manifest_location_or_warn(path)?;
+
+    ProjectManifest::from_location(&manifest_location, true)
+        .inspect_err(|message| {
+            eprintln!("{} syntax errors in Clarinet.toml", red!("error:"));
+            eprintln!("{message}");
+            process::exit(1);
+        })
+        .ok()
 }
 
 fn load_deployment_and_artifacts_or_exit(
