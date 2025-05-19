@@ -167,7 +167,7 @@ impl FormatterInputSource {
         }
     }
 
-    fn filename(&self) -> Option<&str> {
+    fn file_path(&self) -> Option<&str> {
         match self {
             FormatterInputSource::File(path) => Some(path),
             FormatterInputSource::Stdin => None,
@@ -1304,7 +1304,7 @@ pub fn main() {
                 let output = formatter.format(&input);
                 if cmd.in_place {
                     let file_path = source
-                        .filename()
+                        .file_path()
                         .expect("No file path for in-place formatting");
                     let _ = overwrite_formatted(file_path, &output);
                 } else if cmd.dry_run || source.is_stdin() {
