@@ -61,6 +61,9 @@ pub struct ServicesMapHosts {
     pub subnet_api_host: String,
 }
 
+pub static EXCLUDED_STACKS_CACHE_FILES: &[&str] =
+    &["event_observers.sqlite", "event_observers.sqlite-journal"];
+
 impl DevnetOrchestrator {
     pub fn new(
         manifest: ProjectManifest,
@@ -3186,7 +3189,7 @@ pub fn setup_cache_directories(
                 "copying bitcoin cache to project {}",
                 project_bitcoin_cache.display()
             );
-            copy_directory(&global_bitcoin_cache, &project_bitcoin_cache)
+            copy_directory(&global_bitcoin_cache, &project_bitcoin_cache, None)
                 .map_err(|e| format!("Failed to copy Bitcoin template cache: {}", e))?;
         }
 
@@ -3195,17 +3198,16 @@ pub fn setup_cache_directories(
         let project_stacks_cache = project_cache_dir.join("stacks");
         if global_stacks_cache.exists() && !project_stacks_cache.exists() {
             println!("copying stacks cache to project");
-            copy_directory(&global_stacks_cache, &project_stacks_cache)
-                .map_err(|e| format!("Failed to copy Stacks template cache: {}", e))?;
-        }
-
-        // Copy signer data
-        let global_signer_cache = global_cache_dir.join("signer");
-        let project_signer_cache = project_cache_dir.join("signer");
-        if global_signer_cache.exists() && !project_signer_cache.exists() {
-            println!("copying signer cache to project");
-            copy_directory(&global_signer_cache, &project_signer_cache)
-                .map_err(|e| format!("Failed to copy Signer template cache: {}", e))?;
+            // exlude copy of
+            // event_observers.sqlite
+            // event_observers.sqlite-journal
+            // they contain project specific urls
+            copy_directory(
+                &global_stacks_cache,
+                &project_stacks_cache,
+                Some(EXCLUDED_STACKS_CACHE_FILES),
+            )
+            .map_err(|e| format!("Failed to copy Stacks template cache: {}", e))?;
         }
 
         // Copy the marker file too
@@ -3218,8 +3220,11 @@ pub fn setup_cache_directories(
     Ok(project_cache_ready || (global_cache_ready && !project_cache_exists))
 }
 
-pub fn copy_directory(source: &PathBuf, destination: &PathBuf) -> Result<(), String> {
-    // Create the destination directory
+pub fn copy_directory(
+    source: &PathBuf,
+    destination: &PathBuf,
+    exclude_patterns: Option<&[&str]>,
+) -> Result<(), String> {
     fs::create_dir_all(destination).map_err(|e| {
         format!(
             "Failed to create directory {}: {}",
@@ -3232,11 +3237,20 @@ pub fn copy_directory(source: &PathBuf, destination: &PathBuf) -> Result<(), Str
         .map_err(|e| format!("Failed to read directory {}: {}", source.display(), e))?
     {
         let entry = entry.map_err(|e| format!("Failed to read directory entry: {}", e))?;
+        let file_name = entry.file_name();
+        let file_name_str = file_name.to_string_lossy();
+
+        // Skip this file if it matches any exclude pattern
+        if let Some(patterns) = &exclude_patterns {
+            if patterns.iter().any(|pattern| file_name_str == *pattern) {
+                continue;
+            }
+        }
         let entry_path = entry.path();
-        let destination_path = destination.join(entry.file_name());
+        let destination_path = destination.join(&file_name);
 
         if entry_path.is_dir() {
-            copy_directory(&entry_path, &destination_path)?;
+            copy_directory(&entry_path, &destination_path, exclude_patterns)?;
         } else {
             fs::copy(&entry_path, &destination_path).map_err(|e| {
                 format!(

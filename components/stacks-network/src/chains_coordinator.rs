@@ -4,6 +4,7 @@ use crate::event::send_status_update;
 use crate::event::DevnetEvent;
 use crate::event::Status;
 use crate::orchestrator::ServicesMapHosts;
+use crate::orchestrator::EXCLUDED_STACKS_CACHE_FILES;
 use crate::orchestrator::{copy_directory, get_global_cache_dir, get_project_cache_dir};
 
 use base58::FromBase58;
@@ -381,6 +382,7 @@ pub async fn start_chains_coordinator(
                                         let _ = copy_directory(
                                             &project_bitcoin_cache,
                                             &global_bitcoin_cache,
+                                            None,
                                         );
                                     }
 
@@ -391,16 +393,7 @@ pub async fn start_chains_coordinator(
                                         let _ = copy_directory(
                                             &project_stacks_cache,
                                             &global_stacks_cache,
-                                        );
-                                    }
-
-                                    // Copy signer data
-                                    let project_signer_cache = project_cache_dir.join("signer");
-                                    let global_signer_cache = global_cache_dir.join("signer");
-                                    if project_signer_cache.exists() {
-                                        let _ = copy_directory(
-                                            &project_signer_cache,
-                                            &global_signer_cache,
+                                            Some(EXCLUDED_STACKS_CACHE_FILES),
                                         );
                                     }
                                 }
