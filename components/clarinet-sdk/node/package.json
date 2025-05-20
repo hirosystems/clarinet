@@ -61,12 +61,12 @@
     "@stacks/transactions": "^7.0.6",
     "kolorist": "^1.8.0",
     "prompts": "^2.4.2",
-    "vitest": "^3.0.5",
     "yargs": "^17.7.2"
   },
   "devDependencies": {
     "@stacks/encryption": "^7.0.0",
     "@stacks/network": "^7.0.0",
-    "@stacks/stacking": "^7.0.0"
+    "@stacks/stacking": "^7.0.0",
+    "vitest": "^3.0.5"
   }
 }
