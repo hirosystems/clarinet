@@ -1795,6 +1795,26 @@ events_keys = ["*"]
             .await
             .map_err(|e| format!("unable to create image: {}", e))?;
 
+        // Check if we have events to import
+        let import_events = {
+            let project_events_path = PathBuf::from(&devnet_config.working_dir)
+                .join("events_export")
+                .join("events_cache.tsv");
+
+            if project_events_path.exists() {
+                Some(project_events_path)
+            } else {
+                let global_events_path = get_global_cache_dir()
+                    .join("events_export")
+                    .join("events_cache.tsv");
+
+                if global_events_path.exists() {
+                    Some(global_events_path)
+                } else {
+                    None
+                }
+            }
+        };
         let mut port_bindings = HashMap::new();
         port_bindings.insert(
             format!("{}/tcp", devnet_config.stacks_api_port),
@@ -1874,6 +1894,28 @@ events_keys = ["*"]
         ctx.try_log(|logger| slog::info!(logger, "Created container stacks-api: {}", container));
         self.stacks_api_container_id = Some(container);
 
+        // If we have events to import, we need to copy the file to the container
+        if let Some(events_path) = import_events {
+            ctx.try_log(|logger| {
+                slog::info!(
+                    logger,
+                    "Found events file to import: {}",
+                    events_path.display()
+                )
+            });
+
+            // We'll copy the file after starting the container in boot_stacks_api_container
+            // Since copying files to a container before it's started doesn't work well with Docker API
+
+            // Instead, just store the path for later use
+            let mut import_path = PathBuf::from(&devnet_config.working_dir);
+            import_path.push("import_events_path");
+            let mut file = File::create(import_path)
+                .map_err(|e| format!("unable to create import path file: {:?}", e))?;
+
+            file.write_all(events_path.to_string_lossy().as_bytes())
+                .map_err(|e| format!("unable to write import path: {:?}", e))?;
+        }
         Ok(())
     }
 
@@ -1995,7 +2037,125 @@ events_keys = ["*"]
             .id;
 
         ctx.try_log(|logger| slog::info!(logger, "Created container subnet-api: {}", container));
-        self.subnet_api_container_id = Some(container);
+        self.subnet_api_container_id = Some(container.clone());
+
+        let import_path = PathBuf::from(&devnet_config.working_dir).join("import_events_path");
+        if import_path.exists() {
+            // Read the path to the events file
+            let events_path_str = fs::read_to_string(&import_path)
+                .map_err(|e| format!("unable to read import path file: {:?}", e))?;
+            let events_path = PathBuf::from(events_path_str);
+
+            if events_path.exists() {
+                ctx.try_log(|logger| {
+                    slog::info!(logger, "Importing events from {}", events_path.display())
+                });
+
+                // Read the events file
+                let file_content = fs::read(&events_path)
+                    .map_err(|e| format!("unable to read events file: {:?}", e))?;
+
+                // Create a tar archive with the events file
+                let tmp_dir = PathBuf::from(&devnet_config.working_dir).join("tmp_import");
+                let _ = fs::remove_dir_all(&tmp_dir); // Remove if exists
+                fs::create_dir_all(&tmp_dir)
+                    .map_err(|e| format!("unable to create temporary directory: {:?}", e))?;
+
+                // Copy the events file to the temp directory
+                let tmp_events_file = tmp_dir.join("events_cache.tsv");
+                fs::write(&tmp_events_file, &file_content)
+                    .map_err(|e| format!("unable to write temporary events file: {:?}", e))?;
+
+                // Create a tar archive
+                let tar_file = tmp_dir.join("events_import.tar");
+                let status = std::process::Command::new("tar")
+                    .args(&[
+                        "-cf",
+                        tar_file.to_str().unwrap(),
+                        "-C",
+                        tmp_dir.to_str().unwrap(),
+                        "events_cache.tsv",
+                    ])
+                    .status()
+                    .map_err(|e| format!("unable to create tar: {:?}", e))?;
+
+                if !status.success() {
+                    return Err("Failed to create tar archive".to_string());
+                }
+
+                // Read the tar file
+                let tar_content =
+                    fs::read(&tar_file).map_err(|e| format!("unable to read tar file: {:?}", e))?;
+
+                // Copy the tar to the container
+                let container_id = container.clone();
+                docker
+                    .upload_to_container(
+                        &container_id,
+                        Some(bollard::container::UploadToContainerOptions {
+                            path: "/tmp",
+                            ..Default::default()
+                        }),
+                        tar_content.into(),
+                    )
+                    .await
+                    .map_err(|e| format!("unable to copy tar to container: {}", e))?;
+
+                // Extract the tar in the container
+                let config = CreateExecOptions {
+                    cmd: Some(vec!["tar", "-xf", "/tmp/events_import.tar", "-C", "/tmp"]),
+                    attach_stdout: Some(false),
+                    attach_stderr: Some(false),
+                    ..Default::default()
+                };
+
+                let exec = docker
+                    .create_exec(&container_id, config)
+                    .await
+                    .map_err(|e| format!("unable to create exec command for extraction: {}", e))?;
+
+                let _ = docker
+                    .start_exec(&exec.id, None)
+                    .await
+                    .map_err(|e| format!("unable to extract tar in container: {}", e))?;
+
+                ctx.try_log(|logger| slog::info!(logger, "Events file copied to container"));
+
+                // Wait a bit more to ensure the API is fully started before importing
+                std::thread::sleep(std::time::Duration::from_secs(10));
+
+                // Run the import command
+                let config = CreateExecOptions {
+                    cmd: Some(vec![
+                        "node",
+                        "/app/dist/index.js",
+                        "import-events",
+                        "--file",
+                        "/tmp/events_cache.tsv",
+                        "--wipe-db",
+                    ]),
+                    attach_stdout: Some(true),
+                    attach_stderr: Some(true),
+                    ..Default::default()
+                };
+
+                let exec = docker
+                    .create_exec(&container_id, config)
+                    .await
+                    .map_err(|e| format!("unable to create exec command for import: {}", e))?;
+
+                let _output = docker
+                    .start_exec(&exec.id, None)
+                    .await
+                    .map_err(|e| format!("unable to import events: {}", e))?;
+
+                ctx.try_log(|logger| slog::info!(logger, "Events import completed"));
+
+                // Remove the temporary path file and directory
+                let _ = fs::remove_file(&import_path);
+                let _ = fs::remove_dir_all(tmp_dir);
+            }
+        }
 
         Ok(())
     }

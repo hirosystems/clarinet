@@ -9,6 +9,9 @@ use crate::orchestrator::{copy_directory, get_global_cache_dir, get_project_cach
 
 use base58::FromBase58;
 use bitcoincore_rpc::bitcoin::Address;
+use bollard::container::DownloadFromContainerOptions;
+use bollard::exec::CreateExecOptions;
+use bollard::Docker;
 use chainhook_sdk::chainhooks::types::ChainhookStore;
 use chainhook_sdk::observer::PredicatesConfig;
 use chainhook_sdk::observer::{
@@ -37,6 +40,7 @@ use clarity::vm::types::PrincipalData;
 use clarity::vm::types::{BuffData, SequenceData, TupleData};
 use clarity::vm::ClarityName;
 use clarity::vm::Value as ClarityValue;
+use futures::stream::TryStreamExt;
 use hiro_system_kit;
 use hiro_system_kit::slog;
 use hiro_system_kit::yellow;
@@ -51,6 +55,9 @@ use stackslib::util_lib::signed_structured_data::pox4::make_pox_4_signer_key_sig
 use stackslib::util_lib::signed_structured_data::pox4::Pox4SignatureTopic;
 use std::convert::TryFrom;
 use std::fs;
+use std::fs::File;
+use std::io::Write;
+use std::path::PathBuf;
 use std::str;
 use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -349,6 +356,36 @@ pub async fn start_chains_coordinator(
 
                         let global_cache_dir = get_global_cache_dir();
                         let project_cache_dir = get_project_cache_dir(&config.devnet_config);
+
+                        // Check if we've reached the target height for database export (142)
+                        if bitcoin_block_height == 142 {
+                            let _ = devnet_event_tx.send(DevnetEvent::info(
+                    "Reached block height 142, preparing to export Stacks API events...".to_string(),
+                ));
+                            // We can use the network name from the config to find the stacks-api container
+                            let network_name = config.manifest.project.name.clone();
+                            let container_name = format!("stacks-api.{}", network_name);
+
+                            // Find the container using Docker API through the observer_command_tx
+                            // let _ = observer_command_tx.send(
+                            //     ObserverCommand::NotifyBitcoinTransactionProxied(format!(
+                            //         "export-stacks-api-events:{}:{}",
+                            //         container_name, config.devnet_config.working_dir
+                            //     )),
+                            // );
+
+                            // To properly export, we need to:
+                            // 1. Stop mining to prevent further blocks
+                            let _ = mining_command_tx.send(BitcoinMiningCommand::Pause);
+                            // 2. Wait a moment for operations to complete
+                            std::thread::sleep(Duration::from_secs(10));
+                            // 3. Resume mining after presumed export completion
+                            let _ = mining_command_tx.send(BitcoinMiningCommand::Start);
+
+                            // Note: We're relying on the observer to handle the export since
+                            // it has direct access to the Docker client. We'll enhance the
+                            // observer to handle this custom command.
+                        }
                         // If we've reached epoch 3.0, create marker files
                         if bitcoin_block_height >= config.devnet_config.epoch_3_0 {
                             // Project cache marker
@@ -1198,6 +1235,148 @@ fn get_stacking_tx_method_and_args(
     };
 
     (method.to_string(), arguments)
+}
+
+async fn export_stacks_api_events(
+    docker_client: &Docker,
+    container_id: &str,
+    working_dir: &str,
+    devnet_event_tx: &Sender<DevnetEvent>,
+) -> Result<(), String> {
+    // First ensure the directory exists
+    let export_path = PathBuf::from(working_dir).join("events_export");
+    fs::create_dir_all(&export_path)
+        .map_err(|e| format!("unable to create events export directory: {:?}", e))?;
+
+    let export_file = export_path.join("events_cache.tsv");
+
+    // Create exec command to export events
+    let config = CreateExecOptions {
+        cmd: Some(vec![
+            "node",
+            "/app/dist/index.js",
+            "export-events",
+            "--file",
+            "/tmp/events_cache.tsv",
+            "--overwrite-file",
+        ]),
+        attach_stdout: Some(true),
+        attach_stderr: Some(true),
+        ..Default::default()
+    };
+
+    let exec = docker_client
+        .create_exec(container_id, config)
+        .await
+        .map_err(|e| format!("unable to create exec command for export: {}", e))?;
+
+    let _ = devnet_event_tx.send(DevnetEvent::info(
+        "Exporting Stacks API events...".to_string(),
+    ));
+
+    // Execute the command
+    let _ = docker_client
+        .start_exec(&exec.id, None)
+        .await
+        .map_err(|e| format!("unable to export Stacks API events: {}", e))?;
+
+    // Now copy the exported file from the container to the host
+    // First, create a tar archive of the file in the container
+    let config = CreateExecOptions {
+        cmd: Some(vec![
+            "tar",
+            "-cf",
+            "/tmp/events_export.tar",
+            "-C",
+            "/tmp",
+            "events_cache.tsv",
+        ]),
+        attach_stdout: Some(false),
+        attach_stderr: Some(false),
+        ..Default::default()
+    };
+
+    let exec = docker_client
+        .create_exec(container_id, config)
+        .await
+        .map_err(|e| format!("unable to create exec command for file archiving: {}", e))?;
+
+    let _ = docker_client
+        .start_exec(&exec.id, None)
+        .await
+        .map_err(|e| format!("unable to archive exported file: {}", e))?;
+
+    // Now get the tar archive from the container
+    let tar_data = docker_client
+        .download_from_container(
+            container_id,
+            Some(DownloadFromContainerOptions {
+                path: "/tmp/events_export.tar",
+            }),
+        )
+        .try_collect::<Vec<_>>()
+        .await
+        .map_err(|e| format!("unable to copy archive from container: {}", e))?;
+
+    // Create a temporary directory to extract the tar
+    let tmp_dir = PathBuf::from(working_dir).join("tmp_extract");
+    let _ = fs::remove_dir_all(&tmp_dir); // Remove if exists
+    fs::create_dir_all(&tmp_dir)
+        .map_err(|e| format!("unable to create temporary directory: {:?}", e))?;
+
+    // Write the tar data to a file
+    let tar_file = tmp_dir.join("events_export.tar");
+    let mut file =
+        File::create(&tar_file).map_err(|e| format!("unable to create tar file: {:?}", e))?;
+    // tar_data is Vec<Bytes>, need &[u8]
+    for chunk in &tar_data {
+        file.write_all(chunk)
+            .map_err(|e| format!("unable to write tar data: {:?}", e))?;
+    }
+
+    // Extract the archive
+    let status = std::process::Command::new("tar")
+        .args(&[
+            "-xf",
+            tar_file.to_str().unwrap(),
+            "-C",
+            tmp_dir.to_str().unwrap(),
+        ])
+        .status()
+        .map_err(|e| format!("unable to extract tar: {:?}", e))?;
+
+    if !status.success() {
+        return Err("Failed to extract tar archive".to_string());
+    }
+
+    // Copy the extracted file to the export path
+    let extracted_file = tmp_dir.join("events_cache.tsv");
+    if !extracted_file.exists() {
+        return Err("Extracted file not found".to_string());
+    }
+
+    fs::copy(&extracted_file, &export_file)
+        .map_err(|e| format!("unable to copy extracted file: {:?}", e))?;
+
+    // Clean up temporary files
+    let _ = fs::remove_dir_all(&tmp_dir);
+
+    let _ = devnet_event_tx.send(DevnetEvent::success(format!(
+        "Successfully exported Stacks API events to {}",
+        export_file.display()
+    )));
+
+    // Also copy this to the global cache
+    let global_cache_dir = get_global_cache_dir();
+    let global_export_path = global_cache_dir.join("events_export");
+    fs::create_dir_all(&global_export_path)
+        .map_err(|e| format!("unable to create global events export directory: {:?}", e))?;
+
+    let global_export_file = global_export_path.join("events_cache.tsv");
+    fs::copy(export_file, global_export_file)
+        .map_err(|e| format!("unable to copy to global cache: {:?}", e))?;
+
+    Ok(())
 }
 
 #[cfg(test)]
