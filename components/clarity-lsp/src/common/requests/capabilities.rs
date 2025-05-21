@@ -5,7 +5,7 @@ use lsp_types::{
 };
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct InitializationOptions {
     completion: bool,
@@ -18,8 +18,8 @@ pub struct InitializationOptions {
     signature_help: bool,
 }
 
-impl InitializationOptions {
-    pub fn default() -> Self {
+impl Default for InitializationOptions {
+    fn default() -> Self {
         InitializationOptions {
             completion: true,
             completion_smart_parenthesis_wrap: true,
