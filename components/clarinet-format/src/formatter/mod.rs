@@ -69,11 +69,16 @@ impl ClarityFormatter {
     /// formatting for files to ensure a newline at the end
     pub fn format_file(&self, source: &str) -> String {
         let pse = clarity::vm::ast::parser::v2::parse(source).unwrap();
-        let agg = Aggregator::new(&self.settings, &pse, source);
+        let agg = Aggregator::new(&self.settings, &pse, Some(source));
         let result = agg.generate();
 
         // make sure the file ends with a newline
         result.trim_end_matches('\n').to_string() + "\n"
+    }
+    /// formatting an AST without a source file
+    pub fn format_ast(&self, pse: &[PreSymbolicExpression]) -> String {
+        let agg = Aggregator::new(&self.settings, pse, None);
+        agg.generate()
     }
     /// Alias `format_file` to `format`
     pub fn format(&self, source: &str) -> String {
@@ -88,7 +93,7 @@ impl ClarityFormatter {
         // `previous_indentation` for format_source_exprs
         let indentation_level = source.chars().take_while(|c| c.is_whitespace()).count();
         let leading_spaces = &source[..indentation_level];
-        let agg = Aggregator::new(&self.settings, &pse, source);
+        let agg = Aggregator::new(&self.settings, &pse, Some(source));
 
         let result = agg.generate();
         if leading_spaces.is_empty() {
@@ -104,13 +109,17 @@ impl ClarityFormatter {
 pub struct Aggregator<'a> {
     settings: &'a Settings,
     pse: &'a [PreSymbolicExpression],
-    source: &'a str,
+    source: Option<&'a str>,
 
     cache: RefCell<HashMap<(usize, String), String>>,
 }
 
 impl<'a> Aggregator<'a> {
-    pub fn new(settings: &'a Settings, pse: &'a [PreSymbolicExpression], source: &'a str) -> Self {
+    pub fn new(
+        settings: &'a Settings,
+        pse: &'a [PreSymbolicExpression],
+        source: Option<&'a str>,
+    ) -> Self {
         Aggregator {
             settings,
             pse,
@@ -121,12 +130,32 @@ impl<'a> Aggregator<'a> {
     pub fn generate(&self) -> String {
         self.cache.borrow_mut().clear();
         // this handles if we're formatting a section of code rather than the whole file
-        let indentation_level = self
-            .source
-            .chars()
-            .take_while(|c| c.is_whitespace())
-            .count();
-        self.format_source_exprs(self.pse, &self.source[..indentation_level])
+        let indentation_level = match self.source {
+            Some(source) => source.chars().take_while(|c| c.is_whitespace()).count(),
+            None => {
+                (self
+                    .pse
+                    .first()
+                    .map_or(0, |expr| expr.span().start_column.saturating_sub(1)))
+                    as usize
+            }
+        };
+        let previous_indentation = match self.source {
+            Some(source) => &source[..indentation_level],
+            None => &" ".repeat(indentation_level),
+        };
+
+        let formatted = self.format_source_exprs(self.pse, previous_indentation);
+        // If we're formatting an AST without a source and there's indentation,
+        // we need to ensure it's applied to the beginning of the output
+        if self.source.is_none() && indentation_level > 0 {
+            // Only add indentation if we're formatting a top-level expression
+            if self.pse.len() == 1 && formatted.starts_with('(') {
+                return format!("{}{}", previous_indentation, formatted);
+            }
+        }
+
+        formatted
     }
 
     fn format_source_exprs(
@@ -164,7 +193,7 @@ impl<'a> Aggregator<'a> {
                     if let Some(block) = next.match_list() {
                         iter.next();
                         result.push('\n');
-                        result.push_str(&ignored_exprs(block, self.source));
+                        result.push_str(&ignored_exprs(block, self.source.unwrap_or_default()));
                     }
                 }
                 continue;
@@ -785,7 +814,7 @@ impl<'a> Aggregator<'a> {
             acc.push_str(previous_indentation);
         }
         acc.push(')');
-        t(&acc).to_string()
+        acc
     }
     fn format_list(&self, exprs: &[PreSymbolicExpression], previous_indentation: &str) -> String {
         let indentation = &self.settings.indentation.to_string();
@@ -1980,5 +2009,25 @@ mod tests_formatter {
 }"#;
         let result = format_with_default(src);
         assert_eq!(expected, result);
+    }
+
+    #[test]
+    fn format_ast_without_source() {
+        let src = "(define-private (noop) (begin (+ 1 2) (ok true)))";
+        let ast = clarity::vm::ast::parser::v2::parse(src).unwrap();
+        let formatter = ClarityFormatter::new(Settings::default());
+        let expected = format_with_default(src);
+        let result = formatter.format_ast(&ast);
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn format_ast_without_source_handle_indentation() {
+        let src = "  (begin (+ 1 2) (ok true))";
+        let ast = clarity::vm::ast::parser::v2::parse(src).unwrap();
+        let expected = format_with_default(src);
+        let formatter = ClarityFormatter::new(Settings::default());
+        let result = formatter.format_ast(&ast);
+        assert_eq!(result, expected);
     }
 }
