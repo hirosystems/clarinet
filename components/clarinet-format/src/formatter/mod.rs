@@ -145,7 +145,17 @@ impl<'a> Aggregator<'a> {
             None => &" ".repeat(indentation_level),
         };
 
-        self.format_source_exprs(self.pse, previous_indentation)
+        let formatted = self.format_source_exprs(self.pse, previous_indentation);
+        // If we're formatting an AST without a source and there's indentation,
+        // we need to ensure it's applied to the beginning of the output
+        if self.source.is_none() && indentation_level > 0 {
+            // Only add indentation if we're formatting a top-level expression
+            if self.pse.len() == 1 && formatted.starts_with('(') {
+                return format!("{}{}", previous_indentation, formatted);
+            }
+        }
+
+        formatted
     }
 
     fn format_source_exprs(
@@ -804,7 +814,7 @@ impl<'a> Aggregator<'a> {
             acc.push_str(previous_indentation);
         }
         acc.push(')');
-        t(&acc).to_string()
+        acc
     }
     fn format_list(&self, exprs: &[PreSymbolicExpression], previous_indentation: &str) -> String {
         let indentation = &self.settings.indentation.to_string();
@@ -2006,18 +2016,18 @@ mod tests_formatter {
         let src = "(define-private (noop) (begin (+ 1 2) (ok true)))";
         let ast = clarity::vm::ast::parser::v2::parse(src).unwrap();
         let formatter = ClarityFormatter::new(Settings::default());
-        let expected = formatter.format_file(src);
+        let expected = format_with_default(src);
         let result = formatter.format_ast(&ast);
         assert_eq!(result, expected);
     }
 
     #[test]
     fn format_ast_without_source_handle_indentation() {
-        let src = "  (begin (+ 1 2) (ok true))\n";
+        let src = "  (begin (+ 1 2) (ok true))";
         let ast = clarity::vm::ast::parser::v2::parse(src).unwrap();
+        let expected = format_with_default(src);
         let formatter = ClarityFormatter::new(Settings::default());
-        let expected = formatter.format_file(src);
         let result = formatter.format_ast(&ast);
-        assert_eq!(result + "\n", expected);
+        assert_eq!(result, expected);
     }
 }
