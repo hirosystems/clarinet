@@ -1904,22 +1904,16 @@ events_keys = ["*"]
                 )
             });
 
-            // We'll copy the file after starting the container in boot_stacks_api_container
-            // Since copying files to a container before it's started doesn't work well with Docker API
-
-            // Instead, just store the path for later use
-            let mut import_path = PathBuf::from(&devnet_config.working_dir);
-            import_path.push("import_events_path");
-            let mut file = File::create(import_path)
-                .map_err(|e| format!("unable to create import path file: {:?}", e))?;
-
-            file.write_all(events_path.to_string_lossy().as_bytes())
-                .map_err(|e| format!("unable to write import path: {:?}", e))?;
+            // Store the path in a temporary file for later use
+            let import_marker =
+                PathBuf::from(&devnet_config.working_dir).join("pending_events_import");
+            fs::write(&import_marker, events_path.to_string_lossy().as_bytes())
+                .map_err(|e| format!("unable to write import marker: {:?}", e))?;
         }
         Ok(())
     }
 
-    pub async fn boot_stacks_api_container(&self, _ctx: &Context) -> Result<(), String> {
+    pub async fn boot_stacks_api_container(&self, ctx: &Context) -> Result<(), String> {
         let container = match &self.stacks_api_container_id {
             Some(container) => container.clone(),
             _ => return Err("unable to boot container".to_string()),
@@ -1934,6 +1928,74 @@ events_keys = ["*"]
             .await
             .map_err(|e| formatted_docker_error("unable to start stacks-api container", e))?;
 
+        // Check if we need to import events
+        let devnet_config = match &self.network_config {
+            Some(ref network_config) => match network_config.devnet {
+                Some(ref devnet_config) => devnet_config,
+                _ => return Ok(()),
+            },
+            _ => return Ok(()),
+        };
+
+        let import_marker = PathBuf::from(&devnet_config.working_dir).join("pending_events_import");
+
+        if import_marker.exists() {
+            // Read the events file path
+            let events_path = fs::read_to_string(&import_marker)
+                .map_err(|e| format!("unable to read import marker: {:?}", e))?;
+
+            // Wait for API to be ready
+            std::thread::sleep(Duration::from_secs(10));
+
+            ctx.try_log(|logger| slog::info!(logger, "Importing events from {}", events_path));
+
+            // Copy the events file to the container
+            let container_name = format!("stacks-api.{}", self.network_name);
+            let copy_command = format!(
+                "docker cp {} {}:/tmp/events_cache.tsv",
+                events_path, container_name
+            );
+
+            let output = std::process::Command::new("sh")
+                .arg("-c")
+                .arg(&copy_command)
+                .output()
+                .map_err(|e| format!("Failed to copy events file to container: {}", e))?;
+
+            if !output.status.success() {
+                return Err(format!(
+                    "Copy command failed: {}",
+                    String::from_utf8_lossy(&output.stderr)
+                ));
+            }
+
+            // Run the import command
+            let import_command = format!(
+            "docker exec {} node /app/lib/index.js import-events --file /tmp/events_cache.tsv --wipe-db",
+            container_name
+        );
+
+            let output = std::process::Command::new("sh")
+                .arg("-c")
+                .arg(&import_command)
+                .output()
+                .map_err(|e| format!("Failed to import events: {}", e))?;
+
+            if !output.status.success() {
+                ctx.try_log(|logger| {
+                    slog::warn!(
+                        logger,
+                        "Events import failed: {}",
+                        String::from_utf8_lossy(&output.stderr)
+                    )
+                });
+            } else {
+                ctx.try_log(|logger| slog::info!(logger, "Events import completed successfully"));
+            }
+
+            // Remove the marker file
+            let _ = fs::remove_file(&import_marker);
+        }
         Ok(())
     }
 

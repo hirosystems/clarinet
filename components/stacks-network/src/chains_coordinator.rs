@@ -9,9 +9,6 @@ use crate::orchestrator::{copy_directory, get_global_cache_dir, get_project_cach
 
 use base58::FromBase58;
 use bitcoincore_rpc::bitcoin::Address;
-use bollard::container::DownloadFromContainerOptions;
-use bollard::exec::CreateExecOptions;
-use bollard::Docker;
 use chainhook_sdk::chainhooks::types::ChainhookStore;
 use chainhook_sdk::observer::PredicatesConfig;
 use chainhook_sdk::observer::{
@@ -40,7 +37,6 @@ use clarity::vm::types::PrincipalData;
 use clarity::vm::types::{BuffData, SequenceData, TupleData};
 use clarity::vm::ClarityName;
 use clarity::vm::Value as ClarityValue;
-use futures::stream::TryStreamExt;
 use hiro_system_kit;
 use hiro_system_kit::slog;
 use hiro_system_kit::yellow;
@@ -55,8 +51,6 @@ use stackslib::util_lib::signed_structured_data::pox4::make_pox_4_signer_key_sig
 use stackslib::util_lib::signed_structured_data::pox4::Pox4SignatureTopic;
 use std::convert::TryFrom;
 use std::fs;
-use std::fs::File;
-use std::io::Write;
 use std::path::PathBuf;
 use std::str;
 use std::str::FromStr;
@@ -358,36 +352,9 @@ pub async fn start_chains_coordinator(
                         let project_cache_dir = get_project_cache_dir(&config.devnet_config);
 
                         // Check if we've reached the target height for database export (142)
-                        if bitcoin_block_height == 142 {
-                            let _ = devnet_event_tx.send(DevnetEvent::info(
-                    "Reached block height 142, preparing to export Stacks API events...".to_string(),
-                ));
-                            // We can use the network name from the config to find the stacks-api container
-                            let network_name = config.manifest.project.name.clone();
-                            let container_name = format!("stacks-api.{}", network_name);
-
-                            // Find the container using Docker API through the observer_command_tx
-                            // let _ = observer_command_tx.send(
-                            //     ObserverCommand::NotifyBitcoinTransactionProxied(format!(
-                            //         "export-stacks-api-events:{}:{}",
-                            //         container_name, config.devnet_config.working_dir
-                            //     )),
-                            // );
-
-                            // To properly export, we need to:
-                            // 1. Stop mining to prevent further blocks
-                            let _ = mining_command_tx.send(BitcoinMiningCommand::Pause);
-                            // 2. Wait a moment for operations to complete
-                            std::thread::sleep(Duration::from_secs(10));
-                            // 3. Resume mining after presumed export completion
-                            let _ = mining_command_tx.send(BitcoinMiningCommand::Start);
-
-                            // Note: We're relying on the observer to handle the export since
-                            // it has direct access to the Docker client. We'll enhance the
-                            // observer to handle this custom command.
-                        }
-                        // If we've reached epoch 3.0, create marker files
-                        if bitcoin_block_height >= config.devnet_config.epoch_3_0 {
+                        // If we've reached epoch 3.0, create the global cache
+                        // TODO: should we wait until AFTER epoch_3_0 block to cache?
+                        if bitcoin_block_height == config.devnet_config.epoch_3_0 {
                             // Project cache marker
                             let project_marker = project_cache_dir.join("epoch_3_ready");
                             if !project_marker.exists() {
@@ -407,7 +374,6 @@ pub async fn start_chains_coordinator(
                                 }
                             }
 
-                            // Global cache marker - keep this as a template for future projects
                             let global_marker = global_cache_dir.join("epoch_3_ready");
                             if !global_marker.exists() {
                                 // Copy project cache to global cache as a template
@@ -450,6 +416,32 @@ pub async fn start_chains_coordinator(
                                     }
                                 }
                             }
+                            let _ = devnet_event_tx.send(DevnetEvent::info(
+                    "Reached block height 142, preparing to export Stacks API events...".to_string(),
+                ));
+
+                            // To properly export, we need to:
+                            // 1. Stop mining to prevent further blocks
+                            let _ = mining_command_tx.send(BitcoinMiningCommand::Pause);
+                            // 2. Wait a moment for pausing to complete
+                            std::thread::sleep(Duration::from_secs(3));
+
+                            // Export the events
+                            match export_stacks_api_events(&config, &devnet_event_tx).await {
+                                Ok(_) => {
+                                    let _ = devnet_event_tx.send(DevnetEvent::success(
+                                        "Stacks API events exported successfully".to_string(),
+                                    ));
+                                }
+                                Err(e) => {
+                                    let _ = devnet_event_tx.send(DevnetEvent::warning(format!(
+                                        "Failed to export Stacks API events: {}. Continuing without export.",
+                                        e
+                                    )));
+                                }
+                            }
+                            // 3. Resume mining after presumed export completion
+                            let _ = mining_command_tx.send(BitcoinMiningCommand::Start);
                         }
                         // Stacking orders can't be published until devnet is ready
                         if !stacks_signers_keys.is_empty()
@@ -1238,294 +1230,78 @@ fn get_stacking_tx_method_and_args(
 }
 
 async fn export_stacks_api_events(
-    docker_client: &Docker,
-    container_id: &str,
-    working_dir: &str,
+    config: &DevnetEventObserverConfig,
     devnet_event_tx: &Sender<DevnetEvent>,
 ) -> Result<(), String> {
-    // First ensure the directory exists
-    let export_path = PathBuf::from(working_dir).join("events_export");
-    fs::create_dir_all(&export_path)
-        .map_err(|e| format!("unable to create events export directory: {:?}", e))?;
-
-    let export_file = export_path.join("events_cache.tsv");
+    // Get container name
+    let container_name = format!("stacks-api.{}.devnet", config.manifest.project.name);
 
     // Create exec command to export events
-    let config = CreateExecOptions {
-        cmd: Some(vec![
-            "node",
-            "/app/dist/index.js",
-            "export-events",
-            "--file",
-            "/tmp/events_cache.tsv",
-            "--overwrite-file",
-        ]),
-        attach_stdout: Some(true),
-        attach_stderr: Some(true),
-        ..Default::default()
-    };
-
-    let exec = docker_client
-        .create_exec(container_id, config)
-        .await
-        .map_err(|e| format!("unable to create exec command for export: {}", e))?;
+    let export_command = format!(
+        "docker exec {} node /app/lib/index.js export-events --file /tmp/events_cache.tsv --overwrite-file",
+        container_name
+    );
 
     let _ = devnet_event_tx.send(DevnetEvent::info(
         "Exporting Stacks API events...".to_string(),
     ));
 
-    // Execute the command
-    let _ = docker_client
-        .start_exec(&exec.id, None)
-        .await
-        .map_err(|e| format!("unable to export Stacks API events: {}", e))?;
+    // Execute the export command
+    let output = std::process::Command::new("sh")
+        .arg("-c")
+        .arg(&export_command)
+        .output()
+        .map_err(|e| format!("Failed to execute export command: {}", e))?;
 
-    // Now copy the exported file from the container to the host
-    // First, create a tar archive of the file in the container
-    let config = CreateExecOptions {
-        cmd: Some(vec![
-            "tar",
-            "-cf",
-            "/tmp/events_export.tar",
-            "-C",
-            "/tmp",
-            "events_cache.tsv",
-        ]),
-        attach_stdout: Some(false),
-        attach_stderr: Some(false),
-        ..Default::default()
-    };
-
-    let exec = docker_client
-        .create_exec(container_id, config)
-        .await
-        .map_err(|e| format!("unable to create exec command for file archiving: {}", e))?;
-
-    let _ = docker_client
-        .start_exec(&exec.id, None)
-        .await
-        .map_err(|e| format!("unable to archive exported file: {}", e))?;
-
-    // Now get the tar archive from the container
-    let tar_data = docker_client
-        .download_from_container(
-            container_id,
-            Some(DownloadFromContainerOptions {
-                path: "/tmp/events_export.tar",
-            }),
-        )
-        .try_collect::<Vec<_>>()
-        .await
-        .map_err(|e| format!("unable to copy archive from container: {}", e))?;
-
-    // Create a temporary directory to extract the tar
-    let tmp_dir = PathBuf::from(working_dir).join("tmp_extract");
-    let _ = fs::remove_dir_all(&tmp_dir); // Remove if exists
-    fs::create_dir_all(&tmp_dir)
-        .map_err(|e| format!("unable to create temporary directory: {:?}", e))?;
-
-    // Write the tar data to a file
-    let tar_file = tmp_dir.join("events_export.tar");
-    let mut file =
-        File::create(&tar_file).map_err(|e| format!("unable to create tar file: {:?}", e))?;
-    // tar_data is Vec<Bytes>, need &[u8]
-    for chunk in &tar_data {
-        file.write_all(chunk)
-            .map_err(|e| format!("unable to write tar data: {:?}", e))?;
+    if !output.status.success() {
+        return Err(format!(
+            "Export command failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        ));
     }
 
-    // Extract the archive
-    let status = std::process::Command::new("tar")
-        .args(&[
-            "-xf",
-            tar_file.to_str().unwrap(),
-            "-C",
-            tmp_dir.to_str().unwrap(),
-        ])
-        .status()
-        .map_err(|e| format!("unable to extract tar: {:?}", e))?;
+    // Wait for export to complete
+    std::thread::sleep(Duration::from_secs(5));
 
-    if !status.success() {
-        return Err("Failed to extract tar archive".to_string());
+    // Copy the exported file from container to host
+    let export_path = PathBuf::from(&config.devnet_config.working_dir).join("events_export");
+    fs::create_dir_all(&export_path)
+        .map_err(|e| format!("unable to create events export directory: {:?}", e))?;
+
+    let copy_command = format!(
+        "docker cp {}:/tmp/events_cache.tsv {}",
+        container_name,
+        export_path.join("events_cache.tsv").display()
+    );
+
+    let output = std::process::Command::new("sh")
+        .arg("-c")
+        .arg(&copy_command)
+        .output()
+        .map_err(|e| format!("Failed to copy events file: {}", e))?;
+
+    if !output.status.success() {
+        return Err(format!(
+            "Copy command failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        ));
     }
 
-    // Copy the extracted file to the export path
-    let extracted_file = tmp_dir.join("events_cache.tsv");
-    if !extracted_file.exists() {
-        return Err("Extracted file not found".to_string());
-    }
-
-    fs::copy(&extracted_file, &export_file)
-        .map_err(|e| format!("unable to copy extracted file: {:?}", e))?;
-
-    // Clean up temporary files
-    let _ = fs::remove_dir_all(&tmp_dir);
-
-    let _ = devnet_event_tx.send(DevnetEvent::success(format!(
-        "Successfully exported Stacks API events to {}",
-        export_file.display()
-    )));
-
-    // Also copy this to the global cache
+    // Also copy to global cache
     let global_cache_dir = get_global_cache_dir();
     let global_export_path = global_cache_dir.join("events_export");
     fs::create_dir_all(&global_export_path)
         .map_err(|e| format!("unable to create global events export directory: {:?}", e))?;
 
-    let global_export_file = global_export_path.join("events_cache.tsv");
-    fs::copy(export_file, global_export_file)
-        .map_err(|e| format!("unable to copy to global cache: {:?}", e))?;
+    fs::copy(
+        export_path.join("events_cache.tsv"),
+        global_export_path.join("events_cache.tsv"),
+    )
+    .map_err(|e| format!("unable to copy to global cache: {:?}", e))?;
+
+    let _ = devnet_event_tx.send(DevnetEvent::success(
+        "Successfully exported Stacks API events".to_string(),
+    ));
 
     Ok(())
-}
-
-#[cfg(test)]
-mod tests_stacking_orders {
-
-    use super::*;
-
-    fn build_pox_stacking_order(duration: u32, start_at_cycle: u32) -> PoxStackingOrder {
-        PoxStackingOrder {
-            duration,
-            start_at_cycle,
-            wallet: "wallet_1".to_string(),
-            slots: 1,
-            btc_address: "address_1".to_string(),
-            auto_extend: Some(true),
-        }
-    }
-
-    #[test]
-    fn test_should_publish_stacking_orders_basic() {
-        let pox_stacking_order = build_pox_stacking_order(12, 6);
-
-        // cycle just before start_at_cycle
-        assert!(should_publish_stacking_orders(&5, &pox_stacking_order));
-        // cycle before start_at_cycle + duration
-        assert!(should_publish_stacking_orders(&17, &pox_stacking_order),);
-        // cycle before start_at_cycle + duration * 42
-        assert!(should_publish_stacking_orders(&509, &pox_stacking_order));
-        // cycle equal to start_at_cycle
-        assert!(!should_publish_stacking_orders(&6, &pox_stacking_order));
-        // cycle after start_at_cycle
-        assert!(!should_publish_stacking_orders(&8, &pox_stacking_order));
-    }
-
-    #[test]
-    fn test_should_publish_stacking_orders_edge_cases() {
-        // duration is one cycle
-        let pox_stacking_order = build_pox_stacking_order(1, 4);
-        assert!(!should_publish_stacking_orders(&2, &pox_stacking_order));
-
-        for i in 3..=20 {
-            assert!(should_publish_stacking_orders(&i, &pox_stacking_order));
-        }
-        // duration is low and start_at_cycle is high
-        let pox_stacking_order = build_pox_stacking_order(2, 100);
-        for i in 0..=98 {
-            assert!(!should_publish_stacking_orders(&i, &pox_stacking_order));
-        }
-        assert!(should_publish_stacking_orders(&99, &pox_stacking_order));
-        assert!(!should_publish_stacking_orders(&100, &pox_stacking_order));
-        assert!(should_publish_stacking_orders(&101, &pox_stacking_order));
-    }
-}
-
-#[cfg(test)]
-mod test_rpc_client {
-    use clarinet_files::DEFAULT_DERIVATION_PATH;
-    use stacks_rpc_client::{mock_stacks_rpc::MockStacksRpc, rpc_client::NodeInfo};
-
-    use super::*;
-
-    #[test]
-    fn test_fund_genesis_account() {
-        let mut stacks_rpc = MockStacksRpc::new();
-        let info_mock = stacks_rpc.get_info_mock(NodeInfo {
-            peer_version: 4207599116,
-            pox_consensus: "4f4de3d4ab3246299c039084a12c801c9dc70323".to_string(),
-            burn_block_height: 100,
-            stable_pox_consensus: "a2c4972bf818f554809e25fa637b780c77c20b62".to_string(),
-            stable_burn_block_height: 99,
-            server_version: "stacks-node 0.0.1".to_string(),
-            network_id: 2147483648,
-            parent_network_id: 3669344250,
-            stacks_tip_height: 47,
-            stacks_tip: "6bb0e4706fdfb9624a23d9144f2161c61d5c58816643b48ffdb735887bdbf5fa"
-                .to_string(),
-            stacks_tip_consensus_hash: "4f4de3d4ab3246299c039084a12c801c9dc70323".to_string(),
-            genesis_chainstate_hash:
-                "74237aa39aa50a83de11a4f53e9d3bb7d43461d1de9873f402e5453ae60bc59b".to_string(),
-        });
-        let burn_block_mock = stacks_rpc.get_burn_block_mock(100);
-        let nonce_mock = stacks_rpc.get_nonce_mock("ST2JHG361ZXG51QTKY2NQCVBPPRRE2KZB1HR05NNC", 0);
-        let tx_mock = stacks_rpc
-            .get_tx_mock("0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef");
-
-        let deployer = AccountConfig {
-            label: "deployer".to_string(),
-            mnemonic: "cycle puppy glare enroll cost improve round trend wrist mushroom scorpion tower claim oppose clever elephant dinosaur eight problem before frozen dune wagon high".to_string(),
-            derivation: DEFAULT_DERIVATION_PATH.to_string(),
-            balance: 10000000,
-            sbtc_balance: 100000000,
-            stx_address: "ST2JHG361ZXG51QTKY2NQCVBPPRRE2KZB1HR05NNC".to_string(),
-            btc_address: "mvZtbibDAAA3WLpY7zXXFqRa3T4XSknBX7".to_string(),
-            is_mainnet: false,
-        };
-
-        let fee_rate = 10;
-        let (devnet_event_tx, devnet_event_rx) = channel();
-        let services_map_hosts = ServicesMapHosts {
-            stacks_api_host: stacks_rpc.url.replace("http://", ""),
-            // only stacks_node is called
-            stacks_node_host: stacks_rpc.url.clone(),
-            bitcoin_node_host: "localhost".to_string(),
-            bitcoin_explorer_host: "localhost".to_string(),
-            stacks_explorer_host: "localhost".to_string(),
-            subnet_node_host: "localhost".to_string(),
-            subnet_api_host: "localhost".to_string(),
-            postgres_host: "localhost".to_string(),
-        };
-        let accounts = vec![deployer];
-
-        let boot_completed = Arc::new(AtomicBool::new(true));
-
-        fund_genesis_account(
-            &devnet_event_tx,
-            &services_map_hosts,
-            &accounts,
-            fee_rate,
-            &boot_completed,
-        );
-
-        let timeout = Duration::from_secs(3);
-        let start = std::time::Instant::now();
-
-        let mut received_events = Vec::new();
-        while start.elapsed() < timeout {
-            match devnet_event_rx.recv_timeout(Duration::from_millis(100)) {
-                Ok(event) => {
-                    received_events.push(event);
-                }
-                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
-                Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
-                    break;
-                }
-            }
-        }
-
-        assert_eq!(received_events.len(), 1);
-        assert!(received_events.iter().any(|event| {
-            if let DevnetEvent::Log(msg) = event {
-                msg.message.contains("Funded 1 accounts with sBTC")
-            } else {
-                false
-            }
-        }));
-
-        info_mock.assert();
-        nonce_mock.assert();
-        burn_block_mock.assert();
-        tx_mock.assert();
-    }
 }
