@@ -201,6 +201,7 @@ impl StacksDevnet {
                             &mut None,
                             Some(log_tx),
                             false,
+                            false,
                             stacks_network::Context::empty(),
                             termination_tx,
                             None,
