@@ -52,15 +52,9 @@ fn main() {
         serde_yaml::from_slice(&network_manifest_file_content[..])
             .unwrap_or_else(|e| panic!("Devnet.toml file malformatted {:?}", e));
 
-    let orchestrator = DevnetOrchestrator::new(
-        manifest,
-        Some(network_manifest.clone()),
-        None,
-        false,
-        false,
-        args.no_snapshot,
-    )
-    .unwrap();
+    let orchestrator =
+        DevnetOrchestrator::new(manifest, Some(network_manifest.clone()), None, false, false)
+            .unwrap();
 
     let deployment_specification_file_content = deployment_location
         .read_content()
