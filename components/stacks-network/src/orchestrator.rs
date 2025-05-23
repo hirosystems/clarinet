@@ -2131,7 +2131,7 @@ events_keys = ["*"]
                 // Create a tar archive
                 let tar_file = tmp_dir.join("events_import.tar");
                 let status = std::process::Command::new("tar")
-                    .args(&[
+                    .args([
                         "-cf",
                         tar_file.to_str().unwrap(),
                         "-C",
