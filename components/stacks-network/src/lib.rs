@@ -15,11 +15,12 @@ pub use chainhook_sdk::{self, utils::Context};
 use chainhook_sdk::{chainhooks::types::ChainhookStore, observer::ObserverCommand};
 pub use chainhooks::{load_chainhooks, parse_chainhook_full_specification};
 use chains_coordinator::BitcoinMiningCommand;
-use clarinet_files::NetworkManifest;
+use clarinet_files::devnet_diff::{default_significant_fields, DevnetDiffConfig};
+use clarinet_files::{DevnetConfig, NetworkManifest};
 pub use event::DevnetEvent;
 pub use log::{LogData, LogLevel};
 pub use orchestrator::DevnetOrchestrator;
-use orchestrator::ServicesMapHosts;
+use orchestrator::{setup_cache_directories, ServicesMapHosts};
 use std::{
     sync::mpsc::{self, channel, Receiver, Sender},
     thread::sleep,
@@ -51,6 +52,7 @@ async fn do_run_devnet(
     chainhooks: &mut Option<ChainhookStore>,
     log_tx: Option<Sender<LogData>>,
     display_dashboard: bool,
+    no_snapshot: bool,
     ctx: Context,
     orchestrator_terminated_tx: Sender<bool>,
     orchestrator_terminated_rx: Option<Receiver<bool>>,
@@ -76,6 +78,44 @@ async fn do_run_devnet(
         },
         _ => Err("Unable to retrieve config"),
     }?;
+
+    let default_config = DevnetConfig::default();
+    let differ = DevnetDiffConfig::new();
+    let different_fields = differ.get_different_fields(&default_config, &devnet_config);
+    let mut incompatible_config = false;
+    if !different_fields.is_empty() {
+        let _ = devnet_events_tx.send(DevnetEvent::warning(format!(
+            "Default cache can not be used due to differing values in fields: {}",
+            different_fields.join(", ")
+        )));
+        incompatible_config = true
+    }
+    // Check for and potentially copy cached data
+    if start_local_devnet_services && !no_snapshot && !incompatible_config {
+        match setup_cache_directories(&devnet_config, &devnet_events_tx) {
+            Ok(using_cache) => {
+                if using_cache {
+                    let _ = devnet_events_tx.send(DevnetEvent::info(
+                        "Using cached blockchain data up to epoch 3.0. Startup will be faster."
+                            .to_string(),
+                    ));
+                } else {
+                    let _ = devnet_events_tx.send(DevnetEvent::info(
+                        "No cached blockchain data found. Initial startup may take longer."
+                            .to_string(),
+                    ));
+                }
+                using_cache
+            }
+            Err(e) => {
+                let _ = devnet_events_tx.send(DevnetEvent::warning(format!(
+                    "Error setting up cache directories: {}. Continuing without cache.",
+                    e
+                )));
+                false
+            }
+        };
+    }
     // if we're starting all services, all trace logs go to networking.log
     if start_local_devnet_services {
         let file_appender =
@@ -262,6 +302,7 @@ pub async fn do_run_chain_coordinator(
     deployment: DeploymentSpecification,
     chainhooks: &mut Option<ChainhookStore>,
     log_tx: Option<Sender<LogData>>,
+    no_snapshot: bool,
     ctx: Context,
     orchestrator_terminated_tx: Sender<bool>,
     namespace: &str,
@@ -281,6 +322,7 @@ pub async fn do_run_chain_coordinator(
         chainhooks,
         log_tx,
         false,
+        no_snapshot,
         ctx,
         orchestrator_terminated_tx,
         None,
@@ -297,6 +339,7 @@ pub async fn do_run_local_devnet(
     chainhooks: &mut Option<ChainhookStore>,
     log_tx: Option<Sender<LogData>>,
     display_dashboard: bool,
+    no_snapshot: bool,
     ctx: Context,
     orchestrator_terminated_tx: Sender<bool>,
     orchestrator_terminated_rx: Option<Receiver<bool>>,
@@ -315,6 +358,7 @@ pub async fn do_run_local_devnet(
         chainhooks,
         log_tx,
         display_dashboard,
+        no_snapshot,
         ctx,
         orchestrator_terminated_tx,
         orchestrator_terminated_rx,

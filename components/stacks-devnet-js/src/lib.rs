@@ -201,6 +201,7 @@ impl StacksDevnet {
                             &mut None,
                             Some(log_tx),
                             false,
+                            false,
                             stacks_network::Context::empty(),
                             termination_tx,
                             None,
@@ -659,7 +660,7 @@ impl StacksDevnet {
         {
             overrides.bind_containers_volumes = Some(res.value(&mut cx));
         } else {
-            overrides.bind_containers_volumes = Some(false);
+            overrides.bind_containers_volumes = Some(true);
         }
 
         if let Ok(res) = devnet_settings
