@@ -15,7 +15,8 @@ pub use chainhook_sdk::{self, utils::Context};
 use chainhook_sdk::{chainhooks::types::ChainhookStore, observer::ObserverCommand};
 pub use chainhooks::{load_chainhooks, parse_chainhook_full_specification};
 use chains_coordinator::BitcoinMiningCommand;
-use clarinet_files::NetworkManifest;
+use clarinet_files::devnet_diff::{default_significant_fields, DevnetDiffConfig};
+use clarinet_files::{DevnetConfig, NetworkManifest};
 pub use event::DevnetEvent;
 pub use log::{LogData, LogLevel};
 pub use orchestrator::DevnetOrchestrator;
@@ -78,8 +79,19 @@ async fn do_run_devnet(
         _ => Err("Unable to retrieve config"),
     }?;
 
+    let default_config = DevnetConfig::default();
+    let differ = DevnetDiffConfig::new();
+    let different_fields = differ.get_different_fields(&default_config, &devnet_config);
+    let mut incompatible_config = false;
+    if !different_fields.is_empty() {
+        let _ = devnet_events_tx.send(DevnetEvent::warning(format!(
+            "Default cache can not be used due to differing values in fields: {}",
+            different_fields.join(", ")
+        )));
+        incompatible_config = true
+    }
     // Check for and potentially copy cached data
-    if start_local_devnet_services && !no_snapshot {
+    if start_local_devnet_services && !no_snapshot && !incompatible_config {
         match setup_cache_directories(&devnet_config, &devnet_events_tx) {
             Ok(using_cache) => {
                 if using_cache {
