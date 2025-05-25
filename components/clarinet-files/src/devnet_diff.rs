@@ -1,4 +1,4 @@
-use crate::DevnetConfig;
+pub use crate::DevnetConfig;
 
 /// Config which fields to check for differences
 pub struct DevnetDiffConfig {
