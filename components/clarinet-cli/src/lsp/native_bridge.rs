@@ -96,6 +96,35 @@ impl LspNativeBridge {
             response_rx: Arc::new(Mutex::new(response_rx)),
         }
     }
+
+    // Call after receiving `LspNotification` message
+    async fn after_receive_lsp_notification(&self) {
+        let mut aggregated_diagnostics = vec![];
+        let mut notification = None;
+        if let Ok(response_rx) = self.response_rx.lock() {
+            if let Ok(LspResponse::Notification(ref mut notification_response)) = response_rx.recv()
+            {
+                aggregated_diagnostics.append(&mut notification_response.aggregated_diagnostics);
+                notification = notification_response.notification.take();
+            }
+        }
+
+        for (location, diags) in aggregated_diagnostics {
+            if let Ok(url) = location.to_url_string() {
+                self.client
+                    .publish_diagnostics(
+                        Url::parse(&url).unwrap(),
+                        clarity_diagnostics_to_tower_lsp_type(&diags),
+                        None,
+                    )
+                    .await;
+            }
+        }
+
+        if let Some((level, message)) = notification {
+            self.client.show_message(level, message).await;
+        }
+    }
 }
 
 #[async_trait]
@@ -264,29 +293,8 @@ impl LanguageServer for LspNativeBridge {
                 "Command submitted to background thread",
             )
             .await;
-        let mut aggregated_diagnostics = vec![];
-        let mut notification = None;
-        if let Ok(response_rx) = self.response_rx.lock() {
-            if let Ok(LspResponse::Notification(ref mut notification_response)) = response_rx.recv()
-            {
-                aggregated_diagnostics.append(&mut notification_response.aggregated_diagnostics);
-                notification = notification_response.notification.take();
-            }
-        }
-        for (location, diags) in aggregated_diagnostics.into_iter() {
-            if let Ok(url) = location.to_url_string() {
-                self.client
-                    .publish_diagnostics(
-                        Url::parse(&url).unwrap(),
-                        clarity_diagnostics_to_tower_lsp_type(&diags),
-                        None,
-                    )
-                    .await;
-            }
-        }
-        if let Some((level, message)) = notification {
-            self.client.show_message(level, message).await;
-        }
+
+        self.after_receive_lsp_notification().await;
     }
 
     async fn did_save(&self, params: DidSaveTextDocumentParams) {
@@ -306,30 +314,7 @@ impl LanguageServer for LspNativeBridge {
             return;
         };
 
-        let mut aggregated_diagnostics = vec![];
-        let mut notification = None;
-        if let Ok(response_rx) = self.response_rx.lock() {
-            if let Ok(LspResponse::Notification(ref mut notification_response)) = response_rx.recv()
-            {
-                aggregated_diagnostics.append(&mut notification_response.aggregated_diagnostics);
-                notification = notification_response.notification.take();
-            }
-        }
-
-        for (location, diags) in aggregated_diagnostics.into_iter() {
-            if let Ok(url) = location.to_url_string() {
-                self.client
-                    .publish_diagnostics(
-                        Url::parse(&url).unwrap(),
-                        clarity_diagnostics_to_tower_lsp_type(&diags),
-                        None,
-                    )
-                    .await;
-            }
-        }
-        if let Some((level, message)) = notification {
-            self.client.show_message(level, message).await;
-        }
+        self.after_receive_lsp_notification().await;
     }
 
     async fn did_change(&self, params: DidChangeTextDocumentParams) {
@@ -341,6 +326,8 @@ impl LanguageServer for LspNativeBridge {
                 ));
             };
         }
+
+        self.after_receive_lsp_notification().await;
     }
 
     async fn did_close(&self, params: DidCloseTextDocumentParams) {
@@ -349,5 +336,7 @@ impl LanguageServer for LspNativeBridge {
                 let _ = tx.send(LspNotification::ContractClosed(contract_location));
             };
         }
+
+        self.after_receive_lsp_notification().await;
     }
 }
