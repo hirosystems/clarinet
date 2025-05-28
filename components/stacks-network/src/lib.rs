@@ -3,6 +3,7 @@ extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 
+mod cache_extractor;
 mod chainhooks;
 pub mod chains_coordinator;
 mod event;
@@ -15,7 +16,7 @@ pub use chainhook_sdk::{self, utils::Context};
 use chainhook_sdk::{chainhooks::types::ChainhookStore, observer::ObserverCommand};
 pub use chainhooks::{load_chainhooks, parse_chainhook_full_specification};
 use chains_coordinator::BitcoinMiningCommand;
-use clarinet_files::devnet_diff::{default_significant_fields, DevnetDiffConfig};
+use clarinet_files::devnet_diff::DevnetDiffConfig;
 use clarinet_files::{DevnetConfig, NetworkManifest};
 pub use event::DevnetEvent;
 pub use log::{LogData, LogLevel};
@@ -92,6 +93,35 @@ async fn do_run_devnet(
     }
     // Check for and potentially copy cached data
     if start_local_devnet_services && !no_snapshot && !incompatible_config {
+        let global_cache_dir = orchestrator::get_global_cache_dir();
+
+        // First, try to extract embedded cache if it exists and we don't have cache yet
+        let global_cache_ready = global_cache_dir.join("epoch_3_ready").exists();
+
+        if !global_cache_ready {
+            let _ = devnet_events_tx.send(DevnetEvent::info(
+                "No existing cache found, extracting embedded cache data...".to_string(),
+            ));
+
+            match cache_extractor::extract_embedded_cache(&global_cache_dir, &devnet_events_tx) {
+                Ok(true) => {
+                    let _ = devnet_events_tx.send(DevnetEvent::success(
+                        "Embedded cache extracted successfully".to_string(),
+                    ));
+                }
+                Ok(false) => {
+                    let _ = devnet_events_tx.send(DevnetEvent::warning(
+                        "No embedded cache available".to_string(),
+                    ));
+                }
+                Err(e) => {
+                    let _ = devnet_events_tx.send(DevnetEvent::warning(format!(
+                        "Failed to extract embedded cache: {}. Continuing without cache.",
+                        e
+                    )));
+                }
+            }
+        }
         match setup_cache_directories(&devnet_config, &devnet_events_tx) {
             Ok(using_cache) => {
                 if using_cache {
