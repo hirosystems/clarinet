@@ -99,6 +99,27 @@ impl DevnetDiffConfig {
                 name: "stacks_api_image_url".to_string(),
                 extractor: make_extractor(|config| config.stacks_api_image_url.clone()),
             },
+            // Stacking orders
+            SignificantField {
+                name: "pox_stacking_orders".to_string(),
+                extractor: make_extractor(|config| {
+                    config
+                        .pox_stacking_orders
+                        .iter()
+                        .map(|pso| {
+                            format!(
+                                "{}-{}-{}-{}-{}",
+                                pso.start_at_cycle,
+                                pso.duration,
+                                pso.wallet,
+                                pso.slots,
+                                pso.btc_address
+                            )
+                        })
+                        .collect::<Vec<_>>()
+                        .join(",")
+                }),
+            },
         ]
     }
 
@@ -178,20 +199,6 @@ impl DevnetDiffConfig {
     }
 }
 
-pub fn default_significant_fields() -> Vec<(&'static str, Extractor)> {
-    vec![
-        ("epoch_2_0", make_extractor(|c| c.epoch_2_0)),
-        ("epoch_2_05", make_extractor(|c| c.epoch_2_05)),
-        ("epoch_2_1", make_extractor(|c| c.epoch_2_1)),
-        ("epoch_2_2", make_extractor(|c| c.epoch_2_2)),
-        ("epoch_2_3", make_extractor(|c| c.epoch_2_3)),
-        ("epoch_2_4", make_extractor(|c| c.epoch_2_4)),
-        ("epoch_2_5", make_extractor(|c| c.epoch_2_5)),
-        ("epoch_3_0", make_extractor(|c| c.epoch_3_0)),
-        ("epoch_3_1", make_extractor(|c| c.epoch_3_1)),
-    ]
-}
-
 impl Default for DevnetDiffConfig {
     fn default() -> Self {
         Self::new()
@@ -200,6 +207,8 @@ impl Default for DevnetDiffConfig {
 
 #[cfg(test)]
 mod tests {
+    use crate::network_manifest::get_default_stacking_orders;
+
     use super::*;
 
     #[test]
@@ -217,12 +226,13 @@ mod tests {
         let default_config = DevnetConfig::default();
         let mut user_config = default_config.clone();
         user_config.epoch_3_0 = 150; // Different from default
+        user_config.pox_stacking_orders = vec![];
 
         let differ = DevnetDiffConfig::new();
         assert!(differ.has_differences(&default_config, &user_config));
 
         let different_fields = differ.get_different_fields(&default_config, &user_config);
-        assert!(different_fields.iter().any(|f| f == "epoch_3_0"));
+        assert_eq!(different_fields, ["epoch_3_0", "pox_stacking_orders"]);
     }
 
     #[test]
