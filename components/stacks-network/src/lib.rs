@@ -3,6 +3,7 @@ extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 
+mod cache_extractor;
 mod chainhooks;
 pub mod chains_coordinator;
 mod event;
@@ -15,11 +16,12 @@ pub use chainhook_sdk::{self, utils::Context};
 use chainhook_sdk::{chainhooks::types::ChainhookStore, observer::ObserverCommand};
 pub use chainhooks::{load_chainhooks, parse_chainhook_full_specification};
 use chains_coordinator::BitcoinMiningCommand;
-use clarinet_files::NetworkManifest;
+use clarinet_files::devnet_diff::DevnetDiffConfig;
+use clarinet_files::{DevnetConfig, NetworkManifest};
 pub use event::DevnetEvent;
 pub use log::{LogData, LogLevel};
 pub use orchestrator::DevnetOrchestrator;
-use orchestrator::ServicesMapHosts;
+use orchestrator::{setup_cache_directories, ServicesMapHosts};
 use std::{
     sync::mpsc::{self, channel, Receiver, Sender},
     thread::sleep,
@@ -51,6 +53,7 @@ async fn do_run_devnet(
     chainhooks: &mut Option<ChainhookStore>,
     log_tx: Option<Sender<LogData>>,
     display_dashboard: bool,
+    no_snapshot: bool,
     ctx: Context,
     orchestrator_terminated_tx: Sender<bool>,
     orchestrator_terminated_rx: Option<Receiver<bool>>,
@@ -76,6 +79,73 @@ async fn do_run_devnet(
         },
         _ => Err("Unable to retrieve config"),
     }?;
+
+    let default_config = DevnetConfig::default();
+    let differ = DevnetDiffConfig::new();
+    let different_fields = differ.is_same(&default_config, &devnet_config);
+    let mut incompatible_config = false;
+    if let Err(e) = different_fields {
+        let _ = devnet_events_tx.send(DevnetEvent::warning(format!(
+            "Default cache can not be used:\n{}",
+            e
+        )));
+        incompatible_config = true
+    }
+    // Check for and potentially copy cached data
+    if start_local_devnet_services && !no_snapshot && !incompatible_config {
+        let global_cache_dir = orchestrator::get_global_cache_dir();
+
+        // First, try to extract embedded cache if it exists and we don't have cache yet
+        let global_cache_ready = global_cache_dir.join("epoch_3_ready").exists();
+
+        if !global_cache_ready {
+            let _ = devnet_events_tx.send(DevnetEvent::info(
+                "No existing cache found, extracting embedded cache data...".to_string(),
+            ));
+
+            match cache_extractor::extract_embedded_cache(&global_cache_dir, &devnet_events_tx) {
+                Ok(true) => {
+                    let _ = devnet_events_tx.send(DevnetEvent::success(
+                        "Embedded cache extracted successfully".to_string(),
+                    ));
+                }
+                Ok(false) => {
+                    let _ = devnet_events_tx.send(DevnetEvent::warning(
+                        "No embedded cache available".to_string(),
+                    ));
+                }
+                Err(e) => {
+                    let _ = devnet_events_tx.send(DevnetEvent::warning(format!(
+                        "Failed to extract embedded cache: {}. Continuing without cache.",
+                        e
+                    )));
+                }
+            }
+        }
+        match setup_cache_directories(&devnet_config, &devnet_events_tx) {
+            Ok(using_cache) => {
+                if using_cache {
+                    let _ = devnet_events_tx.send(DevnetEvent::info(
+                        "Using cached blockchain data up to epoch 3.0. Startup will be faster."
+                            .to_string(),
+                    ));
+                } else {
+                    let _ = devnet_events_tx.send(DevnetEvent::info(
+                        "No cached blockchain data found. Initial startup may take longer."
+                            .to_string(),
+                    ));
+                }
+                using_cache
+            }
+            Err(e) => {
+                let _ = devnet_events_tx.send(DevnetEvent::warning(format!(
+                    "Error setting up cache directories: {}. Continuing without cache.",
+                    e
+                )));
+                false
+            }
+        };
+    }
     // if we're starting all services, all trace logs go to networking.log
     if start_local_devnet_services {
         let file_appender =
@@ -262,6 +332,7 @@ pub async fn do_run_chain_coordinator(
     deployment: DeploymentSpecification,
     chainhooks: &mut Option<ChainhookStore>,
     log_tx: Option<Sender<LogData>>,
+    no_snapshot: bool,
     ctx: Context,
     orchestrator_terminated_tx: Sender<bool>,
     namespace: &str,
@@ -281,6 +352,7 @@ pub async fn do_run_chain_coordinator(
         chainhooks,
         log_tx,
         false,
+        no_snapshot,
         ctx,
         orchestrator_terminated_tx,
         None,
@@ -297,6 +369,7 @@ pub async fn do_run_local_devnet(
     chainhooks: &mut Option<ChainhookStore>,
     log_tx: Option<Sender<LogData>>,
     display_dashboard: bool,
+    no_snapshot: bool,
     ctx: Context,
     orchestrator_terminated_tx: Sender<bool>,
     orchestrator_terminated_rx: Option<Receiver<bool>>,
@@ -315,6 +388,7 @@ pub async fn do_run_local_devnet(
         chainhooks,
         log_tx,
         display_dashboard,
+        no_snapshot,
         ctx,
         orchestrator_terminated_tx,
         orchestrator_terminated_rx,

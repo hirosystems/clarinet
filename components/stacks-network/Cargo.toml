@@ -39,6 +39,8 @@ clarinet-files = { path = "../clarinet-files" }
 clarinet-deployments = { path = "../clarinet-deployments" }
 hiro-system-kit = { path = "../hiro-system-kit", features = ["log"] }
 stacks-codec = { path = "../stacks-codec" }
+flate2 = "1.1.1"
+tar = "0.4.44"
 
 [dev-dependencies]
 stacks-rpc-client = { path = "../stacks-rpc-client", features = ["test"] }
