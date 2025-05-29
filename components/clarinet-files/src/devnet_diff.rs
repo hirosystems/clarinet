@@ -100,26 +100,27 @@ impl DevnetDiffConfig {
                 extractor: make_extractor(|config| config.stacks_api_image_url.clone()),
             },
             // Stacking orders
-            SignificantField {
-                name: "pox_stacking_orders".to_string(),
-                extractor: make_extractor(|config| {
-                    config
-                        .pox_stacking_orders
-                        .iter()
-                        .map(|pso| {
-                            format!(
-                                "{}-{}-{}-{}-{}",
-                                pso.start_at_cycle,
-                                pso.duration,
-                                pso.wallet,
-                                pso.slots,
-                                pso.btc_address
-                            )
-                        })
-                        .collect::<Vec<_>>()
-                        .join(",")
-                }),
-            },
+            // SignificantField {
+            //     name: "pox_stacking_orders".to_string(),
+            //     extractor: make_extractor(|config| {
+            //         let mut orders = config.pox_stacking_orders.clone();
+            //         orders.sort_by(|a, b| a.wallet.cmp(&b.wallet));
+            //         orders
+            //             .iter()
+            //             .map(|pso| {
+            //                 format!(
+            //                     "{}-{}-{}-{}-{}",
+            //                     pso.start_at_cycle,
+            //                     pso.duration,
+            //                     pso.wallet,
+            //                     pso.slots,
+            //                     pso.btc_address
+            //                 )
+            //             })
+            //             .collect::<Vec<_>>()
+            //             .join(",")
+            //     }),
+            // },
         ]
     }
 
@@ -207,8 +208,6 @@ impl Default for DevnetDiffConfig {
 
 #[cfg(test)]
 mod tests {
-    use crate::network_manifest::get_default_stacking_orders;
-
     use super::*;
 
     #[test]
