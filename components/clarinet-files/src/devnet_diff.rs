@@ -100,27 +100,27 @@ impl DevnetDiffConfig {
                 extractor: make_extractor(|config| config.stacks_api_image_url.clone()),
             },
             // Stacking orders
-            // SignificantField {
-            //     name: "pox_stacking_orders".to_string(),
-            //     extractor: make_extractor(|config| {
-            //         let mut orders = config.pox_stacking_orders.clone();
-            //         orders.sort_by(|a, b| a.wallet.cmp(&b.wallet));
-            //         orders
-            //             .iter()
-            //             .map(|pso| {
-            //                 format!(
-            //                     "{}-{}-{}-{}-{}",
-            //                     pso.start_at_cycle,
-            //                     pso.duration,
-            //                     pso.wallet,
-            //                     pso.slots,
-            //                     pso.btc_address
-            //                 )
-            //             })
-            //             .collect::<Vec<_>>()
-            //             .join(",")
-            //     }),
-            // },
+            SignificantField {
+                name: "pox_stacking_orders".to_string(),
+                extractor: make_extractor(|config| {
+                    let mut orders = config.pox_stacking_orders.clone();
+                    orders.sort_by(|a, b| a.wallet.cmp(&b.wallet));
+                    orders
+                        .iter()
+                        .map(|pso| {
+                            format!(
+                                "{}-{}-{}-{}-{}",
+                                pso.start_at_cycle,
+                                pso.duration,
+                                pso.wallet,
+                                pso.slots,
+                                pso.btc_address
+                            )
+                        })
+                        .collect::<Vec<_>>()
+                        .join(",")
+                }),
+            },
         ]
     }
 
@@ -145,20 +145,24 @@ impl DevnetDiffConfig {
     }
 
     /// Check if any significant fields are different
-    pub fn has_differences(
+    pub fn is_same(
         &self,
         default_config: &DevnetConfig,
         user_config: &DevnetConfig,
-    ) -> bool {
+    ) -> Result<bool, String> {
         for field in &self.significant_fields {
             let default_value = (field.extractor)(default_config);
             let user_value = (field.extractor)(user_config);
 
             if default_value != user_value {
-                return true;
+                return Err(format!(
+                    "user_value: {:?}\ndefault_value: {:?}",
+                    user_value, default_value
+                ));
             }
         }
-        false
+
+        Ok(true)
     }
 
     /// Get the names of fields that are different
@@ -216,7 +220,7 @@ mod tests {
         let config2 = config1.clone();
 
         let differ = DevnetDiffConfig::new();
-        assert!(!differ.has_differences(&config1, &config2));
+        assert!(differ.is_same(&config1, &config2).is_ok());
         assert!(differ.get_different_fields(&config1, &config2).is_empty());
     }
 
@@ -228,7 +232,7 @@ mod tests {
         user_config.pox_stacking_orders = vec![];
 
         let differ = DevnetDiffConfig::new();
-        assert!(differ.has_differences(&default_config, &user_config));
+        assert!(differ.is_same(&default_config, &user_config).is_err());
 
         let different_fields = differ.get_different_fields(&default_config, &user_config);
         assert_eq!(different_fields, ["epoch_3_0", "pox_stacking_orders"]);

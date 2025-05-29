@@ -82,12 +82,12 @@ async fn do_run_devnet(
 
     let default_config = DevnetConfig::default();
     let differ = DevnetDiffConfig::new();
-    let different_fields = differ.get_different_fields(&default_config, &devnet_config);
+    let different_fields = differ.is_same(&default_config, &devnet_config);
     let mut incompatible_config = false;
-    if !different_fields.is_empty() {
+    if let Err(e) = different_fields {
         let _ = devnet_events_tx.send(DevnetEvent::warning(format!(
-            "Default cache can not be used due to differing values in fields: {}",
-            different_fields.join(", ")
+            "Default cache can not be used:\n{}",
+            e
         )));
         incompatible_config = true
     }
