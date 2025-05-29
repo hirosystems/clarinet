@@ -1181,7 +1181,7 @@ impl Default for DevnetConfig {
             postgres_password: "postgres".to_string(),
             stacks_api_postgres_database: "stacks_api".to_string(),
             subnet_api_postgres_database: "subnet_api".to_string(),
-            pox_stacking_orders: vec![],
+            pox_stacking_orders: get_default_stacking_orders(),
             execute_script: vec![],
             bitcoin_node_image_url: DEFAULT_BITCOIN_NODE_IMAGE.to_string(),
             stacks_node_image_url: DEFAULT_STACKS_NODE_IMAGE.to_string(),
@@ -1235,6 +1235,26 @@ impl Default for DevnetConfig {
             docker_platform: DEFAULT_DOCKER_PLATFORM.to_string(),
         }
     }
+}
+
+pub fn get_default_stacking_orders() -> Vec<PoxStackingOrder> {
+    let accounts = [
+        ("wallet_1", "mr1iPkD9N3RJZZxXRk7xF9d36gffa6exNC"),
+        ("wallet_2", "muYdXKmX9bByAueDe6KFfHd5Ff1gdN9ErG"),
+        ("wallet_3", "mvZtbibDAAA3WLpY7zXXFqRa3T4XSknBX7"),
+    ];
+    let mut stacking_orders = vec![];
+    for (name, btc_address) in accounts {
+        stacking_orders.push(PoxStackingOrder {
+            auto_extend: Some(true),
+            duration: 10,
+            start_at_cycle: 1,
+            wallet: name.into(),
+            slots: 2,
+            btc_address: btc_address.to_owned(),
+        })
+    }
+    stacking_orders
 }
 
 pub fn compute_addresses(
