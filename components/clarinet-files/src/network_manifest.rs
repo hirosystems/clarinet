@@ -1239,18 +1239,19 @@ impl Default for DevnetConfig {
 
 pub fn get_default_stacking_orders() -> Vec<PoxStackingOrder> {
     let accounts = [
-        ("wallet_1", "mr1iPkD9N3RJZZxXRk7xF9d36gffa6exNC"),
-        ("wallet_2", "muYdXKmX9bByAueDe6KFfHd5Ff1gdN9ErG"),
-        ("wallet_3", "mvZtbibDAAA3WLpY7zXXFqRa3T4XSknBX7"),
+        ("stacker", "n3r661yy817HN3BZvec67XM1smryNTaizX", 10),
+        ("wallet_1", "mr1iPkD9N3RJZZxXRk7xF9d36gffa6exNC", 2),
+        ("wallet_2", "muYdXKmX9bByAueDe6KFfHd5Ff1gdN9ErG", 2),
+        ("wallet_3", "mvZtbibDAAA3WLpY7zXXFqRa3T4XSknBX7", 2),
     ];
     let mut stacking_orders = vec![];
-    for (name, btc_address) in accounts {
+    for (name, btc_address, slots) in accounts {
         stacking_orders.push(PoxStackingOrder {
             auto_extend: Some(true),
             duration: 10,
             start_at_cycle: 1,
             wallet: name.into(),
-            slots: 2,
+            slots,
             btc_address: btc_address.to_owned(),
         })
     }
