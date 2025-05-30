@@ -47,13 +47,12 @@ async fn do_run_lsp() -> Result<(), String> {
 }
 
 pub fn clarity_diagnostics_to_tower_lsp_type(
-    diagnostics: &mut [ClarityDiagnostic],
+    diagnostics: &[ClarityDiagnostic],
 ) -> Vec<tower_lsp::lsp_types::Diagnostic> {
-    let mut dst = vec![];
-    for d in diagnostics.iter_mut() {
-        dst.push(clarity_diagnostic_to_tower_lsp_type(d));
-    }
-    dst
+    diagnostics
+        .iter()
+        .map(clarity_diagnostic_to_tower_lsp_type)
+        .collect()
 }
 
 pub fn clarity_diagnostic_to_tower_lsp_type(
