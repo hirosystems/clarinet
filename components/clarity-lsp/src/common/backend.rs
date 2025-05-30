@@ -285,16 +285,14 @@ pub fn process_request(
             let file_url = params.text_document_position.text_document.uri;
             let position = params.text_document_position.position;
 
-            let contract_location = match get_contract_location(&file_url) {
-                Some(contract_location) => contract_location,
-                None => return Ok(LspRequestResponse::CompletionItems(vec![])),
+            let Some(contract_location) = get_contract_location(&file_url) else {
+                return Ok(LspRequestResponse::CompletionItems(vec![]));
             };
 
-            let completion_items = match editor_state
+            let Ok(completion_items) = editor_state
                 .try_read(|es| es.get_completion_items_for_contract(&contract_location, &position))
-            {
-                Ok(result) => result,
-                Err(_) => return Ok(LspRequestResponse::CompletionItems(vec![])),
+            else {
+                return Ok(LspRequestResponse::CompletionItems(vec![]));
             };
 
             Ok(LspRequestResponse::CompletionItems(completion_items))
@@ -302,9 +300,8 @@ pub fn process_request(
 
         LspRequest::Definition(params) => {
             let file_url = params.text_document_position_params.text_document.uri;
-            let contract_location = match get_contract_location(&file_url) {
-                Some(contract_location) => contract_location,
-                None => return Ok(LspRequestResponse::Definition(None)),
+            let Some(contract_location) = get_contract_location(&file_url) else {
+                return Ok(LspRequestResponse::Definition(None));
             };
             let position = params.text_document_position_params.position;
             let location = editor_state
@@ -315,9 +312,8 @@ pub fn process_request(
 
         LspRequest::SignatureHelp(params) => {
             let file_url = params.text_document_position_params.text_document.uri;
-            let contract_location = match get_contract_location(&file_url) {
-                Some(contract_location) => contract_location,
-                None => return Ok(LspRequestResponse::SignatureHelp(None)),
+            let Some(contract_location) = get_contract_location(&file_url) else {
+                return Ok(LspRequestResponse::SignatureHelp(None));
             };
             let position = params.text_document_position_params.position;
 
@@ -338,9 +334,8 @@ pub fn process_request(
 
         LspRequest::DocumentSymbol(params) => {
             let file_url = params.text_document.uri;
-            let contract_location = match get_contract_location(&file_url) {
-                Some(contract_location) => contract_location,
-                None => return Ok(LspRequestResponse::DocumentSymbol(vec![])),
+            let Some(contract_location) = get_contract_location(&file_url) else {
+                return Ok(LspRequestResponse::DocumentSymbol(vec![]));
             };
             let document_symbols = editor_state
                 .try_read(|es| es.get_document_symbols_for_contract(&contract_location))
@@ -349,16 +344,14 @@ pub fn process_request(
         }
         LspRequest::DocumentFormatting(param) => {
             let file_url = param.text_document.uri;
-            let contract_location = match get_contract_location(&file_url) {
-                Some(contract_location) => contract_location,
-                None => return Ok(LspRequestResponse::DocumentFormatting(None)),
+            let Some(contract_location) = get_contract_location(&file_url) else {
+                return Ok(LspRequestResponse::DocumentFormatting(None));
             };
 
-            let contract_data = match editor_state
-                .try_read(|es| es.active_contracts.get(&contract_location).cloned())
-            {
-                Ok(Some(data)) => data,
-                _ => return Ok(LspRequestResponse::DocumentFormatting(None)),
+            let Ok(Some(contract_data)) =
+                editor_state.try_read(|es| es.active_contracts.get(&contract_location).cloned())
+            else {
+                return Ok(LspRequestResponse::DocumentFormatting(None));
             };
             let source = &contract_data.source;
 
@@ -406,16 +399,14 @@ pub fn process_request(
         }
         LspRequest::DocumentRangeFormatting(param) => {
             let file_url = param.text_document.uri;
-            let contract_location = match get_contract_location(&file_url) {
-                Some(contract_location) => contract_location,
-                None => return Ok(LspRequestResponse::DocumentRangeFormatting(None)),
+            let Some(contract_location) = get_contract_location(&file_url) else {
+                return Ok(LspRequestResponse::DocumentRangeFormatting(None));
             };
 
-            let contract_data = match editor_state
-                .try_read(|es| es.active_contracts.get(&contract_location).cloned())
-            {
-                Ok(Some(data)) => data,
-                _ => return Ok(LspRequestResponse::DocumentRangeFormatting(None)),
+            let Ok(Some(contract_data)) =
+                editor_state.try_read(|es| es.active_contracts.get(&contract_location).cloned())
+            else {
+                return Ok(LspRequestResponse::DocumentRangeFormatting(None));
             };
 
             let source = &contract_data.source;
@@ -512,9 +503,8 @@ pub fn process_request(
 
         LspRequest::Hover(params) => {
             let file_url = params.text_document_position_params.text_document.uri;
-            let contract_location = match get_contract_location(&file_url) {
-                Some(contract_location) => contract_location,
-                None => return Ok(LspRequestResponse::Hover(None)),
+            let Some(contract_location) = get_contract_location(&file_url) else {
+                return Ok(LspRequestResponse::Hover(None));
             };
             let position = params.text_document_position_params.position;
             let hover_data = editor_state
@@ -522,7 +512,7 @@ pub fn process_request(
                 .unwrap_or_default();
             Ok(LspRequestResponse::Hover(hover_data))
         }
-        _ => Err(format!("Unexpected command: {:?}", &command)),
+        _ => Err(format!("Unexpected command: {command:?}")),
     }
 }
 
@@ -552,8 +542,7 @@ pub fn process_mutating_request(
                 })
         }
         _ => Err(format!(
-            "Unexpected command: {:?}, should not mutate state",
-            &command
+            "Unexpected command: {command:?}, should not mutate state"
         )),
     }
 }

@@ -369,9 +369,8 @@ impl Session {
     pub fn debug(&mut self, output: &mut Vec<String>, cmd: &str) {
         use crate::repl::debug::cli::CLIDebugger;
 
-        let snippet = match cmd.split_once(' ') {
-            Some((_, snippet)) => snippet,
-            _ => return output.push("Usage: ::debug <expr>".red().to_string()),
+        let Some((_, snippet)) = cmd.split_once(' ') else {
+            return output.push("Usage: ::debug <expr>".red().to_string());
         };
 
         let mut debugger = CLIDebugger::new(&QualifiedContractIdentifier::transient(), snippet);
@@ -398,9 +397,8 @@ impl Session {
     pub fn trace(&mut self, output: &mut Vec<String>, cmd: &str) {
         use super::tracer::Tracer;
 
-        let snippet = match cmd.split_once(' ') {
-            Some((_, snippet)) => snippet,
-            _ => return output.push("Usage: ::trace <expr>".red().to_string()),
+        let Some((_, snippet)) = cmd.split_once(' ') else {
+            return output.push("Usage: ::trace <expr>".red().to_string());
         };
 
         let mut tracer = Tracer::new(snippet.to_string());
@@ -430,12 +428,9 @@ impl Session {
         if !self.settings.initial_accounts.is_empty() {
             let mut initial_accounts = self.settings.initial_accounts.clone();
             for account in initial_accounts.drain(..) {
-                let recipient = match PrincipalData::parse(&account.address) {
-                    Ok(recipient) => recipient,
-                    _ => {
-                        output_err.push("Unable to parse address to credit".red().to_string());
-                        continue;
-                    }
+                let Ok(recipient) = PrincipalData::parse(&account.address) else {
+                    output_err.push("Unable to parse address to credit".red().to_string());
+                    continue;
                 };
 
                 match self
@@ -456,9 +451,8 @@ impl Session {
 
     #[cfg(not(target_arch = "wasm32"))]
     pub fn read(&mut self, output: &mut Vec<String>, cmd: &str) {
-        let filename = match cmd.split_once(' ') {
-            Some((_, filename)) => filename,
-            _ => return output.push("Usage: ::read <filename>".red().to_string()),
+        let Some((_, filename)) = cmd.split_once(' ') else {
+            return output.push("Usage: ::read <filename>".red().to_string());
         };
 
         match std::fs::read_to_string(filename) {
@@ -466,7 +460,7 @@ impl Session {
                 let _ = self.run_snippet(output, self.show_costs, &snippet);
             }
             Err(err) => output.push(
-                format!("unable to read {}: {}", filename, err)
+                format!("unable to read {filename}: {err}")
                     .red()
                     .to_string(),
             ),
@@ -806,9 +800,8 @@ impl Session {
 
     fn parse_and_advance_chain_tip(&mut self, command: &str) -> String {
         let args: Vec<_> = command.split(' ').skip(1).collect();
-        let count = match args.first().unwrap_or(&"1").parse::<u32>() {
-            Ok(count) => count,
-            _ => return format!("{}", "Unable to parse count".red()),
+        let Ok(count) = args.first().unwrap_or(&"1").parse::<u32>() else {
+            return format!("{}", "Unable to parse count".red());
         };
 
         let _ = self.advance_chain_tip(count);
@@ -823,9 +816,8 @@ impl Session {
 
     fn parse_and_advance_burn_chain_tip(&mut self, command: &str) -> String {
         let args: Vec<_> = command.split(' ').skip(1).collect();
-        let count = match args.first().unwrap_or(&"1").parse::<u32>() {
-            Ok(count) => count,
-            _ => return format!("{}", "Unable to parse count".red()),
+        let Ok(count) = args.first().unwrap_or(&"1").parse::<u32>() else {
+            return format!("{}", "Unable to parse count".red());
         };
 
         let _ = self.advance_burn_chain_tip(count);
@@ -840,9 +832,8 @@ impl Session {
 
     fn parse_and_advance_stacks_chain_tip(&mut self, command: &str) -> String {
         let args: Vec<_> = command.split(' ').skip(1).collect();
-        let count = match args.first().unwrap_or(&"1").parse::<u32>() {
-            Ok(count) => count,
-            _ => return format!("{}", "Unable to parse count".red()),
+        let Ok(count) = args.first().unwrap_or(&"1").parse::<u32>() else {
+            return format!("{}", "Unable to parse count".red());
         };
 
         match self.advance_stacks_chain_tip(count) {
@@ -865,10 +856,8 @@ impl Session {
         if current_epoch < StacksEpochId::Epoch30 {
             self.advance_burn_chain_tip(count)
         } else {
-            match self.advance_stacks_chain_tip(count) {
-                Ok(count) => count,
-                Err(_) => unreachable!("Epoch checked already"),
-            }
+            self.advance_stacks_chain_tip(count)
+                .expect("Epoch checked already")
         }
     }
 
@@ -980,9 +969,8 @@ impl Session {
     }
 
     pub fn encode(&mut self, cmd: &str) -> String {
-        let snippet = match cmd.split_once(' ') {
-            Some((_, snippet)) => snippet,
-            _ => return "Usage: ::encode <expr>".red().to_string(),
+        let Some((_, snippet)) = cmd.split_once(' ') else {
+            return "Usage: ::encode <expr>".red().to_string();
         };
 
         let result = self.eval(snippet.to_string(), false);
@@ -1021,18 +1009,17 @@ impl Session {
     }
 
     pub fn decode(&mut self, cmd: &str) -> String {
-        let byte_string = match cmd.split_once(' ') {
-            Some((_, bytes)) => bytes,
-            _ => return "Usage: ::decode <hex-bytes>".red().to_string(),
+        let Some((_, byte_string)) = cmd.split_once(' ') else {
+            return "Usage: ::decode <hex-bytes>".red().to_string();
         };
         let tx_bytes = match decode_hex(byte_string) {
             Ok(tx_bytes) => tx_bytes,
-            Err(e) => return format!("Parsing error: {}", e).red().to_string(),
+            Err(e) => return format!("Parsing error: {e}").red().to_string(),
         };
 
         let value = match Value::consensus_deserialize(&mut &tx_bytes[..]) {
             Ok(value) => value,
-            Err(e) => return format!("{}", e).red().to_string(),
+            Err(e) => return format!("{e}").red().to_string(),
         };
 
         format!("{}", value_to_string(&value).green())
@@ -1040,9 +1027,8 @@ impl Session {
 
     #[cfg(not(target_arch = "wasm32"))]
     pub fn get_costs(&mut self, output: &mut Vec<String>, cmd: &str) {
-        let expr = match cmd.split_once(' ') {
-            Some((_, expr)) => expr,
-            _ => return output.push("Usage: ::get_costs <expr>".red().to_string()),
+        let Some((_, expr)) = cmd.split_once(' ') else {
+            return output.push("Usage: ::get_costs <expr>".red().to_string());
         };
 
         let _ = self.run_snippet(output, true, expr);
@@ -1142,14 +1128,12 @@ impl Session {
                 .to_string();
         }
 
-        let recipient = match PrincipalData::parse(args[1]) {
-            Ok(address) => address,
-            _ => return "Unable to parse the address".red().to_string(),
+        let Ok(recipient) = PrincipalData::parse(args[1]) else {
+            return "Unable to parse the address".red().to_string();
         };
 
-        let amount: u64 = match args[2].parse() {
-            Ok(recipient) => recipient,
-            _ => return "Unable to parse the balance".red().to_string(),
+        let Ok(amount) = args[2].parse::<u64>() else {
+            return "Unable to parse the balance".red().to_string();
         };
 
         match self.interpreter.mint_stx_balance(recipient, amount) {
@@ -1772,15 +1756,13 @@ mod tests {
         session.advance_chain_tip(4);
 
         let result = run_session_snippet(&mut session, "(get-block-info? time u2)");
-        let time_block_1 = match result.expect_optional() {
-            Ok(Some(Value::UInt(time))) => time,
-            _ => panic!("Unexpected result"),
+        let Ok(Some(Value::UInt(time_block_1))) = result.expect_optional() else {
+            panic!("Unexpected result");
         };
 
         let result = run_session_snippet(&mut session, "(get-block-info? time u3)");
-        let time_block_2 = match result.expect_optional() {
-            Ok(Some(Value::UInt(time))) => time,
-            _ => panic!("Unexpected result"),
+        let Ok(Some(Value::UInt(time_block_2))) = result.expect_optional() else {
+            panic!("Unexpected result");
         };
 
         assert!(time_block_2 - time_block_1 == 600);

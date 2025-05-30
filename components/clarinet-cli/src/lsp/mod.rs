@@ -120,9 +120,7 @@ fn test_opening_counter_contract_should_return_fresh_analysis() {
 
     let _ = notification_tx.send(LspNotification::ContractOpened(contract_location.clone()));
     let response = response_rx.recv().expect("Unable to get response");
-    let response = if let LspResponse::Notification(response) = response {
-        response
-    } else {
+    let LspResponse::Notification(response) = response else {
         panic!("Unable to get response")
     };
 
@@ -134,9 +132,7 @@ fn test_opening_counter_contract_should_return_fresh_analysis() {
     // re-opening this contract should not trigger a full analysis
     let _ = notification_tx.send(LspNotification::ContractOpened(contract_location));
     let response = response_rx.recv().expect("Unable to get response");
-    let response = if let LspResponse::Notification(response) = response {
-        response
-    } else {
+    let LspResponse::Notification(response) = response else {
         panic!("Unable to get response")
     };
 
@@ -172,9 +168,7 @@ fn test_opening_counter_manifest_should_return_fresh_analysis() {
 
     let _ = notification_tx.send(LspNotification::ManifestOpened(manifest_location.clone()));
     let response = response_rx.recv().expect("Unable to get response");
-    let response = if let LspResponse::Notification(response) = response {
-        response
-    } else {
+    let LspResponse::Notification(response) = response else {
         panic!("Unable to get response")
     };
 
@@ -186,9 +180,7 @@ fn test_opening_counter_manifest_should_return_fresh_analysis() {
     // re-opening this manifest should not trigger a full analysis
     let _ = notification_tx.send(LspNotification::ManifestOpened(manifest_location));
     let response = response_rx.recv().expect("Unable to get response");
-    let response = if let LspResponse::Notification(response) = response {
-        response
-    } else {
+    let LspResponse::Notification(response) = response else {
         panic!("Unable to get response")
     };
     assert_eq!(response, LspNotificationResponse::default());
@@ -222,9 +214,7 @@ fn test_opening_simple_nft_manifest_should_return_fresh_analysis() {
         manifest_location,
     )));
     let response = response_rx.recv().expect("Unable to get response");
-    let response = if let LspResponse::Notification(response) = response {
-        response
-    } else {
+    let LspResponse::Notification(response) = response else {
         panic!("Unable to get response")
     };
 

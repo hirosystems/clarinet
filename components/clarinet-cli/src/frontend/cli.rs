@@ -1144,12 +1144,9 @@ pub fn main() {
             settings.repl_settings.analysis.enable_all_passes();
 
             let mut session = repl::Session::new(settings.clone());
-            let code_source = match fs::read_to_string(&file) {
-                Ok(code) => code,
-                _ => {
-                    eprintln!("{} unable to read file: '{}'", red!("error:"), file);
-                    std::process::exit(1);
-                }
+            let Ok(code_source) = fs::read_to_string(&file) else {
+                eprintln!("{} unable to read file: '{file}'", red!("error:"));
+                std::process::exit(1);
             };
             let contract_id = QualifiedContractIdentifier::transient();
             let epoch = DEFAULT_EPOCH;
@@ -1932,12 +1929,9 @@ fn devnet_start(cmd: DevnetStart, clarinetrc: ClarinetRC) {
     let result = match cmd.deployment_plan_path {
         None => {
             let res = if let Some(package) = cmd.package {
-                let package_file = match File::open(package) {
-                    Ok(file) => file,
-                    Err(_) => {
-                        eprintln!("{} package file not found", red!("error:"));
-                        std::process::exit(1);
-                    }
+                let Ok(package_file) = File::open(package) else {
+                    eprintln!("{} package file not found", red!("error:"));
+                    std::process::exit(1);
                 };
                 let deployment: ConfigurationPackage = serde_json::from_reader(package_file)
                     .expect("error while reading deployment specification");

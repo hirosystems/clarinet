@@ -228,20 +228,16 @@ impl CLIDebugger {
                 if arg_list.len() == 1 {
                     self.state.delete_all_breakpoints();
                 } else {
-                    let id = match arg_list[1].parse::<usize>() {
-                        Ok(id) => id,
-                        Err(_) => {
-                            println!("{}", format_err!("unable to parse breakpoint identifier"));
-                            return;
-                        }
+                    let Ok(id) = arg_list[1].parse::<usize>() else {
+                        println!("{}", format_err!("unable to parse breakpoint identifier"));
+                        return;
                     };
                     if self.state.delete_breakpoint(id) {
                         println!("breakpoint deleted");
                     } else {
                         println!(
-                            "{} '{}' is not a currently valid breakpoint id",
+                            "{} '{id}' is not a currently valid breakpoint id",
                             red!("error:"),
-                            id
                         );
                     }
                 }
@@ -295,13 +291,10 @@ impl CLIDebugger {
                         }
                     };
 
-                    let line = match parts[1].parse::<u32>() {
-                        Ok(line) => line,
-                        Err(_) => {
-                            println!("{}", format_err!("invalid breakpoint format"),);
-                            print_help_breakpoint();
-                            return;
-                        }
+                    let Ok(line) = parts[1].parse::<u32>() else {
+                        println!("{}", format_err!("invalid breakpoint format"),);
+                        print_help_breakpoint();
+                        return;
                     };
 
                     let column = if parts.len() == 3 {
@@ -412,7 +405,7 @@ impl CLIDebugger {
                     println!("No watchpoints set.")
                 } else {
                     for watchpoint in self.state.watchpoints.values() {
-                        println!("{}", watchpoint);
+                        println!("{watchpoint}");
                     }
                 }
             }
@@ -421,20 +414,16 @@ impl CLIDebugger {
                 if arg_list.len() == 1 {
                     self.state.delete_all_watchpoints();
                 } else {
-                    let id = match arg_list[1].parse::<usize>() {
-                        Ok(id) => id,
-                        Err(_) => {
-                            println!("{}", format_err!("unable to parse watchpoint identifier"));
-                            return;
-                        }
+                    let Ok(id) = arg_list[1].parse::<usize>() else {
+                        println!("{}", format_err!("unable to parse watchpoint identifier"));
+                        return;
                     };
                     if self.state.delete_watchpoint(id) {
                         println!("watchpoint deleted");
                     } else {
                         println!(
-                            "{} '{}' is not a currently valid watchpoint id",
+                            "{} '{id}' is not a currently valid watchpoint id",
                             red!("error:"),
-                            id
                         );
                     }
                 }
