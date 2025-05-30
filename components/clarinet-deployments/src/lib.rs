@@ -371,22 +371,17 @@ pub async fn generate_default_deployment(
 
     let deployment_fee_rate = network_manifest.network.deployment_fee_rate;
 
-    let default_deployer = match network_manifest.accounts.get("deployer") {
-        Some(deployer) => deployer,
-        None => {
-            return Err("unable to retrieve default deployer account".to_string());
-        }
+    let Some(default_deployer) = network_manifest.accounts.get("deployer") else {
+        return Err("unable to retrieve default deployer account".to_string());
     };
-    let default_deployer_address =
-        match PrincipalData::parse_standard_principal(&default_deployer.stx_address) {
-            Ok(res) => res,
-            Err(_) => {
-                return Err(format!(
-                    "unable to turn address {} as a valid Stacks address",
-                    default_deployer.stx_address
-                ))
-            }
-        };
+    let Ok(default_deployer_address) =
+        PrincipalData::parse_standard_principal(&default_deployer.stx_address)
+    else {
+        return Err(format!(
+            "unable to turn address {} as a valid Stacks address",
+            default_deployer.stx_address
+        ));
+    };
 
     let mut transactions = BTreeMap::new();
     let mut contracts_map = BTreeMap::new();
@@ -721,33 +716,26 @@ pub async fn generate_default_deployment(
     };
 
     for (name, contract_config) in manifest.contracts.iter() {
-        let contract_name = match ContractName::try_from(name.to_string()) {
-            Ok(res) => res,
-            Err(_) => return Err(format!("unable to use {} as a valid contract name", name)),
+        let Ok(contract_name) = ContractName::try_from(name.to_string()) else {
+            return Err(format!("unable to use {name} as a valid contract name"));
         };
 
         let deployer = match &contract_config.deployer {
             ContractDeployer::DefaultDeployer => default_deployer,
             ContractDeployer::LabeledDeployer(deployer) => {
-                let deployer = match network_manifest.accounts.get(deployer) {
-                    Some(deployer) => deployer,
-                    None => {
-                        return Err(format!("unable to retrieve account '{}'", deployer));
-                    }
+                let Some(deployer) = network_manifest.accounts.get(deployer) else {
+                    return Err(format!("unable to retrieve account '{deployer}'"));
                 };
                 deployer
             }
             _ => unreachable!(),
         };
 
-        let sender = match PrincipalData::parse_standard_principal(&deployer.stx_address) {
-            Ok(res) => res,
-            Err(_) => {
-                return Err(format!(
-                    "unable to turn emulated_sender {} as a valid Stacks address",
-                    deployer.stx_address
-                ))
-            }
+        let Ok(sender) = PrincipalData::parse_standard_principal(&deployer.stx_address) else {
+            return Err(format!(
+                "unable to turn emulated_sender {} as a valid Stacks address",
+                deployer.stx_address
+            ));
         };
 
         let mut contract_location = base_location.clone();

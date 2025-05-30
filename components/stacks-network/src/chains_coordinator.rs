@@ -705,13 +705,12 @@ pub async fn publish_stacking_orders(
             continue;
         }
 
-        let account = match accounts
+        let Some(account) = accounts
             .iter()
             .find(|e| e.label == pox_stacking_order.wallet)
             .cloned()
-        {
-            Some(account) => account,
-            _ => continue,
+        else {
+            continue;
         };
 
         transactions += 1;

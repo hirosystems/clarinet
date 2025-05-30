@@ -289,14 +289,11 @@ impl<'a> ASTDependencyDetector<'a> {
                 if contract_epoch < dep_epoch {
                     return Err(CheckErrors::NoSuchContract(dep.contract_id.to_string()).into());
                 }
-                let dep_id = match lookup.get(&dep.contract_id) {
-                    Some(id) => id,
-                    None => {
-                        // No need to report an error here, it will be caught
-                        // and reported with proper location information by the
-                        // later analyses. Just skip it.
-                        continue;
-                    }
+                let Some(dep_id) = lookup.get(&dep.contract_id) else {
+                    // No need to report an error here, it will be caught
+                    // and reported with proper location information by the
+                    // later analyses. Just skip it.
+                    continue;
                 };
                 graph.add_directed_edge(*contract_id, *dep_id);
             }
@@ -448,9 +445,8 @@ impl<'a> ASTDependencyDetector<'a> {
         // Since this may run before checkers, the function may not be valid.
         // If the key does not exist, just return an empty set and the error
         // will be reported elsewhere.
-        let function_signature = match trait_definition.get(function_name) {
-            Some(signature) => signature,
-            None => return BTreeSet::new(),
+        let Some(function_signature) = trait_definition.get(function_name) else {
+            return BTreeSet::new();
         };
         self.check_callee_type(&function_signature.args, args)
     }
@@ -458,9 +454,8 @@ impl<'a> ASTDependencyDetector<'a> {
     // A trait can only come from a parameter (cannot be a let binding or a return value), so
     // find the corresponding parameter and return it.
     fn get_param_trait(&self, name: &ClarityName) -> Option<&'a TraitIdentifier> {
-        let params = match &self.params {
-            None => return None,
-            Some(params) => params,
+        let Some(params) = &self.params else {
+            return None;
         };
         for param in params {
             if param.name == name {

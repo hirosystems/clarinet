@@ -36,9 +36,8 @@ impl EvalHook for Tracer {
         context: &LocalContext,
         expr: &SymbolicExpression,
     ) {
-        let list = match &expr.expr {
-            List(list) => list,
-            _ => return,
+        let List(list) = &expr.expr else {
+            return;
         };
         if let Some((function_name, args)) = list.split_first() {
             if let Some(function_name) = function_name.match_atom() {

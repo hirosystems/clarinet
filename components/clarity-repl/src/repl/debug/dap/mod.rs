@@ -346,29 +346,23 @@ impl DAPDebugger {
 
     fn launch(&mut self, seq: i64, arguments: LaunchRequestArguments) -> bool {
         // Verify that the manifest and expression were specified
-        let manifest = match arguments.manifest {
-            Some(manifest) => manifest,
-            None => {
-                self.send_response(Response {
-                    request_seq: seq,
-                    success: false,
-                    message: Some("manifest must be specified".to_string()),
-                    body: None,
-                });
-                return false;
-            }
+        let Some(manifest) = arguments.manifest else {
+            self.send_response(Response {
+                request_seq: seq,
+                success: false,
+                message: Some("manifest must be specified".to_string()),
+                body: None,
+            });
+            return false;
         };
-        let expression = match arguments.expression {
-            Some(expression) => expression,
-            None => {
-                self.send_response(Response {
-                    request_seq: seq,
-                    success: false,
-                    message: Some("expression to debug must be specified".to_string()),
-                    body: None,
-                });
-                return false;
-            }
+        let Some(expression) = arguments.expression else {
+            self.send_response(Response {
+                request_seq: seq,
+                success: false,
+                message: Some("expression to debug must be specified".to_string()),
+                body: None,
+            });
+            return false;
         };
 
         let contract_id = QualifiedContractIdentifier::transient();
@@ -402,24 +396,21 @@ impl DAPDebugger {
     fn set_breakpoints(&mut self, seq: i64, arguments: SetBreakpointsArguments) -> bool {
         let mut results = vec![];
         if let Some(breakpoints) = arguments.breakpoints {
-            let contract_id = match self
+            let Some(contract_id) = self
                 .path_to_contract_id
                 .get(&PathBuf::from(arguments.source.path.as_ref().unwrap()))
-            {
-                Some(contract_id) => contract_id,
-                None => {
-                    self.send_response(Response {
-                        request_seq: seq,
-                        success: false,
-                        message: Some(format!(
-                            "contract not found for path {}\nmap: {:?}",
-                            arguments.source.path.clone().unwrap(),
-                            self.path_to_contract_id
-                        )),
-                        body: None,
-                    });
-                    return false;
-                }
+            else {
+                self.send_response(Response {
+                    request_seq: seq,
+                    success: false,
+                    message: Some(format!(
+                        "contract not found for path {}\nmap: {:?}",
+                        arguments.source.path.clone().unwrap(),
+                        self.path_to_contract_id
+                    )),
+                    body: None,
+                });
+                return false;
             };
             let source = super::Source {
                 name: contract_id.clone(),
@@ -650,14 +641,9 @@ impl DAPDebugger {
         env: Option<&mut Environment>,
         context: Option<&LocalContext>,
     ) -> bool {
-        let (env, context) = match (env, context) {
-            (Some(env), Some(context)) => (env, context),
-            _ => {
-                self.log(
-                    "cannot evaluate an expression before initialization is complete".to_string(),
-                );
-                return true;
-            }
+        let (Some(env), Some(context)) = (env, context) else {
+            self.log("cannot evaluate an expression before initialization is complete");
+            return true;
         };
 
         // Evaluate expressions coming from the `watch` context are handled

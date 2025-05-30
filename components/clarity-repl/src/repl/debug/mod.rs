@@ -367,9 +367,8 @@ impl DebugState {
                     continue;
                 }
 
-                let breakpoint = match self.breakpoints.get(id) {
-                    Some(breakpoint) => breakpoint,
-                    None => panic!("internal error: breakpoint {} not found", id),
+                let Some(breakpoint) = self.breakpoints.get(id) else {
+                    panic!("internal error: breakpoint {} not found", id);
                 };
 
                 if let Some(break_span) = &breakpoint.span {
@@ -430,12 +429,8 @@ impl DebugState {
                                 let key = (contract_id.clone(), name);
                                 if let Some(set) = self.watch_variables.get(&key) {
                                     for id in set {
-                                        let watchpoint = match self.watchpoints.get(id) {
-                                            Some(watchpoint) => watchpoint,
-                                            None => panic!(
-                                                "internal error: watchpoint {} not found",
-                                                id
-                                            ),
+                                        let Some(watchpoint) = self.watchpoints.get(id) else {
+                                            panic!("internal error: watchpoint {} not found", id);
                                         };
 
                                         if let BreakpointData::Data(data) = &watchpoint.data {

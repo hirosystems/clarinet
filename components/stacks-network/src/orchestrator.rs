@@ -955,9 +955,8 @@ rpcport={bitcoin_node_rpc_port}
             ..Default::default()
         });
 
-        let docker = match &self.docker_client {
-            Some(ref docker) => docker,
-            _ => panic!("unable to get Docker client"),
+        let Some(docker) = &self.docker_client else {
+            panic!("unable to get Docker client");
         };
         let res = docker.list_containers(options).await;
         let containers = match res {
@@ -970,9 +969,8 @@ rpcport={bitcoin_node_rpc_port}
         let options = KillContainerOptions { signal: "SIGKILL" };
 
         for container in containers.iter() {
-            let container_id = match &container.id {
-                Some(id) => id,
-                None => continue,
+            let Some(container_id) = &container.id else {
+                continue;
             };
             let _ = docker
                 .kill_container(container_id, Some(options.clone()))
@@ -993,9 +991,8 @@ rpcport={bitcoin_node_rpc_port}
             _ => return Err("unable to boot container".to_string()),
         };
 
-        let docker = match &self.docker_client {
-            Some(ref docker) => docker,
-            _ => return Err("unable to get Docker client".into()),
+        let Some(docker) = &self.docker_client else {
+            return Err("unable to get Docker client".into());
         };
 
         docker
@@ -1353,9 +1350,8 @@ start_height = {epoch_3_1}
             _ => return Err("unable to boot container".to_string()),
         };
 
-        let docker = match &self.docker_client {
-            Some(ref docker) => docker,
-            _ => return Err("unable to get Docker client".into()),
+        let Some(docker) = &self.docker_client else {
+            return Err("unable to get Docker client".into());
         };
 
         docker
@@ -1760,9 +1756,8 @@ events_keys = ["*"]
             _ => return Err("unable to boot container".to_string()),
         };
 
-        let docker = match &self.docker_client {
-            Some(ref docker) => docker,
-            _ => return Err("unable to get Docker client".into()),
+        let Some(docker) = &self.docker_client else {
+            return Err("unable to get Docker client".into());
         };
 
         docker
@@ -1884,9 +1879,8 @@ events_keys = ["*"]
             _ => return Err("unable to boot container".to_string()),
         };
 
-        let docker = match &self.docker_client {
-            Some(ref docker) => docker,
-            _ => return Err("unable to get Docker client".into()),
+        let Some(docker) = &self.docker_client else {
+            return Err("unable to get Docker client".into());
         };
 
         docker
@@ -2048,9 +2042,8 @@ events_keys = ["*"]
             _ => return Err("unable to boot container".to_string()),
         };
 
-        let docker = match &self.docker_client {
-            Some(ref docker) => docker,
-            _ => return Err("unable to get Docker client".into()),
+        let Some(docker) = &self.docker_client else {
+            return Err("unable to get Docker client".into());
         };
 
         docker
@@ -2141,9 +2134,8 @@ events_keys = ["*"]
             _ => return Err("unable to boot container".to_string()),
         };
 
-        let docker = match &self.docker_client {
-            Some(ref docker) => docker,
-            _ => return Err("unable to get Docker client".into()),
+        let Some(docker) = &self.docker_client else {
+            return Err("unable to get Docker client".into());
         };
 
         docker
@@ -2252,9 +2244,8 @@ events_keys = ["*"]
             _ => return Err("unable to boot container".to_string()),
         };
 
-        let docker = match &self.docker_client {
-            Some(ref docker) => docker,
-            _ => return Err("unable to get Docker client".into()),
+        let Some(docker) = &self.docker_client else {
+            return Err("unable to get Docker client".into());
         };
 
         docker
@@ -2372,9 +2363,8 @@ events_keys = ["*"]
             _ => return Err("unable to boot container".to_string()),
         };
 
-        let docker = match &self.docker_client {
-            Some(ref docker) => docker,
-            _ => return Err("unable to get Docker client".into()),
+        let Some(docker) = &self.docker_client else {
+            return Err("unable to get Docker client".into());
         };
 
         docker
@@ -2409,9 +2399,8 @@ events_keys = ["*"]
             postgres_c_id,
         ) = containers_ids;
 
-        let docker = match &self.docker_client {
-            Some(ref docker) => docker,
-            _ => return Err("unable to get Docker client".into()),
+        let Some(docker) = &self.docker_client else {
+            return Err("unable to get Docker client".into());
         };
 
         let options = KillContainerOptions { signal: "SIGKILL" };
@@ -2469,9 +2458,8 @@ events_keys = ["*"]
         let (stacks_api_c_id, stacks_explorer_c_id, bitcoin_explorer_c_id, postgres_c_id) =
             containers_ids;
 
-        let docker = match &self.docker_client {
-            Some(ref docker) => docker,
-            _ => return Err("unable to get Docker client".into()),
+        let Some(docker) = &self.docker_client else {
+            return Err("unable to get Docker client".into());
         };
 
         // TODO(lgalabru): should we spawn
@@ -2607,9 +2595,8 @@ events_keys = ["*"]
     }
 
     pub async fn prune(&self) {
-        let docker = match &self.docker_client {
-            Some(ref docker) => docker,
-            _ => return,
+        let Some(docker) = &self.docker_client else {
+            return;
         };
 
         let mut filters = HashMap::new();

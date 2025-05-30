@@ -52,9 +52,8 @@ fn get_deployments_files(
     let mut project_dir = project_root_location.clone();
     let prefix_len = project_dir.to_string().len() + 1;
     project_dir.append_path("deployments")?;
-    let paths = match fs::read_dir(project_dir.to_string()) {
-        Ok(paths) => paths,
-        Err(_) => return Ok(vec![]),
+    let Ok(paths) = fs::read_dir(project_dir.to_string()) else {
+        return Ok(vec![]);
     };
     let mut plans_paths = vec![];
     for path in paths {

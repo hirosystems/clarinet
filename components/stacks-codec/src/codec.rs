@@ -3234,11 +3234,8 @@ impl StacksMessageCodec for TransactionPayload {
             TransactionPayloadID::CoinbaseToAltRecipient => {
                 let payload: CoinbasePayload = read_next(fd)?;
                 let principal_value: Value = read_next(fd)?;
-                let recipient = match principal_value {
-                    Value::Principal(recipient_principal) => recipient_principal,
-                    _ => {
-                        return Err(CodecError::DeserializeError("Failed to parse coinbase transaction -- did not receive a recipient principal value".to_string()));
-                    }
+                let Value::Principal(recipient) = principal_value else {
+                    return Err(CodecError::DeserializeError("Failed to parse coinbase transaction -- did not receive a recipient principal value".to_string()));
                 };
 
                 TransactionPayload::Coinbase(payload, Some(recipient), None)

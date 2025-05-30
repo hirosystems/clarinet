@@ -884,12 +884,11 @@ impl StacksDevnet {
 
         let _ = devnet.mining_tx.send(BitcoinMiningCommand::Mine);
 
-        let blocks = match devnet
+        let Ok(blocks) = devnet
             .stacks_block_rx
             .recv_timeout(std::time::Duration::from_millis(timeout))
-        {
-            Ok(obj) => obj,
-            Err(_) => return Ok(cx.undefined().as_value(&mut cx)),
+        else {
+            return Ok(cx.undefined().as_value(&mut cx));
         };
 
         let js_blocks = serde::to_value(&mut cx, &blocks).expect("Unable to serialize block");
@@ -904,12 +903,11 @@ impl StacksDevnet {
 
         let _ = devnet.mining_tx.send(BitcoinMiningCommand::Mine);
 
-        let block = match devnet
+        let Ok(block) = devnet
             .bitcoin_block_rx
             .recv_timeout(std::time::Duration::from_secs(10))
-        {
-            Ok(obj) => obj,
-            Err(_) => return Ok(cx.undefined().as_value(&mut cx)),
+        else {
+            return Ok(cx.undefined().as_value(&mut cx));
         };
 
         let js_block = serde::to_value(&mut cx, &block).expect("Unable to serialize block");

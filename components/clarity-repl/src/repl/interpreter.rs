@@ -473,14 +473,13 @@ impl ClarityInterpreter {
                 if let List(expression) = &contract_ast.expressions[0].expr {
                     if let Atom(name) = &expression[0].expr {
                         if name.to_string() == "contract-call?" {
-                            let contract_id = match expression[1]
+                            let Ok(PrincipalData::Contract(contract_id)) = expression[1]
                                 .match_literal_value()
                                 .unwrap()
                                 .clone()
                                 .expect_principal()
-                            {
-                                Ok(PrincipalData::Contract(contract_id)) => contract_id,
-                                _ => unreachable!(),
+                            else {
+                                unreachable!();
                             };
                             let method = expression[2].match_atom().unwrap().to_string();
                             let mut args = vec![];
@@ -679,14 +678,13 @@ impl ClarityInterpreter {
                 if let List(expression) = &contract_ast.expressions[0].expr {
                     if let Atom(name) = &expression[0].expr {
                         if name.to_string() == "contract-call?" {
-                            let contract_id = match expression[1]
+                            let Ok(PrincipalData::Contract(contract_id)) = expression[1]
                                 .match_literal_value()
                                 .unwrap()
                                 .clone()
                                 .expect_principal()
-                            {
-                                Ok(PrincipalData::Contract(contract_id)) => contract_id,
-                                _ => unreachable!(),
+                            else {
+                                unreachable!();
                             };
                             let method = expression[2].match_atom().unwrap().to_string();
                             let mut args = vec![];
@@ -712,7 +710,7 @@ impl ClarityInterpreter {
                             ) {
                                 Ok(res) => res,
                                 Err(e) => {
-                                    println!("Error while calling function: {:?}", e);
+                                    println!("Error while calling function: {e:?}");
                                     return Err(e);
                                 }
                             };
@@ -1953,9 +1951,8 @@ mod tests {
             "(get-tenure-info? time u2)",
             ClarityVersion::Clarity3,
         );
-        let time_block_1 = match snippet_1.expect_optional() {
-            Ok(Some(Value::UInt(time))) => time,
-            _ => panic!("Unexpected result"),
+        let Ok(Some(Value::UInt(time_block_1))) = snippet_1.expect_optional() else {
+            panic!("Unexpected result");
         };
 
         let snippet_2 = run_snippet(
@@ -1963,9 +1960,8 @@ mod tests {
             "(get-tenure-info? time u3)",
             ClarityVersion::Clarity3,
         );
-        let time_block_2 = match snippet_2.expect_optional() {
-            Ok(Some(Value::UInt(time))) => time,
-            _ => panic!("Unexpected result"),
+        let Ok(Some(Value::UInt(time_block_2))) = snippet_2.expect_optional() else {
+            panic!("Unexpected result");
         };
         assert_eq!(time_block_2 - time_block_1, 600);
     }
@@ -1982,9 +1978,8 @@ mod tests {
             "(get-tenure-info? time (- stacks-block-height u1))",
             ClarityVersion::Clarity3,
         );
-        let last_tenure_time = match snippet_1.expect_optional() {
-            Ok(Some(Value::UInt(time))) => time,
-            _ => panic!("Unexpected result"),
+        let Ok(Some(Value::UInt(last_tenure_time))) = snippet_1.expect_optional() else {
+            panic!("Unexpected result");
         };
 
         let snippet_2 = run_snippet(
@@ -1992,9 +1987,8 @@ mod tests {
             "(get-stacks-block-info? time (- stacks-block-height u1))",
             ClarityVersion::Clarity3,
         );
-        let last_stacks_block_time = match snippet_2.expect_optional() {
-            Ok(Some(Value::UInt(time))) => time,
-            _ => panic!("Unexpected result"),
+        let Ok(Some(Value::UInt(last_stacks_block_time))) = snippet_2.expect_optional() else {
+            panic!("Unexpected result");
         };
         assert_eq!((last_stacks_block_time) - (last_tenure_time), 10);
     }
@@ -2011,9 +2005,8 @@ mod tests {
             "(get-stacks-block-info? time u2)",
             ClarityVersion::Clarity3,
         );
-        let time_block_1 = match snippet_1.expect_optional() {
-            Ok(Some(Value::UInt(time))) => time,
-            _ => panic!("Unexpected result"),
+        let Ok(Some(Value::UInt(time_block_1))) = snippet_1.expect_optional() else {
+            panic!("Unexpected result");
         };
 
         let snippet_2 = run_snippet(
@@ -2021,9 +2014,8 @@ mod tests {
             "(get-stacks-block-info? time u3)",
             ClarityVersion::Clarity3,
         );
-        let time_block_2 = match snippet_2.expect_optional() {
-            Ok(Some(Value::UInt(time))) => time,
-            _ => panic!("Unexpected result"),
+        let Ok(Some(Value::UInt(time_block_2))) = snippet_2.expect_optional() else {
+            panic!("Unexpected result");
         };
         assert_eq!(time_block_2 - time_block_1, 10);
     }
@@ -2043,9 +2035,8 @@ mod tests {
             "(get-stacks-block-info? time u1)",
             ClarityVersion::Clarity3,
         );
-        let stacks_block_time_1 = match snippet_1.expect_optional() {
-            Ok(Some(Value::UInt(time))) => time,
-            _ => panic!("Unexpected result"),
+        let Ok(Some(Value::UInt(stacks_block_time_1))) = snippet_1.expect_optional() else {
+            panic!("Unexpected result");
         };
 
         let snippet_2 = run_snippet(
@@ -2053,9 +2044,8 @@ mod tests {
             "(get-stacks-block-info? time u101)",
             ClarityVersion::Clarity3,
         );
-        let stacks_block_time_2 = match snippet_2.expect_optional() {
-            Ok(Some(Value::UInt(time))) => time,
-            _ => panic!("Unexpected result"),
+        let Ok(Some(Value::UInt(stacks_block_time_2))) = snippet_2.expect_optional() else {
+            panic!("Unexpected result");
         };
         assert_eq!(stacks_block_time_2 - stacks_block_time_1, 1000);
 
@@ -2067,9 +2057,8 @@ mod tests {
             "(get-tenure-info? time u4)",
             ClarityVersion::Clarity3,
         );
-        let tenure_height_1 = match snippet_3.expect_optional() {
-            Ok(Some(Value::UInt(time))) => time,
-            _ => panic!("Unexpected result"),
+        let Ok(Some(Value::UInt(tenure_height_1))) = snippet_3.expect_optional() else {
+            panic!("Unexpected result");
         };
 
         let snippet_4 = run_snippet(
@@ -2077,9 +2066,8 @@ mod tests {
             "(get-tenure-info? time (- stacks-block-height u1))",
             ClarityVersion::Clarity3,
         );
-        let tenure_height_2 = match snippet_4.expect_optional() {
-            Ok(Some(Value::UInt(time))) => time,
-            _ => panic!("Unexpected result"),
+        let Ok(Some(Value::UInt(tenure_height_2))) = snippet_4.expect_optional() else {
+            panic!("Unexpected result");
         };
 
         assert_eq!(1030, tenure_height_2 - tenure_height_1);
