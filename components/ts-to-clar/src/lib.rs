@@ -34,16 +34,6 @@ fn extract_bin_op(op: swc_ecma_ast::BinaryOp) -> &'static str {
     }
 }
 
-impl AstVisitor {
-    fn extract_ident_or_num(expr: &Expr) -> String {
-        match expr {
-            Expr::Ident(ident) => ident.sym.to_string(),
-            Expr::Lit(swc_ecma_ast::Lit::Num(num)) => num.value.to_string(),
-            _ => "unknown".to_string(),
-        }
-    }
-}
-
 impl Visit for AstVisitor {
     fn visit_var_decl(&mut self, var: &swc_ecma_ast::VarDecl) {
         for decl in &var.decls {
@@ -51,7 +41,6 @@ impl Visit for AstVisitor {
                 if let Some(id) = &decl.name.as_ident() {
                     let var_name = id.sym.to_string();
 
-                    // Try to extract type information
                     let type_ann = id
                         .type_ann
                         .as_ref()
@@ -102,9 +91,20 @@ impl Visit for AstVisitor {
                                         match &**first {
                                             swc_ecma_ast::TsType::TsTypeRef(type_ref) => {
                                                 if let swc_ecma_ast::TsEntityName::Ident(type_ident) = &type_ref.type_name {
-                                                    // Handle StringAscii<N> generics
+                                                    // Handle ClBuffer<N> generics
+                                                    if type_ident.sym == "ClBuffer" {
+                                                        if let Some(type_params) = &type_ref.type_params {
+                                                            if let Some(param) = type_params.params.first() {
+                                                                if let swc_ecma_ast::TsType::TsLitType(lit_type) = &**param {
+                                                                    if let swc_ecma_ast::TsLit::Number(num_lit) = &lit_type.lit {
+                                                                        return format!("(buff {})", num_lit.value as i64);
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                    // Handle StringAscii<N> and StringUtf8<N> generics
                                                     if type_ident.sym == "StringAscii" || type_ident.sym == "StringUtf8" {
-                                                        // Check for type parameters
                                                         if let Some(type_params) = &type_ref.type_params {
                                                             if let Some(param) = type_params.params.first() {
                                                                 if let swc_ecma_ast::TsType::TsLitType(lit_type) = &**param {
@@ -139,6 +139,28 @@ impl Visit for AstVisitor {
                                             }
                                         }
                                         Expr::Lit(swc_ecma_ast::Lit::Str(s)) => s.value.to_string(),
+                                        Expr::New(new_inner) => {
+                                            // Handle new Uint8Array([...]) for ClBuffer
+                                            if let Some(inner_ident) = new_inner.callee.as_ident() {
+                                                if inner_ident.sym == "Uint8Array" && type_arg.starts_with("(buff ") {
+                                                    new_inner.args
+                                                        .as_ref()
+                                                        .and_then(|args| args.first())
+                                                        .and_then(|array_arg| {
+                                                            if let Expr::Array(arr) = &*array_arg.expr {
+                                                                Some(ts_uint_to_clar_buff(arr))
+                                                            } else {
+                                                                None
+                                                            }
+                                                        })
+                                                        .unwrap_or_else(|| "unknown".to_string())
+                                                } else {
+                                                    "unknown".to_string()
+                                                }
+                                            } else {
+                                                "unknown".to_string()
+                                            }
+                                        }
                                         _ => "unknown".to_string(),
                                     }
                                 } else {
@@ -170,16 +192,9 @@ impl Visit for AstVisitor {
                             call_expr.args.first().and_then(|arg| arg.expr.as_ident())
                         {
                             if let Some(value_expr) = call_expr.args.get(1).map(|arg| &*arg.expr) {
-                                let value = match value_expr {
-                                    Expr::Bin(bin_expr) => {
-                                        let left = Self::extract_ident_or_num(&bin_expr.left);
-                                        let right = Self::extract_ident_or_num(&bin_expr.right);
-                                        let op = extract_bin_op(bin_expr.op);
-                                        format!("({} {} {})", op, left, right)
-                                    }
-                                    Expr::Lit(swc_ecma_ast::Lit::Num(num)) => num.value.to_string(),
-                                    _ => "unknown".to_string(),
-                                };
+                                // Use expr_to_clarity for any kind of expression
+                                let value = expr_to_clarity(value_expr, &self.data_vars, None)
+                                    .unwrap_or_else(|| "unknown".to_string());
                                 self.var_set_calls.push((var_ident.sym.to_string(), value));
                             }
                         }
@@ -328,6 +343,33 @@ fn stmt_to_clarity(
     }
 }
 
+fn ts_type_to_clarity_type(
+    type_name: &str,
+    type_params: Option<&swc_ecma_ast::TsTypeParamInstantiation>,
+) -> String {
+    match type_name {
+        "Uint" => "uint".to_string(),
+        "Int" => "int".to_string(),
+        "StringAscii" | "StringUtf8" => {
+            if let Some(params) = type_params {
+                if let Some(param) = params.params.first() {
+                    if let swc_ecma_ast::TsType::TsLitType(lit_type) = &**param {
+                        if let swc_ecma_ast::TsLit::Number(num_lit) = &lit_type.lit {
+                            return format!(
+                                "({} {})",
+                                type_name.to_lowercase(),
+                                num_lit.value as i64
+                            );
+                        }
+                    }
+                }
+            }
+            format!("({} N)", type_name.to_lowercase())
+        }
+        _ => type_name.to_lowercase(),
+    }
+}
+
 fn fn_to_clarity(
     fn_decl: &swc_ecma_ast::FnDecl,
     data_vars: &[(String, String, String)],
@@ -339,40 +381,35 @@ fn fn_to_clarity(
         .params
         .iter()
         .filter_map(|param| {
-            // param: &swc_ecma_ast::Param
             if let swc_ecma_ast::Pat::Ident(binding_ident) = &param.pat {
                 let param_name = helper::to_kebab_case(&binding_ident.id.sym);
-                let param_type = binding_ident
-                    .type_ann
-                    .as_ref()
-                    .and_then(|ann| {
-                        if let swc_ecma_ast::TsType::TsTypeRef(type_ref) = &*ann.type_ann {
-                            if let swc_ecma_ast::TsEntityName::Ident(type_ident) =
-                                &type_ref.type_name
-                            {
-                                Some(type_ident.sym.to_string())
-                            } else {
-                                None
+                let type_info =
+                    binding_ident
+                        .type_ann
+                        .as_ref()
+                        .and_then(|ann| match &*ann.type_ann {
+                            swc_ecma_ast::TsType::TsTypeRef(type_ref) => {
+                                match &type_ref.type_name {
+                                    swc_ecma_ast::TsEntityName::Ident(type_ident) => Some((
+                                        type_ident.sym.as_ref(),
+                                        type_ref.type_params.as_ref(),
+                                    )),
+                                    _ => None,
+                                }
                             }
-                        } else {
-                            None
-                        }
-                    })
-                    .unwrap_or_else(|| "unknown".to_string());
-                // Map TS types to Clarity types
-                let clarity_type = match param_type.as_str() {
-                    "Uint" => "uint",
-                    "Int" => "int",
-                    "StringAscii" => "(string-ascii N)", // TODO: handle generics
-                    "StringUtf8" => "(string-utf8 N)",   // TODO: handle generics
-                    _ => "unknown",
-                };
+                            _ => None,
+                        });
+                let clarity_type = ts_type_to_clarity_type(
+                    type_info.map_or("unknown", |(name, _)| name),
+                    type_info.and_then(|(_, params)| params).map(|v| &**v),
+                );
                 Some(format!("({} {})", param_name, clarity_type))
             } else {
                 None
             }
         })
         .collect();
+
     let params_str = if !params.is_empty() {
         format!(" {}", params.join(" "))
     } else {
@@ -466,9 +503,7 @@ fn parse_ts(file_name: &str, src: &str) -> Result<Module, swc_ecma_parser::error
 
     let fm = cm.new_source_file(FileName::Custom(file_name.into()).into(), src.into());
     let lexer = Lexer::new(
-        // We want to parse ecmascript
         Syntax::Typescript(Default::default()),
-        // EsVersion defaults to es5
         Default::default(),
         StringInput::from(&*fm),
         None,
@@ -494,6 +529,23 @@ fn visit_ts_ast(
 
     module.visit_with(&mut visitor);
     Ok(visitor)
+}
+
+fn ts_uint_to_clar_buff(arr: &swc_ecma_ast::ArrayLit) -> String {
+    let hex_string: String = arr
+        .elems
+        .iter()
+        .filter_map(|el| {
+            el.as_ref().and_then(|el| {
+                if let Expr::Lit(swc_ecma_ast::Lit::Num(num)) = &*el.expr {
+                    Some(format!("{:02x}", num.value as u8))
+                } else {
+                    None
+                }
+            })
+        })
+        .collect();
+    format!("0x{}", hex_string)
 }
 
 pub fn transpile(file_name: &str, src: &str) -> Result<String, swc_ecma_parser::error::Error> {
@@ -548,6 +600,11 @@ mod test {
             "const tokenName = new DataVar<StringUtf8<64>>(\"sBTC\");",
             "(define-data-var token-name (string-utf8 64) u\"sBTC\")\n",
         );
+
+        simple_source_check(
+            "const currentAggregatePubkey = new DataVar<ClBuffer<33>>(new Uint8Array([10, 1]));",
+            "(define-data-var current-aggregate-pubkey (buff 33) 0x0a01)\n",
+        );
     }
 
     #[test]
@@ -559,7 +616,6 @@ mod test {
 
     #[test]
     fn can_infer_types() {
-        // handle both Uint and Init based on the DataVar type
         let ts_source = "const count = new DataVar<Uint>(1);\ncount.set(count.get() + 1);";
         let expected = "(define-data-var count uint u1)\n(var-set count (+ (var-get count) u1))";
         simple_source_check(ts_source, expected);
