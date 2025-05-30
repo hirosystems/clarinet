@@ -1196,7 +1196,7 @@ impl<'a> Aggregator<'a> {
             }
         }
         // TODO: this should ignore comment length
-        for expr in list.iter() {
+        for (i, expr) in list.iter().enumerate() {
             let indented = if first_on_line {
                 &base_indent
             } else {
@@ -1211,9 +1211,17 @@ impl<'a> Aggregator<'a> {
                 // Don't break before an opening brace of a map
                 let is_map_opening = trimmed.starts_with("{");
 
-                // Only add line break if necessary and not breaking before a map opening
-                if !is_map_opening
-                    && (current_line_width + expr_width + 1 > self.settings.max_line_length)
+                // Check if the current expression is on a different line than the previous one
+                // in the original source code
+                let on_different_line_in_source =
+                    // i - 1 index is fine here because we're withing !first_on_line
+                    is_comment(expr) && list[i - 1].span().start_line != expr.span().start_line;
+
+                // Add line break if comment was on different lines in source
+                // or if the line would be too long
+                if on_different_line_in_source
+                    || (!is_map_opening
+                        && (current_line_width + expr_width + 1 > self.settings.max_line_length))
                 {
                     result.push('\n');
                     result.push_str(&base_indent);
@@ -2029,5 +2037,18 @@ mod tests_formatter {
         let formatter = ClarityFormatter::new(Settings::default());
         let result = formatter.format_ast(&ast);
         assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn retain_comment_newlines() {
+        let src = r#"(senderBalance (unwrap!
+  (at-block proposalBlockHash
+    ;; /g/.aibtc-faktory/dao_contract_token
+    (contract-call? .aibtc-faktory get-balance contract-caller)
+  )
+  ERR_FETCHING_TOKEN_DATA
+))"#;
+        let result = format_with_default(src);
+        assert_eq!(src, result);
     }
 }
