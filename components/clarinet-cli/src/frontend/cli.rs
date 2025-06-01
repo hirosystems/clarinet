@@ -259,7 +259,7 @@ struct RemoveContract {
 
 #[derive(Parser, PartialEq, Clone, Debug)]
 struct AddRequirement {
-    /// Contract id (ex. "SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.nft-trait")
+    /// Contract id (ex. SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.nft-trait or SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.nft-trait.nft-trait), optionally enclosed in single or double quotes.
     pub contract_id: String,
     /// Path to Clarinet.toml
     #[clap(long = "manifest-path", short = 'm')]
@@ -1011,17 +1011,22 @@ pub fn main() {
             Requirements::AddRequirement(cmd) => {
                 let manifest = load_manifest_or_exit(cmd.manifest_path, true);
 
+                // Trim quotes from contract_id
+                let mut contract_id = cmd.contract_id.trim();
+                contract_id = contract_id.trim_matches('"');
+                contract_id = contract_id.trim_matches('\'');
+
                 let change = TOMLEdition {
                     comment: format!(
                         "{} with requirement {}",
                         yellow!("Updated Clarinet.toml"),
-                        green!(format!("{}", cmd.contract_id))
+                        green!(format!("{}", contract_id))
                     ),
                     manifest_location: manifest.location,
                     contracts_to_rm: vec![],
                     contracts_to_add: HashMap::new(),
                     requirements_to_add: vec![RequirementConfig {
-                        contract_id: cmd.contract_id,
+                        contract_id: contract_id.to_string(),
                     }],
                 };
                 if !execute_changes(vec![Changes::EditTOML(change)]) {
