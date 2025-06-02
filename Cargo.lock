@@ -679,6 +679,7 @@ dependencies = [
  "serde_json",
  "similar",
  "stacks-network",
+ "tempfile",
  "tokio",
  "toml 0.5.11",
  "tower-lsp",

@@ -62,6 +62,9 @@ winapi = { version = "0.3.9", features = [
     "ws2tcpip",
 ] }
 
+[dev-dependencies]
+tempfile = "3.0.0"
+
 [package.metadata.winres]
 OriginalFilename = "clarinet.exe"
 LegalCopyright = ""
