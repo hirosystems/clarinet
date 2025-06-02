@@ -15,7 +15,7 @@ fn parse_manifest(project_dir: &Path) -> ProjectManifest {
 fn create_new_project(project_name: &str) -> tempfile::TempDir {
     let temp_dir = tempfile::tempdir().expect("Failed to create temp dir");
     let status = Command::new(env!("CARGO_BIN_EXE_clarinet"))
-        .args(["new", project_name])
+        .args(["new", project_name, "--disable-telemetry"])
         .current_dir(&temp_dir)
         .status();
     assert!(status.unwrap().success());
@@ -27,14 +27,14 @@ fn test_new_project() {
     let project_name = "test_project";
     let temp_dir = tempfile::tempdir().expect("Failed to create temp dir");
     let cmd = Command::new(env!("CARGO_BIN_EXE_clarinet"))
-        .args(["new", project_name])
+        .args(["new", project_name, "--disable-telemetry"])
         .current_dir(&temp_dir)
         .output()
         .expect("Failed to execute clarinet new");
     assert!(cmd.status.success());
 
-    let stdout = String::from_utf8_lossy(&cmd.stdout);
     let expected_lines = [
+        "Telemetry disabled. Clarinet will not collect any data on this project.",
         "Created directory test_project",
         "Created directory contracts",
         "Created directory settings",
@@ -52,10 +52,10 @@ fn test_new_project() {
         "Created file tsconfig.json",
         "Created file vitest.config.js",
     ];
+    let stdout = String::from_utf8_lossy(&cmd.stdout);
     let stdout_lines: Vec<_> = stdout.lines().map(str::trim).collect();
-    let expected_len = expected_lines.len();
-    let actual_tail = &stdout_lines[stdout_lines.len() - expected_len..];
-    assert_eq!(actual_tail, expected_lines);
+    let actual = stdout_lines[..expected_lines.len()].to_vec();
+    assert_eq!(actual, expected_lines);
 
     let project_path = temp_dir.path().join(project_name);
     assert!(project_path.is_dir(), "Project directory missing");
@@ -81,16 +81,15 @@ fn test_contract_new() {
         .unwrap();
     assert!(output.status.success(), "clarinet contract new failed");
 
-    let stdout = String::from_utf8_lossy(&output.stdout);
     let expected_lines = [
         format!("Created file contracts/{}.clar", contract_name),
         format!("Created file tests/{}.test.ts", contract_name),
         format!("Updated Clarinet.toml with contract {}", contract_name),
     ];
+    let stdout = String::from_utf8_lossy(&output.stdout);
     let stdout_lines: Vec<_> = stdout.lines().map(str::trim).collect();
-    let expected_len = expected_lines.len();
-    let actual_tail = &stdout_lines[stdout_lines.len() - expected_len..];
-    assert_eq!(actual_tail, expected_lines);
+    let actual = stdout_lines[..expected_lines.len()].to_vec();
+    assert_eq!(actual, expected_lines);
 
     let contract_path = project_path
         .join("contracts")
