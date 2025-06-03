@@ -47,9 +47,10 @@ pub fn build_transaction_spec(
             break;
         }
     }
-    if cumulated_amount < total_required {
-        panic!("Unable to get enough UTXOs");
-    }
+    assert!(
+        !(cumulated_amount < total_required),
+        "Unable to get enough UTXOs"
+    );
 
     // Prepare transaction inputs
     selected_utxos_indices.reverse();
