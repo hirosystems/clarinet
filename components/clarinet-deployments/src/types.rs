@@ -324,25 +324,19 @@ impl StxTransferSpecification {
     pub fn from_specifications(
         specs: &StxTransferSpecificationFile,
     ) -> Result<StxTransferSpecification, String> {
-        let expected_sender = match PrincipalData::parse_standard_principal(&specs.expected_sender)
-        {
-            Ok(res) => res,
-            Err(_) => {
-                return Err(format!(
-                    "unable to parse expected sender '{}' as a valid Stacks address",
-                    specs.expected_sender
-                ))
-            }
+        let Ok(expected_sender) = PrincipalData::parse_standard_principal(&specs.expected_sender)
+        else {
+            return Err(format!(
+                "unable to parse expected sender '{}' as a valid Stacks address",
+                specs.expected_sender
+            ));
         };
 
-        let recipient = match PrincipalData::parse(&specs.recipient) {
-            Ok(res) => res,
-            Err(_) => {
-                return Err(format!(
-                    "unable to parse recipient '{}' as a valid Stacks address",
-                    specs.expected_sender
-                ))
-            }
+        let Ok(recipient) = PrincipalData::parse(&specs.recipient) else {
+            return Err(format!(
+                "unable to parse recipient '{}' as a valid Stacks address",
+                specs.expected_sender
+            ));
         };
 
         let mut memo = [0u8; 34];
@@ -408,35 +402,26 @@ impl ContractCallSpecification {
     pub fn from_specifications(
         specs: &ContractCallSpecificationFile,
     ) -> Result<ContractCallSpecification, String> {
-        let contract_id = match QualifiedContractIdentifier::parse(&specs.contract_id) {
-            Ok(res) => res,
-            Err(_) => {
-                return Err(format!(
-                    "unable to parse '{}' as a valid contract identifier",
-                    specs.contract_id
-                ))
-            }
+        let Ok(contract_id) = QualifiedContractIdentifier::parse(&specs.contract_id) else {
+            return Err(format!(
+                "unable to parse '{}' as a valid contract identifier",
+                specs.contract_id
+            ));
         };
 
-        let expected_sender = match PrincipalData::parse_standard_principal(&specs.expected_sender)
-        {
-            Ok(res) => res,
-            Err(_) => {
-                return Err(format!(
-                    "unable to parse emulated sender '{}' as a valid Stacks address",
-                    specs.expected_sender
-                ))
-            }
+        let Ok(expected_sender) = PrincipalData::parse_standard_principal(&specs.expected_sender)
+        else {
+            return Err(format!(
+                "unable to parse emulated sender '{}' as a valid Stacks address",
+                specs.expected_sender
+            ));
         };
 
-        let method = match ClarityName::try_from(specs.method.to_string()) {
-            Ok(res) => res,
-            Err(_) => {
-                return Err(format!(
-                    "unable to parse '{}' as a valid contract name",
-                    specs.method
-                ))
-            }
+        let Ok(method) = ClarityName::try_from(specs.method.to_string()) else {
+            return Err(format!(
+                "unable to parse '{}' as a valid contract name",
+                specs.method
+            ));
         };
 
         Ok(ContractCallSpecification {
@@ -469,25 +454,19 @@ impl ContractPublishSpecification {
         specs: &ContractPublishSpecificationFile,
         project_root_location: &FileLocation,
     ) -> Result<ContractPublishSpecification, String> {
-        let contract_name = match ContractName::try_from(specs.contract_name.to_string()) {
-            Ok(res) => res,
-            Err(_) => {
-                return Err(format!(
-                    "unable to parse '{}' as a valid contract name",
-                    specs.contract_name
-                ))
-            }
+        let Ok(contract_name) = ContractName::try_from(specs.contract_name.to_string()) else {
+            return Err(format!(
+                "unable to parse '{}' as a valid contract name",
+                specs.contract_name
+            ));
         };
 
-        let expected_sender = match PrincipalData::parse_standard_principal(&specs.expected_sender)
-        {
-            Ok(res) => res,
-            Err(_) => {
-                return Err(format!(
-                    "unable to parse expected sender '{}' as a valid Stacks address",
-                    specs.expected_sender
-                ))
-            }
+        let Ok(expected_sender) = PrincipalData::parse_standard_principal(&specs.expected_sender)
+        else {
+            return Err(format!(
+                "unable to parse expected sender '{}' as a valid Stacks address",
+                specs.expected_sender
+            ));
         };
 
         let location = match (&specs.path, &specs.url) {
@@ -694,46 +673,34 @@ impl RequirementPublishSpecification {
         specs: &RequirementPublishSpecificationFile,
         project_root_location: &FileLocation,
     ) -> Result<RequirementPublishSpecification, String> {
-        let contract_id = match QualifiedContractIdentifier::parse(&specs.contract_id) {
-            Ok(res) => res,
-            Err(_) => {
-                return Err(format!(
-                    "unable to parse '{}' as a valid contract identifier",
-                    specs.contract_id
-                ))
-            }
+        let Ok(contract_id) = QualifiedContractIdentifier::parse(&specs.contract_id) else {
+            return Err(format!(
+                "unable to parse '{}' as a valid contract identifier",
+                specs.contract_id
+            ));
         };
 
-        let remap_sender = match PrincipalData::parse_standard_principal(&specs.remap_sender) {
-            Ok(res) => res,
-            Err(_) => {
-                return Err(format!(
-                    "unable to parse remap sender '{}' as a valid Stacks address",
-                    specs.remap_sender
-                ))
-            }
+        let Ok(remap_sender) = PrincipalData::parse_standard_principal(&specs.remap_sender) else {
+            return Err(format!(
+                "unable to parse remap sender '{}' as a valid Stacks address",
+                specs.remap_sender
+            ));
         };
 
         let mut remap_principals = BTreeMap::new();
         if let Some(ref remap_principals_spec) = specs.remap_principals {
             for (src_spec, dst_spec) in remap_principals_spec {
-                let src = match PrincipalData::parse_standard_principal(src_spec) {
-                    Ok(res) => res,
-                    Err(_) => {
-                        return Err(format!(
-                            "unable to parse remap source '{}' as a valid Stacks address",
-                            specs.remap_sender
-                        ))
-                    }
+                let Ok(src) = PrincipalData::parse_standard_principal(src_spec) else {
+                    return Err(format!(
+                        "unable to parse remap source '{}' as a valid Stacks address",
+                        specs.remap_sender
+                    ));
                 };
-                let dst = match PrincipalData::parse_standard_principal(dst_spec) {
-                    Ok(res) => res,
-                    Err(_) => {
-                        return Err(format!(
-                            "unable to parse remap destination '{}' as a valid Stacks address",
-                            specs.remap_sender
-                        ))
-                    }
+                let Ok(dst) = PrincipalData::parse_standard_principal(dst_spec) else {
+                    return Err(format!(
+                        "unable to parse remap destination '{}' as a valid Stacks address",
+                        specs.remap_sender
+                    ));
                 };
                 remap_principals.insert(src, dst);
             }
@@ -792,35 +759,26 @@ impl EmulatedContractCallSpecification {
     pub fn from_specifications(
         specs: &EmulatedContractCallSpecificationFile,
     ) -> Result<EmulatedContractCallSpecification, String> {
-        let contract_id = match QualifiedContractIdentifier::parse(&specs.contract_id) {
-            Ok(res) => res,
-            Err(_) => {
-                return Err(format!(
-                    "unable to parse '{}' as a valid contract_id",
-                    specs.contract_id
-                ))
-            }
+        let Ok(contract_id) = QualifiedContractIdentifier::parse(&specs.contract_id) else {
+            return Err(format!(
+                "unable to parse '{}' as a valid contract_id",
+                specs.contract_id
+            ));
         };
 
-        let emulated_sender = match PrincipalData::parse_standard_principal(&specs.emulated_sender)
-        {
-            Ok(res) => res,
-            Err(_) => {
-                return Err(format!(
-                    "unable to parse emulated sender '{}' as a valid Stacks address",
-                    specs.emulated_sender
-                ))
-            }
+        let Ok(emulated_sender) = PrincipalData::parse_standard_principal(&specs.emulated_sender)
+        else {
+            return Err(format!(
+                "unable to parse emulated sender '{}' as a valid Stacks address",
+                specs.emulated_sender
+            ));
         };
 
-        let method = match ClarityName::try_from(specs.method.to_string()) {
-            Ok(res) => res,
-            Err(_) => {
-                return Err(format!(
-                    "unable to parse '{}' as a valid contract name",
-                    specs.method
-                ))
-            }
+        let Ok(method) = ClarityName::try_from(specs.method.to_string()) else {
+            return Err(format!(
+                "unable to parse '{}' as a valid contract name",
+                specs.method
+            ));
         };
 
         Ok(EmulatedContractCallSpecification {
@@ -849,25 +807,19 @@ impl EmulatedContractPublishSpecification {
         project_root_location: &FileLocation,
         source: Option<String>,
     ) -> Result<EmulatedContractPublishSpecification, String> {
-        let contract_name = match ContractName::try_from(specs.contract_name.to_string()) {
-            Ok(res) => res,
-            Err(_) => {
-                return Err(format!(
-                    "unable to parse '{}' as a valid contract name",
-                    specs.contract_name
-                ))
-            }
+        let Ok(contract_name) = ContractName::try_from(specs.contract_name.to_string()) else {
+            return Err(format!(
+                "unable to parse '{}' as a valid contract name",
+                specs.contract_name
+            ));
         };
 
-        let emulated_sender = match PrincipalData::parse_standard_principal(&specs.emulated_sender)
-        {
-            Ok(res) => res,
-            Err(_) => {
-                return Err(format!(
-                    "unable to parse emulated sender '{}' as a valid Stacks address",
-                    specs.emulated_sender
-                ))
-            }
+        let Ok(emulated_sender) = PrincipalData::parse_standard_principal(&specs.emulated_sender)
+        else {
+            return Err(format!(
+                "unable to parse emulated sender '{}' as a valid Stacks address",
+                specs.emulated_sender
+            ));
         };
 
         let location = match (&specs.path, &specs.url) {

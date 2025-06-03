@@ -297,9 +297,8 @@ impl EditorState {
         contract_location: &FileLocation,
         position: &Position,
     ) -> Vec<lsp_types::CompletionItem> {
-        let active_contract = match self.active_contracts.get(contract_location) {
-            Some(contract) => contract,
-            None => return vec![],
+        let Some(active_contract) = self.active_contracts.get(contract_location) else {
+            return vec![];
         };
 
         let contract_calls = self
@@ -335,14 +334,12 @@ impl EditorState {
         &self,
         contract_location: &FileLocation,
     ) -> Vec<DocumentSymbol> {
-        let active_contract = match self.active_contracts.get(contract_location) {
-            Some(contract) => contract,
-            None => return vec![],
+        let Some(active_contract) = self.active_contracts.get(contract_location) else {
+            return vec![];
         };
 
-        let expressions = match &active_contract.expressions {
-            Some(expressions) => expressions,
-            None => return vec![],
+        let Some(expressions) = &active_contract.expressions else {
+            return vec![];
         };
 
         let ast_symbols = ASTSymbols::new();
@@ -570,20 +567,16 @@ impl ProtocolState {
 
         // Add / Replace new paths
         for (contract_id, contract_location) in locations.iter() {
-            let (contract_id, ast) = match asts.remove_entry(contract_id) {
-                Some(ast) => ast,
-                None => continue,
+            let Some((contract_id, ast)) = asts.remove_entry(contract_id) else {
+                continue;
             };
-            let deps = match deps.remove(&contract_id) {
-                Some(deps) => deps,
-                None => DependencySet::new(),
-            };
+            let deps = deps.remove(&contract_id).unwrap_or_default();
             let diags = diags.remove(&contract_id).unwrap_or_default();
             let analysis = analyses.remove(&contract_id).unwrap_or_default();
-            let clarity_version = match clarity_versions.remove(&contract_id) {
-                Some(analysis) => analysis,
-                None => DEFAULT_CLARITY_VERSION,
-            };
+            let clarity_version = clarity_versions
+                .remove(&contract_id)
+                .unwrap_or(DEFAULT_CLARITY_VERSION);
+
             let definitions = definitions.remove(&contract_id).unwrap_or_default();
 
             let contract_state = ContractState::new(
@@ -657,9 +650,8 @@ pub async fn build_state(
         Some(StacksEpochId::Epoch21),
     );
     for (contract_id, mut result) in contracts.into_iter() {
-        let (_, contract_location) = match deployment.contracts.get(&contract_id) {
-            Some(entry) => entry,
-            None => continue,
+        let Some((_, contract_location)) = deployment.contracts.get(&contract_id) else {
+            continue;
         };
         locations.insert(contract_id.clone(), contract_location.clone());
         if let Some(contract_metadata) = manifest.contracts_settings.get(contract_location) {

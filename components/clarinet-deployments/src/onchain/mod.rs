@@ -719,14 +719,11 @@ pub fn apply_on_chain_deployment(
         batches.push_back((epoch, batch));
     }
 
-    let _cmd = match deployment_command_rx.recv() {
-        Ok(cmd) => cmd,
-        Err(_) => {
-            let _ = deployment_event_tx.send(DeploymentEvent::Interrupted(
-                "deployment aborted - broken channel".to_string(),
-            ));
-            return;
-        }
+    let Ok(_cmd) = deployment_command_rx.recv() else {
+        let _ = deployment_event_tx.send(DeploymentEvent::Interrupted(
+            "deployment aborted - broken channel".to_string(),
+        ));
+        return;
     };
 
     // Phase 2: we submit all the transactions previously encoded,
@@ -796,9 +793,8 @@ pub fn apply_on_chain_deployment(
 
         let mut ongoing_batch = BTreeMap::new();
         for mut tracker in batch.into_iter() {
-            let (transaction, check) = match tracker.status {
-                TransactionStatus::Encoded(transaction, check) => (transaction, check),
-                _ => unreachable!(),
+            let TransactionStatus::Encoded(transaction, check) = tracker.status else {
+                unreachable!();
             };
             match stacks_rpc.post_transaction(&transaction) {
                 Ok(res) => {

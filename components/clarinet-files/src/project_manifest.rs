@@ -78,9 +78,8 @@ where
         serde::Deserialize::deserialize(des)?;
 
     for (contract_name, contract_settings) in container {
-        let contract_path = match contract_settings.get("path") {
-            Some(JsonValue::String(path)) => path,
-            _ => continue,
+        let Some(JsonValue::String(contract_path)) = contract_settings.get("path") else {
+            continue;
         };
 
         let code_source = match PathBuf::from_str(contract_path) {
@@ -303,14 +302,14 @@ impl ProjectManifest {
         if let Some(TomlValue::Table(contracts)) = project_manifest_file.contracts {
             for (contract_name, contract_settings) in contracts.iter() {
                 if let TomlValue::Table(contract_settings) = contract_settings {
-                    let contract_path = match contract_settings.get("path") {
-                        Some(TomlValue::String(path)) => path,
-                        _ => continue,
+                    let Some(TomlValue::String(contract_path)) = contract_settings.get("path")
+                    else {
+                        continue;
                     };
                     let code_source = match PathBuf::from_str(contract_path) {
                         Ok(path) => ClarityCodeSource::ContractOnDisk(path),
                         Err(e) => {
-                            return Err(format!("unable to parse path {} ({})", contract_path, e))
+                            return Err(format!("unable to parse path {contract_path} ({e})"))
                         }
                     };
                     let deployer = match contract_settings.get("deployer") {

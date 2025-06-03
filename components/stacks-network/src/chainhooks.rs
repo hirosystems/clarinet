@@ -61,9 +61,8 @@ fn get_chainhooks_files(
     let mut chainhooks_dir = manifest_location.get_project_root_location()?;
     chainhooks_dir.append_path("chainhooks")?;
     let prefix_len = chainhooks_dir.to_string().len() + 1;
-    let paths = match fs::read_dir(chainhooks_dir.to_string()) {
-        Ok(paths) => paths,
-        Err(_) => return Ok(vec![]),
+    let Ok(paths) = fs::read_dir(chainhooks_dir.to_string()) else {
+        return Ok(vec![]);
     };
     let mut hook_paths = vec![];
     for path in paths {
