@@ -237,6 +237,10 @@ impl Session {
             cmd if cmd.starts_with("::encode") => self.encode(cmd),
             cmd if cmd.starts_with("::decode") => self.decode(cmd),
 
+            cmd if cmd.starts_with("::print-constant") => self.print_constant(cmd),
+            cmd if cmd.starts_with("::print-data-var") => self.print_data_var(cmd),
+            cmd if cmd.starts_with("::print-map-val") => self.print_map_val(cmd),
+
             _ => "Invalid command. Try `::help`".yellow().to_string(),
         }
     }
@@ -801,6 +805,19 @@ impl Session {
             "::decode <bytes>\t\t\tDecode a Clarity Value bytes representation".yellow()
         ));
 
+        output.push(format!(
+            "{}",
+            "::print-constant [<contract>.]<constant>\tPrint the value of a constant".yellow()
+        ));
+        output.push(format!(
+            "{}",
+            "::print-data-var [<contract>.]<var>\t\tPrint the value of a data variable".yellow()
+        ));
+        output.push(format!(
+            "{}",
+            "::print-map-val [<contract>.]<map> <key>\tPrint a map entry for a key".yellow()
+        ));
+
         output.join("\n")
     }
 
@@ -1186,6 +1203,107 @@ impl Session {
     fn keywords(&self) -> String {
         let keywords = self.get_clarity_keywords();
         format!("{}", keywords.join("\n").yellow())
+    }
+
+    fn parse_contract_and_item_name(&self, name_str: &str, command_name: &str) -> Result<(QualifiedContractIdentifier, String), String> {
+        let parts: Vec<&str> = name_str.splitn(2, '.').collect();
+        if parts.len() == 2 {
+            let contract_name_str = parts[0];
+            let item_name = parts[1].to_string();
+            match QualifiedContractIdentifier::parse(contract_name_str) {
+                Ok(qid) => Ok((qid, item_name)),
+                Err(e) => Err(format!("Error parsing contract identifier '{}': {}. Usage: {} <contract-identifier>.<item-name>", contract_name_str, e, command_name)),
+            }
+        } else if parts.len() == 1 {
+            let item_name = parts[0].to_string();
+            if let Some(current_contract_id) = self.interpreter.current_contract_id.clone() {
+                Ok((current_contract_id, item_name))
+            } else {
+                Err(format!("No current contract context. Specify contract explicitly: {} <contract-identifier>.{}", command_name, item_name))
+            }
+        } else {
+            Err(format!("Invalid format. Usage: {} [<contract-identifier>.]<item-name>", command_name))
+        }
+    }
+
+    pub fn print_constant(&mut self, command: &str) -> String {
+        let parts: Vec<&str> = command.trim().splitn(2, ' ').collect();
+        if parts.len() != 2 {
+            return format!("Invalid format. Usage: ::print-constant [<contract-identifier>.]<constant-name>");
+        }
+        let name_str = parts[1];
+
+        match self.parse_contract_and_item_name(name_str, "::print-constant") {
+            Ok((contract_id, const_name)) => {
+                if let Some(parsed_contract) = self.contracts.get(&contract_id) {
+                    for def in &parsed_contract.contract_ast.definitions {
+                        if let clarity::vm::ast::Definition::DefineConstant(dc) = def {
+                            if dc.name == const_name {
+                                return format!("{} = {}", const_name, value_to_string(&dc.value, &self.interpreter.vm, false, false));
+                            }
+                        }
+                    }
+                    format!("Constant '{}' not found in contract '{}'", const_name, contract_id)
+                } else {
+                    format!("Contract '{}' not found or not loaded.", contract_id)
+                }
+            }
+            Err(e) => e,
+        }
+    }
+
+    pub fn print_data_var(&mut self, command: &str) -> String {
+        let parts: Vec<&str> = command.trim().splitn(2, ' ').collect();
+        if parts.len() != 2 {
+            return format!("Invalid format. Usage: ::print-data-var [<contract-identifier>.]<var-name>");
+        }
+        let name_str = parts[1];
+
+        match self.parse_contract_and_item_name(name_str, "::print-data-var") {
+            Ok((contract_id, var_name)) => {
+                match self.interpreter.vm.get_var(&contract_id, &var_name) {
+                    Some(value) => format!("{} = {}", var_name, value_to_string(&value, &self.interpreter.vm, false, false)),
+                    None => format!("Data variable '{}' not found in contract '{}' or contract not found.", var_name, contract_id),
+                }
+            }
+            Err(e) => e,
+        }
+    }
+
+    pub fn print_map_val(&mut self, command: &str) -> String {
+        let parts: Vec<&str> = command.trim().splitn(3, ' ').collect();
+        if parts.len() != 3 {
+            return format!("Invalid format. Usage: ::print-map-val [<contract-identifier>.]<map-name> <key-expression>");
+        }
+        let name_str = parts[1];
+        let key_expr_str = parts[2];
+
+        match self.parse_contract_and_item_name(name_str, "::print-map-val") {
+            Ok((contract_id, map_name)) => {
+                let key_value_result = self.eval_clarity_string(key_expr_str);
+                match self.eval(key_expr_str.to_string(), false) {
+                    Ok(execution_result) => {
+                        match execution_result.result {
+                            Ok(key_value) => {
+                                match self.interpreter.vm.get_map_entry(&contract_id, &map_name, &key_value) {
+                                    Some(Some(value)) => format!("{}["{}"] = {}", map_name, value_to_string(&key_value, &self.interpreter.vm, false, false), value_to_string(&value, &self.interpreter.vm, false, false)),
+                                    Some(None) => format!("Key '{}' not found in map '{}' of contract '{}'", value_to_string(&key_value, &self.interpreter.vm, false, false), map_name, contract_id),
+                                    None => format!("Map '{}' not found in contract '{}'", map_name, contract_id),
+                                }
+                            }
+                            Err(eval_err) => {
+                                format!("Error evaluating key expression '{}': {:?}", key_expr_str, eval_err)
+                            }
+                        }
+                    }
+                    Err(diag_vec) => {
+                        let diagnostics_str = diag_vec.iter().map(|d| format!("{:?}", d)).collect::<Vec<String>>().join("\n");
+                        format!("Error evaluating key expression '{}':\n{}", key_expr_str, diagnostics_str)
+                    }
+                }
+            }
+            Err(e) => e,
+        }
     }
 }
 
