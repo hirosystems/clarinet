@@ -70,22 +70,22 @@ impl GetChangesForNewProject {
 
     fn create_contracts_directory(&mut self) {
         self.changes
-            .push(self.get_changes_for_new_root_dir("contracts".into()));
+            .push(self.get_changes_for_new_root_dir("contracts"));
     }
 
     fn create_settings_directory(&mut self) {
         self.changes
-            .push(self.get_changes_for_new_root_dir("settings".into()));
+            .push(self.get_changes_for_new_root_dir("settings"));
     }
 
     fn create_tests_directory(&mut self) {
         self.changes
-            .push(self.get_changes_for_new_root_dir("tests".into()));
+            .push(self.get_changes_for_new_root_dir("tests"));
     }
 
     fn create_vscode_directory(&mut self) {
         self.changes
-            .push(self.get_changes_for_new_root_dir(".vscode".into()));
+            .push(self.get_changes_for_new_root_dir(".vscode"));
     }
 
     fn create_vscode_settings_json(&mut self) {
@@ -95,7 +95,7 @@ impl GetChangesForNewProject {
 }
 "#
         .into();
-        let name = ".vscode/settings.json".into();
+        let name = ".vscode/settings.json";
         self.changes
             .push(self.get_changes_for_new_file(name, content));
     }
@@ -122,7 +122,7 @@ impl GetChangesForNewProject {
 }
 "#
         .into();
-        let name = ".vscode/tasks.json".into();
+        let name = ".vscode/tasks.json";
         self.changes
             .push(self.get_changes_for_new_file(name, content));
     }
@@ -143,7 +143,7 @@ costs-reports.json
 node_modules
 "#
         .into();
-        let name = ".gitignore".into();
+        let name = ".gitignore";
         self.changes
             .push(self.get_changes_for_new_file(name, content));
     }
@@ -154,7 +154,7 @@ vitest.config.js linguist-vendored
 * text=lf
 "#
         .into();
-        let name = ".gitattributes".into();
+        let name = ".gitattributes";
         self.changes
             .push(self.get_changes_for_new_file(name, content));
     }
@@ -185,7 +185,7 @@ check_checker = {{ trusted_sender = false, trusted_caller = false, callee_filter
 "#,
             self.project_name, self.telemetry_enabled
         );
-        let name = "Clarinet.toml".into();
+        let name = "Clarinet.toml";
         self.changes
             .push(self.get_changes_for_new_file(name, content));
     }
@@ -200,7 +200,7 @@ deployment_fee_rate = 10
 mnemonic = "<YOUR PRIVATE TESTNET MNEMONIC HERE>"
 "#
         .into();
-        let name = "settings/Testnet.toml".into();
+        let name = "settings/Testnet.toml";
         self.changes
             .push(self.get_changes_for_new_file(name, content));
     }
@@ -215,7 +215,7 @@ deployment_fee_rate = 10
 mnemonic = "<YOUR PRIVATE MAINNET MNEMONIC HERE>"
 "#
         .into();
-        let name = "settings/Mainnet.toml".into();
+        let name = "settings/Mainnet.toml";
         self.changes
             .push(self.get_changes_for_new_file(name, content));
     }
@@ -407,7 +407,7 @@ btc_address = "mvZtbibDAAA3WLpY7zXXFqRa3T4XSknBX7"
             default_stacks_faucet_mnemonic = DEFAULT_FAUCET_MNEMONIC,
             default_stacks_stacker_mnemonic = DEFAULT_STACKER_MNEMONIC,
         );
-        let name = "settings/Devnet.toml".into();
+        let name = "settings/Devnet.toml";
         self.changes
             .push(self.get_changes_for_new_file(name, content));
     }
@@ -446,7 +446,7 @@ btc_address = "mvZtbibDAAA3WLpY7zXXFqRa3T4XSknBX7"
 "#,
             self.project_name
         );
-        let name = "package.json".into();
+        let name = "package.json";
         self.changes
             .push(self.get_changes_for_new_file(name, content));
     }
@@ -480,7 +480,7 @@ btc_address = "mvZtbibDAAA3WLpY7zXXFqRa3T4XSknBX7"
 }
 "#
         .into();
-        let name = "tsconfig.json".into();
+        let name = "tsconfig.json";
         self.changes
             .push(self.get_changes_for_new_file(name, content));
     }
@@ -530,24 +530,24 @@ export default defineConfig({
 });
 
 "#.into();
-        let name = "vitest.config.js".into();
+        let name = "vitest.config.js";
         self.changes
             .push(self.get_changes_for_new_file(name, content))
     }
 
-    fn get_changes_for_new_root_dir(&self, name: String) -> Changes {
-        let dir = format!("{}/{}", self.project_path, name);
+    fn get_changes_for_new_root_dir(&self, name: &str) -> Changes {
+        let dir = format!("{}/{name}", self.project_path);
         Changes::AddDirectory(DirectoryCreation {
-            comment: format!("{} {}", green!("Created directory"), name),
+            comment: format!("{} {name}", green!("Created directory")),
             path: dir,
         })
     }
 
-    fn get_changes_for_new_file(&self, name: String, content: String) -> Changes {
-        let path = format!("{}/{}", self.project_path, name);
+    fn get_changes_for_new_file(&self, name: &str, content: String) -> Changes {
+        let path = format!("{}/{name}", self.project_path);
 
         Changes::AddFile(FileCreation {
-            comment: format!("{} {}", green!("Created file"), name),
+            comment: format!("{} {name}", green!("Created file")),
             content,
             path,
         })

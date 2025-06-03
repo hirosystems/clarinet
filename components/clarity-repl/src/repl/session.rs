@@ -248,12 +248,9 @@ impl Session {
         cost_track: bool,
         cmd: &str,
     ) -> Result<ExecutionResult, Vec<Diagnostic>> {
-        let (mut result, cost, execution_result) = match self.formatted_interpretation(
-            cmd.to_string(),
-            None,
-            cost_track,
-            None,
-        ) {
+        let (mut result, cost, execution_result) = match self
+            .formatted_interpretation(cmd, None, cost_track, None)
+        {
             Ok((mut output, result)) => {
                 if let EvaluationResult::Contract(contract_result) = result.result.clone() {
                     let snippet = format!("→ .{} contract successfully stored. Use (contract-call? ...) for invoking the public functions:", contract_result.contract.contract_identifier);
@@ -319,7 +316,7 @@ impl Session {
 
     pub fn formatted_interpretation(
         &mut self,
-        snippet: String,
+        snippet: &str,
         name: Option<String>,
         cost_track: bool,
         eval_hooks: Option<Vec<&mut dyn EvalHook>>,
@@ -376,7 +373,7 @@ impl Session {
         let mut debugger = CLIDebugger::new(&QualifiedContractIdentifier::transient(), snippet);
 
         let mut result = match self.formatted_interpretation(
-            snippet.to_string(),
+            snippet,
             None,
             true,
             Some(vec![&mut debugger]),
@@ -401,7 +398,7 @@ impl Session {
             return output.push("Usage: ::trace <expr>".red().to_string());
         };
 
-        let mut tracer = Tracer::new(snippet.to_string());
+        let mut tracer = Tracer::new(snippet);
 
         match self.eval_with_hooks(snippet.to_string(), Some(vec![&mut tracer]), false) {
             Ok(_) => (),
@@ -433,7 +430,7 @@ impl Session {
 
             _ = self
                 .interpreter
-                .mint_stx_balance(recipient, account.balance)
+                .mint_stx_balance(&recipient, account.balance)
                 .inspect_err(|e| output_err.push(e.red().to_string()));
         }
 
@@ -1130,7 +1127,7 @@ impl Session {
             return "Unable to parse the balance".red().to_string();
         };
 
-        match self.interpreter.mint_stx_balance(recipient, amount) {
+        match self.interpreter.mint_stx_balance(&recipient, amount) {
             Ok(msg) => msg.green().to_string(),
             Err(err) => err.red().to_string(),
         }

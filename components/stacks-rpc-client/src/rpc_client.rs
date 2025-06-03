@@ -237,12 +237,12 @@ impl StacksRpc {
         contract_addr: &str,
         contract_name: &str,
         method: &str,
-        args: Vec<Value>,
+        args: &[Value],
         sender: &str,
     ) -> Result<Value, RpcError> {
         let path = format!(
-            "{}/v2/contracts/call-read/{}/{}/{}",
-            self.url, contract_addr, contract_name, method
+            "{}/v2/contracts/call-read/{contract_addr}/{contract_name}/{method}",
+            self.url,
         );
 
         let arguments = args
