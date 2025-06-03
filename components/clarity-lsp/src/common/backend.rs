@@ -10,6 +10,7 @@ use lsp_types::{
     InitializeParams, InitializeResult, Location, SignatureHelp, SignatureHelpParams, TextEdit,
 };
 use serde::{Deserialize, Serialize};
+use std::panic;
 use std::sync::{Arc, RwLock};
 
 use super::requests::capabilities::{get_capabilities, InitializationOptions};
@@ -440,6 +441,11 @@ pub fn process_request(
             let start_line = param.range.start.line as usize;
             let end_line = param.range.end.line as usize;
 
+            // Validate range boundaries
+            if start_line >= lines.len() {
+                return Ok(LspRequestResponse::DocumentRangeFormatting(None));
+            }
+
             // Get the substring representing just the selected range
             let range_text = if start_line == end_line {
                 // Single line selection
@@ -448,6 +454,11 @@ pub fn process_request(
                 let end_char = param.range.end.character as usize;
                 let start_char = start_char.min(line.len());
                 let end_char = end_char.min(line.len());
+
+                if start_char >= end_char {
+                    return Ok(LspRequestResponse::DocumentRangeFormatting(None));
+                }
+
                 line[start_char..end_char].to_string()
             } else {
                 // Multiline selection
@@ -462,18 +473,27 @@ pub fn process_request(
                 // Middle lines (complete lines)
                 for line_idx in (start_line + 1)..end_line {
                     if let Some(line) = lines.get(line_idx) {
+                        result.push('\n');
                         result.push_str(line);
                     }
                 }
 
-                // Last line (might be partial)
-                if let Some(last_line) = lines.get(end_line) {
-                    let end_char = (param.range.end.character as usize).min(last_line.len());
-                    result.push_str(&last_line[..end_char]);
+                // Last line (might be partial) - only if end_line is different from start_line
+                if end_line > start_line && end_line < lines.len() {
+                    if let Some(last_line) = lines.get(end_line) {
+                        let end_char = (param.range.end.character as usize).min(last_line.len());
+                        result.push('\n');
+                        result.push_str(&last_line[..end_char]);
+                    }
                 }
 
                 result
             };
+
+            // If the range text is empty or only whitespace, return None
+            if range_text.trim().is_empty() {
+                return Ok(LspRequestResponse::DocumentRangeFormatting(None));
+            }
 
             // Count the number of trailing newlines in the original selection
             let mut trailing_newlines = 0;
@@ -482,14 +502,28 @@ pub fn process_request(
                 trailing_newlines += 1;
                 temp_text.pop();
             }
-            // Format just the selected text
-            let formatter = clarinet_format::formatter::ClarityFormatter::new(formatting_options);
-            let mut formatted_result = formatter.format_section(&range_text).trim_end().to_string();
 
-            // Add back exactly the same number of trailing newlines that were in the original
-            for _ in 0..trailing_newlines {
-                formatted_result.push('\n');
-            }
+            // Format just the selected text - but handle panics/errors gracefully
+            let formatter = clarinet_format::formatter::ClarityFormatter::new(formatting_options);
+
+            // Try to format the range text, but handle panics/errors gracefully
+            let formatted_result = panic::catch_unwind(|| formatter.format_section(&range_text));
+
+            let formatted_result = match formatted_result {
+                Ok(formatted_text) => {
+                    let mut result = formatted_text.trim_end().to_string();
+                    // Add back exactly the same number of trailing newlines that were in the original
+                    for _ in 0..trailing_newlines {
+                        result.push('\n');
+                    }
+                    result
+                }
+                Err(_) => {
+                    // If the selected range contains malformed/incomplete Clarity code,
+                    // or if formatting panics, return None to indicate formatting is not possible
+                    return Ok(LspRequestResponse::DocumentRangeFormatting(None));
+                }
+            };
 
             let text_edit = lsp_types::TextEdit {
                 range: param.range,
@@ -544,5 +578,80 @@ pub fn process_mutating_request(
         _ => Err(format!(
             "Unexpected command: {command:?}, should not mutate state"
         )),
+    }
+}
+
+#[cfg(test)]
+mod range_formatting_tests {
+    use super::*;
+    use crate::common::state::EditorState;
+    use clarinet_files::FileLocation;
+    use clarity_repl::clarity::ClarityVersion;
+    use lsp_types::{
+        DocumentRangeFormattingParams, FormattingOptions, Position, Range, TextDocumentIdentifier,
+        Url, WorkDoneProgressParams,
+    };
+    use std::collections::HashMap;
+    use std::path::PathBuf;
+
+    fn create_test_editor_state(source: &str) -> EditorStateInput {
+        let mut editor_state = EditorState::new();
+
+        // Create FileLocation directly without parsing URLs
+        let contract_location = FileLocation::FileSystem {
+            path: PathBuf::from("test.clar"),
+        };
+
+        // Call insert_active_contract on the EditorState before wrapping it
+        editor_state.insert_active_contract(
+            contract_location,
+            ClarityVersion::Clarity2,
+            None,
+            source,
+        );
+
+        // Now wrap it in EditorStateInput
+        EditorStateInput::Owned(editor_state)
+    }
+
+    #[test]
+    fn test_range_formatting() {
+        // This test reproduces the specific bug where newlines are missing
+        // in multiline range extraction
+        let source = "(ok true)\n\n(define-public (foo)\n  ;; this is a comment\n   (ok   true)\n)";
+
+        let editor_state_input = create_test_editor_state(source);
+
+        // Select range that spans multiple lines - this triggers the multiline extraction
+        let params = DocumentRangeFormattingParams {
+            text_document: TextDocumentIdentifier {
+                uri: Url::parse("file:///test.clar").unwrap(),
+            },
+            range: Range {
+                start: Position {
+                    line: 3,
+                    character: 1,
+                },
+                end: Position {
+                    line: 6,
+                    character: 2,
+                },
+            },
+            options: FormattingOptions {
+                tab_size: 2,
+                insert_spaces: true,
+                properties: HashMap::new(),
+                trim_trailing_whitespace: None,
+                insert_final_newline: None,
+                trim_final_newlines: None,
+            },
+            work_done_progress_params: WorkDoneProgressParams {
+                work_done_token: None,
+            },
+        };
+
+        let request = LspRequest::DocumentRangeFormatting(params);
+
+        assert!(process_request(request, &editor_state_input).is_ok());
     }
 }
