@@ -109,8 +109,7 @@ impl GetChangesForNewContract {
             source.to_string()
         } else {
             format!(
-                r#"
-;; title: {}
+                r#";; title: {}
 ;; version:
 ;; summary:
 ;; description:
