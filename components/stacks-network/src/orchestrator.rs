@@ -2186,16 +2186,16 @@ events_keys = ["*"]
 
         let mut env = vec![
             format!(
-                "NEXT_PUBLIC_REGTEST_API_SERVER=http://localhost:{}",
-                devnet_config.stacks_api_port
+                "NEXT_PUBLIC_REGTEST_API_SERVER=http://stacks-api.{}:{}",
+                self.network_name, devnet_config.stacks_api_port
             ),
             format!(
-                "NEXT_PUBLIC_TESTNET_API_SERVER=http://localhost:{}",
-                devnet_config.stacks_api_port
+                "NEXT_PUBLIC_TESTNET_API_SERVER=http://stacks-api.{}:{}",
+                self.network_name, devnet_config.stacks_api_port
             ),
             format!(
-                "NEXT_PUBLIC_MAINNET_API_SERVER=http://localhost:{}",
-                devnet_config.stacks_api_port
+                "NEXT_PUBLIC_MAINNET_API_SERVER=http://stacks-api.{}:{}",
+                self.network_name, devnet_config.stacks_api_port
             ),
             format!("NEXT_PUBLIC_DEFAULT_POLLING_INTERVAL={}", 5000),
             "NODE_ENV=development".to_string(),
