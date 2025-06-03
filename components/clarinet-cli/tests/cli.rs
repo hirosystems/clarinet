@@ -88,7 +88,7 @@ fn test_contract_new() {
     ];
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stdout_lines: Vec<_> = stdout.lines().map(str::trim).collect();
-    let actual = stdout_lines[..expected_lines.len()].to_vec();
+    let actual = &stdout_lines[..expected_lines.len()];
     assert_eq!(actual, expected_lines);
 
     let contract_path = project_path
