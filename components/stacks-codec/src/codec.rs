@@ -2971,7 +2971,7 @@ pub const MAX_EPOCH_SIZE: u32 = 2 * 1024 * 1024;
 pub const MAX_MICROBLOCK_SIZE: u32 = 65536;
 
 pub fn build_contract_call_transaction(
-    contract_id: String,
+    contract_id: &str,
     function_name: String,
     args: Vec<Value>,
     nonce: u64,
@@ -2979,7 +2979,7 @@ pub fn build_contract_call_transaction(
     sender_secret_key: &[u8],
 ) -> StacksTransaction {
     let contract_id =
-        QualifiedContractIdentifier::parse(&contract_id).expect("Contract identifier invalid");
+        QualifiedContractIdentifier::parse(contract_id).expect("Contract identifier invalid");
 
     let payload = TransactionContractCall {
         address: contract_id.issuer.into(),

@@ -20,7 +20,7 @@ impl MockStacksRpc {
         Self { client, url }
     }
 
-    pub fn get_info_mock(&mut self, info: NodeInfo) -> Mock {
+    pub fn get_info_mock(&mut self, info: &NodeInfo) -> Mock {
         self.client
             .mock("GET", "/v2/info")
             .with_status(200)

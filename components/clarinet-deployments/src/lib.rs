@@ -113,7 +113,7 @@ fn update_session_with_genesis_accounts(
 
         for wallet in spec.wallets.iter() {
             let _ = session.interpreter.mint_stx_balance(
-                wallet.address.clone().into(),
+                &wallet.address.clone().into(),
                 wallet.balance.try_into().unwrap(),
             );
             if wallet.name == "deployer" {
@@ -1145,7 +1145,7 @@ mod tests {
 
         let _ = session
             .interpreter
-            .mint_stx_balance(PrincipalData::Standard(sender_principal.clone()), 1000000);
+            .mint_stx_balance(&PrincipalData::Standard(sender_principal.clone()), 1000000);
 
         let stx_transfer_spec = StxTransferSpecification {
             expected_sender: sender_principal.clone(),
