@@ -2084,7 +2084,7 @@ mod tests {
 (define-read-only (get-data-uint) (var-get data-uint))
         "#;
 
-        let deployer_address = session.get_tx_sender(); // Get current deployer for MY_DEPLOYER_PRINCIPAL
+        let deployer_address = session.get_tx_sender(); 
 
         let contract = ClarityContractBuilder::new()
             .name(PRINT_COMMANDS_TEST_CONTRACT_NAME)
@@ -2093,12 +2093,10 @@ mod tests {
         
         session.deploy_contract(&contract, false, None).expect("Failed to deploy test contract");
         
-        // Set current_contract_id by evaluating a simple expression related to the contract
-        // This simulates a context where the contract was just interacted with.
+        
         let contract_id = QualifiedContractIdentifier::parse(&format!("{}.{}", deployer_address, PRINT_COMMANDS_TEST_CONTRACT_NAME)).unwrap();
         session.interpreter.current_contract_id = Some(contract_id.clone());
 
-        // Initialize contract state
         let _ = session.eval(format!("(contract-call? .{PRINT_COMMANDS_TEST_CONTRACT_NAME} init-data)"), false).expect("init-data call failed");
         
         contract_id
@@ -2157,10 +2155,7 @@ mod tests {
         let result = session.handle_command("::print-data-var data-principal");
         assert_eq!(result, format!("data-principal = ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5"));
         
-        // Test original deployer principal for a var (if it was not changed by init-data)
-        // For this, we'd need a var that retains initial tx-sender. Our `data-principal` is overwritten.
-        // We can test this by deploying a new contract where it's not overwritten or adding one such var.
-        // For now, this case is implicitly covered by `MY_DEPLOYER_PRINCIPAL` constant test.
+
 
         // Not found
         let result = session.handle_command("::print-data-var NON_EXISTENT_VAR");
@@ -2189,7 +2184,7 @@ mod tests {
         let result = session.handle_command("::print-map-val principal-map 'ST2CY5V39NH5AVFMGYQMYY3D000S19R52V1G4E1HT");
         assert_eq!(result, format!("principal-map[\"ST2CY5V39NH5AVFMGYQMYY3D000S19R52V1G4E1HT\"] = true"));
         let result = session.handle_command("::print-map-val tuple-key-map {{k1: u10, k2: \"abc\"}}");
-        assert_eq!(result, format!("tuple-key-map[\"{{k1: u10, k2: \\\"abc\\\"}}\"] = 0x010203")); // Note: Escaping for string comparison
+        assert_eq!(result, format!("tuple-key-map[\"{{k1: u10, k2: \\\"abc\\\"}}\"] = 0x010203")); 
         
         // Key not found
         let result = session.handle_command("::print-map-val simple-map u999");
@@ -2203,19 +2198,18 @@ mod tests {
         
         // Invalid key expression
         let result = session.handle_command("::print-map-val simple-map (invalid-expr");
-        assert!(result.contains("Error evaluating key expression '(invalid-expr':")); // Partial match for error diagnostics
+        assert!(result.contains("Error evaluating key expression '(invalid-expr':")); 
 
         // Invalid format
-        let result = session.handle_command("::print-map-val simple-map"); // Missing key
+        let result = session.handle_command("::print-map-val simple-map");
         assert!(result.contains("Invalid format. Usage: ::print-map-val"));
-        let result = session.handle_command("::print-map-val"); // Missing map and key
+        let result = session.handle_command("::print-map-val"); 
         assert!(result.contains("Invalid format. Usage: ::print-map-val"));
     }
 
     #[test]
     fn test_print_commands_no_context() {
         let mut session = Session::new(SessionSettings::default());
-        // DO NOT deploy a contract or set current_contract_id
 
         let result = session.handle_command("::print-constant MY_UINT");
         assert_eq!(result, "No current contract context. Specify contract explicitly: ::print-constant <contract-identifier>.MY_UINT");
