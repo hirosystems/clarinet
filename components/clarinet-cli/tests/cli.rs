@@ -1,6 +1,7 @@
 use std::{fs, path::Path, process::Command};
 
 use clarinet_files::{FileLocation, ProjectManifest, ProjectManifestFile};
+use indoc::formatdoc;
 
 #[track_caller]
 fn parse_manifest(project_dir: &Path) -> ProjectManifest {
@@ -63,9 +64,31 @@ fn test_new_project() {
     assert!(clarinet_toml.is_file(), "Clarinet.toml missing");
 
     let manifest_str = fs::read_to_string(&clarinet_toml).expect("Failed to read Clarinet.toml");
-    let expected = format!("[project]\nname = \"{}\"", project_name);
+    let expected = formatdoc! {"
+        [project]
+        name = \"{}\"", project_name};
     let actual = manifest_str.lines().take(2).collect::<Vec<_>>().join("\n");
     assert_eq!(actual, expected, "Clarinet.toml header mismatch");
+
+    let expected_files = [
+        "Clarinet.toml",
+        "settings/Mainnet.toml",
+        "settings/Testnet.toml",
+        "settings/Devnet.toml",
+        ".vscode/settings.json",
+        ".vscode/tasks.json",
+        ".gitignore",
+        ".gitattributes",
+        "package.json",
+        "tsconfig.json",
+        "vitest.config.js",
+    ];
+    for file in expected_files.iter() {
+        let file_path = project_path.join(file);
+        assert!(file_path.is_file(), "'{}' is missing", file);
+        let metadata = fs::metadata(&file_path).expect("Failed to get file metadata");
+        assert!(metadata.len() > 0, "'{}' is empty", file);
+    }
 }
 
 #[test]
@@ -99,6 +122,17 @@ fn test_contract_new() {
     let contract_str = fs::read_to_string(&contract_path).expect("Failed to read contract file");
     let expected = format!(";; title: {}", contract_name);
     assert_eq!(contract_str.lines().next().unwrap_or(""), expected);
+
+    let expected_files = [
+        "contracts/test_contract.clar",
+        "tests/test_contract.test.ts",
+    ];
+    for file in expected_files.iter() {
+        let file_path = project_path.join(file);
+        assert!(file_path.is_file(), "'{}' is missing", file);
+        let metadata = fs::metadata(&file_path).expect("Failed to get file metadata");
+        assert!(metadata.len() > 0, "'{}' is empty", file);
+    }
 }
 
 #[test]

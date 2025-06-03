@@ -670,6 +670,7 @@ dependencies = [
  "crossterm",
  "fwdansi",
  "hiro-system-kit",
+ "indoc",
  "mac_address",
  "nix 0.29.0",
  "ratatui",
