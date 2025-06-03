@@ -4,8 +4,8 @@ use crate::event::send_status_update;
 use crate::event::DevnetEvent;
 use crate::event::Status;
 use crate::orchestrator::ServicesMapHosts;
-use crate::orchestrator::EXCLUDED_STACKS_CACHE_FILES;
-use crate::orchestrator::{copy_directory, get_global_cache_dir, get_project_cache_dir};
+use crate::orchestrator::EXCLUDED_STACKS_SNAPSHOT_FILES;
+use crate::orchestrator::{copy_directory, get_global_snapshot_dir, get_project_snapshot_dir};
 
 use base58::FromBase58;
 use bitcoincore_rpc::bitcoin::Address;
@@ -188,20 +188,21 @@ pub async fn start_chains_coordinator(
     let boot_completed = Arc::new(AtomicBool::new(false));
     let mut current_burn_height = 0;
 
-    let global_cache_dir = get_global_cache_dir();
-    let project_cache_dir = get_project_cache_dir(&config.devnet_config);
+    let global_snapshot_dir = get_global_snapshot_dir();
+    let project_snapshot_dir = get_project_snapshot_dir(&config.devnet_config);
     // Ensure directories exist
-    fs::create_dir_all(&global_cache_dir)
-        .map_err(|e| format!("unable to create global cache directory: {:?}", e))?;
-    fs::create_dir_all(&project_cache_dir)
-        .map_err(|e| format!("unable to create project cache directory: {:?}", e))?;
+    fs::create_dir_all(&global_snapshot_dir)
+        .map_err(|e| format!("unable to create global snapshot directory: {:?}", e))?;
+    fs::create_dir_all(&project_snapshot_dir)
+        .map_err(|e| format!("unable to create project snapshot directory: {:?}", e))?;
 
-    let project_cache_ready = project_cache_dir.join("epoch_3_ready").exists();
+    let project_snapshot_ready = project_snapshot_dir.join("epoch_3_ready").exists();
 
-    if project_cache_ready {
+    if project_snapshot_ready {
         devnet_event_tx
             .send(DevnetEvent::info(
-                "Using cached blockchain data up to epoch 3.0. Startup will be faster.".to_string(),
+                "Using snapshotted blockchain data up to epoch 3.0. Startup will be faster."
+                    .to_string(),
             ))
             .expect("Failed to send event");
     }
@@ -348,55 +349,58 @@ pub async fn start_chains_coordinator(
                         let comment =
                             format!("mining blocks (chain_tip = #{})", bitcoin_block_height);
 
-                        let global_cache_dir = get_global_cache_dir();
-                        let project_cache_dir = get_project_cache_dir(&config.devnet_config);
+                        let global_snapshot_dir = get_global_snapshot_dir();
+                        let project_snapshot_dir = get_project_snapshot_dir(&config.devnet_config);
 
                         // Check if we've reached the target height for database export (142)
-                        // If we've reached epoch 3.0, create the global cache
-                        // TODO: should we wait until AFTER epoch_3_0 block to cache?
+                        // If we've reached epoch 3.0, create the global snapshot
+                        // TODO: should we wait until AFTER epoch_3_0 block to snapshot?
                         if bitcoin_block_height == config.devnet_config.epoch_3_0 {
-                            // Project cache marker
-                            let project_marker = project_cache_dir.join("epoch_3_ready");
+                            // Project snapshot marker
+                            let project_marker = project_snapshot_dir.join("epoch_3_ready");
                             if !project_marker.exists() {
                                 match std::fs::File::create(&project_marker) {
                                     Ok(_) => {
                                         let _ = devnet_event_tx.send(DevnetEvent::success(
-                                            "Project cache data prepared up to epoch 3.0. Future project starts will be faster.".to_string(),
+                                            "Project snapshot data prepared up to epoch 3.0. Future project starts will be faster.".to_string(),
                                         ));
                                     }
                                     Err(e) => {
                                         let _ =
                                             devnet_event_tx.send(DevnetEvent::warning(format!(
-                                                "Failed to create project cache marker file: {}",
+                                                "Failed to create project snapshot marker file: {}",
                                                 e
                                             )));
                                     }
                                 }
                             }
 
-                            let global_marker = global_cache_dir.join("epoch_3_ready");
+                            let global_marker = global_snapshot_dir.join("epoch_3_ready");
                             if !global_marker.exists() {
-                                // Copy project cache to global cache as a template
-                                if project_cache_dir != global_cache_dir {
+                                // Copy project snapshot to global snapshot as a template
+                                if project_snapshot_dir != global_snapshot_dir {
                                     // Copy bitcoin data
-                                    let project_bitcoin_cache = project_cache_dir.join("bitcoin");
-                                    let global_bitcoin_cache = global_cache_dir.join("bitcoin");
-                                    if project_bitcoin_cache.exists() {
+                                    let project_bitcoin_snapshot =
+                                        project_snapshot_dir.join("bitcoin");
+                                    let global_bitcoin_snapshot =
+                                        global_snapshot_dir.join("bitcoin");
+                                    if project_bitcoin_snapshot.exists() {
                                         let _ = copy_directory(
-                                            &project_bitcoin_cache,
-                                            &global_bitcoin_cache,
+                                            &project_bitcoin_snapshot,
+                                            &global_bitcoin_snapshot,
                                             None,
                                         );
                                     }
 
                                     // Copy stacks data
-                                    let project_stacks_cache = project_cache_dir.join("stacks");
-                                    let global_stacks_cache = global_cache_dir.join("stacks");
-                                    if project_stacks_cache.exists() {
+                                    let project_stacks_snapshot =
+                                        project_snapshot_dir.join("stacks");
+                                    let global_stacks_snapshot = global_snapshot_dir.join("stacks");
+                                    if project_stacks_snapshot.exists() {
                                         let _ = copy_directory(
-                                            &project_stacks_cache,
-                                            &global_stacks_cache,
-                                            Some(EXCLUDED_STACKS_CACHE_FILES),
+                                            &project_stacks_snapshot,
+                                            &global_stacks_snapshot,
+                                            Some(EXCLUDED_STACKS_SNAPSHOT_FILES),
                                         );
                                     }
                                 }
@@ -1288,8 +1292,8 @@ async fn export_stacks_api_events(
     }
 
     // Also copy to global cache
-    let global_cache_dir = get_global_cache_dir();
-    let global_export_path = global_cache_dir.join("events_export");
+    let global_snapshot_dir = get_global_snapshot_dir();
+    let global_export_path = global_snapshot_dir.join("events_export");
     fs::create_dir_all(&global_export_path)
         .map_err(|e| format!("unable to create global events export directory: {:?}", e))?;
 

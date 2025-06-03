@@ -3,12 +3,12 @@ extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 
-mod cache_extractor;
 mod chainhooks;
 pub mod chains_coordinator;
 mod event;
 mod log;
 mod orchestrator;
+mod snapshot_extractor;
 mod ui;
 
 pub use chainhook_sdk::observer::MempoolAdmissionData;
@@ -21,7 +21,7 @@ use clarinet_files::{DevnetConfig, NetworkManifest};
 pub use event::DevnetEvent;
 pub use log::{LogData, LogLevel};
 pub use orchestrator::DevnetOrchestrator;
-use orchestrator::{setup_cache_directories, ServicesMapHosts};
+use orchestrator::{setup_snapshot_directories, ServicesMapHosts};
 use std::{
     sync::mpsc::{self, channel, Receiver, Sender},
     thread::sleep,
@@ -86,60 +86,63 @@ async fn do_run_devnet(
     let mut incompatible_config = false;
     if let Err(e) = different_fields {
         let _ = devnet_events_tx.send(DevnetEvent::warning(format!(
-            "Default cache can not be used:\n{}",
+            "Default snapshot can not be used:\n{}",
             e
         )));
         incompatible_config = true
     }
-    // Check for and potentially copy cached data
+    // Check for and potentially copy snapshot data
     if start_local_devnet_services && !no_snapshot && !incompatible_config {
-        let global_cache_dir = orchestrator::get_global_cache_dir();
+        let global_snapshot_dir = orchestrator::get_global_snapshot_dir();
 
-        // First, try to extract embedded cache if it exists and we don't have cache yet
-        let global_cache_ready = global_cache_dir.join("epoch_3_ready").exists();
+        // First, try to extract embedded snapshot if it exists and we don't have snapshot yet
+        let global_snapshot_ready = global_snapshot_dir.join("epoch_3_ready").exists();
 
-        if !global_cache_ready {
+        if !global_snapshot_ready {
             let _ = devnet_events_tx.send(DevnetEvent::info(
-                "No existing cache found, extracting embedded cache data...".to_string(),
+                "No existing snapshot found, extracting embedded snapshot data...".to_string(),
             ));
 
-            match cache_extractor::extract_embedded_cache(&global_cache_dir, &devnet_events_tx) {
+            match snapshot_extractor::extract_embedded_snapshot(
+                &global_snapshot_dir,
+                &devnet_events_tx,
+            ) {
                 Ok(true) => {
                     let _ = devnet_events_tx.send(DevnetEvent::success(
-                        "Embedded cache extracted successfully".to_string(),
+                        "Embedded snapshot extracted successfully".to_string(),
                     ));
                 }
                 Ok(false) => {
                     let _ = devnet_events_tx.send(DevnetEvent::warning(
-                        "No embedded cache available".to_string(),
+                        "No embedded snapshot available".to_string(),
                     ));
                 }
                 Err(e) => {
                     let _ = devnet_events_tx.send(DevnetEvent::warning(format!(
-                        "Failed to extract embedded cache: {}. Continuing without cache.",
+                        "Failed to extract embedded snapshot: {}. Continuing without snapshot.",
                         e
                     )));
                 }
             }
         }
-        match setup_cache_directories(&devnet_config, &devnet_events_tx) {
-            Ok(using_cache) => {
-                if using_cache {
+        match setup_snapshot_directories(&devnet_config, &devnet_events_tx) {
+            Ok(using_snapshot) => {
+                if using_snapshot {
                     let _ = devnet_events_tx.send(DevnetEvent::info(
-                        "Using cached blockchain data up to epoch 3.0. Startup will be faster."
+                        "Using snapshotted blockchain data up to epoch 3.0. Startup will be faster."
                             .to_string(),
                     ));
                 } else {
                     let _ = devnet_events_tx.send(DevnetEvent::info(
-                        "No cached blockchain data found. Initial startup may take longer."
+                        "No snapshot blockchain data found. Initial startup may take longer."
                             .to_string(),
                     ));
                 }
-                using_cache
+                using_snapshot
             }
             Err(e) => {
                 let _ = devnet_events_tx.send(DevnetEvent::warning(format!(
-                    "Error setting up cache directories: {}. Continuing without cache.",
+                    "Error setting up snapshot directories: {}. Continuing without snapshot.",
                     e
                 )));
                 false

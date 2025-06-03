@@ -61,7 +61,7 @@ pub struct ServicesMapHosts {
     pub subnet_api_host: String,
 }
 
-pub static EXCLUDED_STACKS_CACHE_FILES: &[&str] =
+pub static EXCLUDED_STACKS_SNAPSHOT_FILES: &[&str] =
     &["event_observers.sqlite", "event_observers.sqlite-journal"];
 
 impl DevnetOrchestrator {
@@ -1804,7 +1804,7 @@ events_keys = ["*"]
             if project_events_path.exists() {
                 Some(project_events_path)
             } else {
-                let global_events_path = get_global_cache_dir()
+                let global_events_path = get_global_snapshot_dir()
                     .join("events_export")
                     .join("events_cache.tsv");
 
@@ -2858,8 +2858,8 @@ events_keys = ["*"]
             _ => return Err("unable to initialize bitcoin node".to_string()),
         };
         // Check if we have cached data
-        let project_cache_dir = get_project_cache_dir(devnet_config);
-        let cache_ready_marker = project_cache_dir.join("epoch_3_ready");
+        let project_snapshot_dir = get_project_snapshot_dir(devnet_config);
+        let cache_ready_marker = project_snapshot_dir.join("epoch_3_ready");
         let using_cache = cache_ready_marker.exists();
 
         let miner_address = Address::from_str(&devnet_config.miner_btc_address)
@@ -3398,46 +3398,60 @@ fn formatted_docker_error(message: &str, error: DockerError) -> String {
     format!("{}: {}", message, error)
 }
 
-pub fn get_global_cache_dir() -> std::path::PathBuf {
+pub fn get_global_snapshot_dir() -> std::path::PathBuf {
     let home_dir = dirs::home_dir().expect("Unable to retrieve home dir");
     home_dir.join(".clarinet").join("cache").join("devnet")
 }
 
-pub fn get_project_cache_dir(devnet_config: &DevnetConfig) -> std::path::PathBuf {
+pub fn get_project_snapshot_dir(devnet_config: &DevnetConfig) -> std::path::PathBuf {
     PathBuf::from(&devnet_config.working_dir)
         .join("data")
         .join("1")
 }
 
-pub fn setup_cache_directories(
+pub fn setup_snapshot_directories(
     devnet_config: &DevnetConfig,
     devnet_event_tx: &Sender<DevnetEvent>,
 ) -> Result<bool, String> {
     // Get global and project cache directories
-    let global_cache_dir = get_global_cache_dir();
-    let project_cache_dir = get_project_cache_dir(devnet_config);
+    let global_snapshot_dir = get_global_snapshot_dir();
+    let project_snapshot_dir = get_project_snapshot_dir(devnet_config);
 
     // Check if we have template data and project doesn't have a cache yet
-    let global_cache_ready = global_cache_dir.join("epoch_3_ready").exists();
-    let project_cache_exists = project_cache_dir.exists();
-    let project_cache_ready = project_cache_dir.join("epoch_3_ready").exists();
+    let global_snapshot_ready = global_snapshot_dir.join("epoch_3_ready").exists();
+    let project_snapshot_exists = project_snapshot_dir.exists();
+    let project_snapshot_ready = project_snapshot_dir.join("epoch_3_ready").exists();
 
     // Create project cache directory if it doesn't exist
-    if !project_cache_exists {
-        fs::create_dir_all(&project_cache_dir)
+    if project_snapshot_exists {
+        for excluded_file in EXCLUDED_STACKS_SNAPSHOT_FILES {
+            let stale_file = project_snapshot_dir.join("stacks").join(excluded_file);
+            if stale_file.exists() {
+                let _ = fs::remove_file(&stale_file);
+                let _ = devnet_event_tx.send(DevnetEvent::info(format!(
+                    "Removed stale cache file: {}",
+                    excluded_file
+                )));
+            }
+        }
+    } else {
+        fs::create_dir_all(&project_snapshot_dir)
             .map_err(|e| format!("unable to create project cache directory: {:?}", e))?;
     }
 
     // If global cache exists but project cache doesn't have the marker, copy the template
-    if global_cache_ready && !project_cache_ready && global_cache_dir != project_cache_dir {
+    if global_snapshot_ready
+        && !project_snapshot_ready
+        && global_snapshot_dir != project_snapshot_dir
+    {
         let _ = devnet_event_tx.send(DevnetEvent::info(
             "Copying blockchain template data to project cache. This will speed up future starts."
                 .to_string(),
         ));
 
         // Copy bitcoin data
-        let global_bitcoin_cache = global_cache_dir.join("bitcoin");
-        let project_bitcoin_cache = project_cache_dir.join("bitcoin");
+        let global_bitcoin_cache = global_snapshot_dir.join("bitcoin");
+        let project_bitcoin_cache = project_snapshot_dir.join("bitcoin");
         if global_bitcoin_cache.exists() && !project_bitcoin_cache.exists() {
             println!(
                 "copying bitcoin cache to project {}",
@@ -3448,8 +3462,8 @@ pub fn setup_cache_directories(
         }
 
         // Copy stacks data
-        let global_stacks_cache = global_cache_dir.join("stacks");
-        let project_stacks_cache = project_cache_dir.join("stacks");
+        let global_stacks_cache = global_snapshot_dir.join("stacks");
+        let project_stacks_cache = project_snapshot_dir.join("stacks");
         if global_stacks_cache.exists() && !project_stacks_cache.exists() {
             println!("copying stacks cache to project");
             // exlude copy of
@@ -3459,19 +3473,19 @@ pub fn setup_cache_directories(
             copy_directory(
                 &global_stacks_cache,
                 &project_stacks_cache,
-                Some(EXCLUDED_STACKS_CACHE_FILES),
+                Some(EXCLUDED_STACKS_SNAPSHOT_FILES),
             )
             .map_err(|e| format!("Failed to copy Stacks template cache: {}", e))?;
         }
 
         // Copy the marker file too
         let _ = fs::copy(
-            global_cache_dir.join("epoch_3_ready"),
-            project_cache_dir.join("epoch_3_ready"),
+            global_snapshot_dir.join("epoch_3_ready"),
+            project_snapshot_dir.join("epoch_3_ready"),
         );
     }
 
-    Ok(project_cache_ready || (global_cache_ready && !project_cache_exists))
+    Ok(project_snapshot_ready || (global_snapshot_ready && !project_snapshot_exists))
 }
 
 pub fn copy_directory(
