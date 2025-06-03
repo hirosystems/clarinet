@@ -13,7 +13,7 @@ fn symbolic_expression_to_name(symbolic_expr: &SymbolicExpression) -> String {
     match &symbolic_expr.expr {
         SymbolicExpressionType::Atom(name) => name.to_string(),
         SymbolicExpressionType::List(list) => symbolic_expression_to_name(&(*list).to_vec()[0]),
-        _ => "".to_string(),
+        _ => String::new(),
     }
 }
 
@@ -291,7 +291,7 @@ impl<'a> ASTVisitor<'a> for ASTSymbols {
         let nft_type = match nft_type.expr.clone() {
             SymbolicExpressionType::Atom(name) => name.to_string(),
             SymbolicExpressionType::List(_) => "tuple".to_string(),
-            _ => "".to_string(),
+            _ => String::new(),
         };
 
         self.symbols.push(build_symbol(
