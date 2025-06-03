@@ -183,7 +183,7 @@ impl<'a> Aggregator<'a> {
 
         // use peekable to handle trailing comments nicely
         let mut iter = expressions.iter().peekable();
-        let mut result = "".to_owned(); // Accumulate results here
+        let mut result = String::new(); // Accumulate results here
 
         while let Some(expr) = iter.next() {
             let trailing_comment = get_trailing_comment(expr, &mut iter);
@@ -354,7 +354,7 @@ impl<'a> Aggregator<'a> {
                                             " ".to_string()
                                         }
                                     } else {
-                                        "".to_string()
+                                        String::new()
                                     }
                                 )
                             }

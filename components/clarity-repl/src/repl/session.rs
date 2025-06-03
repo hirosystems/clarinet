@@ -102,7 +102,7 @@ impl Session {
             println!("Collecting coverage data...");
             coverage_hook.collect_lcov_content(asts, contract_paths)
         } else {
-            "".to_string()
+            String::new()
         }
     }
 
@@ -266,7 +266,7 @@ impl Session {
 
         if let Some(cost) = cost {
             let headers = [
-                "".to_string(),
+                String::new(),
                 "Consumed".to_string(),
                 "Limit".to_string(),
                 "Percentage".to_string(),
