@@ -237,6 +237,10 @@ impl Session {
             cmd if cmd.starts_with("::encode") => self.encode(cmd),
             cmd if cmd.starts_with("::decode") => self.decode(cmd),
 
+            cmd if cmd.starts_with("::print-constant") => self.print_constant(cmd),
+            cmd if cmd.starts_with("::print-data-var") => self.print_data_var(cmd),
+            cmd if cmd.starts_with("::print-map-val") => self.print_map_val(cmd),
+
             _ => "Invalid command. Try `::help`".yellow().to_string(),
         }
     }
@@ -801,6 +805,19 @@ impl Session {
             "::decode <bytes>\t\t\tDecode a Clarity Value bytes representation".yellow()
         ));
 
+        output.push(format!(
+            "{}",
+            "::print-constant [<contract>.]<constant>\tPrint the value of a constant".yellow()
+        ));
+        output.push(format!(
+            "{}",
+            "::print-data-var [<contract>.]<var>\t\tPrint the value of a data variable".yellow()
+        ));
+        output.push(format!(
+            "{}",
+            "::print-map-val [<contract>.]<map> <key>\tPrint a map entry for a key".yellow()
+        ));
+
         output.join("\n")
     }
 
@@ -1186,6 +1203,107 @@ impl Session {
     fn keywords(&self) -> String {
         let keywords = self.get_clarity_keywords();
         format!("{}", keywords.join("\n").yellow())
+    }
+
+    fn parse_contract_and_item_name(&self, name_str: &str, command_name: &str) -> Result<(QualifiedContractIdentifier, String), String> {
+        let parts: Vec<&str> = name_str.splitn(2, '.').collect();
+        if parts.len() == 2 {
+            let contract_name_str = parts[0];
+            let item_name = parts[1].to_string();
+            match QualifiedContractIdentifier::parse(contract_name_str) {
+                Ok(qid) => Ok((qid, item_name)),
+                Err(e) => Err(format!("Error parsing contract identifier '{}': {}. Usage: {} <contract-identifier>.<item-name>", contract_name_str, e, command_name)),
+            }
+        } else if parts.len() == 1 {
+            let item_name = parts[0].to_string();
+            if let Some(current_contract_id) = self.interpreter.current_contract_id.clone() {
+                Ok((current_contract_id, item_name))
+            } else {
+                Err(format!("No current contract context. Specify contract explicitly: {} <contract-identifier>.{}", command_name, item_name))
+            }
+        } else {
+            Err(format!("Invalid format. Usage: {} [<contract-identifier>.]<item-name>", command_name))
+        }
+    }
+
+    pub fn print_constant(&mut self, command: &str) -> String {
+        let parts: Vec<&str> = command.trim().splitn(2, ' ').collect();
+        if parts.len() != 2 {
+            return format!("Invalid format. Usage: ::print-constant [<contract-identifier>.]<constant-name>");
+        }
+        let name_str = parts[1];
+
+        match self.parse_contract_and_item_name(name_str, "::print-constant") {
+            Ok((contract_id, const_name)) => {
+                if let Some(parsed_contract) = self.contracts.get(&contract_id) {
+                    for def in &parsed_contract.contract_ast.definitions {
+                        if let clarity::vm::ast::Definition::DefineConstant(dc) = def {
+                            if dc.name == const_name {
+                                return format!("{} = {}", const_name, value_to_string(&dc.value, &self.interpreter.vm, false, false));
+                            }
+                        }
+                    }
+                    format!("Constant '{}' not found in contract '{}'", const_name, contract_id)
+                } else {
+                    format!("Contract '{}' not found or not loaded.", contract_id)
+                }
+            }
+            Err(e) => e,
+        }
+    }
+
+    pub fn print_data_var(&mut self, command: &str) -> String {
+        let parts: Vec<&str> = command.trim().splitn(2, ' ').collect();
+        if parts.len() != 2 {
+            return format!("Invalid format. Usage: ::print-data-var [<contract-identifier>.]<var-name>");
+        }
+        let name_str = parts[1];
+
+        match self.parse_contract_and_item_name(name_str, "::print-data-var") {
+            Ok((contract_id, var_name)) => {
+                match self.interpreter.vm.get_var(&contract_id, &var_name) {
+                    Some(value) => format!("{} = {}", var_name, value_to_string(&value, &self.interpreter.vm, false, false)),
+                    None => format!("Data variable '{}' not found in contract '{}' or contract not found.", var_name, contract_id),
+                }
+            }
+            Err(e) => e,
+        }
+    }
+
+    pub fn print_map_val(&mut self, command: &str) -> String {
+        let parts: Vec<&str> = command.trim().splitn(3, ' ').collect();
+        if parts.len() != 3 {
+            return format!("Invalid format. Usage: ::print-map-val [<contract-identifier>.]<map-name> <key-expression>");
+        }
+        let name_str = parts[1];
+        let key_expr_str = parts[2];
+
+        match self.parse_contract_and_item_name(name_str, "::print-map-val") {
+            Ok((contract_id, map_name)) => {
+                let key_value_result = self.eval_clarity_string(key_expr_str);
+                match self.eval(key_expr_str.to_string(), false) {
+                    Ok(execution_result) => {
+                        match execution_result.result {
+                            Ok(key_value) => {
+                                match self.interpreter.vm.get_map_entry(&contract_id, &map_name, &key_value) {
+                                    Some(Some(value)) => format!("{}["{}"] = {}", map_name, value_to_string(&key_value, &self.interpreter.vm, false, false), value_to_string(&value, &self.interpreter.vm, false, false)),
+                                    Some(None) => format!("Key '{}' not found in map '{}' of contract '{}'", value_to_string(&key_value, &self.interpreter.vm, false, false), map_name, contract_id),
+                                    None => format!("Map '{}' not found in contract '{}'", map_name, contract_id),
+                                }
+                            }
+                            Err(eval_err) => {
+                                format!("Error evaluating key expression '{}': {:?}", key_expr_str, eval_err)
+                            }
+                        }
+                    }
+                    Err(diag_vec) => {
+                        let diagnostics_str = diag_vec.iter().map(|d| format!("{:?}", d)).collect::<Vec<String>>().join("\n");
+                        format!("Error evaluating key expression '{}':\n{}", key_expr_str, diagnostics_str)
+                    }
+                }
+            }
+            Err(e) => e,
+        }
     }
 }
 
@@ -1925,5 +2043,187 @@ mod tests {
             format!("(contract-call? .{} get-burn u18)", contract.name).as_str(),
         );
         assert_eq!(result, Value::UInt(21));
+    }
+
+    // Tests for ::print-* commands
+    const PRINT_COMMANDS_TEST_CONTRACT_NAME: &str = "print-commands-contract";
+
+    fn deploy_print_commands_test_contract(session: &mut Session) -> QualifiedContractIdentifier {
+        let contract_code = r#"
+;; Contract for testing ::print-* REPL commands
+(define-constant HELLO_WORLD "Hello World")
+(define-constant MY_UINT u123)
+(define-constant MY_INT i-456)
+(define-constant MY_BOOL true)
+(define-constant MY_DEPLOYER_PRINCIPAL tx-sender)
+(define-constant MY_BUFFER 0xdeadbeef)
+
+(define-data-var data-uint uint u0)
+(define-data-var data-string-ascii (string-ascii 20) "initial-ascii")
+(define-data-var data-bool bool false)
+(define-data-var data-principal principal tx-sender)
+
+(define-map simple-map uint (string-utf8 30))
+(define-map principal-map principal bool)
+(define-map tuple-key-map {k1: uint, k2: (string-ascii 5)} (buff 10))
+
+(define-public (init-data)
+  (begin
+    (var-set data-uint u987)
+    (var-set data-string-ascii "new-ascii")
+    (var-set data-bool true)
+    (var-set data-principal 'ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5)
+    (map-set simple-map u1 "Value for 1")
+    (map-set simple-map u2 "Another Value")
+    (map-set principal-map 'ST2CY5V39NH5AVFMGYQMYY3D000S19R52V1G4E1HT true)
+    (map-set tuple-key-map {k1: u10, k2: "abc"} 0x010203)
+    (ok true)
+  )
+)
+
+(define-read-only (get-data-uint) (var-get data-uint))
+        "#;
+
+        let deployer_address = session.get_tx_sender(); // Get current deployer for MY_DEPLOYER_PRINCIPAL
+
+        let contract = ClarityContractBuilder::new()
+            .name(PRINT_COMMANDS_TEST_CONTRACT_NAME)
+            .code_source(contract_code.into())
+            .build();
+        
+        session.deploy_contract(&contract, false, None).expect("Failed to deploy test contract");
+        
+        // Set current_contract_id by evaluating a simple expression related to the contract
+        // This simulates a context where the contract was just interacted with.
+        let contract_id = QualifiedContractIdentifier::parse(&format!("{}.{}", deployer_address, PRINT_COMMANDS_TEST_CONTRACT_NAME)).unwrap();
+        session.interpreter.current_contract_id = Some(contract_id.clone());
+
+        // Initialize contract state
+        let _ = session.eval(format!("(contract-call? .{PRINT_COMMANDS_TEST_CONTRACT_NAME} init-data)"), false).expect("init-data call failed");
+        
+        contract_id
+    }
+
+    #[test]
+    fn test_print_constant_commands() {
+        let mut session = Session::new(SessionSettings::default());
+        let contract_id = deploy_print_commands_test_contract(&mut session);
+        let fq_contract_name = contract_id.to_string();
+        let deployer_principal_str = session.get_tx_sender();
+
+        // Fully qualified
+        let result = session.handle_command(&format!("::print-constant {}.HELLO_WORLD", fq_contract_name));
+        assert_eq!(result, format!("HELLO_WORLD = \"Hello World\""));
+        let result = session.handle_command(&format!("::print-constant {}.MY_UINT", fq_contract_name));
+        assert_eq!(result, format!("MY_UINT = u123"));
+        let result = session.handle_command(&format!("::print-constant {}.MY_DEPLOYER_PRINCIPAL", fq_contract_name));
+        assert_eq!(result, format!("MY_DEPLOYER_PRINCIPAL = {}", deployer_principal_str));
+
+        // Using current context (contract_id was set in deploy_print_commands_test_contract)
+        let result = session.handle_command("::print-constant MY_INT");
+        assert_eq!(result, format!("MY_INT = i-456"));
+        let result = session.handle_command("::print-constant MY_BOOL");
+        assert_eq!(result, format!("MY_BOOL = true"));
+        let result = session.handle_command("::print-constant MY_BUFFER");
+        assert_eq!(result, format!("MY_BUFFER = 0xdeadbeef"));
+
+        // Not found
+        let result = session.handle_command("::print-constant NON_EXISTENT_CONST");
+        assert_eq!(result, format!("Constant 'NON_EXISTENT_CONST' not found in contract '{}'", fq_contract_name));
+        let result = session.handle_command("::print-constant .fake-contract.HELLO_WORLD");
+        assert!(result.contains("Contract '.fake-contract' not found or not loaded"));
+        
+        // Invalid format
+        let result = session.handle_command("::print-constant");
+        assert!(result.contains("Invalid format. Usage: ::print-constant"));
+    }
+
+    #[test]
+    fn test_print_data_var_commands() {
+        let mut session = Session::new(SessionSettings::default());
+        let contract_id = deploy_print_commands_test_contract(&mut session);
+        let fq_contract_name = contract_id.to_string();
+        let deployer_principal_str = session.get_tx_sender();
+
+        // Fully qualified
+        let result = session.handle_command(&format!("::print-data-var {}.data-uint", fq_contract_name));
+        assert_eq!(result, format!("data-uint = u987"));
+
+        // Using current context
+        let result = session.handle_command("::print-data-var data-string-ascii");
+        assert_eq!(result, format!("data-string-ascii = \"new-ascii\""));
+        let result = session.handle_command("::print-data-var data-bool");
+        assert_eq!(result, format!("data-bool = true"));
+        let result = session.handle_command("::print-data-var data-principal");
+        assert_eq!(result, format!("data-principal = ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5"));
+        
+        // Test original deployer principal for a var (if it was not changed by init-data)
+        // For this, we'd need a var that retains initial tx-sender. Our `data-principal` is overwritten.
+        // We can test this by deploying a new contract where it's not overwritten or adding one such var.
+        // For now, this case is implicitly covered by `MY_DEPLOYER_PRINCIPAL` constant test.
+
+        // Not found
+        let result = session.handle_command("::print-data-var NON_EXISTENT_VAR");
+        assert_eq!(result, format!("Data variable 'NON_EXISTENT_VAR' not found in contract '{}' or contract not found.", fq_contract_name));
+        let result = session.handle_command("::print-data-var .fake-contract.data-uint");
+        assert!(result.contains("Data variable 'data-uint' not found in contract '.fake-contract' or contract not found."));
+
+        // Invalid format
+        let result = session.handle_command("::print-data-var");
+        assert!(result.contains("Invalid format. Usage: ::print-data-var"));
+    }
+
+    #[test]
+    fn test_print_map_val_commands() {
+        let mut session = Session::new(SessionSettings::default());
+        let contract_id = deploy_print_commands_test_contract(&mut session);
+        let fq_contract_name = contract_id.to_string();
+
+        // Fully qualified
+        let result = session.handle_command(&format!("::print-map-val {}.simple-map u1", fq_contract_name));
+        assert_eq!(result, format!("simple-map[\"u1\"] = \"Value for 1\""));
+
+        // Using current context
+        let result = session.handle_command("::print-map-val simple-map u2");
+        assert_eq!(result, format!("simple-map[\"u2\"] = \"Another Value\""));
+        let result = session.handle_command("::print-map-val principal-map 'ST2CY5V39NH5AVFMGYQMYY3D000S19R52V1G4E1HT");
+        assert_eq!(result, format!("principal-map[\"ST2CY5V39NH5AVFMGYQMYY3D000S19R52V1G4E1HT\"] = true"));
+        let result = session.handle_command("::print-map-val tuple-key-map {{k1: u10, k2: \"abc\"}}");
+        assert_eq!(result, format!("tuple-key-map[\"{{k1: u10, k2: \\\"abc\\\"}}\"] = 0x010203")); // Note: Escaping for string comparison
+        
+        // Key not found
+        let result = session.handle_command("::print-map-val simple-map u999");
+        assert_eq!(result, format!("Key 'u999' not found in map 'simple-map' of contract '{}'", fq_contract_name));
+
+        // Map not found
+        let result = session.handle_command("::print-map-val NON_EXISTENT_MAP u1");
+        assert_eq!(result, format!("Map 'NON_EXISTENT_MAP' not found in contract '{}'", fq_contract_name));
+        let result = session.handle_command("::print-map-val .fake-contract.simple-map u1");
+        assert!(result.contains("Map 'simple-map' not found in contract '.fake-contract'"));
+        
+        // Invalid key expression
+        let result = session.handle_command("::print-map-val simple-map (invalid-expr");
+        assert!(result.contains("Error evaluating key expression '(invalid-expr':")); // Partial match for error diagnostics
+
+        // Invalid format
+        let result = session.handle_command("::print-map-val simple-map"); // Missing key
+        assert!(result.contains("Invalid format. Usage: ::print-map-val"));
+        let result = session.handle_command("::print-map-val"); // Missing map and key
+        assert!(result.contains("Invalid format. Usage: ::print-map-val"));
+    }
+
+    #[test]
+    fn test_print_commands_no_context() {
+        let mut session = Session::new(SessionSettings::default());
+        // DO NOT deploy a contract or set current_contract_id
+
+        let result = session.handle_command("::print-constant MY_UINT");
+        assert_eq!(result, "No current contract context. Specify contract explicitly: ::print-constant <contract-identifier>.MY_UINT");
+
+        let result = session.handle_command("::print-data-var data-uint");
+        assert_eq!(result, "No current contract context. Specify contract explicitly: ::print-data-var <contract-identifier>.data-uint");
+
+        let result = session.handle_command("::print-map-val simple-map u1");
+        assert_eq!(result, "No current contract context. Specify contract explicitly: ::print-map-val <contract-identifier>.simple-map");
     }
 }
