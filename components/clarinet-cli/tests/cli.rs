@@ -54,7 +54,7 @@ fn test_new_project() {
     ];
     let stdout = String::from_utf8_lossy(&cmd.stdout);
     let stdout_lines: Vec<_> = stdout.lines().map(str::trim).collect();
-    let actual = stdout_lines[..expected_lines.len()].to_vec();
+    let actual = &stdout_lines[..expected_lines.len()];
     assert_eq!(actual, expected_lines);
 
     let project_path = temp_dir.path().join(project_name);
