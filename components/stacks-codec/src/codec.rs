@@ -352,7 +352,7 @@ impl<const MAX_SIZE: u16> StacksMessageCodec for BitVec<MAX_SIZE> {
 impl<const MAX_SIZE: u16> BitVec<MAX_SIZE> {
     /// Return the number of bytes needed to store `len` bits.
     fn data_len(len: u16) -> u16 {
-        len / 8 + if len % 8 == 0 { 0 } else { 1 }
+        len.div_ceil(8)
     }
 }
 
@@ -1022,11 +1022,7 @@ impl TransactionSpendingCondition {
     pub fn num_signatures(&self) -> u16 {
         match *self {
             TransactionSpendingCondition::Singlesig(ref data) => {
-                if data.signature != MessageSignature::empty() {
-                    1
-                } else {
-                    0
-                }
+                u16::from(data.signature != MessageSignature::empty())
             }
             TransactionSpendingCondition::Multisig(ref data) => {
                 let mut num_sigs: u16 = 0;
