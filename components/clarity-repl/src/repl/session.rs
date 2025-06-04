@@ -870,7 +870,7 @@ impl Session {
     }
 
     fn parse_and_set_tx_sender(&mut self, command: &str) -> String {
-        let args: Vec<_> = command.split(' ').collect();
+        let args: Vec<_> = command.split(' ').map(|s| s.trim()).collect();
 
         if args.len() != 2 {
             return format!("{}", "Usage: ::set_tx_sender <address>".red());
