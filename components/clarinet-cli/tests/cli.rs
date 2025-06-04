@@ -156,3 +156,49 @@ fn test_requirement_add() {
         .any(|c| c.contract_id == requirement_name);
     assert!(found, "Requirement not found in manifest");
 }
+
+#[test]
+fn test_requirement_add_with_quotes() {
+    let project_name = "test_requirement_add_with_quotes";
+    let temp_dir = create_new_project(project_name);
+    let project_path = temp_dir.path().join(project_name);
+    let requirement_name_with_quotes = "\"SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.sip-010-trait-ft-standard\"";
+    let requirement_name_expected = "SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.sip-010-trait-ft-standard";
+    let status = Command::new(env!("CARGO_BIN_EXE_clarinet"))
+        .args(["requirement", "add", requirement_name_with_quotes])
+        .current_dir(&project_path)
+        .status();
+    assert!(status.unwrap().success(), "Failed to add requirement with quotes");
+
+    let manifest = parse_manifest(&project_path);
+    let found = manifest
+        .project
+        .requirements
+        .iter()
+        .flatten()
+        .any(|c| c.contract_id == requirement_name_expected);
+    assert!(found, "Requirement (with quotes) not found in manifest");
+}
+
+#[test]
+fn test_requirement_add_trait_reference() {
+    let project_name = "test_requirement_add_trait_reference";
+    let temp_dir = create_new_project(project_name);
+    let project_path = temp_dir.path().join(project_name);
+    // Using a fictional trait reference for testing structure, actual resolution depends on network state not mocked here.
+    let requirement_name = "SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.some-contract.some-trait";
+    let status = Command::new(env!("CARGO_BIN_EXE_clarinet"))
+        .args(["requirement", "add", requirement_name])
+        .current_dir(&project_path)
+        .status();
+    assert!(status.unwrap().success(), "Failed to add trait reference requirement");
+
+    let manifest = parse_manifest(&project_path);
+    let found = manifest
+        .project
+        .requirements
+        .iter()
+        .flatten()
+        .any(|c| c.contract_id == requirement_name);
+    assert!(found, "Trait reference requirement not found in manifest");
+}
