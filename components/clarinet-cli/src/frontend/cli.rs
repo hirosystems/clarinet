@@ -259,7 +259,7 @@ struct RemoveContract {
 
 #[derive(Parser, PartialEq, Clone, Debug)]
 struct AddRequirement {
-    /// Contract id (ex. SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.nft-trait or SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.nft-trait.nft-trait), optionally enclosed in single or double quotes.
+    /// Contract id (ex. SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.nft-trait)
     pub contract_id: String,
     /// Path to Clarinet.toml
     #[clap(long = "manifest-path", short = 'm')]
