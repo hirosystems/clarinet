@@ -7,6 +7,7 @@
 
 ##### Bug Fixes
 
+- Use old explorer in devnet (#1853) (8035a00f)
 - LSP synchronization (#1828) (276400c6)
 - Use correct `default()` function for initializing LSP options (49746c4f)
 - Top level newline issue (#1822) (a10a6c25)
