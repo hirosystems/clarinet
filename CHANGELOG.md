@@ -10,6 +10,7 @@
 - LSP synchronization (#1828) (276400c6)
 - Use correct `default()` function for initializing LSP options (49746c4f)
 - Top level newline issue (#1822) (a10a6c25)
+- Retain comment original start_line (#1831) (54ffbee8)
 - Update npm project template (#1814) (e05a3673)
 
 ##### Other Changes
