@@ -6,6 +6,8 @@ use lsp_types::Diagnostic as LspDiagnostic;
 use lsp_types::Url;
 use lsp_types::{DiagnosticSeverity, Position, Range};
 
+pub mod file_logger;
+
 #[allow(unused_macros)]
 #[cfg(target_arch = "wasm32")]
 macro_rules! log {
