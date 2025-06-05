@@ -639,7 +639,7 @@ checksum = "f46ad14479a25103f283c0f10005961cf086d8dc42205bb44c46ac563475dca6"
 [[package]]
 name = "clar2wasm"
 version = "0.1.0"
-source = "git+https://github.com/stacks-network/clarity-wasm.git?branch=main#0e9f0890d4a3bb3060ff893c684d3458fc79025b"
+source = "git+https://github.com/stacks-network/clarity-wasm.git?branch=main#9a0c9ad8a6b7913bb5eb20fe59faa3a0001e1669"
 dependencies = [
  "chrono",
  "clap",
@@ -2747,7 +2747,7 @@ dependencies = [
 [[package]]
 name = "libstackerdb"
 version = "0.0.1"
-source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat%2Fclarity-wasm-develop#c10dde4f0dda1a35104a022af00a316dff7f3296"
+source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat%2Fclarity-wasm-develop#6adc670a5cad8290b3862c4dd00952f1d038086d"
 dependencies = [
  "clarity",
  "secp256k1 0.24.3",
@@ -3360,7 +3360,7 @@ checksum = "439ee305def115ba05938db6eb1644ff94165c5ab5e9420d1c1bcedbba909391"
 [[package]]
 name = "pox-locking"
 version = "2.4.0"
-source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat%2Fclarity-wasm-develop#c10dde4f0dda1a35104a022af00a316dff7f3296"
+source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat%2Fclarity-wasm-develop#6adc670a5cad8290b3862c4dd00952f1d038086d"
 dependencies = [
  "clarity",
  "slog",
@@ -4693,7 +4693,7 @@ dependencies = [
 [[package]]
 name = "stackslib"
 version = "0.0.1"
-source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat%2Fclarity-wasm-develop#c10dde4f0dda1a35104a022af00a316dff7f3296"
+source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat%2Fclarity-wasm-develop#6adc670a5cad8290b3862c4dd00952f1d038086d"
 dependencies = [
  "clar2wasm",
  "clarity",
