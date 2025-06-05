@@ -20,7 +20,8 @@ pub const DEFAULT_STACKS_API_IMAGE: &str = "hirosystems/stacks-blockchain-api:ma
 
 pub const DEFAULT_BITCOIN_NODE_IMAGE: &str = "quay.io/hirosystems/bitcoind:26.0";
 pub const DEFAULT_BITCOIN_EXPLORER_IMAGE: &str = "quay.io/hirosystems/bitcoin-explorer:devnet";
-pub const DEFAULT_STACKS_EXPLORER_IMAGE: &str = "hirosystems/explorer:latest";
+// This is the latest Explorer image before the "hybrid version" with SSR
+pub const DEFAULT_STACKS_EXPLORER_IMAGE: &str = "hirosystems/explorer:1.276.1";
 pub const DEFAULT_POSTGRES_IMAGE: &str = "postgres:alpine";
 pub const DEFAULT_SUBNET_NODE_IMAGE: &str = "hirosystems/stacks-subnets:0.8.1";
 pub const DEFAULT_SUBNET_API_IMAGE: &str = "hirosystems/stacks-blockchain-api:master";
