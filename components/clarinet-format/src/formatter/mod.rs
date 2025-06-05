@@ -85,8 +85,8 @@ impl ClarityFormatter {
         self.format_file(source)
     }
     /// for range formatting within editors
-    pub fn format_section(&self, source: &str) -> String {
-        let pse = clarity::vm::ast::parser::v2::parse(source).unwrap();
+    pub fn format_section(&self, source: &str) -> Result<String, String> {
+        let pse = clarity::vm::ast::parser::v2::parse(source).map_err(|e| e.to_string())?;
 
         // range formatting specifies to the aggregator that we're
         // starting mid-source and thus should pre-populate
@@ -96,11 +96,11 @@ impl ClarityFormatter {
         let agg = Aggregator::new(&self.settings, &pse, Some(source));
 
         let result = agg.generate();
-        if leading_spaces.is_empty() {
+        Ok(if leading_spaces.is_empty() {
             result
         } else {
             format!("{}{}", leading_spaces, result)
-        }
+        })
     }
 }
 
@@ -1345,12 +1345,12 @@ mod tests_formatter {
 
     fn format_with_default(source: &str) -> String {
         let formatter = ClarityFormatter::new(Settings::default());
-        formatter.format_section(source)
+        formatter.format_section(source).unwrap()
     }
 
     fn format_with(source: &str, settings: Settings) -> String {
         let formatter = ClarityFormatter::new(settings);
-        formatter.format_section(source)
+        formatter.format_section(source).unwrap()
     }
 
     #[test]

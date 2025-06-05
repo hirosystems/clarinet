@@ -10,7 +10,6 @@ use lsp_types::{
     InitializeParams, InitializeResult, Location, SignatureHelp, SignatureHelpParams, TextEdit,
 };
 use serde::{Deserialize, Serialize};
-use std::panic;
 use std::sync::{Arc, RwLock};
 
 use super::requests::capabilities::{get_capabilities, InitializationOptions};
@@ -436,7 +435,7 @@ pub fn process_request(
                 max_line_length,
             };
 
-            // We need to extract the text of just this range to format it
+            // extract the text of just this range
             let lines: Vec<&str> = source.lines().collect();
             let start_line = param.range.start.line as usize;
             let end_line = param.range.end.line as usize;
@@ -461,7 +460,6 @@ pub fn process_request(
 
                 line[start_char..end_char].to_string()
             } else {
-                // Multiline selection
                 let mut result = String::new();
 
                 // First line (might be partial)
@@ -503,16 +501,15 @@ pub fn process_request(
                 temp_text.pop();
             }
 
-            // Format just the selected text - but handle panics/errors gracefully
             let formatter = clarinet_format::formatter::ClarityFormatter::new(formatting_options);
 
             // Try to format the range text, but handle panics/errors gracefully
-            let formatted_result = panic::catch_unwind(|| formatter.format_section(&range_text));
+            let formatted_result = formatter.format_section(&range_text);
 
             let formatted_result = match formatted_result {
                 Ok(formatted_text) => {
                     let mut result = formatted_text.trim_end().to_string();
-                    // Add back exactly the same number of trailing newlines that were in the original
+                    // Add back the same number of trailing newlines that were in the original
                     for _ in 0..trailing_newlines {
                         result.push('\n');
                     }
@@ -520,7 +517,7 @@ pub fn process_request(
                 }
                 Err(_) => {
                     // If the selected range contains malformed/incomplete Clarity code,
-                    // or if formatting panics, return None to indicate formatting is not possible
+                    // return None to indicate formatting is not possible
                     return Ok(LspRequestResponse::DocumentRangeFormatting(None));
                 }
             };
@@ -597,12 +594,10 @@ mod range_formatting_tests {
     fn create_test_editor_state(source: &str) -> EditorStateInput {
         let mut editor_state = EditorState::new();
 
-        // Create FileLocation directly without parsing URLs
         let contract_location = FileLocation::FileSystem {
             path: PathBuf::from("test.clar"),
         };
 
-        // Call insert_active_contract on the EditorState before wrapping it
         editor_state.insert_active_contract(
             contract_location,
             ClarityVersion::Clarity2,
@@ -610,19 +605,15 @@ mod range_formatting_tests {
             source,
         );
 
-        // Now wrap it in EditorStateInput
         EditorStateInput::Owned(editor_state)
     }
 
     #[test]
-    fn test_range_formatting() {
-        // This test reproduces the specific bug where newlines are missing
-        // in multiline range extraction
+    fn test_range_formatting_comments() {
         let source = "(ok true)\n\n(define-public (foo)\n  ;; this is a comment\n   (ok   true)\n)";
 
         let editor_state_input = create_test_editor_state(source);
 
-        // Select range that spans multiple lines - this triggers the multiline extraction
         let params = DocumentRangeFormattingParams {
             text_document: TextDocumentIdentifier {
                 uri: Url::parse("file:///test.clar").unwrap(),
