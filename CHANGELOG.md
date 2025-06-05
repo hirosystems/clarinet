@@ -1,3 +1,22 @@
+# [3.1.0](https://github.com/hirosystems/clarinet/compare/v3.0.2...v3.1.0) (2025-05-14)
+
+##### New Features
+
+- Accept ast only in the formatter (#1826) (3cbe9243)
+- Add `--stdin` flag to formatter (5b5cecae)
+
+##### Bug Fixes
+
+- LSP synchronization (#1828) (276400c6)
+- Use correct `default()` function for initializing LSP options (49746c4f)
+- Top level newline issue (#1822) (a10a6c25)
+- Update npm project template (#1814) (e05a3673)
+
+##### Other Changes
+
+- Manual_let_else (#1832) (e7e3a33a)
+- Basic cli tests (#1836) (e473d637)
+
 # [3.0.2](https://github.com/hirosystems/clarinet/compare/v3.0.1...v3.0.2) (2025-05-14)
 
 ##### Chores
