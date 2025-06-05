@@ -14,7 +14,6 @@ fn get_uint_header_value(headers: &HeaderMap, header_name: &str) -> Option<u32> 
         .and_then(|s| s.parse().ok())
 }
 
-/// Handles HTTP response, returning success data or appropriate error
 fn handle_response<T: DeserializeOwned>(
     response: reqwest::blocking::Response,
 ) -> Result<T, String> {
