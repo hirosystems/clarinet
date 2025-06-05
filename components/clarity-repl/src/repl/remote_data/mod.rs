@@ -370,6 +370,74 @@ mod tests {
         );
     }
 
+    #[test]
+    fn it_crashes_if_rate_limit_is_reached() {
+        let mut server = mockito::Server::new();
+
+        let _rate_limit_mock = server
+            .mock("GET", "/v2/info")
+            .with_status(429)
+            .with_header("content-type", "application/json")
+            .with_header("ratelimit-remaining", "0")
+            .with_header("retry-after", "1")
+            .with_body(r#"{"error":"Rate limit exceeded","message":"Too many requests"}"#)
+            .create();
+
+        let client = HttpClient::new(ApiUrl(server.url()));
+        let info_result = std::panic::catch_unwind(|| client.fetch_info());
+        assert!(
+            info_result.is_err(),
+            "Expected session creation to succeed after rate limit retries"
+        );
+    }
+
+    #[test]
+    fn it_retries_when_reaching_rate_limit() {
+        let mut server = mockito::Server::new();
+
+        let _rate_limit_mock = server
+            .mock("GET", "/v2/info")
+            .with_status(429)
+            .with_header("content-type", "application/json")
+            .with_header("ratelimit-remaining", "0")
+            .with_header("retry-after", "1")
+            .with_body(r#"{"error":"Rate limit exceeded","message":"Too many requests"}"#)
+            .expect(2)
+            .create();
+
+        // The third call returns a 200
+        let _ = server
+            .mock("GET", "/v2/info")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(r#"{
+                "peer_version": 402653196,
+                "pox_consensus": "0ce291b675bb0148b435a884e250aafc3fd6bc86",
+                "burn_block_height": 882262,
+                "stable_pox_consensus": "f517f5aced5be836f9fe10980ff06108a6a2acec",
+                "stable_burn_block_height": 882255,
+                "network_id": 1,
+                "parent_network_id": 3652501241,
+                "stacks_tip_height": 556946,
+                "stacks_tip": "70526983b920b31d5e0d65750033a4dc2f328f31a3ffeb1f8780bfb164d50502",
+                "stacks_tip_consensus_hash": "0ce291b675bb0148b435a884e250aafc3fd6bc86",
+                "genesis_chainstate_hash": "74237aa39aa50a83de11a4f53e9d3bb7d43461d1de9873f402e5453ae60bc59b",
+                "unanchored_tip": null,
+                "unanchored_seq": null,
+                "tenure_height": 184037,
+                "is_fully_synced": true,
+                "node_public_key": "02e0ce39375d699d164f90cc815427943c5acccca02069e394f9ed28d2c2bca317",
+                "node_public_key_hash": "d5b1f3c7f9b2ffa8ac610170d1352550d240197c",
+                "stackerdbs": []
+            }"#)
+            .create();
+
+        let client = HttpClient::new(ApiUrl(server.url()));
+        let info = client.fetch_info();
+        assert_eq!(info.network_id, 1);
+        assert_eq!(info.stacks_tip_height, 556946);
+    }
+
     // we should better handle network errors. tracked in #1646
     #[test]
     #[should_panic]
