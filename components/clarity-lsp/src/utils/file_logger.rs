@@ -3,7 +3,6 @@
 use std::fmt::{self, Display};
 use std::fs::{File, OpenOptions};
 use std::io::{self, Write as _};
-use std::time::SystemTime;
 
 #[derive(Default, PartialEq, PartialOrd)]
 pub enum LogLevel {
@@ -83,8 +82,8 @@ impl FileLogger {
         if level < self.filter {
             return Ok(false);
         }
-        let time = SystemTime::now();
-        writeln!(file, "{level} {time:?} {message}").map(|()| true)
+        let time = chrono::Local::now();
+        writeln!(file, "{level} {time} {message}").map(|()| true)
     }
 
     // Wrappers around `Self::write()` for convenience

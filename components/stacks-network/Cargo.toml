@@ -20,7 +20,7 @@ reqwest = { workspace = true, features = ["blocking"] }
 crossbeam-channel = "0.5.6"
 crossterm = { workspace = true }
 ratatui = { workspace = true }
-chrono = "0.4.31"
+chrono = { workspace = true }
 futures = "0.3.12"
 base58 = "0.2.0"
 tokio = { version = "1.35.1", features = ["full"] }

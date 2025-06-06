@@ -22,7 +22,7 @@ categories = [
 ]
 
 [dependencies]
-chrono = "0.4.31"
+chrono = { workspace = true }
 colored = { workspace = true }
 regex = "1.7"
 reqwest = { workspace = true, features = ["blocking"] }
