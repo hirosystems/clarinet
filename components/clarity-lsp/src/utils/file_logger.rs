@@ -3,6 +3,7 @@
 use std::fmt::{self, Display};
 use std::fs::{File, OpenOptions};
 use std::io::{self, Write as _};
+use std::path::Path;
 
 #[derive(Default, PartialEq, PartialOrd)]
 pub enum LogLevel {
@@ -61,7 +62,7 @@ pub struct FileLogger {
 }
 
 impl FileLogger {
-    pub fn new(path: Option<&str>, filter: Option<LogLevel>) -> Self {
+    pub fn new<P: AsRef<Path>>(path: Option<P>, filter: Option<LogLevel>) -> Self {
         let filter = filter.unwrap_or_default();
         let file = path.and_then(|p| {
             OpenOptions::new()
