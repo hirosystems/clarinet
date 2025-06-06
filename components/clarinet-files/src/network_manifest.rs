@@ -1027,7 +1027,7 @@ impl NetworkManifest {
                 disable_stacks_api: devnet_config.disable_stacks_api.unwrap_or(false),
                 disable_postgres: devnet_config.disable_postgres.unwrap_or(false),
                 disable_stacks_explorer: devnet_config.disable_stacks_explorer.unwrap_or(false),
-                bind_containers_volumes: devnet_config.bind_containers_volumes.unwrap_or(false),
+                bind_containers_volumes: devnet_config.bind_containers_volumes.unwrap_or(true),
                 enable_subnet_node,
                 subnet_node_image_url: devnet_config
                     .subnet_node_image_url
@@ -1115,6 +1115,147 @@ impl NetworkManifest {
 
         Ok(config)
     }
+}
+
+impl Default for DevnetConfig {
+    fn default() -> Self {
+        // Compute default addresses using the default mnemonics
+        let networks = (BitcoinNetwork::Regtest, StacksNetwork::Devnet);
+
+        let (miner_stx_address, miner_btc_address, miner_secret_key_hex) = compute_addresses(
+            DEFAULT_STACKS_MINER_MNEMONIC,
+            DEFAULT_DERIVATION_PATH,
+            &networks,
+        );
+
+        let (faucet_stx_address, faucet_btc_address, faucet_secret_key_hex) =
+            compute_addresses(DEFAULT_FAUCET_MNEMONIC, DEFAULT_DERIVATION_PATH, &networks);
+
+        let (subnet_leader_stx_address, subnet_leader_btc_address, subnet_leader_secret_key_hex) =
+            compute_addresses(DEFAULT_SUBNET_MNEMONIC, DEFAULT_DERIVATION_PATH, &networks);
+
+        Self {
+            name: "devnet".to_string(),
+            network_id: None,
+            orchestrator_ingestion_port: 20445,
+            orchestrator_control_port: 20446,
+            bitcoin_node_p2p_port: 18444,
+            bitcoin_node_rpc_port: 18443,
+            bitcoin_node_username: "devnet".to_string(),
+            bitcoin_node_password: "devnet".to_string(),
+            stacks_node_p2p_port: 20444,
+            stacks_node_rpc_port: 20443,
+            stacks_node_wait_time_for_microblocks: 50,
+            stacks_node_first_attempt_time_ms: 500,
+            stacks_node_events_observers: vec![],
+            stacks_node_env_vars: vec![],
+            stacks_node_next_initiative_delay: 3000,
+            stacks_api_port: 3999,
+            stacks_api_events_port: 3700,
+            stacks_api_env_vars: vec![],
+            stacks_signers_keys: DEFAULT_PRIVATE_KEYS.to_vec(),
+            stacks_signers_env_vars: vec![],
+            stacks_explorer_port: 8000,
+            stacks_explorer_env_vars: vec![],
+            bitcoin_explorer_port: 8001,
+            bitcoin_controller_block_time: 60_000,
+            bitcoin_controller_automining_disabled: false,
+            miner_stx_address: miner_stx_address.clone(),
+            miner_secret_key_hex,
+            miner_btc_address,
+            miner_mnemonic: DEFAULT_STACKS_MINER_MNEMONIC.to_string(),
+            miner_derivation_path: DEFAULT_DERIVATION_PATH.to_string(),
+            miner_coinbase_recipient: miner_stx_address,
+            miner_wallet_name: String::new(),
+            faucet_stx_address,
+            faucet_secret_key_hex,
+            faucet_btc_address,
+            faucet_mnemonic: DEFAULT_FAUCET_MNEMONIC.to_string(),
+            faucet_derivation_path: DEFAULT_DERIVATION_PATH.to_string(),
+            stacker_mnemonic: DEFAULT_STACKER_MNEMONIC.to_string(),
+            stacker_derivation_path: DEFAULT_DERIVATION_PATH.to_string(),
+            pre_nakamoto_mock_signing: false,
+            working_dir: "/tmp".to_string(),
+            postgres_port: 5432,
+            postgres_username: "postgres".to_string(),
+            postgres_password: "postgres".to_string(),
+            stacks_api_postgres_database: "stacks_api".to_string(),
+            subnet_api_postgres_database: "subnet_api".to_string(),
+            pox_stacking_orders: get_default_stacking_orders(),
+            execute_script: vec![],
+            bitcoin_node_image_url: DEFAULT_BITCOIN_NODE_IMAGE.to_string(),
+            stacks_node_image_url: DEFAULT_STACKS_NODE_IMAGE.to_string(),
+            stacks_signer_image_url: DEFAULT_STACKS_SIGNER_IMAGE.to_string(),
+            stacks_api_image_url: DEFAULT_STACKS_API_IMAGE.to_string(),
+            stacks_explorer_image_url: DEFAULT_STACKS_EXPLORER_IMAGE.to_string(),
+            postgres_image_url: DEFAULT_POSTGRES_IMAGE.to_string(),
+            bitcoin_explorer_image_url: DEFAULT_BITCOIN_EXPLORER_IMAGE.to_string(),
+            disable_bitcoin_explorer: false,
+            disable_stacks_explorer: false,
+            disable_stacks_api: false,
+            disable_postgres: false,
+            bind_containers_volumes: true,
+            enable_subnet_node: false,
+            subnet_node_image_url: DEFAULT_SUBNET_NODE_IMAGE.to_string(),
+            subnet_leader_stx_address,
+            subnet_leader_secret_key_hex,
+            subnet_leader_btc_address,
+            subnet_leader_mnemonic: DEFAULT_SUBNET_MNEMONIC.to_string(),
+            subnet_leader_derivation_path: DEFAULT_DERIVATION_PATH.to_string(),
+            subnet_node_p2p_port: 30444,
+            subnet_node_rpc_port: 30443,
+            subnet_events_ingestion_port: 30445,
+            subnet_node_events_observers: vec![],
+            subnet_contract_id: DEFAULT_SUBNET_CONTRACT_ID.to_string(),
+            remapped_subnet_contract_id: format!(
+                "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.{}",
+                DEFAULT_SUBNET_CONTRACT_ID
+                    .split('.')
+                    .nth(1)
+                    .unwrap_or("subnet-v3-0-1")
+            ),
+            subnet_node_env_vars: vec![],
+            subnet_api_image_url: DEFAULT_SUBNET_API_IMAGE.to_string(),
+            subnet_api_port: 13999,
+            subnet_api_events_port: 13700,
+            subnet_api_env_vars: vec![],
+            disable_subnet_api: true, // disabled by default since subnet is disabled
+            docker_host: DEFAULT_DOCKER_SOCKET.to_string(),
+            components_host: "127.0.0.1".to_string(),
+            epoch_2_0: DEFAULT_EPOCH_2_0,
+            epoch_2_05: DEFAULT_EPOCH_2_05,
+            epoch_2_1: DEFAULT_EPOCH_2_1,
+            epoch_2_2: DEFAULT_EPOCH_2_2,
+            epoch_2_3: DEFAULT_EPOCH_2_3,
+            epoch_2_4: DEFAULT_EPOCH_2_4,
+            epoch_2_5: DEFAULT_EPOCH_2_5,
+            epoch_3_0: DEFAULT_EPOCH_3_0,
+            epoch_3_1: DEFAULT_EPOCH_3_1,
+            use_docker_gateway_routing: false,
+            docker_platform: DEFAULT_DOCKER_PLATFORM.to_string(),
+        }
+    }
+}
+
+pub fn get_default_stacking_orders() -> Vec<PoxStackingOrder> {
+    let accounts = [
+        ("stacker", "n3r661yy817HN3BZvec67XM1smryNTaizX", 10),
+        ("wallet_1", "mr1iPkD9N3RJZZxXRk7xF9d36gffa6exNC", 2),
+        ("wallet_2", "muYdXKmX9bByAueDe6KFfHd5Ff1gdN9ErG", 2),
+        ("wallet_3", "mvZtbibDAAA3WLpY7zXXFqRa3T4XSknBX7", 2),
+    ];
+    let mut stacking_orders = vec![];
+    for (name, btc_address, slots) in accounts {
+        stacking_orders.push(PoxStackingOrder {
+            auto_extend: Some(true),
+            duration: 10,
+            start_at_cycle: 1,
+            wallet: name.into(),
+            slots,
+            btc_address: btc_address.to_owned(),
+        })
+    }
+    stacking_orders
 }
 
 pub fn compute_addresses(
