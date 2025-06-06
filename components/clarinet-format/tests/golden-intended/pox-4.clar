@@ -1470,7 +1470,7 @@
 ;; *New in Stacks 2.1*
 ;; This method locks up an additional amount of STX from `tx-sender`'s, indicated
 ;; by `increase-by`.  The `tx-sender` must already be Stacking & must not be
-;; straddling more than one signer-key for the cycles effected. 
+;; straddling more than one signer-key for the cycles effected.
 ;; Refer to `verify-signer-key-sig` for more information on the authorization parameters
 ;; included here.
 (define-public (stack-increase
