@@ -56,6 +56,7 @@ pub struct IR {
     pub data_vars: Vec<IRDataVar>,
     pub data_maps: Vec<IRDataMap>,
     pub functions: Vec<IRFunction>,
+    pub top_level_exprs: Vec<Expr>,
 }
 
 fn parse_ts(file_name: &str, src: String) -> Result<Module> {
@@ -174,7 +175,7 @@ impl Visit for IR {
                     Err(_) => continue,
                 };
                 match callee_ident.sym.as_str() {
-                    "Const" => {
+                    "Constant" => {
                         let type_args = new_expr.type_args.as_deref().unwrap();
                         let typ = arg_type_to_signature(type_args.params.first().unwrap());
                         let expr = extract_var_expr(new_expr).unwrap_or_default();
@@ -241,6 +242,13 @@ impl Visit for IR {
             body,
         });
     }
+
+    fn visit_module_item(&mut self, item: &swc_ecma_ast::ModuleItem) {
+        if let swc_ecma_ast::ModuleItem::Stmt(swc_ecma_ast::Stmt::Expr(expr_stmt)) = item {
+            self.top_level_exprs.push(*expr_stmt.expr.clone());
+        }
+        item.visit_children_with(self);
+    }
 }
 
 pub fn get_ir(file_name: &str, source: String) -> IR {
@@ -251,6 +259,7 @@ pub fn get_ir(file_name: &str, source: String) -> IR {
         data_vars: Vec::new(),
         data_maps: Vec::new(),
         functions: Vec::new(),
+        top_level_exprs: Vec::new(),
     };
     module.visit_with(&mut ir);
     ir
@@ -295,9 +304,9 @@ mod test {
     #[test]
     fn test_constant_ir() {
         let src = indoc!(
-            r#"const OWNER_ROLE = new Const<Uint>(1);
-            const COST = new Const<Int>(10);
-            const HELLO = new Const<StringAscii<32>>("World");"#
+            r#"const OWNER_ROLE = new Constant<Uint>(1);
+            const COST = new Constant<Int>(10);
+            const HELLO = new Constant<StringAscii<32>>("World");"#
         );
         let constants = get_tmp_ir(src).constants;
         let expected = IRConstant {
@@ -396,7 +405,7 @@ mod test {
     #[test]
     fn test_multiple_var_types() {
         let src = indoc!(
-            "const a = new Const<Uint>(12);
+            "const a = new Constant<Uint>(12);
             const b = new DataVar<Uint>(100);
             const c = new DataMap<StringAscii<2>, StringUtf8<4>>();"
         );
@@ -428,18 +437,40 @@ mod test {
     }
 
     #[test]
+    fn test_top_level_expressions() {
+        let src = "const n = new DataVar<Int>(0); n.set(1);";
+        let ir = get_tmp_ir(src);
+        assert_eq!(ir.top_level_exprs.len(), 1);
+    }
+
+    #[test]
     fn test_basic_function_ir() {
         let src = "function add(a: Int, b: Int): Int { return a + b }";
         let ir = get_tmp_ir(src);
         assert_eq!(ir.functions.len(), 1);
 
         let func = &ir.functions[0];
+        let expected_params = vec![("a".to_string(), IntType), ("b".to_string(), IntType)];
         assert_eq!(func.name, "add");
-        assert_eq!(func.params.len(), 2);
-        assert_eq!(func.params[0].0, "a");
-        assert_eq!(func.params[0].1, IntType);
-        assert_eq!(func.params[1].0, "b");
-        assert_eq!(func.params[1].1, IntType);
+        assert_eq!(func.params, expected_params);
         assert_eq!(func.return_type, IntType);
+    }
+
+    #[test]
+    fn test_function_update_var() {
+        let src = indoc! {"
+            const n = new DataVar<Int>(0);
+            function setN(newValue: Int) {
+                return n.set(newValue);
+            }
+        "};
+
+        let ir = get_tmp_ir(src);
+        assert_eq!(ir.functions.len(), 1);
+        let func = &ir.functions[0];
+        assert_eq!(func.name, "setN");
+        let expected_params = vec![("newValue".to_string(), IntType)];
+        assert_eq!(func.params, expected_params);
+        assert_eq!(func.return_type, BoolType);
     }
 }
