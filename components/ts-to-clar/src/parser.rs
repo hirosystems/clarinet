@@ -7,11 +7,11 @@
 //  - define-public
 //  - define-private
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use swc_common::{sync::Lrc, FileName, SourceMap};
 use swc_ecma_ast::{
-    Expr, Module, NewExpr, TsEntityName, TsType, TsTypeParamInstantiation, TsTypeRef, VarDeclKind,
-    VarDeclarator,
+    BlockStmt, Expr, Module, NewExpr, TsEntityName, TsType, TsTypeParamInstantiation, TsTypeRef,
+    VarDeclKind, VarDeclarator,
 };
 use swc_ecma_parser::{lexer::Lexer, Parser, StringInput, Syntax};
 use swc_ecma_visit::{Visit, VisitWith};
@@ -19,7 +19,6 @@ use swc_ecma_visit::{Visit, VisitWith};
 use clarity::vm::callables::DefineType;
 use clarity::vm::types::{SequenceSubtype, TypeSignature};
 
-/// Represents a constant in the IR.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct IRConstant {
     pub name: String,
@@ -27,7 +26,6 @@ pub struct IRConstant {
     pub expr: Expr,
 }
 
-/// Represents a data variable in the IR.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct IRDataVar {
     pub name: String,
@@ -35,7 +33,6 @@ pub struct IRDataVar {
     pub expr: Expr,
 }
 
-/// Represents a data map in the IR.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct IRDataMap {
     pub name: String,
@@ -43,17 +40,15 @@ pub struct IRDataMap {
     pub value_typ: TypeSignature,
 }
 
-/// Represents a function in the IR.
 #[derive(Debug, PartialEq, Clone)]
 pub struct IRFunction {
     pub name: String,
     pub define_type: DefineType,
     pub params: Vec<(String, TypeSignature)>,
     pub return_type: TypeSignature,
-    pub body: Expr,
+    pub body: BlockStmt,
 }
 
-/// The main IR structure.
 #[derive(Debug, PartialEq, Clone)]
 pub struct IR {
     pub source: String,
@@ -63,7 +58,6 @@ pub struct IR {
     pub functions: Vec<IRFunction>,
 }
 
-/// Parse TypeScript source into a SWC AST module.
 fn parse_ts(file_name: &str, src: String) -> Result<Module> {
     let cm: Lrc<SourceMap> = Default::default();
     let fm = cm.new_source_file(FileName::Custom(file_name.into()).into(), src);
@@ -74,9 +68,7 @@ fn parse_ts(file_name: &str, src: String) -> Result<Module> {
         None,
     );
     let mut parser = Parser::new_from(lexer);
-    parser
-        .parse_module()
-        .map_err(|e| anyhow::anyhow!("{:?}", e))
+    parser.parse_module().map_err(|e| anyhow!("{:?}", e))
 }
 
 fn get_ascii_type(n: u32) -> TypeSignature {
@@ -96,14 +88,14 @@ fn get_utf8_type(n: u32) -> TypeSignature {
 fn extract_numeric_type_param(type_params: Option<&TsTypeParamInstantiation>) -> Result<u32> {
     let param = type_params
         .and_then(|params| params.params.first())
-        .ok_or_else(|| anyhow::anyhow!("Missing type parameter"))?;
+        .ok_or_else(|| anyhow!("Missing type parameter"))?;
 
-    if let TsType::TsLitType(lit_type) = &**param {
+    if let TsType::TsLitType(lit_type) = param.as_ref() {
         if let swc_ecma_ast::TsLit::Number(num_lit) = &lit_type.lit {
             return Ok(num_lit.value as u32);
         }
     }
-    Err(anyhow::anyhow!("Expected numeric literal type parameter"))
+    Err(anyhow!("Expected numeric literal type parameter"))
 }
 
 fn extract_type(
@@ -116,7 +108,7 @@ fn extract_type(
         "Bool" => Ok(TypeSignature::BoolType),
         "StringAscii" => extract_numeric_type_param(type_params).map(get_ascii_type),
         "StringUtf8" => extract_numeric_type_param(type_params).map(get_utf8_type),
-        _ => Err(anyhow::anyhow!("Unknown type: {}", type_ident)),
+        _ => Err(anyhow!("Unknown type: {}", type_ident)),
     }
 }
 
@@ -129,7 +121,7 @@ fn arg_type_to_signature(ts_type: &TsType) -> Result<TypeSignature> {
     {
         extract_type(type_ident.sym.as_str(), type_params.as_deref())
     } else {
-        Err(anyhow::anyhow!("Expected TsTypeRef with Ident type name"))
+        Err(anyhow!("Expected TsTypeRef with Ident type name"))
     }
 }
 
@@ -137,11 +129,33 @@ fn extract_var_name(decl: &VarDeclarator) -> Result<String> {
     decl.name
         .as_ident()
         .map(|id| id.sym.to_string())
-        .ok_or_else(|| anyhow::anyhow!("Expected identifier for variable name"))
+        .ok_or_else(|| anyhow!("Expected identifier for variable name"))
 }
 
 fn extract_var_expr(new_expr: &NewExpr) -> Option<Expr> {
     new_expr.args.as_ref()?.first().map(|arg| *arg.expr.clone())
+}
+
+fn parse_function_params(params: &[swc_ecma_ast::Param]) -> Result<Vec<(String, TypeSignature)>> {
+    params
+        .iter()
+        .map(|param| {
+            if let swc_ecma_ast::Pat::Ident(ident) = &param.pat {
+                let param_name = ident.id.sym.to_string();
+                let param_type = ident
+                    .type_ann
+                    .as_ref()
+                    .ok_or_else(|| anyhow!("Missing type annotation for param '{}'.", param_name))
+                    .and_then(|type_ann_box| {
+                        arg_type_to_signature(&type_ann_box.type_ann)
+                            .map_err(|e| anyhow!("Invalid param type for '{}': {}", param_name, e))
+                    })?;
+                Ok((param_name, param_type))
+            } else {
+                Err(anyhow!("Expected identifier for parameter."))
+            }
+        })
+        .collect()
 }
 
 impl Visit for IR {
@@ -194,9 +208,41 @@ impl Visit for IR {
         }
         var_decl.visit_children_with(self);
     }
+
+    fn visit_fn_decl(&mut self, fn_decl: &swc_ecma_ast::FnDecl) {
+        if fn_decl.function.is_async || fn_decl.function.is_generator {
+            return;
+        }
+        let name = fn_decl.ident.sym.to_string();
+
+        let params = match parse_function_params(&fn_decl.function.params) {
+            Ok(p) => p,
+            Err(_) => return,
+        };
+
+        let return_type = if let Some(type_ann_box) = &fn_decl.function.return_type {
+            match arg_type_to_signature(&type_ann_box.type_ann) {
+                Ok(t) => t,
+                Err(_) => return,
+            }
+        } else {
+            TypeSignature::BoolType
+        };
+
+        let Some(body) = fn_decl.function.body.clone() else {
+            return;
+        };
+
+        self.functions.push(IRFunction {
+            name,
+            define_type: DefineType::Private,
+            params,
+            return_type,
+            body,
+        });
+    }
 }
 
-/// Build the IR from a TypeScript source file.
 pub fn get_ir(file_name: &str, source: String) -> IR {
     let module = parse_ts(file_name, source.clone()).expect("Failed to parse TypeScript");
     let mut ir = IR {
@@ -259,19 +305,19 @@ mod test {
             typ: UIntType,
             expr: expr_number(1.0, constants[0].expr.span()),
         };
-        assert_eq!(expected, constants[0]);
+        assert_eq!(constants[0], expected);
         let expected = IRConstant {
             name: "COST".to_string(),
             typ: IntType,
             expr: expr_number(10.0, constants[1].expr.span()),
         };
-        assert_eq!(expected, constants[1]);
+        assert_eq!(constants[1], expected);
         let expected = IRConstant {
             name: "HELLO".to_string(),
             typ: get_ascii_type(32),
             expr: expr_string("World", constants[2].expr.span()),
         };
-        assert_eq!(expected, constants[2]);
+        assert_eq!(constants[2], expected);
     }
 
     #[test]
@@ -304,10 +350,10 @@ mod test {
             typ: get_utf8_type(64),
             expr: expr_string("world", vars[3].expr.span()),
         };
-        assert_eq!(expected_int, vars[0]);
-        assert_eq!(expected_uint, vars[1]);
-        assert_eq!(expected_ascii, vars[2]);
-        assert_eq!(expected_utf8, vars[3]);
+        assert_eq!(vars[0], expected_int);
+        assert_eq!(vars[1], expected_uint);
+        assert_eq!(vars[2], expected_ascii);
+        assert_eq!(vars[3], expected_utf8);
     }
 
     #[test]
@@ -319,8 +365,8 @@ mod test {
             expr: Expr::from("1 + 2"),
         };
         let ir = get_tmp_ir(src).data_vars[0].clone();
-        assert_eq!(expected.name, ir.name);
-        assert_eq!(expected.typ, ir.typ);
+        assert_eq!(ir.name, expected.name);
+        assert_eq!(ir.typ, expected.typ);
         ir.expr.expect_bin();
     }
 
@@ -333,7 +379,7 @@ mod test {
             typ: BoolType,
             expr: expr_bool(true, ir.expr.span()),
         };
-        assert_eq!(expected, ir);
+        assert_eq!(ir, expected);
     }
 
     #[test]
@@ -344,7 +390,7 @@ mod test {
             key_typ: UIntType,
             value_typ: BoolType,
         };
-        assert_eq!(expected, get_tmp_ir(src).data_maps[0]);
+        assert_eq!(get_tmp_ir(src).data_maps[0], expected);
     }
 
     #[test]
@@ -356,28 +402,44 @@ mod test {
         );
         let ir = get_tmp_ir(src);
         assert_eq!(
+            ir.constants[0],
             IRConstant {
                 name: "a".to_string(),
                 typ: UIntType,
                 expr: expr_number(12.0, ir.constants[0].expr.span()),
             },
-            ir.constants[0],
         );
         assert_eq!(
+            ir.data_vars[0],
             IRDataVar {
                 name: "b".to_string(),
                 typ: UIntType,
                 expr: expr_number(100.0, ir.data_vars[0].expr.span()),
             },
-            ir.data_vars[0],
         );
         assert_eq!(
+            ir.data_maps[0],
             IRDataMap {
                 name: "c".to_string(),
                 key_typ: get_ascii_type(2),
                 value_typ: get_utf8_type(4),
             },
-            ir.data_maps[0],
         );
+    }
+
+    #[test]
+    fn test_basic_function_ir() {
+        let src = "function add(a: Int, b: Int): Int { return a + b }";
+        let ir = get_tmp_ir(src);
+        assert_eq!(ir.functions.len(), 1);
+
+        let func = &ir.functions[0];
+        assert_eq!(func.name, "add");
+        assert_eq!(func.params.len(), 2);
+        assert_eq!(func.params[0].0, "a");
+        assert_eq!(func.params[0].1, IntType);
+        assert_eq!(func.params[1].0, "b");
+        assert_eq!(func.params[1].1, IntType);
+        assert_eq!(func.return_type, IntType);
     }
 }
