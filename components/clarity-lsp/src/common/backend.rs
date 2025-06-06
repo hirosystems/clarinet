@@ -1,5 +1,6 @@
 use crate::lsp_types::MessageType;
 use crate::state::{build_state, EditorState, ProtocolState};
+use crate::utils::file_logger::{FileLogger, LogLevel};
 use crate::utils::get_contract_location;
 use clarinet_files::{FileAccessor, FileLocation, ProjectManifest};
 use clarity_repl::clarity::diagnostic::Diagnostic;
@@ -48,6 +49,18 @@ impl EditorStateInput {
     }
 }
 
+fn open_log(editor_state: &EditorStateInput) -> FileLogger {
+    let (log_file, log_level) = editor_state
+        .try_read(|es| {
+            (
+                es.settings.log_file.clone(),
+                LogLevel::try_from(es.settings.log_level.as_deref()).ok(),
+            )
+        })
+        .unwrap_or_default();
+    FileLogger::new(log_file.as_deref(), log_level)
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub enum LspNotification {
     ManifestOpened(FileLocation),
@@ -68,7 +81,7 @@ impl LspNotificationResponse {
     pub fn error(message: &str) -> LspNotificationResponse {
         LspNotificationResponse {
             aggregated_diagnostics: vec![],
-            notification: Some((MessageType::ERROR, format!("Internal error: {}", message))),
+            notification: Some((MessageType::ERROR, format!("Internal error: {message}"))),
         }
     }
 }
@@ -78,8 +91,13 @@ pub async fn process_notification(
     editor_state: &mut EditorStateInput,
     file_accessor: Option<&dyn FileAccessor>,
 ) -> Result<LspNotificationResponse, String> {
+    let mut log = open_log(editor_state);
+
     match command {
         LspNotification::ManifestOpened(manifest_location) => {
+            log.debug(format!(
+                "Received LspNotification::ManifestOpened for file {manifest_location}"
+            ));
             // Only build the initial protocol state if it does not exist
             if editor_state.try_read(|es| es.protocols.contains_key(&manifest_location))? {
                 return Ok(LspNotificationResponse::default());
@@ -103,6 +121,9 @@ pub async fn process_notification(
         }
 
         LspNotification::ManifestSaved(manifest_location) => {
+            log.debug(format!(
+                "Received LspNotification::ManifestSaved for file {manifest_location}"
+            ));
             // We will rebuild the entire state, without to try any optimizations for now
             let mut protocol_state = ProtocolState::new();
             match build_state(&manifest_location, &mut protocol_state, file_accessor).await {
@@ -121,6 +142,9 @@ pub async fn process_notification(
         }
 
         LspNotification::ContractOpened(contract_location) => {
+            log.debug(format!(
+                "Received LspNotification::ContractOpened for file {contract_location}"
+            ));
             let manifest_location = contract_location
                 .get_project_manifest_location(file_accessor)
                 .await?;
@@ -203,6 +227,9 @@ pub async fn process_notification(
         }
 
         LspNotification::ContractSaved(contract_location) => {
+            log.debug(format!(
+                "Received LspNotification::ContractSaved for file {contract_location}"
+            ));
             let manifest_location = match editor_state
                 .try_write(|es| es.clear_protocol_associated_with_contract(&contract_location))?
             {
@@ -237,6 +264,9 @@ pub async fn process_notification(
         }
 
         LspNotification::ContractChanged(contract_location, contract_source) => {
+            log.debug(format!(
+                "Received LspNotification::ContractChanged for file {contract_location}"
+            ));
             match editor_state.try_write(|es| {
                 es.update_active_contract(&contract_location, &contract_source, false)
             })? {
@@ -246,6 +276,9 @@ pub async fn process_notification(
         }
 
         LspNotification::ContractClosed(contract_location) => {
+            log.debug(format!(
+                "Received LspNotification::ContractClosed for file {contract_location}"
+            ));
             editor_state.try_write(|es| es.active_contracts.remove_entry(&contract_location))?;
             Ok(LspNotificationResponse::default())
         }
@@ -280,8 +313,11 @@ pub fn process_request(
     command: LspRequest,
     editor_state: &EditorStateInput,
 ) -> Result<LspRequestResponse, String> {
+    let mut log = open_log(editor_state);
+
     match command {
         LspRequest::Completion(params) => {
+            log.debug(format!("Received LspRequest::Completion: {params:?}"));
             let file_url = params.text_document_position.text_document.uri;
             let position = params.text_document_position.position;
 
@@ -299,6 +335,7 @@ pub fn process_request(
         }
 
         LspRequest::Definition(params) => {
+            log.debug(format!("Received LspRequest::Definition: {params:?}"));
             let file_url = params.text_document_position_params.text_document.uri;
             let Some(contract_location) = get_contract_location(&file_url) else {
                 return Ok(LspRequestResponse::Definition(None));
@@ -311,6 +348,7 @@ pub fn process_request(
         }
 
         LspRequest::SignatureHelp(params) => {
+            log.debug(format!("Received LspRequest::SignatureHelp: {params:?}"));
             let file_url = params.text_document_position_params.text_document.uri;
             let Some(contract_location) = get_contract_location(&file_url) else {
                 return Ok(LspRequestResponse::SignatureHelp(None));
@@ -333,6 +371,7 @@ pub fn process_request(
         }
 
         LspRequest::DocumentSymbol(params) => {
+            log.debug(format!("Received LspRequest::DocumentSymbol: {params:?}"));
             let file_url = params.text_document.uri;
             let Some(contract_location) = get_contract_location(&file_url) else {
                 return Ok(LspRequestResponse::DocumentSymbol(vec![]));
@@ -342,8 +381,11 @@ pub fn process_request(
                 .unwrap_or_default();
             Ok(LspRequestResponse::DocumentSymbol(document_symbols))
         }
-        LspRequest::DocumentFormatting(param) => {
-            let file_url = param.text_document.uri;
+        LspRequest::DocumentFormatting(params) => {
+            log.debug(format!(
+                "Received LspRequest::DocumentFormatting: {params:?}"
+            ));
+            let file_url = params.text_document.uri;
             let Some(contract_location) = get_contract_location(&file_url) else {
                 return Ok(LspRequestResponse::DocumentFormatting(None));
             };
@@ -355,9 +397,9 @@ pub fn process_request(
             };
             let source = &contract_data.source;
 
-            let tab_size = param.options.tab_size as usize;
-            let prefer_space = param.options.insert_spaces;
-            let props = param.options.properties;
+            let tab_size = params.options.tab_size as usize;
+            let prefer_space = params.options.insert_spaces;
+            let props = params.options.properties;
             let max_line_length = props
                 .get("maxLineLength")
                 .and_then(|value| {
@@ -397,8 +439,11 @@ pub fn process_request(
                 text_edit,
             ])))
         }
-        LspRequest::DocumentRangeFormatting(param) => {
-            let file_url = param.text_document.uri;
+        LspRequest::DocumentRangeFormatting(params) => {
+            log.debug(format!(
+                "Received LspRequest::DocumentRangeFormatting: {params:?}"
+            ));
+            let file_url = params.text_document.uri;
             let Some(contract_location) = get_contract_location(&file_url) else {
                 return Ok(LspRequestResponse::DocumentRangeFormatting(None));
             };
@@ -411,8 +456,8 @@ pub fn process_request(
 
             let source = &contract_data.source;
 
-            let tab_size = param.options.tab_size as usize;
-            let max_line_length = param
+            let tab_size = params.options.tab_size as usize;
+            let max_line_length = params
                 .options
                 .properties
                 .get("maxLineLength")
@@ -425,7 +470,7 @@ pub fn process_request(
                     }
                 })
                 .unwrap_or(80);
-            let prefer_space = param.options.insert_spaces;
+            let prefer_space = params.options.insert_spaces;
             let formatting_options = clarinet_format::formatter::Settings {
                 indentation: if !prefer_space {
                     clarinet_format::formatter::Indentation::Tab
@@ -437,8 +482,8 @@ pub fn process_request(
 
             // extract the text of just this range
             let lines: Vec<&str> = source.lines().collect();
-            let start_line = param.range.start.line as usize;
-            let end_line = param.range.end.line as usize;
+            let start_line = params.range.start.line as usize;
+            let end_line = params.range.end.line as usize;
 
             // Validate range boundaries
             if start_line >= lines.len() {
@@ -449,8 +494,8 @@ pub fn process_request(
             let range_text = if start_line == end_line {
                 // Single line selection
                 let line = lines.get(start_line).unwrap_or(&"");
-                let start_char = param.range.start.character as usize;
-                let end_char = param.range.end.character as usize;
+                let start_char = params.range.start.character as usize;
+                let end_char = params.range.end.character as usize;
                 let start_char = start_char.min(line.len());
                 let end_char = end_char.min(line.len());
 
@@ -464,7 +509,7 @@ pub fn process_request(
 
                 // First line (might be partial)
                 if let Some(first_line) = lines.get(start_line) {
-                    let start_char = (param.range.start.character as usize).min(first_line.len());
+                    let start_char = (params.range.start.character as usize).min(first_line.len());
                     result.push_str(&first_line[start_char..]);
                 }
 
@@ -479,7 +524,7 @@ pub fn process_request(
                 // Last line (might be partial) - only if end_line is different from start_line
                 if end_line > start_line && end_line < lines.len() {
                     if let Some(last_line) = lines.get(end_line) {
-                        let end_char = (param.range.end.character as usize).min(last_line.len());
+                        let end_char = (params.range.end.character as usize).min(last_line.len());
                         result.push('\n');
                         result.push_str(&last_line[..end_char]);
                     }
@@ -523,7 +568,7 @@ pub fn process_request(
             };
 
             let text_edit = lsp_types::TextEdit {
-                range: param.range,
+                range: params.range,
                 new_text: formatted_result,
             };
 
@@ -533,6 +578,7 @@ pub fn process_request(
         }
 
         LspRequest::Hover(params) => {
+            log.debug(format!("Received LspRequest::Hover: {params:?}"));
             let file_url = params.text_document_position_params.text_document.uri;
             let Some(contract_location) = get_contract_location(&file_url) else {
                 return Ok(LspRequestResponse::Hover(None));
@@ -556,8 +602,11 @@ pub fn process_mutating_request(
     command: LspRequest,
     editor_state: &mut EditorStateInput,
 ) -> Result<LspRequestResponse, String> {
+    let mut log = open_log(editor_state);
+
     match command {
         LspRequest::Initialize(params) => {
+            log.debug(format!("Received LspRequest::Initialize: {params:?}"));
             let initialization_options: InitializationOptions = params
                 .initialization_options
                 .and_then(|o| serde_json::from_value(o).ok())
