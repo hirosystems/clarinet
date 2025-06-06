@@ -237,24 +237,20 @@ impl EvalHook for CoverageHook {
 
 fn retrieve_functions(exprs: &[SymbolicExpression]) -> Vec<(String, u32, u32)> {
     let mut functions = vec![];
-    for cur_expr in exprs.iter() {
-        if let Some(define_expr) = DefineFunctionsParsed::try_parse(cur_expr).ok().flatten() {
-            match define_expr {
-                DefineFunctionsParsed::PrivateFunction { signature, body: _ }
-                | DefineFunctionsParsed::PublicFunction { signature, body: _ }
-                | DefineFunctionsParsed::ReadOnlyFunction { signature, body: _ } => {
-                    let expr = signature.first().expect("Invalid function signature");
-                    let function_name = expr.match_atom().expect("Invalid function signature");
+    for cur_expr in exprs {
+        if let Some(DefineFunctionsParsed::PrivateFunction { signature, .. })
+        | Some(DefineFunctionsParsed::PublicFunction { signature, .. })
+        | Some(DefineFunctionsParsed::ReadOnlyFunction { signature, .. }) =
+            DefineFunctionsParsed::try_parse(cur_expr).ok().flatten()
+        {
+            let expr = signature.first().expect("Invalid function signature");
+            let function_name = expr.match_atom().expect("Invalid function signature");
 
-                    functions.push((
-                        function_name.to_string(),
-                        cur_expr.span.start_line,
-                        cur_expr.span.end_line,
-                    ));
-                }
-                _ => {}
-            }
-            continue;
+            functions.push((
+                function_name.to_string(),
+                cur_expr.span.start_line,
+                cur_expr.span.end_line,
+            ));
         }
     }
     functions

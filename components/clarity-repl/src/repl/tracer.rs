@@ -18,8 +18,8 @@ pub struct Tracer {
 }
 
 impl Tracer {
-    pub fn new(snippet: String) -> Tracer {
-        println!("{}  {}", snippet, black!("<console>"));
+    pub fn new(snippet: &str) -> Tracer {
+        println!("{snippet}  {}", black!("<console>"));
         Tracer {
             stack: vec![u64::MAX],
             pending_call_string: Vec::new(),

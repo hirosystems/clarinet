@@ -73,12 +73,12 @@ impl ClarityContractBuilder {
         let default_version = ClarityVersion::default_for_epoch(self.contract.epoch);
         let clarity_version = self.contract.clarity_version;
 
-        if clarity_version > default_version {
-            panic!(
-                "invalid clarity version {} for epoch {}",
-                clarity_version, self.contract.epoch
-            );
-        }
+        assert!(
+            !(clarity_version > default_version),
+            "invalid clarity version {} for epoch {}",
+            clarity_version,
+            self.contract.epoch
+        );
 
         self.contract
     }
