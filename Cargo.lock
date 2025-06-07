@@ -639,7 +639,7 @@ checksum = "f46ad14479a25103f283c0f10005961cf086d8dc42205bb44c46ac563475dca6"
 [[package]]
 name = "clar2wasm"
 version = "0.1.0"
-source = "git+https://github.com/stacks-network/clarity-wasm.git?branch=main#0e9f0890d4a3bb3060ff893c684d3458fc79025b"
+source = "git+https://github.com/stacks-network/clarity-wasm.git?branch=main#9a0c9ad8a6b7913bb5eb20fe59faa3a0001e1669"
 dependencies = [
  "chrono",
  "clap",
@@ -656,7 +656,7 @@ dependencies = [
 
 [[package]]
 name = "clarinet-cli"
-version = "3.0.2"
+version = "3.1.0"
 dependencies = [
  "clap",
  "clap_complete",
@@ -689,7 +689,7 @@ dependencies = [
 
 [[package]]
 name = "clarinet-deployments"
-version = "3.0.2"
+version = "3.1.0"
 dependencies = [
  "base58",
  "base64 0.21.7",
@@ -714,7 +714,7 @@ dependencies = [
 
 [[package]]
 name = "clarinet-files"
-version = "3.0.2"
+version = "3.1.0"
 dependencies = [
  "bitcoin",
  "clarinet-utils",
@@ -745,7 +745,7 @@ dependencies = [
 
 [[package]]
 name = "clarinet-sdk-wasm"
-version = "3.0.2"
+version = "3.1.0"
 dependencies = [
  "clarinet-deployments",
  "clarinet-files",
@@ -774,7 +774,7 @@ dependencies = [
 [[package]]
 name = "clarity"
 version = "2.3.0"
-source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat%2Fclarity-wasm-develop#c10dde4f0dda1a35104a022af00a316dff7f3296"
+source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat%2Fclarity-wasm-develop#6adc670a5cad8290b3862c4dd00952f1d038086d"
 dependencies = [
  "getrandom 0.2.15",
  "hashbrown 0.15.2",
@@ -797,7 +797,7 @@ dependencies = [
 
 [[package]]
 name = "clarity-events"
-version = "3.0.2"
+version = "3.1.0"
 dependencies = [
  "clap",
  "clarinet-files",
@@ -809,7 +809,7 @@ dependencies = [
 
 [[package]]
 name = "clarity-lsp"
-version = "3.0.2"
+version = "3.1.0"
 dependencies = [
  "clarinet-deployments",
  "clarinet-files",
@@ -829,7 +829,7 @@ dependencies = [
 
 [[package]]
 name = "clarity-repl"
-version = "3.0.2"
+version = "3.1.0"
 dependencies = [
  "bytes",
  "chrono",
@@ -2747,7 +2747,7 @@ dependencies = [
 [[package]]
 name = "libstackerdb"
 version = "0.0.1"
-source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat%2Fclarity-wasm-develop#c10dde4f0dda1a35104a022af00a316dff7f3296"
+source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat%2Fclarity-wasm-develop#6adc670a5cad8290b3862c4dd00952f1d038086d"
 dependencies = [
  "clarity",
  "secp256k1 0.24.3",
@@ -3360,7 +3360,7 @@ checksum = "439ee305def115ba05938db6eb1644ff94165c5ab5e9420d1c1bcedbba909391"
 [[package]]
 name = "pox-locking"
 version = "2.4.0"
-source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat%2Fclarity-wasm-develop#c10dde4f0dda1a35104a022af00a316dff7f3296"
+source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat%2Fclarity-wasm-develop#6adc670a5cad8290b3862c4dd00952f1d038086d"
 dependencies = [
  "clarity",
  "slog",
@@ -4584,7 +4584,7 @@ dependencies = [
 
 [[package]]
 name = "stacks-codec"
-version = "3.0.2"
+version = "3.1.0"
 dependencies = [
  "clarity",
  "serde",
@@ -4594,7 +4594,7 @@ dependencies = [
 [[package]]
 name = "stacks-common"
 version = "0.0.2"
-source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat%2Fclarity-wasm-develop#c10dde4f0dda1a35104a022af00a316dff7f3296"
+source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat%2Fclarity-wasm-develop#6adc670a5cad8290b3862c4dd00952f1d038086d"
 dependencies = [
  "chrono",
  "curve25519-dalek",
@@ -4624,7 +4624,7 @@ dependencies = [
 
 [[package]]
 name = "stacks-devnet-js"
-version = "3.0.2"
+version = "3.1.0"
 dependencies = [
  "bip39",
  "clarinet-deployments",
@@ -4640,7 +4640,7 @@ dependencies = [
 
 [[package]]
 name = "stacks-network"
-version = "3.0.2"
+version = "3.1.0"
 dependencies = [
  "base58",
  "bitcoincore-rpc",
@@ -4677,7 +4677,7 @@ dependencies = [
 
 [[package]]
 name = "stacks-rpc-client"
-version = "3.0.2"
+version = "3.1.0"
 dependencies = [
  "clarinet-utils",
  "clarity",
@@ -4693,7 +4693,7 @@ dependencies = [
 [[package]]
 name = "stackslib"
 version = "0.0.1"
-source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat%2Fclarity-wasm-develop#c10dde4f0dda1a35104a022af00a316dff7f3296"
+source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat%2Fclarity-wasm-develop#6adc670a5cad8290b3862c4dd00952f1d038086d"
 dependencies = [
  "clar2wasm",
  "clarity",
