@@ -187,6 +187,7 @@ fn test_requirement_add_trait_reference() {
     let project_path = temp_dir.path().join(project_name);
     // Using a fictional trait reference for testing structure, actual resolution depends on network state not mocked here.
     let requirement_name = "SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.some-contract.some-trait";
+    let expected_requirement_name = "SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.some-contract";
     let status = Command::new(env!("CARGO_BIN_EXE_clarinet"))
         .args(["requirement", "add", requirement_name])
         .current_dir(&project_path)
@@ -199,6 +200,6 @@ fn test_requirement_add_trait_reference() {
         .requirements
         .iter()
         .flatten()
-        .any(|c| c.contract_id == requirement_name);
+        .any(|c| c.contract_id == expected_requirement_name);
     assert!(found, "Trait reference requirement not found in manifest");
 }
