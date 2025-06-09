@@ -447,9 +447,9 @@ impl ClarityInterpreter {
 
         let mut global_context = self.get_global_context(contract.epoch, cost_track)?;
 
-        if let Some(mut in_hooks) = eval_hooks {
+        if let Some(in_hooks) = eval_hooks {
             let mut hooks: Vec<&mut dyn EvalHook> = Vec::new();
-            for hook in in_hooks.drain(..) {
+            for hook in in_hooks {
                 hooks.push(hook);
             }
             global_context.eval_hooks = Some(hooks);
@@ -598,7 +598,7 @@ impl ClarityInterpreter {
 
         global_context.commit().unwrap();
 
-        let (events, mut accounts_to_credit, mut accounts_to_debit) =
+        let (events, accounts_to_credit, accounts_to_debit) =
             Self::process_events(&mut emitted_events);
 
         let mut execution_result = ExecutionResult {
@@ -614,11 +614,11 @@ impl ClarityInterpreter {
             }
         }
 
-        for (account, token, value) in accounts_to_credit.drain(..) {
+        for (account, token, value) in accounts_to_credit {
             self.credit_token(account, token, value);
         }
 
-        for (account, token, value) in accounts_to_debit.drain(..) {
+        for (account, token, value) in accounts_to_debit {
             self.debit_token(account, token, value);
         }
 
@@ -648,13 +648,13 @@ impl ClarityInterpreter {
             ContractContext::new(contract_id.clone(), contract.clarity_version);
 
         let show_timings = self.repl_settings.show_timings;
-        let tx_sender: PrincipalData = self.tx_sender.clone().into();
+        let tx_sender = PrincipalData::from(self.tx_sender.clone());
 
         let mut global_context = self.get_global_context(contract.epoch, cost_track)?;
 
-        if let Some(mut in_hooks) = eval_hooks {
+        if let Some(in_hooks) = eval_hooks {
             let mut hooks: Vec<&mut dyn EvalHook> = Vec::new();
-            for hook in in_hooks.drain(..) {
+            for hook in in_hooks {
                 hooks.push(hook);
             }
             global_context.eval_hooks = Some(hooks);
@@ -815,7 +815,7 @@ impl ClarityInterpreter {
 
         global_context.commit().unwrap();
 
-        let (events, mut accounts_to_credit, mut accounts_to_debit) =
+        let (events, accounts_to_credit, accounts_to_debit) =
             Self::process_events(&mut emitted_events);
 
         let mut execution_result = ExecutionResult {
@@ -831,11 +831,11 @@ impl ClarityInterpreter {
             }
         }
 
-        for (account, token, value) in accounts_to_credit.drain(..) {
+        for (account, token, value) in accounts_to_credit {
             self.credit_token(account, token, value);
         }
 
-        for (account, token, value) in accounts_to_debit.drain(..) {
+        for (account, token, value) in accounts_to_debit {
             self.debit_token(account, token, value);
         }
 
@@ -858,14 +858,14 @@ impl ClarityInterpreter {
         clarity_version: ClarityVersion,
         track_costs: bool,
         allow_private: bool,
-        mut eval_hooks: Vec<&mut dyn EvalHook>,
+        eval_hooks: Vec<&mut dyn EvalHook>,
     ) -> Result<ExecutionResult, String> {
         let tx_sender: PrincipalData = self.tx_sender.clone().into();
 
         let mut global_context = self.get_global_context(epoch, track_costs)?;
 
         let mut hooks: Vec<&mut dyn EvalHook> = Vec::new();
-        for hook in eval_hooks.drain(..) {
+        for hook in eval_hooks {
             hooks.push(hook);
         }
         if !hooks.is_empty() {
@@ -917,7 +917,7 @@ impl ClarityInterpreter {
         let eval_result = EvaluationResult::Snippet(SnippetEvaluationResult { result: value });
         global_context.commit().unwrap();
 
-        let (events, mut accounts_to_credit, mut accounts_to_debit) =
+        let (events, accounts_to_credit, accounts_to_debit) =
             Self::process_events(&mut emitted_events);
 
         let mut execution_result = ExecutionResult {
@@ -933,11 +933,11 @@ impl ClarityInterpreter {
             }
         }
 
-        for (account, token, value) in accounts_to_credit.drain(..) {
+        for (account, token, value) in accounts_to_credit {
             self.credit_token(account, token, value);
         }
 
-        for (account, token, value) in accounts_to_debit.drain(..) {
+        for (account, token, value) in accounts_to_debit {
             self.debit_token(account, token, value);
         }
 

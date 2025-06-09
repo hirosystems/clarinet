@@ -141,7 +141,7 @@ impl ContractState {
         contract_id: QualifiedContractIdentifier,
         _ast: ContractAST,
         _deps: DependencySet,
-        mut diags: Vec<ClarityDiagnostic>,
+        diags: Vec<ClarityDiagnostic>,
         analysis: Option<ContractAnalysis>,
         definitions: HashMap<ClarityName, Range>,
         location: FileLocation,
@@ -151,7 +151,7 @@ impl ContractState {
         let mut warnings = vec![];
         let mut notes = vec![];
 
-        for diag in diags.drain(..) {
+        for diag in diags.into_iter() {
             match diag.level {
                 ClarityLevel::Error => {
                     errors.push(diag);
@@ -165,10 +165,10 @@ impl ContractState {
             }
         }
 
-        let contract_calls = match analysis {
-            Some(ref analysis) => get_contract_calls(analysis),
-            None => vec![],
-        };
+        let contract_calls = analysis
+            .as_ref()
+            .map(get_contract_calls)
+            .unwrap_or_default();
 
         ContractState {
             contract_id,
