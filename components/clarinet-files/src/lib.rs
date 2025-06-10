@@ -73,7 +73,7 @@ impl TryInto<Url> for &FileLocation {
     fn try_into(self) -> Result<Url, Self::Error> {
         match self {
             #[cfg(target_arch = "wasm32")]
-            FileLocation::FileSystem { path } => {
+            FileLocation::FileSystem { .. } => {
                 Err("Url::from_file_path() not available on target architecture")
             }
             #[cfg(not(target_arch = "wasm32"))]
