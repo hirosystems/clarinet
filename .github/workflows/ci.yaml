@@ -205,6 +205,11 @@ jobs:
             platform: darwin
             target: aarch64-apple-darwin
             architecture: arm64
+          - os: ubuntu-latest
+            platform: linux
+            target: x86_64-unknown-linux-musl
+            architecture: x64
+            libc: musl
 
     steps:
       - name: Configure git to use LF (Windows)
@@ -270,6 +275,13 @@ jobs:
 
       - name: Build - Cargo
         if: matrix.target != 'x86_64-unknown-linux-musl'
+        run: cargo build --release --features=telemetry --locked --target ${{ matrix.target }}
+
+      - name: Build - Cargo (linux-musl)
+        if: matrix.target == 'x86_64-unknown-linux-musl'
+        uses: docker://rust:alpine
+        env:
+          RUSTFLAGS: -C target-feature=-crt-static
         run: cargo build --release --features=telemetry --locked --target ${{ matrix.target }}
 
       # Steps for Windows Code Signing with DigiCert
