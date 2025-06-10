@@ -17,7 +17,6 @@ use clarity_repl::clarity::{ClarityName, ClarityVersion, StacksEpochId, Symbolic
 use clarity_repl::repl::{ContractDeployer, DEFAULT_CLARITY_VERSION};
 use lsp_types::{
     CompletionItem, DocumentSymbol, Hover, Location, MessageType, Position, Range, SignatureHelp,
-    Url,
 };
 use std::borrow::BorrowMut;
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -365,7 +364,7 @@ impl EditorState {
 
         match definitions.get(&position_hash)? {
             DefinitionLocation::Internal(range) => Some(Location {
-                uri: Url::parse(&contract_location.to_string()).ok()?,
+                uri: contract_location.try_into().ok()?,
                 range: *range,
             }),
             DefinitionLocation::External(contract_identifier, function_name) => {
@@ -383,18 +382,18 @@ impl EditorState {
                 {
                     let public_definitions = get_public_function_definitions(expressions);
                     return Some(Location {
+                        uri: contract_location.try_into().ok()?,
                         range: *public_definitions.get(function_name)?,
-                        uri: Url::parse(&definition_contract_location.to_string()).ok()?,
                     });
                 };
 
                 Some(Location {
+                    uri: contract_location.try_into().ok()?,
                     range: *protocol
                         .contracts
                         .get(definition_contract_location)?
                         .definitions
                         .get(function_name)?,
-                    uri: Url::parse(&definition_contract_location.to_string()).ok()?,
                 })
             }
         }
