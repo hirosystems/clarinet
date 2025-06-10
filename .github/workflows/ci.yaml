@@ -282,7 +282,9 @@ jobs:
         uses: docker://rust:alpine
         env:
           RUSTFLAGS: -C target-feature=-crt-static
-        run: cargo build --release --features=telemetry --locked --target ${{ matrix.target }}
+        with:
+          entrypoint: /bin/sh
+          args: -c "cargo build --release --features=telemetry --locked --target ${{ matrix.target }}"
 
       # Steps for Windows Code Signing with DigiCert
       - name: Windows - Setup Certificate
