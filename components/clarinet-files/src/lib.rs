@@ -68,11 +68,18 @@ impl fmt::Display for FileLocation {
 }
 
 impl TryInto<Url> for &FileLocation {
-    type Error = ();
+    type Error = &'static str;
 
     fn try_into(self) -> Result<Url, Self::Error> {
         match self {
-            FileLocation::FileSystem { path } => Url::from_file_path(path),
+            #[cfg(target_arch = "wasm32")]
+            FileLocation::FileSystem { path } => {
+                Err("Url::from_file_path() not available on target architecture")
+            }
+            #[cfg(not(target_arch = "wasm32"))]
+            FileLocation::FileSystem { path } => {
+                Url::from_file_path(path).map_err(|()| "Url::from_file_path() failed")
+            }
             FileLocation::Url { url } => Ok(url.clone()),
         }
     }
