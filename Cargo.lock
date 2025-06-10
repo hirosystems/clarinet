@@ -5724,7 +5724,7 @@ checksum = "3528ecfd12c466c6f163363caf2d02a71161dd5e1cc6ae7b34207ea2d42d81ed"
 
 [[package]]
 name = "ts-to-clar"
-version = "3.0.2"
+version = "3.1.0"
 dependencies = [
  "anyhow",
  "clarinet-format",
