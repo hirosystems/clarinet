@@ -5846,6 +5846,7 @@ dependencies = [
  "oxc_span",
  "oxc_syntax",
  "oxc_traverse",
+ "pretty_assertions",
  "swc_atoms",
 ]
 
