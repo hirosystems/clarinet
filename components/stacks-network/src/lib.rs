@@ -208,6 +208,7 @@ async fn do_run_devnet(
                 observer_command_rx,
                 moved_mining_command_tx,
                 mining_command_rx,
+                !no_snapshot,
                 ctx_moved,
             );
             let rt = hiro_system_kit::create_basic_runtime();

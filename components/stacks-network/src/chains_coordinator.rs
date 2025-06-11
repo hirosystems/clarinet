@@ -10,16 +10,22 @@ use crate::orchestrator::{copy_directory, get_global_snapshot_dir, get_project_s
 use base58::FromBase58;
 use bitcoincore_rpc::bitcoin::Address;
 use chainhook_sdk::chainhooks::types::ChainhookStore;
+use chainhook_sdk::indexer::stacks::standardize_stacks_serialized_block;
+use chainhook_sdk::indexer::StacksChainContext;
+use chainhook_sdk::observer::PredicateEvaluationReport;
 use chainhook_sdk::observer::PredicatesConfig;
 use chainhook_sdk::observer::{
     start_event_observer, EventObserverConfig, ObserverCommand, ObserverEvent,
-    StacksChainMempoolEvent,
+    StacksChainMempoolEvent, StacksObserverStartupContext,
 };
 use chainhook_sdk::types::BitcoinBlockSignaling;
 use chainhook_sdk::types::BitcoinChainEvent;
 use chainhook_sdk::types::StacksChainEvent;
 use chainhook_sdk::types::StacksNodeConfig;
 use chainhook_sdk::utils::Context;
+use chainhook_types::StacksBlockData;
+use chainhook_types::StacksBlockUpdate;
+use chainhook_types::StacksChainUpdatedWithBlocksData;
 use chainhook_types::StacksTransactionKind;
 use clarinet_deployments::onchain::TransactionStatus;
 use clarinet_deployments::onchain::{
@@ -182,11 +188,12 @@ pub async fn start_chains_coordinator(
     observer_command_rx: Receiver<ObserverCommand>,
     mining_command_tx: Sender<BitcoinMiningCommand>,
     mining_command_rx: Receiver<BitcoinMiningCommand>,
+    using_snapshot: bool,
     ctx: Context,
 ) -> Result<(), String> {
     let mut should_deploy_protocol = true; // Will change when `stacks-network` components becomes compatible with Testnet / Mainnet setups
     let boot_completed = Arc::new(AtomicBool::new(false));
-    let mut current_burn_height = 0;
+    let mut current_burn_height = if using_snapshot { 143 } else { 0 };
 
     let global_snapshot_dir = get_global_snapshot_dir();
     let project_snapshot_dir = get_project_snapshot_dir(&config.devnet_config);
@@ -195,17 +202,6 @@ pub async fn start_chains_coordinator(
         .map_err(|e| format!("unable to create global snapshot directory: {:?}", e))?;
     fs::create_dir_all(&project_snapshot_dir)
         .map_err(|e| format!("unable to create project snapshot directory: {:?}", e))?;
-
-    let project_snapshot_ready = project_snapshot_dir.join("epoch_3_ready").exists();
-
-    if project_snapshot_ready {
-        devnet_event_tx
-            .send(DevnetEvent::info(
-                "Using snapshotted blockchain data up to epoch 3.0. Startup will be faster."
-                    .to_string(),
-            ))
-            .expect("Failed to send event");
-    }
 
     let (deployment_commands_tx, deployments_command_rx) = channel();
     let (deployment_events_tx, deployment_events_rx) = channel();
@@ -257,6 +253,74 @@ pub async fn start_chains_coordinator(
     let observer_event_tx_moved = observer_event_tx.clone();
     let observer_command_tx_moved = observer_command_tx.clone();
     let ctx_moved = ctx.clone();
+
+    // Load events from snapshot if available
+    let event_pool: Vec<StacksBlockData> = if using_snapshot {
+        let mut events = vec![];
+        let events_cache_path = get_global_snapshot_dir()
+            .join("events_export")
+            .join("events_cache.tsv");
+
+        let mut chain_ctx = StacksChainContext::new(&chainhook_types::StacksNetwork::Devnet);
+        if let Ok(file_content) = fs::read_to_string(&events_cache_path) {
+            for line in file_content.lines() {
+                if line.split('\t').nth(2).unwrap_or("") == "/new_block" {
+                    let maybe_block = standardize_stacks_serialized_block(
+                        &chainhook_sdk::indexer::IndexerConfig {
+                            bitcoin_network: chainhook_types::BitcoinNetwork::Regtest,
+                            stacks_network: chainhook_types::StacksNetwork::Devnet,
+                            bitcoind_rpc_url: config.devnet_config.bitcoin_node_image_url.clone(),
+                            bitcoind_rpc_username: config
+                                .devnet_config
+                                .bitcoin_node_username
+                                .clone(),
+                            bitcoind_rpc_password: config
+                                .devnet_config
+                                .bitcoin_node_password
+                                .clone(),
+                            bitcoin_block_signaling: BitcoinBlockSignaling::Stacks(
+                                StacksNodeConfig {
+                                    rpc_url: config.devnet_config.stacks_node_image_url.clone(),
+                                    ingestion_port: 3999,
+                                },
+                            ),
+                        },
+                        line.split('\t').nth(3).unwrap_or(""),
+                        &mut chain_ctx,
+                        &ctx,
+                    );
+                    match maybe_block {
+                        Ok(block) => {
+                            events.push(block);
+                        }
+                        Err(e) => {
+                            let _ =
+                                devnet_event_tx.send(DevnetEvent::debug(format!("Error: {}", e)));
+                        }
+                    }
+                }
+            }
+        }
+
+        let _ = observer_event_tx.send(ObserverEvent::StacksChainEvent((
+            StacksChainEvent::ChainUpdatedWithBlocks(StacksChainUpdatedWithBlocksData {
+                new_blocks: events
+                    .clone()
+                    .iter()
+                    .map(|event| StacksBlockUpdate::new(event.clone()))
+                    .collect::<Vec<_>>(),
+                confirmed_blocks: events.clone(),
+            }),
+            PredicateEvaluationReport::default(),
+        )));
+        events
+    } else {
+        vec![]
+    };
+    let stacks_startup_context = StacksObserverStartupContext {
+        block_pool_seed: event_pool,
+        last_block_height_appended: if using_snapshot { 38 } else { 0 },
+    };
     let _ = hiro_system_kit::thread_named("Event observer").spawn(move || {
         let _ = start_event_observer(
             event_observer_config,
@@ -264,7 +328,7 @@ pub async fn start_chains_coordinator(
             observer_command_rx,
             Some(observer_event_tx_moved),
             None,
-            None,
+            Some(stacks_startup_context),
             ctx_moved,
         );
     });
@@ -450,6 +514,7 @@ pub async fn start_chains_coordinator(
                         // Stacking orders can't be published until devnet is ready
                         if !stacks_signers_keys.is_empty()
                             && bitcoin_block_height >= DEFAULT_FIRST_BURN_HEADER_HEIGHT + 10
+                            && !using_snapshot
                         {
                             let res = publish_stacking_orders(
                                 &config.devnet_config,
