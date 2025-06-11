@@ -564,9 +564,10 @@ pub async fn start_chains_coordinator(
                 let _ = devnet_event_tx.send(DevnetEvent::BitcoinChainEvent(chain_update.clone()));
             }
             ObserverEvent::StacksChainEvent((chain_event, _)) => {
+                let starting_block_height = if using_snapshot { 38 } else { 0 };
                 if should_deploy_protocol {
                     if let Some(block_identifier) = chain_event.get_latest_block_identifier() {
-                        if block_identifier.index == 1 {
+                        if block_identifier.index == starting_block_height {
                             should_deploy_protocol = false;
                             if let Some(deployment_commands_tx) = deployment_commands_tx.take() {
                                 deployment_commands_tx
