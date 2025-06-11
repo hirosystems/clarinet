@@ -273,18 +273,14 @@ jobs:
           echo "SHORT_TARGET_NAME=${{ matrix.platform }}-${{ matrix.architecture }}" >> $GITHUB_ENV
           echo "PRE_GYP_TARGET_NAME=${{ matrix.platform }}-${{ matrix.architecture }}-unknown" >> $GITHUB_ENV
 
-      - name: Build - Cargo
-        if: matrix.target != 'x86_64-unknown-linux-musl'
-        run: cargo build --release --features=telemetry --locked --target ${{ matrix.target }}
-
-      - name: Build - Cargo (linux-musl)
+      - name: Install musl-gcc
         if: matrix.target == 'x86_64-unknown-linux-musl'
-        uses: docker://rust:alpine
-        env:
-          RUSTFLAGS: -C target-feature=-crt-static
-        with:
-          entrypoint: /bin/sh
-          args: -c "cargo build --release --features=telemetry --locked --target ${{ matrix.target }}"
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y musl-tools
+
+      - name: Build - Cargo
+        run: cargo build --release --features=telemetry --locked --target ${{ matrix.target }}
 
       # Steps for Windows Code Signing with DigiCert
       - name: Windows - Setup Certificate
