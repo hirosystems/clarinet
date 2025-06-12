@@ -205,6 +205,11 @@ jobs:
             platform: darwin
             target: aarch64-apple-darwin
             architecture: arm64
+          - os: ubuntu-latest
+            platform: linux
+            target: x86_64-unknown-linux-musl
+            architecture: x64
+            libc: musl
 
     steps:
       - name: Configure git to use LF (Windows)
@@ -268,8 +273,13 @@ jobs:
           echo "SHORT_TARGET_NAME=${{ matrix.platform }}-${{ matrix.architecture }}" >> $GITHUB_ENV
           echo "PRE_GYP_TARGET_NAME=${{ matrix.platform }}-${{ matrix.architecture }}-unknown" >> $GITHUB_ENV
 
+      - name: Install musl-gcc
+        if: matrix.target == 'x86_64-unknown-linux-musl'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y musl-tools
+
       - name: Build - Cargo
-        if: matrix.target != 'x86_64-unknown-linux-musl'
         run: cargo build --release --features=telemetry --locked --target ${{ matrix.target }}
 
       # Steps for Windows Code Signing with DigiCert
