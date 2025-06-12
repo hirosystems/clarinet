@@ -692,6 +692,7 @@ pub trait ASTVisitor<'a> {
         name: &'a ClarityName,
         trait_def: &TraitDefinition,
     ) -> bool {
+        eprintln!("visit_trait_reference() empty");
         true
     }
 
@@ -2552,12 +2553,7 @@ pub trait ASTVisitor<'a> {
 }
 
 pub fn traverse<'a>(visitor: &mut impl ASTVisitor<'a>, exprs: &'a [SymbolicExpression]) -> bool {
-    for expr in exprs {
-        if !visitor.traverse_expr(expr) {
-            return false;
-        }
-    }
-    true
+    exprs.iter().all(|expr| visitor.traverse_expr(expr))
 }
 
 fn match_tuple(
