@@ -1378,3 +1378,154 @@ async fn export_stacks_api_events(
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests_stacking_orders {
+
+    use super::*;
+
+    fn build_pox_stacking_order(duration: u32, start_at_cycle: u32) -> PoxStackingOrder {
+        PoxStackingOrder {
+            duration,
+            start_at_cycle,
+            wallet: "wallet_1".to_string(),
+            slots: 1,
+            btc_address: "address_1".to_string(),
+            auto_extend: Some(true),
+        }
+    }
+
+    #[test]
+    fn test_should_publish_stacking_orders_basic() {
+        let pox_stacking_order = build_pox_stacking_order(12, 6);
+
+        // cycle just before start_at_cycle
+        assert!(should_publish_stacking_orders(&5, &pox_stacking_order));
+        // cycle before start_at_cycle + duration
+        assert!(should_publish_stacking_orders(&17, &pox_stacking_order),);
+        // cycle before start_at_cycle + duration * 42
+        assert!(should_publish_stacking_orders(&509, &pox_stacking_order));
+        // cycle equal to start_at_cycle
+        assert!(!should_publish_stacking_orders(&6, &pox_stacking_order));
+        // cycle after start_at_cycle
+        assert!(!should_publish_stacking_orders(&8, &pox_stacking_order));
+    }
+
+    #[test]
+    fn test_should_publish_stacking_orders_edge_cases() {
+        // duration is one cycle
+        let pox_stacking_order = build_pox_stacking_order(1, 4);
+        assert!(!should_publish_stacking_orders(&2, &pox_stacking_order));
+
+        for i in 3..=20 {
+            assert!(should_publish_stacking_orders(&i, &pox_stacking_order));
+        }
+        // duration is low and start_at_cycle is high
+        let pox_stacking_order = build_pox_stacking_order(2, 100);
+        for i in 0..=98 {
+            assert!(!should_publish_stacking_orders(&i, &pox_stacking_order));
+        }
+        assert!(should_publish_stacking_orders(&99, &pox_stacking_order));
+        assert!(!should_publish_stacking_orders(&100, &pox_stacking_order));
+        assert!(should_publish_stacking_orders(&101, &pox_stacking_order));
+    }
+}
+
+#[cfg(test)]
+mod test_rpc_client {
+    use clarinet_files::DEFAULT_DERIVATION_PATH;
+    use stacks_rpc_client::{mock_stacks_rpc::MockStacksRpc, rpc_client::NodeInfo};
+
+    use super::*;
+
+    #[test]
+    fn test_fund_genesis_account() {
+        let mut stacks_rpc = MockStacksRpc::new();
+        let info_mock = stacks_rpc.get_info_mock(NodeInfo {
+            peer_version: 4207599116,
+            pox_consensus: "4f4de3d4ab3246299c039084a12c801c9dc70323".to_string(),
+            burn_block_height: 100,
+            stable_pox_consensus: "a2c4972bf818f554809e25fa637b780c77c20b62".to_string(),
+            stable_burn_block_height: 99,
+            server_version: "stacks-node 0.0.1".to_string(),
+            network_id: 2147483648,
+            parent_network_id: 3669344250,
+            stacks_tip_height: 47,
+            stacks_tip: "6bb0e4706fdfb9624a23d9144f2161c61d5c58816643b48ffdb735887bdbf5fa"
+                .to_string(),
+            stacks_tip_consensus_hash: "4f4de3d4ab3246299c039084a12c801c9dc70323".to_string(),
+            genesis_chainstate_hash:
+                "74237aa39aa50a83de11a4f53e9d3bb7d43461d1de9873f402e5453ae60bc59b".to_string(),
+        });
+        let burn_block_mock = stacks_rpc.get_burn_block_mock(100);
+        let nonce_mock = stacks_rpc.get_nonce_mock("ST2JHG361ZXG51QTKY2NQCVBPPRRE2KZB1HR05NNC", 0);
+        let tx_mock = stacks_rpc
+            .get_tx_mock("0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef");
+
+        let deployer = AccountConfig {
+            label: "deployer".to_string(),
+            mnemonic: "cycle puppy glare enroll cost improve round trend wrist mushroom scorpion tower claim oppose clever elephant dinosaur eight problem before frozen dune wagon high".to_string(),
+            derivation: DEFAULT_DERIVATION_PATH.to_string(),
+            balance: 10000000,
+            sbtc_balance: 100000000,
+            stx_address: "ST2JHG361ZXG51QTKY2NQCVBPPRRE2KZB1HR05NNC".to_string(),
+            btc_address: "mvZtbibDAAA3WLpY7zXXFqRa3T4XSknBX7".to_string(),
+            is_mainnet: false,
+        };
+
+        let fee_rate = 10;
+        let (devnet_event_tx, devnet_event_rx) = channel();
+        let services_map_hosts = ServicesMapHosts {
+            stacks_api_host: stacks_rpc.url.replace("http://", ""),
+            // only stacks_node is called
+            stacks_node_host: stacks_rpc.url.clone(),
+            bitcoin_node_host: "localhost".to_string(),
+            bitcoin_explorer_host: "localhost".to_string(),
+            stacks_explorer_host: "localhost".to_string(),
+            subnet_node_host: "localhost".to_string(),
+            subnet_api_host: "localhost".to_string(),
+            postgres_host: "localhost".to_string(),
+        };
+        let accounts = vec![deployer];
+
+        let boot_completed = Arc::new(AtomicBool::new(true));
+
+        fund_genesis_account(
+            &devnet_event_tx,
+            &services_map_hosts,
+            &accounts,
+            fee_rate,
+            &boot_completed,
+        );
+
+        let timeout = Duration::from_secs(3);
+        let start = std::time::Instant::now();
+
+        let mut received_events = Vec::new();
+        while start.elapsed() < timeout {
+            match devnet_event_rx.recv_timeout(Duration::from_millis(100)) {
+                Ok(event) => {
+                    received_events.push(event);
+                }
+                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
+                Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+                    break;
+                }
+            }
+        }
+
+        assert_eq!(received_events.len(), 1);
+        assert!(received_events.iter().any(|event| {
+            if let DevnetEvent::Log(msg) = event {
+                msg.message.contains("Funded 1 accounts with sBTC")
+            } else {
+                false
+            }
+        }));
+
+        info_mock.assert();
+        nonce_mock.assert();
+        burn_block_mock.assert();
+        tx_mock.assert();
+    }
+}
