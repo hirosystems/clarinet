@@ -4,7 +4,9 @@ use super::helpers::span_to_range;
 
 use clarity_repl::analysis::ast_visitor::{traverse, ASTVisitor, TypedVar};
 use clarity_repl::clarity::functions::define::DefineFunctions;
-use clarity_repl::clarity::vm::types::{QualifiedContractIdentifier, StandardPrincipalData};
+use clarity_repl::clarity::vm::types::{
+    QualifiedContractIdentifier, StandardPrincipalData, TraitIdentifier,
+};
 use clarity_repl::clarity::{ClarityName, SymbolicExpression};
 use lsp_types::Range;
 
@@ -112,6 +114,45 @@ impl<'a> ASTVisitor<'a> for Definitions {
                 DefinitionLocation::Internal(*range),
             );
         }
+        true
+    }
+
+    fn visit_use_trait(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        _name: &'a ClarityName,
+        trait_identifier: &TraitIdentifier,
+    ) -> bool {
+        eprintln!(
+            "Insert use trait '{_name}' at ({}, {}), defined at {trait_identifier:?}",
+            expr.span.start_line, expr.span.start_column
+        );
+        self.tokens.insert(
+            (expr.span.start_line, expr.span.start_column),
+            DefinitionLocation::External(
+                trait_identifier.contract_identifier.clone(),
+                trait_identifier.name.clone(),
+            ),
+        );
+        true
+    }
+
+    fn visit_impl_trait(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        trait_identifier: &TraitIdentifier,
+    ) -> bool {
+        eprintln!(
+            "Insert inpl trait '{}' at ({}, {}), defined at {trait_identifier:?}",
+            trait_identifier.name, expr.span.start_line, expr.span.start_column
+        );
+        self.tokens.insert(
+            (expr.span.start_line, expr.span.start_column),
+            DefinitionLocation::External(
+                trait_identifier.contract_identifier.clone(),
+                trait_identifier.name.clone(),
+            ),
+        );
         true
     }
 
