@@ -123,16 +123,19 @@ impl<'a> ASTVisitor<'a> for Definitions {
         _name: &'a ClarityName,
         trait_identifier: &TraitIdentifier,
     ) -> bool {
-        eprintln!(
-            "Insert use trait '{_name}' at ({}, {}), defined at {trait_identifier:?}",
-            expr.span.start_line, expr.span.start_column
-        );
+        let Some(keyword) = expr.match_list().and_then(|expr| expr.get(1)) else {
+            return true;
+        };
         self.tokens.insert(
-            (expr.span.start_line, expr.span.start_column),
+            (keyword.span.start_line, keyword.span.start_column),
             DefinitionLocation::External(
                 trait_identifier.contract_identifier.clone(),
                 trait_identifier.name.clone(),
             ),
+        );
+        eprintln!(
+            "Insert use trait '{_name}' at ({}, {}), defined at {trait_identifier:?}",
+            keyword.span.start_line, keyword.span.start_column
         );
         true
     }
@@ -142,16 +145,19 @@ impl<'a> ASTVisitor<'a> for Definitions {
         expr: &'a SymbolicExpression,
         trait_identifier: &TraitIdentifier,
     ) -> bool {
-        eprintln!(
-            "Insert inpl trait '{}' at ({}, {}), defined at {trait_identifier:?}",
-            trait_identifier.name, expr.span.start_line, expr.span.start_column
-        );
+        let Some(keyword) = expr.match_list().and_then(|expr| expr.get(1)) else {
+            return true;
+        };
         self.tokens.insert(
-            (expr.span.start_line, expr.span.start_column),
+            (keyword.span.start_line, keyword.span.start_column),
             DefinitionLocation::External(
                 trait_identifier.contract_identifier.clone(),
                 trait_identifier.name.clone(),
             ),
+        );
+        eprintln!(
+            "Insert inpl trait '{}' at ({}, {}), defined at {trait_identifier:?}",
+            trait_identifier.name, keyword.span.start_line, keyword.span.start_column
         );
         true
     }
