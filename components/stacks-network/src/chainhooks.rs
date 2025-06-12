@@ -10,17 +10,12 @@ use std::fs;
 pub fn parse_chainhook_full_specification(
     path: &PathBuf,
 ) -> Result<ChainhookSpecificationNetworkMap, String> {
-    let path = match File::open(path) {
-        Ok(path) => path,
-        Err(_e) => {
-            return Err(format!("unable to locate {}", path.display()));
-        }
-    };
+    let path = File::open(path).map_err(|_| format!("unable to locate {}", path.display()))?;
 
     let mut hook_spec_file_reader = BufReader::new(path);
     let specification: ChainhookSpecificationNetworkMap =
         serde_json::from_reader(&mut hook_spec_file_reader)
-            .map_err(|e| format!("unable to parse chainhook spec: {}", e))?;
+            .map_err(|e| format!("unable to parse chainhook spec: {e}"))?;
 
     Ok(specification)
 }
