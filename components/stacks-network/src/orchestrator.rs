@@ -1795,26 +1795,6 @@ events_keys = ["*"]
             .await
             .map_err(|e| format!("unable to create image: {}", e))?;
 
-        // Check if we have events to import
-        let import_events = {
-            let project_events_path = PathBuf::from(&devnet_config.working_dir)
-                .join("events_export")
-                .join("events_cache.tsv");
-
-            if project_events_path.exists() {
-                Some(project_events_path)
-            } else {
-                let global_events_path = get_global_snapshot_dir()
-                    .join("events_export")
-                    .join("events_cache.tsv");
-
-                if global_events_path.exists() {
-                    Some(global_events_path)
-                } else {
-                    None
-                }
-            }
-        };
         let mut port_bindings = HashMap::new();
         port_bindings.insert(
             format!("{}/tcp", devnet_config.stacks_api_port),
@@ -1894,25 +1874,44 @@ events_keys = ["*"]
         ctx.try_log(|logger| slog::info!(logger, "Created container stacks-api: {}", container));
         self.stacks_api_container_id = Some(container);
 
-        // If we have events to import, we need to copy the file to the container
-        if let Some(events_path) = import_events {
-            ctx.try_log(|logger| {
-                slog::info!(
-                    logger,
-                    "Found events file to import: {}",
-                    events_path.display()
-                )
-            });
+        // // If we have events to import, we need to copy the file to the container
+        // if let Some(events_path) = import_events {
+        //     ctx.try_log(|logger| {
+        //         slog::info!(
+        //             logger,
+        //             "Found events file to import: {}",
+        //             events_path.display()
+        //         )
+        //     });
 
-            // Store the path in a temporary file for later use
-            let import_marker =
-                PathBuf::from(&devnet_config.working_dir).join("pending_events_import");
-            fs::write(&import_marker, events_path.to_string_lossy().as_bytes())
-                .map_err(|e| format!("unable to write import marker: {:?}", e))?;
-        }
+        //     // Store the path in a temporary file for later use
+        //     let import_marker =
+        //         PathBuf::from(&devnet_config.working_dir).join("pending_events_import");
+        //     fs::write(&import_marker, events_path.to_string_lossy().as_bytes())
+        //         .map_err(|e| format!("unable to write import marker: {:?}", e))?;
+        // }
         Ok(())
     }
 
+    fn has_events_to_import(&self, devnet_config: &DevnetConfig) -> Option<PathBuf> {
+        let project_events_path = PathBuf::from(&devnet_config.working_dir)
+            .join("events_export")
+            .join("events_cache.tsv");
+
+        if project_events_path.exists() {
+            Some(project_events_path)
+        } else {
+            let global_events_path = get_global_snapshot_dir()
+                .join("events_export")
+                .join("events_cache.tsv");
+
+            if global_events_path.exists() {
+                Some(global_events_path)
+            } else {
+                None
+            }
+        }
+    }
     pub async fn boot_stacks_api_container(&self, ctx: &Context) -> Result<(), String> {
         let container = match &self.stacks_api_container_id {
             Some(container) => container.clone(),
@@ -1928,7 +1927,6 @@ events_keys = ["*"]
             .await
             .map_err(|e| formatted_docker_error("unable to start stacks-api container", e))?;
 
-        // Check if we need to import events
         let devnet_config = match &self.network_config {
             Some(ref network_config) => match network_config.devnet {
                 Some(ref devnet_config) => devnet_config,
@@ -1937,23 +1935,22 @@ events_keys = ["*"]
             _ => return Ok(()),
         };
 
-        let import_marker = PathBuf::from(&devnet_config.working_dir).join("pending_events_import");
-
-        if import_marker.exists() {
-            // Read the events file path
-            let events_path = fs::read_to_string(&import_marker)
-                .map_err(|e| format!("unable to read import marker: {:?}", e))?;
-
+        // Check if we need to import events
+        if let Some(events_path) = self.has_events_to_import(devnet_config) {
             // Wait for API to be ready
-            std::thread::sleep(Duration::from_secs(10));
+            // TODO: don't do this..
+            std::thread::sleep(Duration::from_secs(8));
 
-            ctx.try_log(|logger| slog::info!(logger, "Importing events from {}", events_path));
+            ctx.try_log(|logger| {
+                slog::info!(logger, "Importing events from {}", events_path.display())
+            });
 
             // Copy the events file to the container
             let container_name = format!("stacks-api.{}", self.network_name);
             let copy_command = format!(
                 "docker cp {} {}:/tmp/events_cache.tsv",
-                events_path, container_name
+                events_path.display(),
+                container_name
             );
 
             let output = std::process::Command::new("sh")
@@ -1992,9 +1989,6 @@ events_keys = ["*"]
             } else {
                 ctx.try_log(|logger| slog::info!(logger, "Events import completed successfully"));
             }
-
-            // Remove the marker file
-            let _ = fs::remove_file(&import_marker);
         }
         Ok(())
     }
