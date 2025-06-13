@@ -456,8 +456,8 @@ struct DevnetStart {
     /// Display streams of logs instead of terminal UI dashboard
     #[clap(long = "no-dashboard")]
     pub no_dashboard: bool,
-    /// Don't use snapshot data on startup
-    #[clap(long = "no-snapshot")]
+    /// Start from genesis rather than using snapshot
+    #[clap(long = "from-genesis")]
     pub no_snapshot: bool,
     /// If specified, use this deployment file
     #[clap(long = "deployment-plan-path", short = 'p')]
