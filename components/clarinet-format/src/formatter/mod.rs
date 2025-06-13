@@ -68,12 +68,13 @@ impl ClarityFormatter {
     }
     /// formatting for files to ensure a newline at the end
     pub fn format_file(&self, source: &str) -> String {
-        let pse = clarity::vm::ast::parser::v2::parse(source).unwrap();
-        let agg = Aggregator::new(&self.settings, &pse, Some(source));
+        let trimmed_source = source.trim_start_matches(['\n', '\r']);
+        let pse = clarity::vm::ast::parser::v2::parse(trimmed_source).unwrap();
+        let agg = Aggregator::new(&self.settings, &pse, Some(trimmed_source));
         let result = agg.generate();
 
         // make sure the file ends with a newline
-        result.trim_end_matches('\n').to_string() + "\n"
+        format!("{}\n", result.trim_end_matches(['\n', '\r']))
     }
     /// formatting an AST without a source file
     pub fn format_ast(&self, pse: &[PreSymbolicExpression]) -> String {
