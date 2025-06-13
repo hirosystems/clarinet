@@ -864,7 +864,7 @@ impl Session {
     }
 
     fn parse_and_set_tx_sender(&mut self, command: &str) -> String {
-        let args: Vec<_> = command.split(' ').collect();
+        let args: Vec<_> = command.split(' ').filter(|&s| !s.is_empty()).collect();
 
         if args.len() != 2 {
             return format!("{}", "Usage: ::set_tx_sender <address>".red());
@@ -1901,5 +1901,19 @@ mod tests {
             format!("(contract-call? .{} get-burn u18)", contract.name).as_str(),
         );
         assert_eq!(result, Value::UInt(21));
+    }
+
+    #[test]
+    fn test_parse_and_set_tx_sender() {
+        let settings = SessionSettings::default();
+        let mut session = Session::new(settings);
+        let sender = "ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5";
+        session.start().expect("session could not start");
+
+        let result = session.process_console_input(&format!("::set_tx_sender    {}", sender));
+        assert!(result.1[0].contains(sender));
+
+        let result = session.process_console_input(&format!("::set_tx_sender {}     ", sender));
+        assert!(result.1[0].contains(sender));
     }
 }
