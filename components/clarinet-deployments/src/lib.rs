@@ -523,8 +523,18 @@ pub async fn generate_default_deployment(
                             _ => {}
                         }
 
+                        // Create unique contract name by appending issuer address
+                        let unique_contract_name = format!("{}-{}", 
+                            contract_id.name,
+                            contract_id.issuer.to_address().replace(".", "-")
+                        );
+                        let unique_contract_id = QualifiedContractIdentifier::new(
+                            default_deployer_address.clone(),
+                            ContractName::try_from(unique_contract_name).unwrap(),
+                        );
+
                         let data = RequirementPublishSpecification {
-                            contract_id: contract_id.clone(),
+                            contract_id: unique_contract_id,
                             remap_sender: default_deployer_address.clone(),
                             source: source.clone(),
                             location: contract_location,
@@ -548,8 +558,18 @@ pub async fn generate_default_deployment(
                             );
                         }
 
+                        // Create unique contract name by appending issuer address
+                        let unique_contract_name = format!("{}-{}", 
+                            contract_id.name,
+                            contract_id.issuer.to_address().replace(".", "-")
+                        );
+                        let unique_contract_id = QualifiedContractIdentifier::new(
+                            remap_sender.clone(),
+                            ContractName::try_from(unique_contract_name).unwrap(),
+                        );
+
                         let data = RequirementPublishSpecification {
-                            contract_id: contract_id.clone(),
+                            contract_id: unique_contract_id,
                             remap_sender,
                             source: source.clone(),
                             location: contract_location,
