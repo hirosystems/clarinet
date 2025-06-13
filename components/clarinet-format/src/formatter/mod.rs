@@ -74,7 +74,7 @@ impl ClarityFormatter {
         let result = agg.generate();
 
         // make sure the file ends with a newline
-        format!("{}\n", result.trim_end_matches('\n'))
+        format!("{}\n", result.trim_end_matches(['\n', '\r']))
     }
     /// formatting an AST without a source file
     pub fn format_ast(&self, pse: &[PreSymbolicExpression]) -> String {
