@@ -419,28 +419,22 @@ impl Session {
     pub fn start(&mut self) -> Result<(String, Vec<(ContractAnalysis, String, String)>), String> {
         let mut output_err = Vec::<String>::new();
         let output = Vec::<String>::new();
-        let contracts = vec![];
+        let contracts = vec![]; // This is never modified, remove?
 
         if !self.settings.include_boot_contracts.is_empty() {
             self.load_boot_contracts();
         }
 
-        if !self.settings.initial_accounts.is_empty() {
-            let mut initial_accounts = self.settings.initial_accounts.clone();
-            for account in initial_accounts.drain(..) {
-                let Ok(recipient) = PrincipalData::parse(&account.address) else {
-                    output_err.push("Unable to parse address to credit".red().to_string());
-                    continue;
-                };
+        for account in &self.settings.initial_accounts {
+            let Ok(recipient) = PrincipalData::parse(&account.address) else {
+                output_err.push("Unable to parse address to credit".red().to_string());
+                continue;
+            };
 
-                match self
-                    .interpreter
-                    .mint_stx_balance(recipient, account.balance)
-                {
-                    Ok(_) => {}
-                    Err(err) => output_err.push(err.red().to_string()),
-                };
-            }
+            _ = self
+                .interpreter
+                .mint_stx_balance(recipient, account.balance)
+                .inspect_err(|e| output_err.push(e.red().to_string()));
         }
 
         match output_err.len() {

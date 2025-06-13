@@ -326,7 +326,7 @@ impl DebugState {
         let contract_id = QualifiedContractIdentifier::transient();
         let lines = snippet.lines();
         let formatted_lines: Vec<String> = lines.map(|l| l.to_string()).collect();
-        let (ast, mut diagnostics, success) = build_ast_with_diagnostics(
+        let (ast, diagnostics, success) = build_ast_with_diagnostics(
             &contract_id,
             snippet,
             &mut (),
@@ -338,7 +338,7 @@ impl DebugState {
         }
         if !success {
             let mut errors = Vec::new();
-            for diagnostic in diagnostics.drain(..).filter(|d| d.level == Level::Error) {
+            for diagnostic in diagnostics.into_iter().filter(|d| d.level == Level::Error) {
                 errors.append(&mut output_diagnostic(
                     &diagnostic,
                     "print expression",
@@ -348,10 +348,7 @@ impl DebugState {
             return Err(errors);
         }
 
-        match eval(&ast.expressions[0], env, context) {
-            Ok(value) => Ok(value),
-            Err(e) => Err(vec![format_err!(e)]),
-        }
+        eval(&ast.expressions[0], env, context).map_err(|e| vec![format_err!(e)])
     }
 
     fn did_hit_source_breakpoint(
