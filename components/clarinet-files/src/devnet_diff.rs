@@ -1,5 +1,7 @@
 pub use crate::DevnetConfig;
 
+use std::fmt::Write as _;
+
 /// Config which fields to check for differences
 pub struct DevnetDiffConfig {
     /// Fields to check for differences
@@ -106,7 +108,7 @@ impl DevnetDiffConfig {
                     let mut orders = config.pox_stacking_orders.clone();
                     orders.sort_by(|a, b| a.wallet.cmp(&b.wallet));
                     orders
-                        .iter()
+                        .into_iter()
                         .map(|pso| {
                             format!(
                                 "{}-{}-{}-{}-{}",
@@ -155,9 +157,10 @@ impl DevnetDiffConfig {
             let user_value = (field.extractor)(user_config);
 
             if default_value != user_value {
-                return Err(format!(
-                    "user_value: {:?}\ndefault_value: {:?}",
-                    user_value, default_value
+                return Err(indoc::formatdoc!(
+                    "
+                user_value: {user_value:?}
+                default_value: {default_value:?}"
                 ));
             }
         }
@@ -172,8 +175,6 @@ impl DevnetDiffConfig {
         user_config: &DevnetConfig,
     ) -> Vec<String> {
         self.get_different_fields(default_config, user_config)
-            .into_iter()
-            .collect()
     }
 
     /// Generate a simple report of different fields
@@ -195,9 +196,7 @@ impl DevnetDiffConfig {
         );
 
         for field in different_fields {
-            report.push_str(&format!("• {}\n", field));
-
-            report.push('\n');
+            write!(report, "• {field}\n\n").unwrap();
         }
 
         report
