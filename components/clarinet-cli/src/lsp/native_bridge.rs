@@ -49,9 +49,7 @@ pub async fn start_language_server(
                         let _ = response_tx.send(LspResponse::Notification(response));
                     }
                 }
-                Err(_e) => {
-                    continue;
-                }
+                Err(_e) => {}
             },
             i if i == requests_oper => match oper.recv(&request_rx) {
                 Ok(request) => {
@@ -65,9 +63,7 @@ pub async fn start_language_server(
                         let _ = response_tx.send(LspResponse::Request(response));
                     }
                 }
-                Err(_e) => {
-                    continue;
-                }
+                Err(_e) => {}
             },
             _ => unreachable!(),
         }
