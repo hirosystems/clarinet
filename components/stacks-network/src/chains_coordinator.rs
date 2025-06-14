@@ -65,6 +65,9 @@ use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Arc;
 use std::time::Duration;
 
+static SNAPSHOT_STACKS_START_HEIGHT: u64 = 38;
+static SNAPSHOT_BURN_START_HEIGHT: u64 = 143;
+
 #[derive(Deserialize)]
 pub struct NewTransaction {
     pub txid: String,
@@ -177,7 +180,6 @@ impl DevnetEventObserverConfig {
         }
     }
 }
-
 pub async fn start_chains_coordinator(
     config: DevnetEventObserverConfig,
     devnet_event_tx: Sender<DevnetEvent>,
@@ -193,8 +195,16 @@ pub async fn start_chains_coordinator(
 ) -> Result<(), String> {
     let mut should_deploy_protocol = true; // Will change when `stacks-network` components becomes compatible with Testnet / Mainnet setups
     let boot_completed = Arc::new(AtomicBool::new(false));
-    let mut current_burn_height = if using_snapshot { 143 } else { 0 };
-    let starting_block_height = if using_snapshot { 38 } else { 0 };
+    let mut current_burn_height = if using_snapshot {
+        SNAPSHOT_BURN_START_HEIGHT
+    } else {
+        0
+    };
+    let starting_block_height = if using_snapshot {
+        SNAPSHOT_STACKS_START_HEIGHT
+    } else {
+        0
+    };
 
     let global_snapshot_dir = get_global_snapshot_dir();
     let project_snapshot_dir = get_project_snapshot_dir(&config.devnet_config);
@@ -265,7 +275,8 @@ pub async fn start_chains_coordinator(
         let mut chain_ctx = StacksChainContext::new(&chainhook_types::StacksNetwork::Devnet);
         if let Ok(file_content) = fs::read_to_string(&events_cache_path) {
             for line in file_content.lines() {
-                if line.split('\t').nth(2).unwrap_or("") == "/new_block" {
+                let mut line_parts = line.split('\t');
+                if line_parts.nth(2).unwrap_or("") == "/new_block" {
                     let maybe_block = standardize_stacks_serialized_block(
                         &chainhook_sdk::indexer::IndexerConfig {
                             bitcoin_network: chainhook_types::BitcoinNetwork::Regtest,
@@ -286,7 +297,7 @@ pub async fn start_chains_coordinator(
                                 },
                             ),
                         },
-                        line.split('\t').nth(3).unwrap_or(""),
+                        line_parts.nth(3).unwrap_or(""),
                         &mut chain_ctx,
                         &ctx,
                     );
@@ -306,8 +317,8 @@ pub async fn start_chains_coordinator(
         let _ = observer_event_tx.send(ObserverEvent::StacksChainEvent((
             StacksChainEvent::ChainUpdatedWithBlocks(StacksChainUpdatedWithBlocksData {
                 new_blocks: events
-                    .clone()
                     .iter()
+                    .cloned()
                     .map(|event| StacksBlockUpdate::new(event.clone()))
                     .collect::<Vec<_>>(),
                 confirmed_blocks: events.clone(),
@@ -780,7 +791,13 @@ pub async fn create_global_snapshot(
             let project_bitcoin_snapshot = project_snapshot_dir.join("bitcoin");
             let global_bitcoin_snapshot = global_snapshot_dir.join("bitcoin");
             if project_bitcoin_snapshot.exists() {
-                let _ = copy_directory(&project_bitcoin_snapshot, &global_bitcoin_snapshot, None);
+                let _ = copy_directory(&project_bitcoin_snapshot, &global_bitcoin_snapshot, None)
+                    .inspect_err(|e| {
+                        let _ = devnet_event_tx.send(DevnetEvent::warning(format!(
+                            "Failed to copy bitcoin snapshot: {}",
+                            e
+                        )));
+                    });
             }
 
             // Copy stacks data

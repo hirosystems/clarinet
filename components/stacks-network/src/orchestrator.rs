@@ -1874,22 +1874,6 @@ events_keys = ["*"]
         ctx.try_log(|logger| slog::info!(logger, "Created container stacks-api: {}", container));
         self.stacks_api_container_id = Some(container);
 
-        // // If we have events to import, we need to copy the file to the container
-        // if let Some(events_path) = import_events {
-        //     ctx.try_log(|logger| {
-        //         slog::info!(
-        //             logger,
-        //             "Found events file to import: {}",
-        //             events_path.display()
-        //         )
-        //     });
-
-        //     // Store the path in a temporary file for later use
-        //     let import_marker =
-        //         PathBuf::from(&devnet_config.working_dir).join("pending_events_import");
-        //     fs::write(&import_marker, events_path.to_string_lossy().as_bytes())
-        //         .map_err(|e| format!("unable to write import marker: {:?}", e))?;
-        // }
         Ok(())
     }
 
@@ -3105,10 +3089,24 @@ events_keys = ["*"]
                                     let err = r.text().await;
                                     let msg = format!("{:?}", err);
                                     // if it returns "Wallet is already loaded" we break out
-                                    if err.unwrap().contains("is already loaded") {
-                                        break;
-                                    } else {
-                                        let _ = devnet_event_tx.send(DevnetEvent::error(msg));
+                                    match err {
+                                        Ok(text) => {
+                                            if text.contains("is already loaded") {
+                                                break;
+                                            } else {
+                                                let _ =
+                                                    devnet_event_tx.send(DevnetEvent::error(msg));
+                                            }
+                                        }
+                                        Err(e) => {
+                                            let _ = devnet_event_tx.send(DevnetEvent::error(
+                                                format!("Failed to read error text: {}", e),
+                                            ));
+                                            return Err(format!(
+                                                "Failed to read error text: {}",
+                                                e
+                                            ));
+                                        }
                                     }
                                 }
                             }
