@@ -126,26 +126,23 @@ async fn do_run_devnet(
             }
         }
         match setup_snapshot_directories(&devnet_config, &devnet_events_tx) {
-            Ok(using_snapshot) => {
-                if using_snapshot {
-                    let _ = devnet_events_tx.send(DevnetEvent::info(
-                        "Using snapshotted blockchain data up to epoch 3.0. Startup will be faster."
-                            .to_string(),
-                    ));
-                } else {
-                    let _ = devnet_events_tx.send(DevnetEvent::info(
-                        "No snapshot blockchain data found. Initial startup may take longer."
-                            .to_string(),
-                    ));
-                }
-                using_snapshot
+            Ok(true) => {
+                let _ = devnet_events_tx.send(DevnetEvent::info(
+                    "Using snapshotted blockchain data up to epoch 3.0. Startup will be faster."
+                        .to_string(),
+                ));
+            }
+            Ok(false) => {
+                let _ = devnet_events_tx.send(DevnetEvent::info(
+                    "No snapshot blockchain data found. Initial startup may take longer."
+                        .to_string(),
+                ));
             }
             Err(e) => {
                 let _ = devnet_events_tx.send(DevnetEvent::warning(format!(
                     "Error setting up snapshot directories: {}. Continuing without snapshot.",
                     e
                 )));
-                false
             }
         };
     }
