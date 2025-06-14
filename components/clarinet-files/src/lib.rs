@@ -5,6 +5,7 @@ extern crate serde_derive;
 
 pub mod clarinetrc;
 
+pub mod devnet_diff;
 mod network_manifest;
 mod project_manifest;
 

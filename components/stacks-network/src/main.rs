@@ -28,6 +28,7 @@ struct Args {
     /// Path of the project's root
     #[clap(short, long)]
     project_root_path: Option<String>,
+    no_snapshot: bool,
 }
 
 fn main() {
@@ -85,6 +86,7 @@ fn main() {
         deployment,
         &mut Some(chainhooks),
         None,
+        args.no_snapshot,
         ctx,
         orchestrator_terminated_tx,
         &args.namespace,
