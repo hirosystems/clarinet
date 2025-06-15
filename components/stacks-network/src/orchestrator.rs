@@ -11,7 +11,7 @@ use bollard::service::Ipam;
 use bollard::Docker;
 use chainhook_sdk::bitcoin::hex::DisplayHex;
 use chainhook_sdk::utils::Context;
-use clarinet_files::StacksNetwork;
+use clarinet_files::{DevnetConfig, StacksNetwork};
 use clarinet_files::{DevnetConfigFile, NetworkManifest, ProjectManifest};
 use clarity::types::chainstate::StacksPrivateKey;
 use clarity::types::PrivateKey;
@@ -60,6 +60,9 @@ pub struct ServicesMapHosts {
     pub subnet_node_host: String,
     pub subnet_api_host: String,
 }
+
+pub static EXCLUDED_STACKS_SNAPSHOT_FILES: &[&str] =
+    &["event_observers.sqlite", "event_observers.sqlite-journal"];
 
 impl DevnetOrchestrator {
     pub fn new(
@@ -883,7 +886,8 @@ rpcport={bitcoin_node_rpc_port}
                 "-conf=/etc/bitcoin/bitcoin.conf".into(),
                 "-nodebuglogfile".into(),
                 "-pid=/run/bitcoind.pid".into(),
-                // "-datadir=/root/.bitcoin".into(),
+                "-reindex".into(), // TODO make this only for cached startups
+                "-datadir=/root/.bitcoin".into(),
             ]),
             ..Default::default()
         };
@@ -1051,7 +1055,7 @@ microblock_frequency = 1000
 # inv_sync_interval = 10
 # download_interval = 10
 # walk_interval = 10
-disable_block_download = true
+disable_block_download = false
 disable_inbound_handshakes = true
 disable_inbound_walks = true
 public_ip_address = "1.1.1.1:1234"
@@ -1873,7 +1877,26 @@ events_keys = ["*"]
         Ok(())
     }
 
-    pub async fn boot_stacks_api_container(&self, _ctx: &Context) -> Result<(), String> {
+    fn has_events_to_import(&self, devnet_config: &DevnetConfig) -> Option<PathBuf> {
+        let project_events_path = PathBuf::from(&devnet_config.working_dir)
+            .join("events_export")
+            .join("events_cache.tsv");
+
+        if project_events_path.exists() {
+            Some(project_events_path)
+        } else {
+            let global_events_path = get_global_snapshot_dir()
+                .join("events_export")
+                .join("events_cache.tsv");
+
+            if global_events_path.exists() {
+                Some(global_events_path)
+            } else {
+                None
+            }
+        }
+    }
+    pub async fn boot_stacks_api_container(&self, ctx: &Context) -> Result<(), String> {
         let container = match &self.stacks_api_container_id {
             Some(container) => container.clone(),
             _ => return Err("unable to boot container".to_string()),
@@ -1888,6 +1911,69 @@ events_keys = ["*"]
             .await
             .map_err(|e| formatted_docker_error("unable to start stacks-api container", e))?;
 
+        let devnet_config = match &self.network_config {
+            Some(ref network_config) => match network_config.devnet {
+                Some(ref devnet_config) => devnet_config,
+                _ => return Ok(()),
+            },
+            _ => return Ok(()),
+        };
+
+        // Check if we need to import events
+        if let Some(events_path) = self.has_events_to_import(devnet_config) {
+            // Wait for API to be ready
+            // TODO: don't do this..
+            std::thread::sleep(Duration::from_secs(8));
+
+            ctx.try_log(|logger| {
+                slog::info!(logger, "Importing events from {}", events_path.display())
+            });
+
+            // Copy the events file to the container
+            let container_name = format!("stacks-api.{}", self.network_name);
+            let copy_command = format!(
+                "docker cp {} {}:/tmp/events_cache.tsv",
+                events_path.display(),
+                container_name
+            );
+
+            let output = std::process::Command::new("sh")
+                .arg("-c")
+                .arg(&copy_command)
+                .output()
+                .map_err(|e| format!("Failed to copy events file to container: {}", e))?;
+
+            if !output.status.success() {
+                return Err(format!(
+                    "Copy command failed: {}",
+                    String::from_utf8_lossy(&output.stderr)
+                ));
+            }
+
+            // Run the import command
+            let import_command = format!(
+            "docker exec {} node /app/lib/index.js import-events --file /tmp/events_cache.tsv --wipe-db",
+            container_name
+        );
+
+            let output = std::process::Command::new("sh")
+                .arg("-c")
+                .arg(&import_command)
+                .output()
+                .map_err(|e| format!("Failed to import events: {}", e))?;
+
+            if !output.status.success() {
+                ctx.try_log(|logger| {
+                    slog::warn!(
+                        logger,
+                        "Events import failed: {}",
+                        String::from_utf8_lossy(&output.stderr)
+                    )
+                });
+            } else {
+                ctx.try_log(|logger| slog::info!(logger, "Events import completed successfully"));
+            }
+        }
         Ok(())
     }
 
@@ -1991,7 +2077,125 @@ events_keys = ["*"]
             .id;
 
         ctx.try_log(|logger| slog::info!(logger, "Created container subnet-api: {}", container));
-        self.subnet_api_container_id = Some(container);
+        self.subnet_api_container_id = Some(container.clone());
+
+        let import_path = PathBuf::from(&devnet_config.working_dir).join("import_events_path");
+        if import_path.exists() {
+            // Read the path to the events file
+            let events_path_str = fs::read_to_string(&import_path)
+                .map_err(|e| format!("unable to read import path file: {:?}", e))?;
+            let events_path = PathBuf::from(events_path_str);
+
+            if events_path.exists() {
+                ctx.try_log(|logger| {
+                    slog::info!(logger, "Importing events from {}", events_path.display())
+                });
+
+                // Read the events file
+                let file_content = fs::read(&events_path)
+                    .map_err(|e| format!("unable to read events file: {:?}", e))?;
+
+                // Create a tar archive with the events file
+                let tmp_dir = PathBuf::from(&devnet_config.working_dir).join("tmp_import");
+                let _ = fs::remove_dir_all(&tmp_dir); // Remove if exists
+                fs::create_dir_all(&tmp_dir)
+                    .map_err(|e| format!("unable to create temporary directory: {:?}", e))?;
+
+                // Copy the events file to the temp directory
+                let tmp_events_file = tmp_dir.join("events_cache.tsv");
+                fs::write(&tmp_events_file, &file_content)
+                    .map_err(|e| format!("unable to write temporary events file: {:?}", e))?;
+
+                // Create a tar archive
+                let tar_file = tmp_dir.join("events_import.tar");
+                let status = std::process::Command::new("tar")
+                    .args([
+                        "-cf",
+                        tar_file.to_str().unwrap(),
+                        "-C",
+                        tmp_dir.to_str().unwrap(),
+                        "events_cache.tsv",
+                    ])
+                    .status()
+                    .map_err(|e| format!("unable to create tar: {:?}", e))?;
+
+                if !status.success() {
+                    return Err("Failed to create tar archive".to_string());
+                }
+
+                // Read the tar file
+                let tar_content =
+                    fs::read(&tar_file).map_err(|e| format!("unable to read tar file: {:?}", e))?;
+
+                // Copy the tar to the container
+                let container_id = container.clone();
+                docker
+                    .upload_to_container(
+                        &container_id,
+                        Some(bollard::container::UploadToContainerOptions {
+                            path: "/tmp",
+                            ..Default::default()
+                        }),
+                        tar_content.into(),
+                    )
+                    .await
+                    .map_err(|e| format!("unable to copy tar to container: {}", e))?;
+
+                // Extract the tar in the container
+                let config = CreateExecOptions {
+                    cmd: Some(vec!["tar", "-xf", "/tmp/events_import.tar", "-C", "/tmp"]),
+                    attach_stdout: Some(false),
+                    attach_stderr: Some(false),
+                    ..Default::default()
+                };
+
+                let exec = docker
+                    .create_exec(&container_id, config)
+                    .await
+                    .map_err(|e| format!("unable to create exec command for extraction: {}", e))?;
+
+                let _ = docker
+                    .start_exec(&exec.id, None)
+                    .await
+                    .map_err(|e| format!("unable to extract tar in container: {}", e))?;
+
+                ctx.try_log(|logger| slog::info!(logger, "Events file copied to container"));
+
+                // Wait a bit more to ensure the API is fully started before importing
+                std::thread::sleep(std::time::Duration::from_secs(10));
+
+                // Run the import command
+                let config = CreateExecOptions {
+                    cmd: Some(vec![
+                        "node",
+                        "/app/dist/index.js",
+                        "import-events",
+                        "--file",
+                        "/tmp/events_cache.tsv",
+                        "--wipe-db",
+                    ]),
+                    attach_stdout: Some(true),
+                    attach_stderr: Some(true),
+                    ..Default::default()
+                };
+
+                let exec = docker
+                    .create_exec(&container_id, config)
+                    .await
+                    .map_err(|e| format!("unable to create exec command for import: {}", e))?;
+
+                let _output = docker
+                    .start_exec(&exec.id, None)
+                    .await
+                    .map_err(|e| format!("unable to import events: {}", e))?;
+
+                ctx.try_log(|logger| slog::info!(logger, "Events import completed"));
+
+                // Remove the temporary path file and directory
+                let _ = fs::remove_file(&import_path);
+                let _ = fs::remove_dir_all(tmp_dir);
+            }
+        }
 
         Ok(())
     }
@@ -2631,6 +2835,10 @@ events_keys = ["*"]
             },
             _ => return Err("unable to initialize bitcoin node".to_string()),
         };
+        // Check if we have cached data
+        let project_snapshot_dir = get_project_snapshot_dir(devnet_config);
+        let cache_ready_marker = project_snapshot_dir.join("epoch_3_ready");
+        let using_cache = cache_ready_marker.exists();
 
         let miner_address = Address::from_str(&devnet_config.miner_btc_address)
             .map_err(|e| format!("unable to create miner address: {:?}", e))?;
@@ -2661,6 +2869,7 @@ events_keys = ["*"]
         let max_errors = 30;
 
         let mut error_count = 0;
+        // Wait for the bitcoin node to be responsive
         loop {
             let network_info = base_builder(
                 &bitcoin_node_url,
@@ -2692,9 +2901,151 @@ events_keys = ["*"]
             let _ = devnet_event_tx.send(DevnetEvent::info("Waiting for bitcoin-node".to_string()));
         }
 
+        // Only generate blocks if we're NOT using cached data
+        if !using_cache {
+            let _ = devnet_event_tx.send(DevnetEvent::info(
+                "Initializing blockchain with fresh blocks".to_string(),
+            ));
+            let mut error_count = 0;
+            loop {
+                let rpc_call = base_builder(
+                    &bitcoin_node_url,
+                    &devnet_config.bitcoin_node_username,
+                    &devnet_config.bitcoin_node_password,
+                )
+                .json(&json!({
+                    "jsonrpc": "1.0",
+                    "id": "stacks-network",
+                    "method": "generatetoaddress",
+                    "params": [json!(3), json!(miner_address)]
+                }))
+                .send()
+                .await
+                .map_err(|e| format!("unable to send 'generatetoaddress' request ({})", e));
+
+                match rpc_call {
+                    Ok(_r) => break,
+                    Err(e) => {
+                        error_count += 1;
+                        if error_count > max_errors {
+                            return Err(e);
+                        } else if error_count > 1 {
+                            let _ = devnet_event_tx.send(DevnetEvent::error(e));
+                        }
+                    }
+                }
+                std::thread::sleep(std::time::Duration::from_secs(1));
+
+                let _ =
+                    devnet_event_tx.send(DevnetEvent::info("Waiting for bitcoin-node".to_string()));
+            }
+
+            let mut error_count = 0;
+            loop {
+                let rpc_call = base_builder(
+                    &bitcoin_node_url,
+                    &devnet_config.bitcoin_node_username,
+                    &devnet_config.bitcoin_node_password,
+                )
+                .json(&json!({
+                    "jsonrpc": "1.0",
+                    "id": "stacks-network",
+                    "method": "generatetoaddress",
+                    "params": [json!(97), json!(faucet_address)]
+                }))
+                .send()
+                .await
+                .map_err(|e| format!("unable to send 'generatetoaddress' request ({})", e));
+
+                match rpc_call {
+                    Ok(_r) => break,
+                    Err(e) => {
+                        error_count += 1;
+                        if error_count > max_errors {
+                            return Err(e);
+                        } else if error_count > 1 {
+                            let _ = devnet_event_tx.send(DevnetEvent::error(e));
+                        }
+                    }
+                }
+                std::thread::sleep(std::time::Duration::from_secs(1));
+                let _ =
+                    devnet_event_tx.send(DevnetEvent::info("Waiting for bitcoin-node".to_string()));
+            }
+
+            let mut error_count = 0;
+            loop {
+                let rpc_call = base_builder(
+                    &bitcoin_node_url,
+                    &devnet_config.bitcoin_node_username,
+                    &devnet_config.bitcoin_node_password,
+                )
+                .json(&json!({
+                "jsonrpc": "1.0",
+                "id": "stacks-network",
+                "method": "generatetoaddress",
+                "params": [json!(1), json!(miner_address)]
+                }))
+                .send()
+                .await
+                .map_err(|e| format!("unable to send 'generatetoaddress' request ({})", e));
+
+                match rpc_call {
+                    Ok(_r) => break,
+                    Err(e) => {
+                        error_count += 1;
+                        if error_count > max_errors {
+                            return Err(e);
+                        } else if error_count > 1 {
+                            let _ = devnet_event_tx.send(DevnetEvent::error(e));
+                        }
+                    }
+                }
+                std::thread::sleep(std::time::Duration::from_secs(1));
+                let _ =
+                    devnet_event_tx.send(DevnetEvent::info("Waiting for bitcoin-node".to_string()));
+            }
+        } else {
+            let _ = devnet_event_tx.send(DevnetEvent::info(
+                "Using cached blockchain data - mining one block".to_string(),
+            ));
+
+            loop {
+                let rpc_call = base_builder(
+                    &bitcoin_node_url,
+                    &devnet_config.bitcoin_node_username,
+                    &devnet_config.bitcoin_node_password,
+                )
+                .json(&json!({
+                "jsonrpc": "1.0",
+                "id": "stacks-network",
+                "method": "generatetoaddress",
+                "params": [json!(1), json!(miner_address)]
+                }))
+                .send()
+                .await
+                .map_err(|e| format!("unable to send 'generatetoaddress' request ({})", e));
+
+                match rpc_call {
+                    Ok(_r) => break,
+                    Err(e) => {
+                        error_count += 1;
+                        if error_count > max_errors {
+                            return Err(e);
+                        } else if error_count > 1 {
+                            let _ = devnet_event_tx.send(DevnetEvent::error(e));
+                        }
+                    }
+                }
+                std::thread::sleep(std::time::Duration::from_secs(1));
+                let _ =
+                    devnet_event_tx.send(DevnetEvent::info("Waiting for bitcoin-node".to_string()));
+            }
+        }
+
         let mut error_count = 0;
         loop {
-            let rpc_call = base_builder(
+            let rpc_load_call = base_builder(
                 &bitcoin_node_url,
                 &devnet_config.bitcoin_node_username,
                 &devnet_config.bitcoin_node_password,
@@ -2702,95 +3053,14 @@ events_keys = ["*"]
             .json(&json!({
                 "jsonrpc": "1.0",
                 "id": "stacks-network",
-                "method": "generatetoaddress",
-                "params": [json!(3), json!(miner_address)]
+                "method": "loadwallet",
+                "params": json!(vec![&devnet_config.miner_wallet_name])
             }))
             .send()
             .await
-            .map_err(|e| format!("unable to send 'generatetoaddress' request ({})", e));
+            .map_err(|e| format!("unable to send 'loadwallet' request ({})", e));
 
-            match rpc_call {
-                Ok(_r) => break,
-                Err(e) => {
-                    error_count += 1;
-                    if error_count > max_errors {
-                        return Err(e);
-                    } else if error_count > 1 {
-                        let _ = devnet_event_tx.send(DevnetEvent::error(e));
-                    }
-                }
-            }
-            std::thread::sleep(std::time::Duration::from_secs(1));
-            let _ = devnet_event_tx.send(DevnetEvent::info("Waiting for bitcoin-node".to_string()));
-        }
-
-        let mut error_count = 0;
-        loop {
-            let rpc_call = base_builder(
-                &bitcoin_node_url,
-                &devnet_config.bitcoin_node_username,
-                &devnet_config.bitcoin_node_password,
-            )
-            .json(&json!({
-                "jsonrpc": "1.0",
-                "id": "stacks-network",
-                "method": "generatetoaddress",
-                "params": [json!(97), json!(faucet_address)]
-            }))
-            .send()
-            .await
-            .map_err(|e| format!("unable to send 'generatetoaddress' request ({})", e));
-
-            match rpc_call {
-                Ok(_r) => break,
-                Err(e) => {
-                    error_count += 1;
-                    if error_count > max_errors {
-                        return Err(e);
-                    } else if error_count > 1 {
-                        let _ = devnet_event_tx.send(DevnetEvent::error(e));
-                    }
-                }
-            }
-            std::thread::sleep(std::time::Duration::from_secs(1));
-            let _ = devnet_event_tx.send(DevnetEvent::info("Waiting for bitcoin-node".to_string()));
-        }
-
-        let mut error_count = 0;
-        loop {
-            let rpc_call = base_builder(
-                &bitcoin_node_url,
-                &devnet_config.bitcoin_node_username,
-                &devnet_config.bitcoin_node_password,
-            )
-            .json(&json!({
-            "jsonrpc": "1.0",
-            "id": "stacks-network",
-            "method": "generatetoaddress",
-            "params": [json!(1), json!(miner_address)]
-            }))
-            .send()
-            .await
-            .map_err(|e| format!("unable to send 'generatetoaddress' request ({})", e));
-
-            match rpc_call {
-                Ok(_r) => break,
-                Err(e) => {
-                    error_count += 1;
-                    if error_count > max_errors {
-                        return Err(e);
-                    } else if error_count > 1 {
-                        let _ = devnet_event_tx.send(DevnetEvent::error(e));
-                    }
-                }
-            }
-            std::thread::sleep(std::time::Duration::from_secs(1));
-            let _ = devnet_event_tx.send(DevnetEvent::info("Waiting for bitcoin-node".to_string()));
-        }
-
-        let mut error_count = 0;
-        loop {
-            let rpc_call = base_builder(
+            let rpc_create_call = base_builder(
                 &bitcoin_node_url,
                 &devnet_config.bitcoin_node_username,
                 &devnet_config.bitcoin_node_password,
@@ -2805,14 +3075,55 @@ events_keys = ["*"]
             .await
             .map_err(|e| format!("unable to send 'createwallet' request ({})", e));
 
-            match rpc_call {
+            match rpc_create_call {
                 Ok(r) => {
                     if r.status().is_success() {
                         break;
                     } else {
-                        let err = r.text().await;
-                        let msg = format!("{:?}", err);
-                        let _ = devnet_event_tx.send(DevnetEvent::error(msg));
+                        // if createwallet fails it likely means we need to load the existing wallet
+                        match rpc_load_call {
+                            Ok(r) => {
+                                if r.status().is_success() {
+                                    break;
+                                } else {
+                                    let err = r.text().await;
+                                    let msg = format!("{:?}", err);
+                                    // if it returns "Wallet is already loaded" we break out
+                                    match err {
+                                        Ok(text) => {
+                                            if text.contains("is already loaded") {
+                                                break;
+                                            } else {
+                                                let _ =
+                                                    devnet_event_tx.send(DevnetEvent::error(msg));
+                                            }
+                                        }
+                                        Err(e) => {
+                                            let _ = devnet_event_tx.send(DevnetEvent::error(
+                                                format!("Failed to read error text: {}", e),
+                                            ));
+                                            return Err(format!(
+                                                "Failed to read error text: {}",
+                                                e
+                                            ));
+                                        }
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                let err = r.text().await;
+                                let msg = format!("{:?}", err);
+                                println!("msg: {}", msg);
+                                let _ = devnet_event_tx.send(DevnetEvent::error(msg));
+
+                                error_count += 1;
+                                if error_count > max_errors {
+                                    return Err(e);
+                                } else if error_count > 1 {
+                                    let _ = devnet_event_tx.send(DevnetEvent::error(e));
+                                }
+                            }
+                        }
                     }
                 }
                 Err(e) => {
@@ -3077,4 +3388,140 @@ fn formatted_docker_error(message: &str, error: DockerError) -> String {
         _ => format!("{:?}", error),
     };
     format!("{}: {}", message, error)
+}
+
+pub fn get_global_snapshot_dir() -> std::path::PathBuf {
+    let home_dir = dirs::home_dir().expect("Unable to retrieve home dir");
+    home_dir.join(".clarinet").join("cache").join("devnet")
+}
+
+pub fn get_project_snapshot_dir(devnet_config: &DevnetConfig) -> std::path::PathBuf {
+    PathBuf::from(&devnet_config.working_dir)
+        .join("data")
+        .join("1")
+}
+
+pub fn setup_snapshot_directories(
+    devnet_config: &DevnetConfig,
+    devnet_event_tx: &Sender<DevnetEvent>,
+) -> Result<bool, String> {
+    // Get global and project cache directories
+    let global_snapshot_dir = get_global_snapshot_dir();
+    let project_snapshot_dir = get_project_snapshot_dir(devnet_config);
+
+    // Check if we have template data and project doesn't have a cache yet
+    let global_snapshot_ready = global_snapshot_dir.join("epoch_3_ready").exists();
+    let project_snapshot_exists = project_snapshot_dir.exists();
+    let project_snapshot_ready = project_snapshot_dir.join("epoch_3_ready").exists();
+
+    // Create project cache directory if it doesn't exist
+    if project_snapshot_exists {
+        for excluded_file in EXCLUDED_STACKS_SNAPSHOT_FILES {
+            let stale_file = project_snapshot_dir.join("stacks").join(excluded_file);
+            if stale_file.exists() {
+                let _ = fs::remove_file(&stale_file);
+                let _ = devnet_event_tx.send(DevnetEvent::info(format!(
+                    "Removed stale cache file: {}",
+                    excluded_file
+                )));
+            }
+        }
+    } else {
+        fs::create_dir_all(&project_snapshot_dir)
+            .map_err(|e| format!("unable to create project cache directory: {:?}", e))?;
+    }
+
+    // If global cache exists but project cache doesn't have the marker, copy the template
+    if global_snapshot_ready
+        && !project_snapshot_ready
+        && global_snapshot_dir != project_snapshot_dir
+    {
+        let _ = devnet_event_tx.send(DevnetEvent::info(
+            "Copying blockchain template data to project cache. This will speed up future starts."
+                .to_string(),
+        ));
+
+        // Copy bitcoin data
+        let global_bitcoin_cache = global_snapshot_dir.join("bitcoin");
+        let project_bitcoin_cache = project_snapshot_dir.join("bitcoin");
+        if global_bitcoin_cache.exists() && !project_bitcoin_cache.exists() {
+            println!(
+                "copying bitcoin cache to project {}",
+                project_bitcoin_cache.display()
+            );
+            copy_directory(&global_bitcoin_cache, &project_bitcoin_cache, None)
+                .map_err(|e| format!("Failed to copy Bitcoin template cache: {}", e))?;
+        }
+
+        // Copy stacks data
+        let global_stacks_cache = global_snapshot_dir.join("stacks");
+        let project_stacks_cache = project_snapshot_dir.join("stacks");
+        if global_stacks_cache.exists() && !project_stacks_cache.exists() {
+            println!("copying stacks cache to project");
+            // exlude copy of
+            // event_observers.sqlite
+            // event_observers.sqlite-journal
+            // they contain project specific urls
+            copy_directory(
+                &global_stacks_cache,
+                &project_stacks_cache,
+                Some(EXCLUDED_STACKS_SNAPSHOT_FILES),
+            )
+            .map_err(|e| format!("Failed to copy Stacks template cache: {}", e))?;
+        }
+
+        // Copy the marker file too
+        let _ = fs::copy(
+            global_snapshot_dir.join("epoch_3_ready"),
+            project_snapshot_dir.join("epoch_3_ready"),
+        );
+    }
+
+    Ok(project_snapshot_ready || (global_snapshot_ready && !project_snapshot_exists))
+}
+
+pub fn copy_directory(
+    source: &PathBuf,
+    destination: &PathBuf,
+    exclude_patterns: Option<&[&str]>,
+) -> Result<(), String> {
+    fs::create_dir_all(destination).map_err(|e| {
+        format!(
+            "Failed to create directory {}: {}",
+            destination.display(),
+            e
+        )
+    })?;
+
+    for entry in fs::read_dir(source)
+        .map_err(|e| format!("Failed to read directory {}: {}", source.display(), e))?
+    {
+        let entry = entry.map_err(|e| format!("Failed to read directory entry: {}", e))?;
+        let file_name = entry.file_name();
+        let file_name_str = file_name.to_string_lossy();
+
+        // Skip this file if it matches any exclude pattern
+        if let Some(patterns) = &exclude_patterns {
+            if patterns.iter().any(|pattern| file_name_str == *pattern) {
+                continue;
+            }
+        }
+        let entry_path = entry.path();
+        let destination_path = destination.join(&file_name);
+
+        if entry_path.is_dir() {
+            copy_directory(&entry_path, &destination_path, exclude_patterns)?;
+        } else {
+            fs::copy(&entry_path, &destination_path).map_err(|e| {
+                format!(
+                    "Failed to copy {} to {}: {}",
+                    entry_path.display(),
+                    destination_path.display(),
+                    e
+                )
+            })?;
+        }
+    }
+
+    Ok(())
 }
