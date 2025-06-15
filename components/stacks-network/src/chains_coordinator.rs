@@ -275,8 +275,8 @@ pub async fn start_chains_coordinator(
         let mut chain_ctx = StacksChainContext::new(&chainhook_types::StacksNetwork::Devnet);
         if let Ok(file_content) = fs::read_to_string(&events_cache_path) {
             for line in file_content.lines() {
-                let mut line_parts = line.split('\t');
-                if line_parts.nth(2).unwrap_or("") == "/new_block" {
+                let parts: Vec<&str> = line.split('\t').collect();
+                if parts.get(2).unwrap_or(&"") == &"/new_block" {
                     let maybe_block = standardize_stacks_serialized_block(
                         &chainhook_sdk::indexer::IndexerConfig {
                             bitcoin_network: chainhook_types::BitcoinNetwork::Regtest,
@@ -297,7 +297,7 @@ pub async fn start_chains_coordinator(
                                 },
                             ),
                         },
-                        line_parts.nth(3).unwrap_or(""),
+                        parts.get(3).unwrap_or(&""),
                         &mut chain_ctx,
                         &ctx,
                     );
@@ -314,17 +314,17 @@ pub async fn start_chains_coordinator(
             }
         }
 
-        let _ = observer_event_tx.send(ObserverEvent::StacksChainEvent((
-            StacksChainEvent::ChainUpdatedWithBlocks(StacksChainUpdatedWithBlocksData {
-                new_blocks: events
-                    .iter()
-                    .cloned()
-                    .map(|event| StacksBlockUpdate::new(event.clone()))
-                    .collect::<Vec<_>>(),
-                confirmed_blocks: events.clone(),
-            }),
-            PredicateEvaluationReport::default(),
-        )));
+        //     let _ = observer_event_tx.send(ObserverEvent::StacksChainEvent((
+        //         StacksChainEvent::ChainUpdatedWithBlocks(StacksChainUpdatedWithBlocksData {
+        //             new_blocks: events
+        //                 .iter()
+        //                 .cloned()
+        //                 .map(|event| StacksBlockUpdate::new(event.clone()))
+        //                 .collect::<Vec<_>>(),
+        //             confirmed_blocks: events.clone(),
+        //         }),
+        //         PredicateEvaluationReport::default(),
+        //     )));
         events
     } else {
         vec![]
