@@ -12,7 +12,6 @@ use bitcoincore_rpc::bitcoin::Address;
 use chainhook_sdk::chainhooks::types::ChainhookStore;
 use chainhook_sdk::indexer::stacks::standardize_stacks_serialized_block;
 use chainhook_sdk::indexer::StacksChainContext;
-use chainhook_sdk::observer::PredicateEvaluationReport;
 use chainhook_sdk::observer::PredicatesConfig;
 use chainhook_sdk::observer::{
     start_event_observer, EventObserverConfig, ObserverCommand, ObserverEvent,
@@ -24,8 +23,6 @@ use chainhook_sdk::types::StacksChainEvent;
 use chainhook_sdk::types::StacksNodeConfig;
 use chainhook_sdk::utils::Context;
 use chainhook_types::StacksBlockData;
-use chainhook_types::StacksBlockUpdate;
-use chainhook_types::StacksChainUpdatedWithBlocksData;
 use chainhook_types::StacksTransactionKind;
 use clarinet_deployments::onchain::TransactionStatus;
 use clarinet_deployments::onchain::{
@@ -313,18 +310,6 @@ pub async fn start_chains_coordinator(
                 }
             }
         }
-
-        //     let _ = observer_event_tx.send(ObserverEvent::StacksChainEvent((
-        //         StacksChainEvent::ChainUpdatedWithBlocks(StacksChainUpdatedWithBlocksData {
-        //             new_blocks: events
-        //                 .iter()
-        //                 .cloned()
-        //                 .map(|event| StacksBlockUpdate::new(event.clone()))
-        //                 .collect::<Vec<_>>(),
-        //             confirmed_blocks: events.clone(),
-        //         }),
-        //         PredicateEvaluationReport::default(),
-        //     )));
         events
     } else {
         vec![]
