@@ -1310,7 +1310,7 @@
             (begin
                 ;; Asserts contract-caller is the send-to if not a managed namespace
                 (asserts! (is-eq contract-caller send-to) ERR-NOT-AUTHORIZED)
-                ;; Updated this to burn the actual ammount of the name-price
+                ;; Updated this to burn the actual amount of the name-price
                 (try! (stx-burn? name-price send-to))
             )
         )
@@ -2129,7 +2129,7 @@
     )
 )
 
-;; Private function to update the primary name of an address when recieving
+;; Private function to update the primary name of an address when receiving
 (define-private (update-primary-name-recipient
         (id uint)
         (recipient principal)

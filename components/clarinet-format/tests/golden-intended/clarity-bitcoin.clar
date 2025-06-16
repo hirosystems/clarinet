@@ -633,7 +633,7 @@
 )
 
 ;; Parse a Bitcoin block header.
-;; Returns a tuple structured as folowed on success:
+;; Returns a tuple structured as followed on success:
 ;; (ok {
 ;;      version: uint,                  ;; block version,
 ;;      parent: (buff 32),              ;; parent block hash,
