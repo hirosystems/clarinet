@@ -62,8 +62,8 @@ use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Arc;
 use std::time::Duration;
 
-static SNAPSHOT_STACKS_START_HEIGHT: u64 = 38;
-static SNAPSHOT_BURN_START_HEIGHT: u64 = 143;
+const SNAPSHOT_STACKS_START_HEIGHT: u64 = 38;
+const SNAPSHOT_BURN_START_HEIGHT: u64 = 143;
 
 #[derive(Deserialize)]
 pub struct NewTransaction {
