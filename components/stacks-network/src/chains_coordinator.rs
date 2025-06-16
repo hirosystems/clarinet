@@ -793,9 +793,13 @@ pub async fn create_global_snapshot(
                     &project_stacks_snapshot,
                     &global_stacks_snapshot,
                     Some(EXCLUDED_STACKS_SNAPSHOT_FILES),
-                );
+                ).inspect_err(|e| {
+                        let _ = devnet_event_tx.send(DevnetEvent::warning(format!(
+                            "Failed to copy stacks snapshot: {}",
+                            e
+                        )));
+                });
             }
-        }
 
         match std::fs::File::create(&global_marker) {
             Ok(_) => {
