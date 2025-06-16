@@ -157,10 +157,10 @@ impl DevnetDiffConfig {
             let user_value = (field.extractor)(user_config);
 
             if default_value != user_value {
-                return Err(indoc::formatdoc!(
-                    "
-                user_value: {user_value:?}
-                default_value: {default_value:?}"
+                #[rustfmt::skip]
+                return Err(indoc::formatdoc!("
+                    user_value: {user_value:?}
+                    default_value: {default_value:?}"
                 ));
             }
         }

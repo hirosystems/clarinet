@@ -755,9 +755,10 @@ pub async fn create_global_snapshot(
     if !project_marker.exists() {
         match std::fs::File::create(&project_marker) {
             Ok(_) => {
+                #[rustfmt::skip]
                 let _ = devnet_event_tx.send(DevnetEvent::success(
-                                            "Project snapshot data prepared up to epoch 3.0. Future project starts will be faster.".to_string(),
-                                        ));
+                    "Project snapshot data prepared up to epoch 3.0. Future project starts will be faster.".to_string(),
+                ));
             }
             Err(e) => {
                 let _ = devnet_event_tx.send(DevnetEvent::warning(format!(
@@ -793,24 +794,26 @@ pub async fn create_global_snapshot(
                     &project_stacks_snapshot,
                     &global_stacks_snapshot,
                     Some(EXCLUDED_STACKS_SNAPSHOT_FILES),
-                ).inspect_err(|e| {
-                        let _ = devnet_event_tx.send(DevnetEvent::warning(format!(
-                            "Failed to copy stacks snapshot: {}",
-                            e
-                        )));
+                )
+                .inspect_err(|e| {
+                    let _ = devnet_event_tx.send(DevnetEvent::warning(format!(
+                        "Failed to copy stacks snapshot: {}",
+                        e
+                    )));
                 });
             }
 
-        match std::fs::File::create(&global_marker) {
-            Ok(_) => {
-                let _ = devnet_event_tx.send(DevnetEvent::success("Global template cache data prepared. Future project initializations will be faster.".to_string(),
+            match std::fs::File::create(&global_marker) {
+                Ok(_) => {
+                    let _ = devnet_event_tx.send(DevnetEvent::success("Global template cache data prepared. Future project initializations will be faster.".to_string(),
                                         ));
-            }
-            Err(e) => {
-                let _ = devnet_event_tx.send(DevnetEvent::warning(format!(
-                    "Failed to create global cache marker file: {}",
-                    e
-                )));
+                }
+                Err(e) => {
+                    let _ = devnet_event_tx.send(DevnetEvent::warning(format!(
+                        "Failed to create global cache marker file: {}",
+                        e
+                    )));
+                }
             }
         }
     }
