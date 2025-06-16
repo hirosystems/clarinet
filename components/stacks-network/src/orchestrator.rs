@@ -2957,16 +2957,14 @@ events_keys = ["*"]
                 .await
                 .map_err(|e| format!("unable to send 'generatetoaddress' request ({})", e));
 
-                match rpc_call {
-                    Ok(_r) => break,
-                    Err(e) => {
-                        error_count += 1;
-                        if error_count > max_errors {
-                            return Err(e);
-                        } else if error_count > 1 {
-                            let _ = devnet_event_tx.send(DevnetEvent::error(e));
-                        }
-                    }
+                let Err(e) = rpc_call else {
+                    break;
+                };
+                error_count += 1;
+                if error_count > max_errors {
+                    return Err(e);
+                } else if error_count > 1 {
+                    let _ = devnet_event_tx.send(DevnetEvent::error(e));
                 }
                 std::thread::sleep(std::time::Duration::from_secs(1));
                 let _ =
