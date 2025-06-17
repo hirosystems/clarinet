@@ -1,6 +1,6 @@
 pub use crate::DevnetConfig;
 
-use std::iter::zip;
+use std::{collections::HashMap, iter::zip};
 
 /// Config which fields to check for differences
 pub struct DevnetDiffConfig {
@@ -139,11 +139,10 @@ impl DevnetDiffConfig {
 
             if default_value != user_value {
                 if field.name == "pox_stacking_orders" {
-                    errors.push((
-                        field.name.clone(),
-                        self.clean_stacking_orders(user_value),
-                        self.clean_stacking_orders(default_value),
-                    ))
+                    let stacking_errors = self.clean_stacking_orders(user_value, default_value);
+                    for (field_name, user_val, default_val) in stacking_errors {
+                        errors.push((field_name, user_val, default_val));
+                    }
                 } else {
                     errors.push((field.name.clone(), user_value, default_value))
                 }
@@ -156,9 +155,39 @@ impl DevnetDiffConfig {
         }
     }
 
-    fn clean_stacking_orders(&self, user_value: String) -> String {
-        let mut result = String::new();
-        let vals: Vec<String> = user_value.split("-").map(|s| s.to_string()).collect();
+    fn clean_stacking_orders(
+        &self,
+        user_value: String,
+        default_value: String,
+    ) -> Vec<(String, String, String)> {
+        let mut result = Vec::new();
+        let user_orders: Vec<String> = user_value.split(",").map(|s| s.to_string()).collect();
+        let default_orders: Vec<String> = default_value.split(",").map(|s| s.to_string()).collect();
+        let constructed_user_orders = construct_stacking_orders(&user_orders);
+        let constructed_default_orders = construct_stacking_orders(&default_orders);
+        for (btc_address, user_order) in constructed_user_orders {
+            let default_order = constructed_default_orders.get(&btc_address).unwrap();
+            for (field, user_val) in user_order {
+                let default_val = default_order
+                    .iter()
+                    .find(|(f, _)| *f == field)
+                    .map(|(_, v)| v)
+                    .unwrap();
+                if default_val != &user_val {
+                    result.push((field, user_val, default_val.clone()));
+                }
+            }
+        }
+        result
+    }
+}
+
+fn construct_stacking_orders(orders: &Vec<String>) -> HashMap<String, Vec<(String, String)>> {
+    let mut result = HashMap::new();
+    for order in orders {
+        let mut order_vals = Vec::new();
+        let vals: Vec<String> = order.split("-").map(|s| s.to_string()).collect();
+        let btc_address = vals[4].clone();
         for (v, field) in zip(
             vals,
             [
@@ -169,10 +198,11 @@ impl DevnetDiffConfig {
                 "btc_address",
             ],
         ) {
-            result.push_str(&format!("{}: {}\n", field, v));
+            order_vals.push((field.to_string(), v));
         }
-        result
+        result.insert(btc_address, order_vals);
     }
+    result
 }
 
 impl Default for DevnetDiffConfig {
