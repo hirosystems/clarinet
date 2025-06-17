@@ -1,6 +1,6 @@
 pub use crate::DevnetConfig;
 
-use std::fmt::Write as _;
+use std::iter::zip;
 
 /// Config which fields to check for differences
 pub struct DevnetDiffConfig {
@@ -126,80 +126,52 @@ impl DevnetDiffConfig {
         ]
     }
 
-    /// Compare two DevnetConfig instances and return fields that are different
-    pub fn get_different_fields(
-        &self,
-        default_config: &DevnetConfig,
-        user_config: &DevnetConfig,
-    ) -> Vec<String> {
-        let mut different_fields = Vec::new();
-
-        for field in &self.significant_fields {
-            let default_value = (field.extractor)(default_config);
-            let user_value = (field.extractor)(user_config);
-
-            if default_value != user_value {
-                different_fields.push(field.name.clone())
-            }
-        }
-
-        different_fields
-    }
-
     /// Check if any significant fields are different
-    pub fn is_same(
+    pub fn is_compatible(
         &self,
-        default_config: &DevnetConfig,
         user_config: &DevnetConfig,
-    ) -> Result<bool, String> {
+    ) -> Result<bool, Vec<(String, String, String)>> {
+        let default_config = DevnetConfig::default();
+        let mut errors = Vec::new();
         for field in &self.significant_fields {
-            let default_value = (field.extractor)(default_config);
+            let default_value = (field.extractor)(&default_config);
             let user_value = (field.extractor)(user_config);
 
             if default_value != user_value {
-                #[rustfmt::skip]
-                return Err(indoc::formatdoc!("
-                    user_value: {user_value:?}
-                    default_value: {default_value:?}"
-                ));
+                if field.name == "pox_stacking_orders" {
+                    errors.push((
+                        field.name.clone(),
+                        self.clean_stacking_orders(user_value),
+                        self.clean_stacking_orders(default_value),
+                    ))
+                } else {
+                    errors.push((field.name.clone(), user_value, default_value))
+                }
             }
         }
-
-        Ok(true)
+        if errors.is_empty() {
+            Ok(true)
+        } else {
+            Err(errors)
+        }
     }
 
-    /// Get the names of fields that are different
-    pub fn get_different_field_names(
-        &self,
-        default_config: &DevnetConfig,
-        user_config: &DevnetConfig,
-    ) -> Vec<String> {
-        self.get_different_fields(default_config, user_config)
-    }
-
-    /// Generate a simple report of different fields
-    pub fn generate_report(
-        &self,
-        default_config: &DevnetConfig,
-        user_config: &DevnetConfig,
-    ) -> String {
-        let different_fields = self.get_different_fields(default_config, user_config);
-
-        if different_fields.is_empty() {
-            return "No significant differences found between user and default configuration."
-                .to_string();
+    fn clean_stacking_orders(&self, user_value: String) -> String {
+        let mut result = String::new();
+        let vals: Vec<String> = user_value.split("-").map(|s| s.to_string()).collect();
+        for (v, field) in zip(
+            vals,
+            [
+                "start_at_cycle",
+                "duration",
+                "wallet",
+                "slots",
+                "btc_address",
+            ],
+        ) {
+            result.push_str(&format!("{}: {}\n", field, v));
         }
-
-        let mut report = format!(
-            "Found {} significant difference(s):\n\n",
-            different_fields.len()
-        );
-
-        for field in different_fields {
-            write!(report, "• {field}\n\n").unwrap();
-        }
-
-        report
+        result
     }
 }
 
@@ -216,11 +188,9 @@ mod tests {
     #[test]
     fn test_no_differences() {
         let config1 = DevnetConfig::default();
-        let config2 = config1.clone();
 
         let differ = DevnetDiffConfig::new();
-        assert!(differ.is_same(&config1, &config2).is_ok());
-        assert!(differ.get_different_fields(&config1, &config2).is_empty());
+        assert!(differ.is_compatible(&config1).is_ok());
     }
 
     #[test]
@@ -231,10 +201,14 @@ mod tests {
         user_config.pox_stacking_orders = vec![];
 
         let differ = DevnetDiffConfig::new();
-        assert!(differ.is_same(&default_config, &user_config).is_err());
+        assert!(differ.is_compatible(&user_config).is_err());
 
-        let different_fields = differ.get_different_fields(&default_config, &user_config);
-        assert_eq!(different_fields, ["epoch_3_0", "pox_stacking_orders"]);
+        let different_fields = differ.is_compatible(&user_config);
+        assert!(different_fields.is_err());
+        let incompatibles = different_fields.unwrap_err();
+        assert_eq!(incompatibles.len(), 2);
+        assert_eq!(incompatibles[0].0, "epoch_3_0");
+        assert_eq!(incompatibles[1].0, "pox_stacking_orders");
     }
 
     #[test]
@@ -247,8 +221,10 @@ mod tests {
         let mut user_config = default_config.clone();
         user_config.epoch_3_1 = 146;
 
-        let different_fields = differ.get_different_fields(&default_config, &user_config);
-        assert_eq!(different_fields.len(), 1);
-        assert_eq!(different_fields[0], "epoch_3_1");
+        let different_fields = differ.is_compatible(&user_config);
+        assert!(different_fields.is_err());
+        let incompatibles = different_fields.unwrap_err();
+        assert_eq!(incompatibles.len(), 1);
+        assert_eq!(incompatibles[0].0, "epoch_3_1");
     }
 }

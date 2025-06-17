@@ -17,7 +17,7 @@ use chainhook_sdk::{chainhooks::types::ChainhookStore, observer::ObserverCommand
 pub use chainhooks::{load_chainhooks, parse_chainhook_full_specification};
 use chains_coordinator::BitcoinMiningCommand;
 use clarinet_files::devnet_diff::DevnetDiffConfig;
-use clarinet_files::{DevnetConfig, NetworkManifest};
+use clarinet_files::NetworkManifest;
 pub use event::DevnetEvent;
 pub use log::{LogData, LogLevel};
 pub use orchestrator::DevnetOrchestrator;
@@ -80,19 +80,15 @@ async fn do_run_devnet(
         _ => Err("Unable to retrieve config"),
     }?;
 
-    let default_config = DevnetConfig::default();
     let differ = DevnetDiffConfig::new();
-    let different_fields = differ.is_same(&default_config, &devnet_config);
-    let mut incompatible_config = false;
-    if let Err(e) = different_fields {
-        let _ = devnet_events_tx.send(DevnetEvent::warning(format!(
-            "Default snapshot can not be used:\n{}",
-            e
-        )));
-        incompatible_config = true
+    let diff = differ.is_compatible(&devnet_config);
+    if diff.is_err() {
+        let _ = devnet_events_tx.send(DevnetEvent::warning(
+            "Default snapshot can not be used".to_string(),
+        ));
     }
     // Check for and potentially copy snapshot data
-    if start_local_devnet_services && !no_snapshot && !incompatible_config {
+    if start_local_devnet_services && !no_snapshot && diff.is_ok() {
         let global_snapshot_dir = orchestrator::get_global_snapshot_dir();
 
         // First, try to extract embedded snapshot if it exists and we don't have snapshot yet

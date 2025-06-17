@@ -23,6 +23,7 @@ use clarinet_deployments::{
     get_default_deployment_path, load_deployment, setup_session_with_deployment,
 };
 use clarinet_files::clarinetrc::ClarinetRC;
+use clarinet_files::devnet_diff::DevnetDiffConfig;
 use clarinet_files::StacksNetwork;
 use clarinet_files::{
     get_manifest_location, FileLocation, NetworkManifest, ProjectManifest, ProjectManifestFile,
@@ -1848,6 +1849,33 @@ fn display_hint_footer() {
     display_separator();
 }
 
+fn display_devnet_incompatibilities(incompatibles: Vec<(String, String, String)>) {
+    println!(
+        "{}",
+        yellow!("The default snapshot can not be used because the following Devnet.toml fields are incompatible with the snapshot:")
+    );
+    for (field, user_value, default_value) in incompatibles {
+        println!(
+            "{}",
+            yellow!(format!(
+                "{}:\n{}\ndefault: {}",
+                field, user_value, default_value
+            ))
+        );
+    }
+}
+
+fn display_devnet_incompatibilities_continue() {
+    println!(
+        "{}",
+        yellow!("Continuing with startup, no snapshot will be used")
+    );
+    println!(
+        "{}",
+        yellow!("You can use the --from-genesis flag to skip the snapshot")
+    );
+}
+
 fn display_post_check_hint() {
     println!();
     display_hint_header();
@@ -2015,6 +2043,21 @@ fn devnet_start(cmd: DevnetStart, clarinetrc: ClarinetRC) {
                 &orchestrator.manifest.project.authors,
             ),
         ));
+    }
+
+    let devnet_config = match orchestrator.network_config {
+        Some(ref network_config) => match &network_config.devnet {
+            Some(devnet_config) => Ok(devnet_config.clone()),
+            _ => Err("Unable to retrieve config"),
+        },
+        _ => Err("Unable to retrieve config"),
+    };
+    let differ = DevnetDiffConfig::new();
+    let compatible = differ.is_compatible(&devnet_config.unwrap());
+    if let Err(incompatibles) = compatible {
+        display_devnet_incompatibilities(incompatibles);
+        prompt_user_to_continue();
+        display_devnet_incompatibilities_continue()
     }
     match start(
         orchestrator,
