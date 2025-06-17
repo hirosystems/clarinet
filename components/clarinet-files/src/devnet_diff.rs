@@ -161,8 +161,8 @@ impl DevnetDiffConfig {
         default_value: String,
     ) -> Vec<(String, String, String)> {
         let mut result = Vec::new();
-        let user_orders: Vec<String> = user_value.split(",").map(|s| s.to_string()).collect();
-        let default_orders: Vec<String> = default_value.split(",").map(|s| s.to_string()).collect();
+        let user_orders: Vec<String> = user_value.split(",").map(String::from).collect();
+        let default_orders: Vec<String> = default_value.split(",").map(String::from).collect();
         let constructed_user_orders = construct_stacking_orders(&user_orders);
         let constructed_default_orders = construct_stacking_orders(&default_orders);
         for (btc_address, user_order) in constructed_user_orders {
