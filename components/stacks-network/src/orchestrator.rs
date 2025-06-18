@@ -3438,9 +3438,14 @@ pub fn setup_snapshot_directories(
     } else {
         fs::create_dir_all(&project_snapshot_dir)
             .map_err(|e| format!("unable to create project cache directory: {:?}", e))?;
-        let permissions = std::fs::Permissions::from_mode(0o755);
-        let _ = fs::set_permissions(&project_snapshot_dir, permissions)
-            .map_err(|e| format!("unable to create project cache director: {:?}", e));
+
+        #[cfg(target_os = "linux")]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let permissions = std::fs::Permissions::from_mode(0o755);
+            let _ = fs::set_permissions(&project_snapshot_dir, permissions)
+                .map_err(|e| format!("unable to set project cache directory permissions: {:?}", e));
+        }
     }
 
     // If global cache exists but project cache doesn't have the marker, copy the template
@@ -3489,11 +3494,15 @@ pub fn setup_snapshot_directories(
         );
     }
 
-    fix_container_mount_permissions(&project_snapshot_dir, devnet_event_tx)?;
+    #[cfg(target_os = "linux")]
+    {
+        fix_container_mount_permissions(&project_snapshot_dir, devnet_event_tx)?;
+    }
 
     Ok(project_snapshot_ready || (global_snapshot_ready && !project_snapshot_exists))
 }
 
+#[cfg(target_os = "linux")]
 fn fix_container_mount_permissions(
     project_snapshot_dir: &std::path::Path,
     devnet_event_tx: &Sender<DevnetEvent>,
@@ -3516,6 +3525,7 @@ fn fix_container_mount_permissions(
     Ok(())
 }
 
+#[cfg(target_os = "linux")]
 fn fix_permissions_recursive(path: &std::path::Path) -> Result<(), String> {
     use std::os::unix::fs::PermissionsExt;
 
