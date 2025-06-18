@@ -1643,7 +1643,14 @@ events_keys = ["*"]
         let mut stacks_node_data_path = PathBuf::from(&devnet_config.working_dir);
         stacks_node_data_path.push("data");
         stacks_node_data_path.push(format!("{}", boot_index));
-        let _ = fs::create_dir(stacks_node_data_path.clone());
+        let _ = fs::create_dir(stacks_node_data_path.clone()).map_err(|e| {
+            format!(
+                "unable to create stacks node data path ({}): {:?}",
+                stacks_node_data_path.to_str().unwrap(),
+                e
+            )
+        });
+
         stacks_node_data_path.push("subnet");
 
         let mut exposed_ports = HashMap::new();
@@ -3475,7 +3482,56 @@ pub fn setup_snapshot_directories(
         );
     }
 
+    fix_container_mount_permissions(&project_snapshot_dir, devnet_event_tx)?;
+
     Ok(project_snapshot_ready || (global_snapshot_ready && !project_snapshot_exists))
+}
+
+fn fix_container_mount_permissions(
+    project_snapshot_dir: &std::path::Path,
+    devnet_event_tx: &Sender<DevnetEvent>,
+) -> Result<(), String> {
+    let bitcoin_dir = project_snapshot_dir.join("bitcoin");
+    let stacks_dir = project_snapshot_dir.join("stacks");
+
+    for dir in [&bitcoin_dir, &stacks_dir] {
+        if dir.exists() {
+            let _ = devnet_event_tx.send(DevnetEvent::debug(format!(
+                "Fixing permissions for container mount: {}",
+                dir.display()
+            )));
+
+            // Make directories and files accessible to containers (which often run as root)
+            fix_permissions_recursive(dir)?;
+        }
+    }
+
+    Ok(())
+}
+
+fn fix_permissions_recursive(path: &std::path::Path) -> Result<(), String> {
+    use std::os::unix::fs::PermissionsExt;
+
+    // Set directory permissions to 755
+    if path.is_dir() {
+        let permissions = std::fs::Permissions::from_mode(0o755);
+        fs::set_permissions(path, permissions)
+            .map_err(|e| format!("Failed to set permissions on {}: {}", path.display(), e))?;
+
+        for entry in fs::read_dir(path)
+            .map_err(|e| format!("Failed to read directory {}: {}", path.display(), e))?
+        {
+            let entry = entry.map_err(|e| format!("Failed to read entry: {}", e))?;
+            fix_permissions_recursive(&entry.path())?;
+        }
+    } else {
+        // Set file permissions to 644
+        let permissions = std::fs::Permissions::from_mode(0o644);
+        fs::set_permissions(path, permissions)
+            .map_err(|e| format!("Failed to set permissions on {}: {}", path.display(), e))?;
+    }
+
+    Ok(())
 }
 
 pub fn copy_directory(
