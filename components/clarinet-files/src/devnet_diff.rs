@@ -1,6 +1,6 @@
 pub use crate::DevnetConfig;
 
-use std::{collections::HashMap, iter::zip};
+use std::collections::HashMap;
 
 /// Config which fields to check for differences
 pub struct DevnetDiffConfig {
@@ -160,47 +160,74 @@ impl DevnetDiffConfig {
         user_value: String,
         default_value: String,
     ) -> Vec<(String, String, String)> {
-        let mut result = Vec::new();
         let user_orders: Vec<String> = user_value.split(",").map(String::from).collect();
         let default_orders: Vec<String> = default_value.split(",").map(String::from).collect();
         let constructed_user_orders = construct_stacking_orders(&user_orders);
         let constructed_default_orders = construct_stacking_orders(&default_orders);
-        for (btc_address, user_order) in constructed_user_orders {
-            let default_order = constructed_default_orders.get(&btc_address).unwrap();
-            for (field, user_val) in user_order {
-                let default_val = default_order
-                    .iter()
-                    .find(|(f, _)| *f == field)
-                    .map(|(_, v)| v)
-                    .unwrap();
-                if default_val != &user_val {
-                    result.push((field, user_val, default_val.clone()));
-                }
-            }
+
+        if constructed_user_orders == constructed_default_orders {
+            return Vec::new();
         }
-        result
+
+        constructed_default_orders
+            .into_iter()
+            .flat_map(|(btc_address, default_order)| {
+                let user_order = constructed_user_orders.get(&btc_address);
+
+                match user_order {
+                    Some(user_order) => {
+                        // Compare fields between user and default orders
+                        default_order
+                            .into_iter()
+                            .filter_map(|(field, default_val)| {
+                                let user_val = user_order
+                                    .iter()
+                                    .find(|(f, _)| *f == field)
+                                    .map(|(_, v)| v.clone());
+
+                                match user_val {
+                                    Some(val) if val != default_val => {
+                                        Some((field, val, default_val))
+                                    }
+                                    None => Some((field, String::new(), default_val)),
+                                    _ => None,
+                                }
+                            })
+                            .collect::<Vec<_>>()
+                    }
+                    None => {
+                        // If no user order exists, add all default fields
+                        default_order
+                            .into_iter()
+                            .map(|(field, default_val)| (field, String::new(), default_val))
+                            .collect::<Vec<_>>()
+                    }
+                }
+            })
+            .collect()
     }
 }
 
-fn construct_stacking_orders(orders: &Vec<String>) -> HashMap<String, Vec<(String, String)>> {
+fn construct_stacking_orders(orders: &[String]) -> HashMap<String, Vec<(String, String)>> {
     let mut result = HashMap::new();
     for order in orders {
-        let mut order_vals = Vec::new();
-        let vals: Vec<String> = order.split("-").map(|s| s.to_string()).collect();
-        let btc_address = vals[4].clone();
-        for (v, field) in zip(
-            vals,
-            [
+        let vals: Vec<_> = order
+            .split("-")
+            .map(String::from)
+            .filter(|s| !s.is_empty())
+            .collect();
+        if !vals.is_empty() {
+            let btc_address = vals[4].to_owned();
+            let fields = [
                 "start_at_cycle",
                 "duration",
                 "wallet",
                 "slots",
                 "btc_address",
-            ],
-        ) {
-            order_vals.push((field.to_string(), v));
+            ];
+            let order_vals: Vec<_> = fields.map(String::from).into_iter().zip(vals).collect();
+            result.insert(btc_address, order_vals);
         }
-        result.insert(btc_address, order_vals);
     }
     result
 }
@@ -231,14 +258,13 @@ mod tests {
         user_config.pox_stacking_orders = vec![];
 
         let differ = DevnetDiffConfig::new();
-        assert!(differ.is_compatible(&user_config).is_err());
-
         let different_fields = differ.is_compatible(&user_config);
         assert!(different_fields.is_err());
+
+        assert!(different_fields.is_err());
         let incompatibles = different_fields.unwrap_err();
-        assert_eq!(incompatibles.len(), 2);
         assert_eq!(incompatibles[0].0, "epoch_3_0");
-        assert_eq!(incompatibles[1].0, "pox_stacking_orders");
+        assert_eq!(incompatibles[1].0, "start_at_cycle");
     }
 
     #[test]

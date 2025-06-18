@@ -755,7 +755,6 @@ pub async fn create_global_snapshot(
     if !project_marker.exists() {
         match std::fs::File::create(&project_marker) {
             Ok(_) => {
-                #[rustfmt::skip]
                 let _ = devnet_event_tx.send(DevnetEvent::success(
                     "Project snapshot data prepared up to epoch 3.0. Future project starts will be faster.".to_string(),
                 ));
@@ -805,8 +804,9 @@ pub async fn create_global_snapshot(
 
             match std::fs::File::create(&global_marker) {
                 Ok(_) => {
-                    let _ = devnet_event_tx.send(DevnetEvent::success("Global template cache data prepared. Future project initializations will be faster.".to_string(),
-                                        ));
+                    let _ = devnet_event_tx.send(DevnetEvent::success(
+                        "Global template cache data prepared. Future project initializations will be faster.".to_string()
+                    ));
                 }
                 Err(e) => {
                     let _ = devnet_event_tx.send(DevnetEvent::warning(format!(
