@@ -361,6 +361,7 @@ impl EditorState {
         };
 
         let position_hash = get_atom_start_at_position(&position, contract.expressions.as_ref()?)?;
+        eprintln!("Getting definitions at {position_hash:?}");
         let definitions = match &contract.definitions {
             Some(definitions) => definitions.to_owned(),
             None => get_definitions(contract.expressions.as_ref()?, contract.issuer.clone()),
@@ -372,6 +373,7 @@ impl EditorState {
                 range: *range,
             }),
             DefinitionLocation::External(contract_identifier, function_name) => {
+                eprintln!("External definition at {contract_identifier}::{function_name}");
                 let metadata = self.contracts_lookup.get(contract_location)?;
                 let protocol = self.protocols.get(&metadata.manifest_location)?;
                 let definition_contract_location =
