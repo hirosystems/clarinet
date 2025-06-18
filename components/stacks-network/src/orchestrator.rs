@@ -17,6 +17,7 @@ use clarity::types::chainstate::StacksPrivateKey;
 use clarity::types::PrivateKey;
 use futures::stream::TryStreamExt;
 use hiro_system_kit::{slog, slog_term, Drain};
+use libc;
 use reqwest::RequestBuilder;
 use serde_json::Value as JsonValue;
 use std::collections::HashMap;
@@ -865,6 +866,8 @@ rpcport={bitcoin_node_rpc_port}
             ));
         }
 
+        let uid = unsafe { libc::getuid() };
+        let gid = unsafe { libc::getgid() };
         let config = Config {
             labels: Some(labels),
             image: Some(devnet_config.bitcoin_node_image_url.clone()),
@@ -879,6 +882,7 @@ rpcport={bitcoin_node_rpc_port}
                 network_mode: Some(self.network_name.clone()),
                 port_bindings: Some(port_bindings),
                 extra_hosts: Some(vec!["host.docker.internal:host-gateway".into()]),
+                userns_mode: Some(format!("{}:{}", uid, gid)),
                 ..Default::default()
             }),
             cmd: Some(vec![
@@ -3434,6 +3438,9 @@ pub fn setup_snapshot_directories(
     } else {
         fs::create_dir_all(&project_snapshot_dir)
             .map_err(|e| format!("unable to create project cache directory: {:?}", e))?;
+        let permissions = std::fs::Permissions::from_mode(0o755);
+        let _ = fs::set_permissions(&project_snapshot_dir, permissions)
+            .map_err(|e| format!("unable to create project cache director: {:?}", e));
     }
 
     // If global cache exists but project cache doesn't have the marker, copy the template
