@@ -82,16 +82,13 @@ impl Definitions {
         identifier: &QualifiedContractIdentifier,
     ) -> QualifiedContractIdentifier {
         if identifier.issuer == StandardPrincipalData::transient() {
-            match &self.deployer {
-                Some(deployer) => {
-                    QualifiedContractIdentifier::parse(&format!("{}.{}", deployer, identifier.name))
-                        .expect("failed to set contract name")
-                }
-                None => identifier.to_owned(),
+            if let Some(deployer) = &self.deployer {
+                let contract = &format!("{deployer}.{}", identifier.name);
+                return QualifiedContractIdentifier::parse(contract)
+                    .expect("Failed to set contract name");
             }
-        } else {
-            identifier.to_owned()
         }
+        identifier.to_owned()
     }
 }
 
