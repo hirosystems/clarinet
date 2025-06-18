@@ -382,13 +382,13 @@ impl EditorState {
                 {
                     let public_definitions = get_public_function_definitions(expressions);
                     return Some(Location {
-                        uri: contract_location.try_into().ok()?,
+                        uri: definition_contract_location.try_into().ok()?,
                         range: *public_definitions.get(function_name)?,
                     });
                 };
 
                 Some(Location {
-                    uri: contract_location.try_into().ok()?,
+                    uri: definition_contract_location.try_into().ok()?,
                     range: *protocol
                         .contracts
                         .get(definition_contract_location)?
