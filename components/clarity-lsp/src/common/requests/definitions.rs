@@ -75,6 +75,24 @@ impl Definitions {
         );
         Some(())
     }
+
+    /// Replace transient principal (`S1G2081040G2081040G2081040G208105NK8PE5`)
+    fn replace_transient(
+        &self,
+        identifier: &QualifiedContractIdentifier,
+    ) -> QualifiedContractIdentifier {
+        if identifier.issuer == StandardPrincipalData::transient() {
+            match &self.deployer {
+                Some(deployer) => {
+                    QualifiedContractIdentifier::parse(&format!("{}.{}", deployer, identifier.name))
+                        .expect("failed to set contract name")
+                }
+                None => identifier.to_owned(),
+            }
+        } else {
+            identifier.to_owned()
+        }
+    }
 }
 
 impl<'a> ASTVisitor<'a> for Definitions {
@@ -126,16 +144,15 @@ impl<'a> ASTVisitor<'a> for Definitions {
         let Some(keyword) = expr.match_list().and_then(|expr| expr.get(1)) else {
             return true;
         };
+        let contract_identifier = self.replace_transient(&trait_identifier.contract_identifier);
+
+        eprintln!(
+            "Insert use trait '{_name}' at ({}, {}), defined at {contract_identifier:?}",
+            keyword.span.start_line, keyword.span.start_column
+        );
         self.tokens.insert(
             (keyword.span.start_line, keyword.span.start_column),
-            DefinitionLocation::External(
-                trait_identifier.contract_identifier.clone(),
-                trait_identifier.name.clone(),
-            ),
-        );
-        eprintln!(
-            "Insert use trait '{_name}' at ({}, {}), defined at {trait_identifier:?}",
-            keyword.span.start_line, keyword.span.start_column
+            DefinitionLocation::External(contract_identifier, trait_identifier.name.clone()),
         );
         true
     }
@@ -148,16 +165,15 @@ impl<'a> ASTVisitor<'a> for Definitions {
         let Some(keyword) = expr.match_list().and_then(|expr| expr.get(1)) else {
             return true;
         };
+        let contract_identifier = self.replace_transient(&trait_identifier.contract_identifier);
+
+        eprintln!(
+            "Insert inpl trait '{}' at ({}, {}), defined at {contract_identifier:?}",
+            trait_identifier.name, keyword.span.start_line, keyword.span.start_column
+        );
         self.tokens.insert(
             (keyword.span.start_line, keyword.span.start_column),
-            DefinitionLocation::External(
-                trait_identifier.contract_identifier.clone(),
-                trait_identifier.name.clone(),
-            ),
-        );
-        eprintln!(
-            "Insert inpl trait '{}' at ({}, {}), defined at {trait_identifier:?}",
-            trait_identifier.name, keyword.span.start_line, keyword.span.start_column
+            DefinitionLocation::External(contract_identifier, trait_identifier.name.clone()),
         );
         true
     }
@@ -371,19 +387,12 @@ impl<'a> ASTVisitor<'a> for Definitions {
     ) -> bool {
         if let Some(list) = expr.match_list() {
             if let Some(SymbolicExpression { span, .. }) = list.get(2) {
-                let identifier = if identifier.issuer == StandardPrincipalData::transient() {
-                    match &self.deployer {
-                        Some(deployer) => QualifiedContractIdentifier::parse(&format!(
-                            "{}.{}",
-                            deployer, identifier.name
-                        ))
-                        .expect("failed to set contract name"),
-                        None => identifier.to_owned(),
-                    }
-                } else {
-                    identifier.to_owned()
-                };
+                let identifier = self.replace_transient(identifier);
 
+                eprintln!(
+                    "Insert function '{function_name}' at ({}, {}), defined at {identifier:?}",
+                    span.start_line, span.start_column
+                );
                 self.tokens.insert(
                     (span.start_line, span.start_column),
                     DefinitionLocation::External(identifier, function_name.to_owned()),
