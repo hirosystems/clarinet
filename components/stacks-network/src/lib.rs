@@ -201,12 +201,17 @@ async fn do_run_devnet(
             .spawn(move || {
                 let moved_orchestrator_event_tx = orchestrator_event_tx.clone();
                 let res = if start_local_devnet_services {
-                    let future =
-                        devnet.start(moved_orchestrator_event_tx, terminator_rx, &ctx_moved);
+                    let future = devnet.start(
+                        moved_orchestrator_event_tx,
+                        terminator_rx,
+                        &ctx_moved,
+                        no_snapshot,
+                    );
                     let rt = hiro_system_kit::create_basic_runtime();
                     rt.block_on(future)
                 } else {
-                    let future = devnet.initialize_bitcoin_node(&moved_orchestrator_event_tx);
+                    let future =
+                        devnet.initialize_bitcoin_node(&moved_orchestrator_event_tx, no_snapshot);
                     let rt = hiro_system_kit::create_basic_runtime();
                     rt.block_on(future)
                 };

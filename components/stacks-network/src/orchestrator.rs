@@ -289,6 +289,7 @@ impl DevnetOrchestrator {
         event_tx: Sender<DevnetEvent>,
         terminator_rx: Receiver<bool>,
         ctx: &Context,
+        no_snapshot: bool,
     ) -> Result<(), String> {
         let (_docker, devnet_config) = match (&self.docker_client, &self.network_config) {
             (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
@@ -433,9 +434,12 @@ impl DevnetOrchestrator {
             Status::Yellow,
             "booting",
         );
-        match self.boot_bitcoin_node_container(&event_tx).await {
+        match self
+            .boot_bitcoin_node_container(&event_tx, no_snapshot)
+            .await
+        {
             Ok(_) => {
-                self.initialize_bitcoin_node(&event_tx).await?;
+                self.initialize_bitcoin_node(&event_tx, no_snapshot).await?;
             }
             Err(message) => {
                 let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
@@ -586,7 +590,10 @@ impl DevnetOrchestrator {
             Status::Yellow,
             "booting",
         );
-        match self.boot_stacks_node_container(&event_tx).await {
+        match self
+            .boot_stacks_node_container(&event_tx, no_snapshot)
+            .await
+        {
             Ok(_) => {}
             Err(message) => {
                 let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
@@ -997,6 +1004,7 @@ rpcport={bitcoin_node_rpc_port}
     pub async fn boot_bitcoin_node_container(
         &mut self,
         devnet_event_tx: &Sender<DevnetEvent>,
+        no_snapshot: bool,
     ) -> Result<(), String> {
         let container = match &self.bitcoin_node_container_id {
             Some(container) => container.clone(),
@@ -1010,7 +1018,7 @@ rpcport={bitcoin_node_rpc_port}
         let global_cache_dir = get_global_snapshot_dir();
         let bitcoin_cache = global_cache_dir.join("bitcoin").join("regtest");
 
-        if bitcoin_cache.exists() {
+        if !no_snapshot {
             copy_cache_to_container(
                 docker,
                 &container,
@@ -1026,9 +1034,9 @@ rpcport={bitcoin_node_rpc_port}
             .start_container::<String>(&container, None)
             .await
             .map_err(|e| formatted_docker_error("unable to start bitcoind container", e))?;
-        if bitcoin_cache.exists() {
-            fix_bitcoin_permissions(docker, &container, devnet_event_tx).await?;
-        }
+        // if bitcoin_cache.exists() {
+        //     fix_bitcoin_permissions(docker, &container, devnet_event_tx).await?;
+        // }
 
         Ok(())
     }
@@ -1377,6 +1385,7 @@ start_height = {epoch_3_1}
     pub async fn boot_stacks_node_container(
         &mut self,
         devnet_event_tx: &Sender<DevnetEvent>,
+        no_snapshot: bool,
     ) -> Result<(), String> {
         let container = match &self.stacks_node_container_id {
             Some(container) => container.clone(),
@@ -1389,7 +1398,7 @@ start_height = {epoch_3_1}
         let global_cache_dir = get_global_snapshot_dir();
         let stacks_cache = global_cache_dir.join("stacks").join("krypton");
 
-        if stacks_cache.exists() {
+        if !no_snapshot {
             copy_cache_to_container(
                 docker,
                 &container,
@@ -1406,9 +1415,9 @@ start_height = {epoch_3_1}
             .await
             .map_err(|e| formatted_docker_error("unable to start stacks-node container", e))?;
 
-        if stacks_cache.exists() {
-            fix_stacks_permissions(docker, &container, devnet_event_tx).await?;
-        }
+        // if stacks_cache.exists() {
+        //     fix_stacks_permissions(docker, &container, devnet_event_tx).await?;
+        // }
 
         Ok(())
     }
@@ -2876,6 +2885,7 @@ events_keys = ["*"]
     pub async fn initialize_bitcoin_node(
         &self,
         devnet_event_tx: &Sender<DevnetEvent>,
+        no_snapshot: bool,
     ) -> Result<(), String> {
         use bitcoincore_rpc::bitcoin::Address;
         use reqwest::Client as HttpClient;
@@ -2889,10 +2899,6 @@ events_keys = ["*"]
             },
             _ => return Err("unable to initialize bitcoin node".to_string()),
         };
-        // Check if we have cached data
-        // let project_snapshot_dir = get_project_snapshot_dir(devnet_config);
-        // let cache_ready_marker = project_snapshot_dir.join("epoch_3_ready");
-        let using_cache = true; // cache_ready_marker.exists();
 
         let miner_address = Address::from_str(&devnet_config.miner_btc_address)
             .map_err(|e| format!("unable to create miner address: {:?}", e))?;
@@ -2956,7 +2962,7 @@ events_keys = ["*"]
         }
 
         // Only generate blocks if we're NOT using cached data
-        if !using_cache {
+        if no_snapshot {
             let _ = devnet_event_tx.send(DevnetEvent::info(
                 "Initializing blockchain with fresh blocks".to_string(),
             ));

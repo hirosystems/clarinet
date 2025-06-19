@@ -262,61 +262,66 @@ pub async fn start_chains_coordinator(
     let observer_command_tx_moved = observer_command_tx.clone();
     let ctx_moved = ctx.clone();
 
-    // Load events from snapshot if available
-    let event_pool: Vec<StacksBlockData> = if using_snapshot {
-        let mut events = vec![];
-        let events_cache_path = get_global_snapshot_dir()
-            .join("events_export")
-            .join("events_cache.tsv");
+    let stacks_startup_context = if using_snapshot {
+        // Load events from snapshot if available
+        let event_pool: Vec<StacksBlockData> = {
+            let mut events = vec![];
+            let events_cache_path = get_global_snapshot_dir()
+                .join("events_export")
+                .join("events_cache.tsv");
 
-        let mut chain_ctx = StacksChainContext::new(&chainhook_types::StacksNetwork::Devnet);
-        if let Ok(file_content) = fs::read_to_string(&events_cache_path) {
-            for line in file_content.lines() {
-                let parts: Vec<&str> = line.split('\t').collect();
-                if parts.get(2).unwrap_or(&"") == &"/new_block" {
-                    let maybe_block = standardize_stacks_serialized_block(
-                        &chainhook_sdk::indexer::IndexerConfig {
-                            bitcoin_network: chainhook_types::BitcoinNetwork::Regtest,
-                            stacks_network: chainhook_types::StacksNetwork::Devnet,
-                            bitcoind_rpc_url: config.devnet_config.bitcoin_node_image_url.clone(),
-                            bitcoind_rpc_username: config
-                                .devnet_config
-                                .bitcoin_node_username
-                                .clone(),
-                            bitcoind_rpc_password: config
-                                .devnet_config
-                                .bitcoin_node_password
-                                .clone(),
-                            bitcoin_block_signaling: BitcoinBlockSignaling::Stacks(
-                                StacksNodeConfig {
-                                    rpc_url: config.devnet_config.stacks_node_image_url.clone(),
-                                    ingestion_port: 3999,
-                                },
-                            ),
-                        },
-                        parts.get(3).unwrap_or(&""),
-                        &mut chain_ctx,
-                        &ctx,
-                    );
-                    match maybe_block {
-                        Ok(block) => {
-                            events.push(block);
-                        }
-                        Err(e) => {
-                            let _ =
-                                devnet_event_tx.send(DevnetEvent::debug(format!("Error: {}", e)));
+            let mut chain_ctx = StacksChainContext::new(&chainhook_types::StacksNetwork::Devnet);
+            if let Ok(file_content) = fs::read_to_string(&events_cache_path) {
+                for line in file_content.lines() {
+                    let parts: Vec<&str> = line.split('\t').collect();
+                    if parts.get(2).unwrap_or(&"") == &"/new_block" {
+                        let maybe_block = standardize_stacks_serialized_block(
+                            &chainhook_sdk::indexer::IndexerConfig {
+                                bitcoin_network: chainhook_types::BitcoinNetwork::Regtest,
+                                stacks_network: chainhook_types::StacksNetwork::Devnet,
+                                bitcoind_rpc_url: config
+                                    .devnet_config
+                                    .bitcoin_node_image_url
+                                    .clone(),
+                                bitcoind_rpc_username: config
+                                    .devnet_config
+                                    .bitcoin_node_username
+                                    .clone(),
+                                bitcoind_rpc_password: config
+                                    .devnet_config
+                                    .bitcoin_node_password
+                                    .clone(),
+                                bitcoin_block_signaling: BitcoinBlockSignaling::Stacks(
+                                    StacksNodeConfig {
+                                        rpc_url: config.devnet_config.stacks_node_image_url.clone(),
+                                        ingestion_port: 3999,
+                                    },
+                                ),
+                            },
+                            parts.get(3).unwrap_or(&""),
+                            &mut chain_ctx,
+                            &ctx,
+                        );
+                        match maybe_block {
+                            Ok(block) => {
+                                events.push(block);
+                            }
+                            Err(e) => {
+                                let _ = devnet_event_tx
+                                    .send(DevnetEvent::debug(format!("Error: {}", e)));
+                            }
                         }
                     }
                 }
             }
-        }
-        events
+            events
+        };
+        Some(StacksObserverStartupContext {
+            block_pool_seed: event_pool,
+            last_block_height_appended: starting_block_height,
+        })
     } else {
-        vec![]
-    };
-    let stacks_startup_context = StacksObserverStartupContext {
-        block_pool_seed: event_pool,
-        last_block_height_appended: starting_block_height,
+        None
     };
     let _ = hiro_system_kit::thread_named("Event observer").spawn(move || {
         let _ = start_event_observer(
@@ -325,7 +330,7 @@ pub async fn start_chains_coordinator(
             observer_command_rx,
             Some(observer_event_tx_moved),
             None,
-            Some(stacks_startup_context),
+            stacks_startup_context,
             ctx_moved,
         );
     });
