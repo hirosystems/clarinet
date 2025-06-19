@@ -21,7 +21,7 @@ use clarinet_files::NetworkManifest;
 pub use event::DevnetEvent;
 pub use log::{LogData, LogLevel};
 pub use orchestrator::DevnetOrchestrator;
-use orchestrator::{setup_snapshot_directories, ServicesMapHosts};
+use orchestrator::ServicesMapHosts;
 use std::{
     sync::mpsc::{self, channel, Receiver, Sender},
     thread::sleep,
@@ -121,26 +121,6 @@ async fn do_run_devnet(
                 }
             }
         }
-        //     match setup_snapshot_directories(&devnet_config, &devnet_events_tx) {
-        //         Ok(true) => {
-        //             let _ = devnet_events_tx.send(DevnetEvent::info(
-        //                 "Using snapshotted blockchain data up to epoch 3.0. Startup will be faster."
-        //                     .to_string(),
-        //             ));
-        //         }
-        //         Ok(false) => {
-        //             let _ = devnet_events_tx.send(DevnetEvent::info(
-        //                 "No snapshot blockchain data found. Initial startup may take longer."
-        //                     .to_string(),
-        //             ));
-        //         }
-        //         Err(e) => {
-        //             let _ = devnet_events_tx.send(DevnetEvent::warning(format!(
-        //                 "Error setting up snapshot directories: {}. Continuing without snapshot.",
-        //                 e
-        //             )));
-        //         }
-        //     };
     }
     // if we're starting all services, all trace logs go to networking.log
     if start_local_devnet_services {

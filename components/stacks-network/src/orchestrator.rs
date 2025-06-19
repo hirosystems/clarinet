@@ -17,6 +17,7 @@ use clarity::types::chainstate::StacksPrivateKey;
 use clarity::types::PrivateKey;
 use futures::stream::TryStreamExt;
 use hiro_system_kit::{slog, slog_term, Drain};
+#[cfg(target_os = "linux")]
 use libc;
 use reqwest::RequestBuilder;
 use serde_json::Value as JsonValue;
@@ -26,7 +27,6 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::sync::mpsc::{Receiver, Sender};
 use std::time::Duration;
-use tar::Builder;
 
 use crate::event::{send_status_update, DevnetEvent, Status};
 
@@ -3453,147 +3453,6 @@ pub fn get_project_snapshot_dir(devnet_config: &DevnetConfig) -> std::path::Path
         .join("1")
 }
 
-pub fn setup_snapshot_directories(
-    devnet_config: &DevnetConfig,
-    devnet_event_tx: &Sender<DevnetEvent>,
-) -> Result<bool, String> {
-    // Get global and project cache directories
-    let global_snapshot_dir = get_global_snapshot_dir();
-    let project_snapshot_dir = get_project_snapshot_dir(devnet_config);
-
-    // Check if we have template data and project doesn't have a cache yet
-    let global_snapshot_ready = global_snapshot_dir.join("epoch_3_ready").exists();
-    let project_snapshot_exists = project_snapshot_dir.exists();
-    let project_snapshot_ready = project_snapshot_dir.join("epoch_3_ready").exists();
-
-    // Create project cache directory if it doesn't exist
-    if project_snapshot_exists {
-        for excluded_file in EXCLUDED_STACKS_SNAPSHOT_FILES {
-            let stale_file = project_snapshot_dir.join("stacks").join(excluded_file);
-            if stale_file.exists() {
-                let _ = fs::remove_file(&stale_file);
-                let _ = devnet_event_tx.send(DevnetEvent::info(format!(
-                    "Removed stale cache file: {}",
-                    excluded_file
-                )));
-            }
-        }
-    } else {
-        fs::create_dir_all(&project_snapshot_dir)
-            .map_err(|e| format!("unable to create project cache directory: {:?}", e))?;
-
-        #[cfg(target_os = "linux")]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            let permissions = std::fs::Permissions::from_mode(0o755);
-            let _ = fs::set_permissions(&project_snapshot_dir, permissions)
-                .map_err(|e| format!("unable to set project cache directory permissions: {:?}", e));
-        }
-    }
-
-    // If global cache exists but project cache doesn't have the marker, copy the template
-    if global_snapshot_ready
-        && !project_snapshot_ready
-        && global_snapshot_dir != project_snapshot_dir
-    {
-        let _ = devnet_event_tx.send(DevnetEvent::info(
-            "Copying blockchain template data to project cache. This will speed up future starts."
-                .to_string(),
-        ));
-
-        // Copy bitcoin data
-        let global_bitcoin_cache = global_snapshot_dir.join("bitcoin");
-        let project_bitcoin_cache = project_snapshot_dir.join("bitcoin");
-        if global_bitcoin_cache.exists() && !project_bitcoin_cache.exists() {
-            println!(
-                "copying bitcoin cache to project {}",
-                project_bitcoin_cache.display()
-            );
-            copy_directory(&global_bitcoin_cache, &project_bitcoin_cache, None)
-                .map_err(|e| format!("Failed to copy Bitcoin template cache: {}", e))?;
-        }
-
-        // Copy stacks data
-        let global_stacks_cache = global_snapshot_dir.join("stacks");
-        let project_stacks_cache = project_snapshot_dir.join("stacks");
-        if global_stacks_cache.exists() && !project_stacks_cache.exists() {
-            println!("copying stacks cache to project");
-            // exlude copy of
-            // event_observers.sqlite
-            // event_observers.sqlite-journal
-            // they contain project specific urls
-            copy_directory(
-                &global_stacks_cache,
-                &project_stacks_cache,
-                Some(EXCLUDED_STACKS_SNAPSHOT_FILES),
-            )
-            .map_err(|e| format!("Failed to copy Stacks template cache: {}", e))?;
-        }
-
-        // Copy the marker file too
-        let _ = fs::copy(
-            global_snapshot_dir.join("epoch_3_ready"),
-            project_snapshot_dir.join("epoch_3_ready"),
-        );
-    }
-
-    #[cfg(target_os = "linux")]
-    {
-        fix_container_mount_permissions(&project_snapshot_dir, devnet_event_tx)?;
-    }
-
-    Ok(project_snapshot_ready || (global_snapshot_ready && !project_snapshot_exists))
-}
-
-#[cfg(target_os = "linux")]
-fn fix_container_mount_permissions(
-    project_snapshot_dir: &std::path::Path,
-    devnet_event_tx: &Sender<DevnetEvent>,
-) -> Result<(), String> {
-    let bitcoin_dir = project_snapshot_dir.join("bitcoin");
-    let stacks_dir = project_snapshot_dir.join("stacks");
-
-    for dir in [&bitcoin_dir, &stacks_dir] {
-        if dir.exists() {
-            let _ = devnet_event_tx.send(DevnetEvent::debug(format!(
-                "Fixing permissions for container mount: {}",
-                dir.display()
-            )));
-
-            // Make directories and files accessible to containers (which often run as root)
-            fix_permissions_recursive(dir)?;
-        }
-    }
-
-    Ok(())
-}
-
-#[cfg(target_os = "linux")]
-fn fix_permissions_recursive(path: &std::path::Path) -> Result<(), String> {
-    use std::os::unix::fs::PermissionsExt;
-
-    // Set directory permissions to 755
-    if path.is_dir() {
-        let permissions = std::fs::Permissions::from_mode(0o755);
-        fs::set_permissions(path, permissions)
-            .map_err(|e| format!("Failed to set permissions on {}: {}", path.display(), e))?;
-
-        for entry in fs::read_dir(path)
-            .map_err(|e| format!("Failed to read directory {}: {}", path.display(), e))?
-        {
-            let entry = entry.map_err(|e| format!("Failed to read entry: {}", e))?;
-            fix_permissions_recursive(&entry.path())?;
-        }
-    } else {
-        // Set file permissions to 644
-        let permissions = std::fs::Permissions::from_mode(0o644);
-        fs::set_permissions(path, permissions)
-            .map_err(|e| format!("Failed to set permissions on {}: {}", path.display(), e))?;
-    }
-
-    Ok(())
-}
-
 pub fn copy_directory(
     source: &PathBuf,
     destination: &PathBuf,
@@ -3710,7 +3569,9 @@ pub async fn copy_cache_to_container(
         .args([
             "-cvf",
             tar_path.to_str().unwrap(),
+            "--format=posix",
             "--no-xattrs", // ⚠️ This strips macOS extended attributes
+            "--no-same-owner",
             "--owner=root",
             "--group=root",
             "-C",
