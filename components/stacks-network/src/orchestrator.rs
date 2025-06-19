@@ -1008,7 +1008,7 @@ rpcport={bitcoin_node_rpc_port}
         };
         // Copy cache data if available
         let global_cache_dir = get_global_snapshot_dir();
-        let bitcoin_cache = global_cache_dir.join("bitcoin");
+        let bitcoin_cache = global_cache_dir.join("bitcoin").join("regtest");
 
         if bitcoin_cache.exists() {
             copy_cache_to_container(
@@ -1387,7 +1387,7 @@ start_height = {epoch_3_1}
             return Err("unable to get Docker client".into());
         };
         let global_cache_dir = get_global_snapshot_dir();
-        let stacks_cache = global_cache_dir.join("stacks");
+        let stacks_cache = global_cache_dir.join("stacks").join("krypton");
 
         if stacks_cache.exists() {
             copy_cache_to_container(
@@ -3711,7 +3711,6 @@ pub async fn copy_cache_to_container(
             "-cvf",
             tar_path.to_str().unwrap(),
             "--no-xattrs", // ⚠️ This strips macOS extended attributes
-            "--no-fflags", // ⚠️ This strips macOS file flags
             "--owner=root",
             "--group=root",
             "-C",
@@ -3789,11 +3788,6 @@ pub async fn fix_bitcoin_permissions(
 
     // Change ownership to root:root and set proper permissions
     let commands = vec![
-        vec![
-            "mv",
-            "/root/.bitcoin/bitcoin/regtest",
-            "/root/.bitcoin/regtest",
-        ],
         // Change ownership of the entire bitcoin directory
         vec!["chown", "-R", "root:root", "/root/.bitcoin"],
         // Set directory permissions
@@ -3862,8 +3856,6 @@ pub async fn fix_stacks_permissions(
 
     // Commands to fix permissions and rename directory
     let commands = vec![
-        // First rename the directory from /stacks to /devnet
-        vec!["mv", "/devnet/stacks/krypton", "/devnet"],
         // Change ownership to root:root
         vec!["chown", "-R", "root:root", "/devnet"],
         // Set directory permissions
