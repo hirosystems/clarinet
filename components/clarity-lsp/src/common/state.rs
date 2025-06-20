@@ -39,8 +39,8 @@ pub struct ActiveContractData {
     pub clarity_version: ClarityVersion,
     pub epoch: StacksEpochId,
     pub issuer: Option<StandardPrincipalData>,
-    pub expressions: Option<Vec<SymbolicExpression>>,
     pub definitions: Option<HashMap<(u32, u32), DefinitionLocation>>,
+    pub expressions: Option<Vec<SymbolicExpression>>,
     pub diagnostic: Option<ClarityDiagnostic>,
     pub source: String,
 }
@@ -50,11 +50,11 @@ impl ActiveContractData {
         clarity_version: ClarityVersion,
         epoch: StacksEpochId,
         issuer: Option<StandardPrincipalData>,
-        source: &str,
+        source: String,
     ) -> Self {
         match build_ast_with_rules(
             &QualifiedContractIdentifier::transient(),
-            source,
+            &source,
             &mut (),
             clarity_version,
             epoch,
@@ -64,29 +64,28 @@ impl ActiveContractData {
                 clarity_version,
                 epoch,
                 issuer: issuer.clone(),
-                expressions: Some(ast.expressions.clone()),
                 definitions: Some(get_definitions(&ast.expressions, issuer)),
+                expressions: Some(ast.expressions),
                 diagnostic: None,
-                source: source.to_string(),
+                source,
             },
             Err(err) => ActiveContractData {
                 clarity_version,
                 epoch,
                 issuer,
-                expressions: None,
                 definitions: None,
+                expressions: None,
                 diagnostic: Some(err.diagnostic),
-                source: source.to_string(),
+                source,
             },
         }
     }
 
-    pub fn update_sources(&mut self, source: &str, with_definitions: bool) {
-        self.source = source.to_string();
+    pub fn update_expressions(&mut self, with_definitions: bool) {
         self.definitions = None;
         match build_ast_with_rules(
             &QualifiedContractIdentifier::transient(),
-            source,
+            &self.source,
             &mut (),
             self.clarity_version,
             self.epoch,
@@ -106,6 +105,11 @@ impl ActiveContractData {
         };
     }
 
+    pub fn update_sources(&mut self, source: &str, with_definitions: bool) {
+        source.clone_into(&mut self.source);
+        self.update_expressions(with_definitions);
+    }
+
     pub fn update_definitions(&mut self) {
         if let Some(expressions) = &self.expressions {
             self.definitions = Some(get_definitions(expressions, self.issuer.clone()));
@@ -114,7 +118,7 @@ impl ActiveContractData {
 
     pub fn update_clarity_version(&mut self, clarity_version: ClarityVersion) {
         self.clarity_version = clarity_version;
-        self.update_sources(&self.source.clone(), true);
+        self.update_expressions(true);
     }
 
     pub fn update_issuer(&mut self, issuer: Option<StandardPrincipalData>) {
@@ -518,7 +522,7 @@ impl EditorState {
         contract_location: FileLocation,
         clarity_version: ClarityVersion,
         issuer: Option<StandardPrincipalData>,
-        source: &str,
+        source: String,
     ) {
         let epoch = StacksEpochId::Epoch21;
         let contract = ActiveContractData::new(clarity_version, epoch, issuer, source);

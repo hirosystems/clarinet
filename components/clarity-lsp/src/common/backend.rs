@@ -176,7 +176,7 @@ pub async fn process_notification(
                         contract_location.clone(),
                         clarity_version,
                         issuer,
-                        contract_source.as_str(),
+                        contract_source,
                     )
                 })?;
             }
@@ -591,7 +591,7 @@ mod range_formatting_tests {
     use std::collections::HashMap;
     use std::path::PathBuf;
 
-    fn create_test_editor_state(source: &str) -> EditorStateInput {
+    fn create_test_editor_state(source: String) -> EditorStateInput {
         let mut editor_state = EditorState::new();
 
         let contract_location = FileLocation::FileSystem {
@@ -612,7 +612,7 @@ mod range_formatting_tests {
     fn test_range_formatting_comments() {
         let source = "(ok true)\n\n(define-public (foo)\n  ;; this is a comment\n   (ok   true)\n)";
 
-        let editor_state_input = create_test_editor_state(source);
+        let editor_state_input = create_test_editor_state(source.to_owned());
 
         let params = DocumentRangeFormattingParams {
             text_document: TextDocumentIdentifier {

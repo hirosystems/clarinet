@@ -90,7 +90,7 @@ mod definitions_visitor_tests {
     use super::get_signatures;
 
     fn get_source_signature(
-        source: &str,
+        source: String,
         position: &Position,
     ) -> Option<Vec<lsp_types::SignatureInformation>> {
         let contract = &ActiveContractData::new(Clarity2, Epoch21, None, source);
@@ -100,7 +100,7 @@ mod definitions_visitor_tests {
     #[test]
     fn get_simple_signature() {
         let signatures = get_source_signature(
-            "(var-set counter )",
+            "(var-set counter )".to_owned(),
             &Position {
                 line: 1,
                 character: 18,
@@ -150,9 +150,9 @@ mod definitions_visitor_tests {
                 continue;
             }
 
-            let src = format!("({} )", &method);
+            let src = format!("({method} )");
             let signatures = get_source_signature(
-                src.as_str(),
+                src,
                 &Position {
                     line: 1,
                     character: 2,

@@ -555,7 +555,7 @@ pub fn get_definitions(
 }
 
 pub fn get_public_function_definitions(
-    expressions: &Vec<SymbolicExpression>,
+    expressions: &[SymbolicExpression],
 ) -> HashMap<ClarityName, Range> {
     let mut definitions = HashMap::new();
 
