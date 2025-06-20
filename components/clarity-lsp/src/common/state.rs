@@ -387,10 +387,11 @@ impl EditorState {
                     .get(definition_contract_location)
                     .and_then(|c| c.expressions.as_ref())
                 {
-                    let public_definitions = get_public_function_and_trait_definitions(expressions);
+                    let mut definitions = HashMap::new();
+                    get_public_function_and_trait_definitions(&mut definitions, expressions);
                     return Some(Location {
                         uri,
-                        range: *public_definitions.get(name)?,
+                        range: *definitions.get(name)?,
                     });
                 };
 
@@ -672,10 +673,9 @@ pub async fn build_state(
 
                 if let EvaluationResult::Contract(contract_result) = execution_result.result {
                     if let Some(ast) = artifacts.asts.get(&contract_id) {
-                        definitions.insert(
-                            contract_id.clone(),
-                            get_public_function_and_trait_definitions(&ast.expressions),
-                        );
+                        let mut v = HashMap::new();
+                        get_public_function_and_trait_definitions(&mut v, &ast.expressions);
+                        definitions.insert(contract_id.clone(), v);
                     }
                     analyses.insert(contract_id.clone(), Some(contract_result.contract.analysis));
                 };
