@@ -649,9 +649,7 @@ pub fn get_trait_definitions(
                     Some(DefineFunctions::Trait)
                 )
             })
-            .map(|(_, args)| args) // Throw away `define-trait`
-            .inspect(|args| eprintln!("Found trait definition: {args:?}"))
-            .and_then(|args| args.split_first())
+            .and_then(|(_, args)| args.split_first()) // Throw away `define-trait`
             .and_then(|(trait_name, _)| trait_name.match_atom())
             .inspect(|&trait_name| {
                 definitions.insert(trait_name.to_owned(), span_to_range(&expression.span));
@@ -660,12 +658,11 @@ pub fn get_trait_definitions(
 }
 
 pub fn get_public_function_and_trait_definitions(
+    definitions: &mut HashMap<ClarityName, Range>,
     expressions: &[SymbolicExpression],
-) -> HashMap<ClarityName, Range> {
-    let mut definitions = HashMap::new();
-    get_public_function_definitions(&mut definitions, expressions);
-    get_trait_definitions(&mut definitions, expressions);
-    definitions
+) {
+    get_public_function_definitions(definitions, expressions);
+    get_trait_definitions(definitions, expressions);
 }
 
 #[cfg(test)]
