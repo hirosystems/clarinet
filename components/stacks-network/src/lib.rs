@@ -8,6 +8,7 @@ pub mod chains_coordinator;
 mod event;
 mod log;
 mod orchestrator;
+mod snapshot_extractor;
 mod ui;
 
 pub use chainhook_sdk::observer::MempoolAdmissionData;
@@ -15,6 +16,7 @@ pub use chainhook_sdk::{self, utils::Context};
 use chainhook_sdk::{chainhooks::types::ChainhookStore, observer::ObserverCommand};
 pub use chainhooks::{load_chainhooks, parse_chainhook_full_specification};
 use chains_coordinator::BitcoinMiningCommand;
+use clarinet_files::devnet_diff::DevnetDiffConfig;
 use clarinet_files::NetworkManifest;
 pub use event::DevnetEvent;
 pub use log::{LogData, LogLevel};
@@ -51,6 +53,7 @@ async fn do_run_devnet(
     chainhooks: &mut Option<ChainhookStore>,
     log_tx: Option<Sender<LogData>>,
     display_dashboard: bool,
+    no_snapshot: bool,
     ctx: Context,
     orchestrator_terminated_tx: Sender<bool>,
     orchestrator_terminated_rx: Option<Receiver<bool>>,
@@ -76,6 +79,49 @@ async fn do_run_devnet(
         },
         _ => Err("Unable to retrieve config"),
     }?;
+
+    let differ = DevnetDiffConfig::new();
+    let diff = differ.is_compatible(&devnet_config);
+    if diff.is_err() {
+        let _ = devnet_events_tx.send(DevnetEvent::warning(
+            "Default snapshot can not be used".to_string(),
+        ));
+    }
+    // Check for and potentially copy snapshot data
+    if start_local_devnet_services && !no_snapshot && diff.is_ok() {
+        let global_snapshot_dir = orchestrator::get_global_snapshot_dir();
+
+        // First, try to extract embedded snapshot if it exists and we don't have snapshot yet
+        let global_snapshot_ready = global_snapshot_dir.join("epoch_3_ready").exists();
+
+        if !global_snapshot_ready {
+            let _ = devnet_events_tx.send(DevnetEvent::info(
+                "No existing snapshot found, extracting embedded snapshot data...".to_string(),
+            ));
+
+            match snapshot_extractor::extract_embedded_snapshot(
+                &global_snapshot_dir,
+                &devnet_events_tx,
+            ) {
+                Ok(true) => {
+                    let _ = devnet_events_tx.send(DevnetEvent::success(
+                        "Embedded snapshot extracted successfully".to_string(),
+                    ));
+                }
+                Ok(false) => {
+                    let _ = devnet_events_tx.send(DevnetEvent::warning(
+                        "No embedded snapshot available".to_string(),
+                    ));
+                }
+                Err(e) => {
+                    let _ = devnet_events_tx.send(DevnetEvent::warning(format!(
+                        "Failed to extract embedded snapshot: {}. Continuing without snapshot.",
+                        e
+                    )));
+                }
+            }
+        }
+    }
     // if we're starting all services, all trace logs go to networking.log
     if start_local_devnet_services {
         let file_appender =
@@ -135,6 +181,7 @@ async fn do_run_devnet(
                 observer_command_rx,
                 moved_mining_command_tx,
                 mining_command_rx,
+                !no_snapshot,
                 ctx_moved,
             );
             let rt = hiro_system_kit::create_basic_runtime();
@@ -154,12 +201,17 @@ async fn do_run_devnet(
             .spawn(move || {
                 let moved_orchestrator_event_tx = orchestrator_event_tx.clone();
                 let res = if start_local_devnet_services {
-                    let future =
-                        devnet.start(moved_orchestrator_event_tx, terminator_rx, &ctx_moved);
+                    let future = devnet.start(
+                        moved_orchestrator_event_tx,
+                        terminator_rx,
+                        &ctx_moved,
+                        no_snapshot,
+                    );
                     let rt = hiro_system_kit::create_basic_runtime();
                     rt.block_on(future)
                 } else {
-                    let future = devnet.initialize_bitcoin_node(&moved_orchestrator_event_tx);
+                    let future =
+                        devnet.initialize_bitcoin_node(&moved_orchestrator_event_tx, no_snapshot);
                     let rt = hiro_system_kit::create_basic_runtime();
                     rt.block_on(future)
                 };
@@ -262,6 +314,7 @@ pub async fn do_run_chain_coordinator(
     deployment: DeploymentSpecification,
     chainhooks: &mut Option<ChainhookStore>,
     log_tx: Option<Sender<LogData>>,
+    no_snapshot: bool,
     ctx: Context,
     orchestrator_terminated_tx: Sender<bool>,
     namespace: &str,
@@ -281,6 +334,7 @@ pub async fn do_run_chain_coordinator(
         chainhooks,
         log_tx,
         false,
+        no_snapshot,
         ctx,
         orchestrator_terminated_tx,
         None,
@@ -297,6 +351,7 @@ pub async fn do_run_local_devnet(
     chainhooks: &mut Option<ChainhookStore>,
     log_tx: Option<Sender<LogData>>,
     display_dashboard: bool,
+    no_snapshot: bool,
     ctx: Context,
     orchestrator_terminated_tx: Sender<bool>,
     orchestrator_terminated_rx: Option<Receiver<bool>>,
@@ -315,6 +370,7 @@ pub async fn do_run_local_devnet(
         chainhooks,
         log_tx,
         display_dashboard,
+        no_snapshot,
         ctx,
         orchestrator_terminated_tx,
         orchestrator_terminated_rx,
