@@ -62,7 +62,25 @@ impl fmt::Display for FileLocation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             FileLocation::FileSystem { path } => write!(f, "{}", path.display()),
-            FileLocation::Url { url } => write!(f, "{}", url),
+            FileLocation::Url { url } => write!(f, "{url}"),
+        }
+    }
+}
+
+impl TryInto<Url> for &FileLocation {
+    type Error = &'static str;
+
+    fn try_into(self) -> Result<Url, Self::Error> {
+        match self {
+            #[cfg(target_arch = "wasm32")]
+            FileLocation::FileSystem { .. } => {
+                Err("Url::from_file_path() not available on target architecture")
+            }
+            #[cfg(not(target_arch = "wasm32"))]
+            FileLocation::FileSystem { path } => {
+                Url::from_file_path(path).map_err(|()| "Url::from_file_path() failed")
+            }
+            FileLocation::Url { url } => Ok(url.clone()),
         }
     }
 }
@@ -101,13 +119,13 @@ impl FileLocation {
 
     pub fn from_url_string(url_string: &str) -> Result<FileLocation, String> {
         let url = Url::from_str(url_string)
-            .map_err(|e| format!("unable to parse {} as a url\n{:?}", url_string, e))?;
+            .map_err(|e| format!("unable to parse {url_string} as a url\n{e:?}"))?;
 
         #[cfg(not(target_arch = "wasm32"))]
         if url.scheme() == "file" {
             let path = url
                 .to_file_path()
-                .map_err(|_| format!("unable to conver url {} to path", url))?;
+                .map_err(|_| format!("unable to conver url {url} to path"))?;
             return Ok(FileLocation::FileSystem { path });
         }
 
@@ -116,13 +134,13 @@ impl FileLocation {
 
     pub fn from_path_string(path_string: &str) -> Result<FileLocation, String> {
         let path = PathBuf::from_str(path_string)
-            .map_err(|e| format!("unable to parse {} as a path\n{:?}", path_string, e))?;
+            .map_err(|e| format!("unable to parse {path_string} as a path\n{e:?}"))?;
         Ok(FileLocation::FileSystem { path })
     }
 
     pub fn append_path(&mut self, path_string: &str) -> Result<(), String> {
         let path_to_append = PathBuf::from_str(path_string)
-            .map_err(|e| format!("unable to read relative path {}\n{:?}", path_string, e))?;
+            .map_err(|e| format!("unable to read relative path {path_string}\n{e:?}"))?;
         match self.borrow_mut() {
             FileLocation::FileSystem { path } => {
                 path.extend(&path_to_append);
@@ -135,7 +153,7 @@ impl FileLocation {
                     let segment = component
                         .as_os_str()
                         .to_str()
-                        .ok_or(format!("unable to format component {:?}", component))?;
+                        .ok_or(format!("unable to format component {component:?}"))?;
                     paths_segments.push(segment);
                 }
             }
@@ -146,7 +164,7 @@ impl FileLocation {
     pub fn read_content_as_utf8(&self) -> Result<String, String> {
         let content = self.read_content()?;
         let contract_as_utf8 = String::from_utf8(content)
-            .map_err(|e| format!("unable to read content as utf8 {}\n{:?}", self, e))?;
+            .map_err(|e| format!("unable to read content as utf8 {self}\n{e:?}"))?;
         Ok(contract_as_utf8)
     }
 

@@ -17,7 +17,6 @@ use clarity_repl::clarity::{ClarityName, ClarityVersion, StacksEpochId, Symbolic
 use clarity_repl::repl::{ContractDeployer, DEFAULT_CLARITY_VERSION};
 use lsp_types::{
     CompletionItem, DocumentSymbol, Hover, Location, MessageType, Position, Range, SignatureHelp,
-    Url,
 };
 use std::borrow::BorrowMut;
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -40,8 +39,8 @@ pub struct ActiveContractData {
     pub clarity_version: ClarityVersion,
     pub epoch: StacksEpochId,
     pub issuer: Option<StandardPrincipalData>,
-    pub expressions: Option<Vec<SymbolicExpression>>,
     pub definitions: Option<HashMap<(u32, u32), DefinitionLocation>>,
+    pub expressions: Option<Vec<SymbolicExpression>>,
     pub diagnostic: Option<ClarityDiagnostic>,
     pub source: String,
 }
@@ -51,11 +50,11 @@ impl ActiveContractData {
         clarity_version: ClarityVersion,
         epoch: StacksEpochId,
         issuer: Option<StandardPrincipalData>,
-        source: &str,
+        source: String,
     ) -> Self {
         match build_ast_with_rules(
             &QualifiedContractIdentifier::transient(),
-            source,
+            &source,
             &mut (),
             clarity_version,
             epoch,
@@ -65,29 +64,28 @@ impl ActiveContractData {
                 clarity_version,
                 epoch,
                 issuer: issuer.clone(),
-                expressions: Some(ast.expressions.clone()),
                 definitions: Some(get_definitions(&ast.expressions, issuer)),
+                expressions: Some(ast.expressions),
                 diagnostic: None,
-                source: source.to_string(),
+                source,
             },
             Err(err) => ActiveContractData {
                 clarity_version,
                 epoch,
                 issuer,
-                expressions: None,
                 definitions: None,
+                expressions: None,
                 diagnostic: Some(err.diagnostic),
-                source: source.to_string(),
+                source,
             },
         }
     }
 
-    pub fn update_sources(&mut self, source: &str, with_definitions: bool) {
-        self.source = source.to_string();
+    pub fn update_expressions(&mut self, with_definitions: bool) {
         self.definitions = None;
         match build_ast_with_rules(
             &QualifiedContractIdentifier::transient(),
-            source,
+            &self.source,
             &mut (),
             self.clarity_version,
             self.epoch,
@@ -107,6 +105,11 @@ impl ActiveContractData {
         };
     }
 
+    pub fn update_sources(&mut self, source: &str, with_definitions: bool) {
+        source.clone_into(&mut self.source);
+        self.update_expressions(with_definitions);
+    }
+
     pub fn update_definitions(&mut self) {
         if let Some(expressions) = &self.expressions {
             self.definitions = Some(get_definitions(expressions, self.issuer.clone()));
@@ -115,7 +118,7 @@ impl ActiveContractData {
 
     pub fn update_clarity_version(&mut self, clarity_version: ClarityVersion) {
         self.clarity_version = clarity_version;
-        self.update_sources(&self.source.clone(), true);
+        self.update_expressions(true);
     }
 
     pub fn update_issuer(&mut self, issuer: Option<StandardPrincipalData>) {
@@ -142,7 +145,7 @@ impl ContractState {
         contract_id: QualifiedContractIdentifier,
         _ast: ContractAST,
         _deps: DependencySet,
-        mut diags: Vec<ClarityDiagnostic>,
+        diags: Vec<ClarityDiagnostic>,
         analysis: Option<ContractAnalysis>,
         definitions: HashMap<ClarityName, Range>,
         location: FileLocation,
@@ -152,7 +155,7 @@ impl ContractState {
         let mut warnings = vec![];
         let mut notes = vec![];
 
-        for diag in diags.drain(..) {
+        for diag in diags.into_iter() {
             match diag.level {
                 ClarityLevel::Error => {
                     errors.push(diag);
@@ -166,10 +169,10 @@ impl ContractState {
             }
         }
 
-        let contract_calls = match analysis {
-            Some(ref analysis) => get_contract_calls(analysis),
-            None => vec![],
-        };
+        let contract_calls = analysis
+            .as_ref()
+            .map(get_contract_calls)
+            .unwrap_or_default();
 
         ContractState {
             contract_id,
@@ -365,7 +368,7 @@ impl EditorState {
 
         match definitions.get(&position_hash)? {
             DefinitionLocation::Internal(range) => Some(Location {
-                uri: Url::parse(&contract_location.to_string()).ok()?,
+                uri: contract_location.try_into().ok()?,
                 range: *range,
             }),
             DefinitionLocation::External(contract_identifier, function_name) => {
@@ -383,18 +386,18 @@ impl EditorState {
                 {
                     let public_definitions = get_public_function_definitions(expressions);
                     return Some(Location {
+                        uri: definition_contract_location.try_into().ok()?,
                         range: *public_definitions.get(function_name)?,
-                        uri: Url::parse(&definition_contract_location.to_string()).ok()?,
                     });
                 };
 
                 Some(Location {
+                    uri: definition_contract_location.try_into().ok()?,
                     range: *protocol
                         .contracts
                         .get(definition_contract_location)?
                         .definitions
                         .get(function_name)?,
-                    uri: Url::parse(&definition_contract_location.to_string()).ok()?,
                 })
             }
         }
@@ -519,7 +522,7 @@ impl EditorState {
         contract_location: FileLocation,
         clarity_version: ClarityVersion,
         issuer: Option<StandardPrincipalData>,
-        source: &str,
+        source: String,
     ) {
         let epoch = StacksEpochId::Epoch21;
         let contract = ActiveContractData::new(clarity_version, epoch, issuer, source);

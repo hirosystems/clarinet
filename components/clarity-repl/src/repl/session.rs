@@ -419,28 +419,22 @@ impl Session {
     pub fn start(&mut self) -> Result<(String, Vec<(ContractAnalysis, String, String)>), String> {
         let mut output_err = Vec::<String>::new();
         let output = Vec::<String>::new();
-        let contracts = vec![];
+        let contracts = vec![]; // This is never modified, remove?
 
         if !self.settings.include_boot_contracts.is_empty() {
             self.load_boot_contracts();
         }
 
-        if !self.settings.initial_accounts.is_empty() {
-            let mut initial_accounts = self.settings.initial_accounts.clone();
-            for account in initial_accounts.drain(..) {
-                let Ok(recipient) = PrincipalData::parse(&account.address) else {
-                    output_err.push("Unable to parse address to credit".red().to_string());
-                    continue;
-                };
+        for account in &self.settings.initial_accounts {
+            let Ok(recipient) = PrincipalData::parse(&account.address) else {
+                output_err.push("Unable to parse address to credit".red().to_string());
+                continue;
+            };
 
-                match self
-                    .interpreter
-                    .mint_stx_balance(recipient, account.balance)
-                {
-                    Ok(_) => {}
-                    Err(err) => output_err.push(err.red().to_string()),
-                };
-            }
+            _ = self
+                .interpreter
+                .mint_stx_balance(recipient, account.balance)
+                .inspect_err(|e| output_err.push(e.red().to_string()));
         }
 
         match output_err.len() {
@@ -870,7 +864,7 @@ impl Session {
     }
 
     fn parse_and_set_tx_sender(&mut self, command: &str) -> String {
-        let args: Vec<_> = command.split(' ').collect();
+        let args: Vec<_> = command.split(' ').filter(|&s| !s.is_empty()).collect();
 
         if args.len() != 2 {
             return format!("{}", "Usage: ::set_tx_sender <address>".red());
@@ -1907,5 +1901,19 @@ mod tests {
             format!("(contract-call? .{} get-burn u18)", contract.name).as_str(),
         );
         assert_eq!(result, Value::UInt(21));
+    }
+
+    #[test]
+    fn test_parse_and_set_tx_sender() {
+        let settings = SessionSettings::default();
+        let mut session = Session::new(settings);
+        let sender = "ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5";
+        session.start().expect("session could not start");
+
+        let result = session.process_console_input(&format!("::set_tx_sender    {}", sender));
+        assert!(result.1[0].contains(sender));
+
+        let result = session.process_console_input(&format!("::set_tx_sender {}     ", sender));
+        assert!(result.1[0].contains(sender));
     }
 }
