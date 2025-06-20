@@ -30,7 +30,7 @@ use super::requests::definitions::{
     get_definitions, get_public_function_and_trait_definitions, DefinitionLocation,
 };
 use super::requests::document_symbols::ASTSymbols;
-use super::requests::helpers::get_atom_start_at_position;
+use super::requests::helpers::get_atom_or_field_start_at_position;
 use super::requests::hover::get_expression_documentation;
 use super::requests::signature_help::get_signatures;
 
@@ -360,7 +360,8 @@ impl EditorState {
             character: position.character + 1,
         };
 
-        let position_hash = get_atom_start_at_position(&position, contract.expressions.as_ref()?)?;
+        let position_hash =
+            get_atom_or_field_start_at_position(&position, contract.expressions.as_ref()?)?;
         eprintln!("Getting definitions at {position_hash:?}");
         let definitions = match &contract.definitions {
             Some(definitions) => definitions.to_owned(),
