@@ -348,7 +348,7 @@ pub fn get_contract_calls(analysis: &ContractAnalysis) -> Vec<CompletionItem> {
 
 pub fn build_completion_item_list(
     clarity_version: &ClarityVersion,
-    expressions: &Vec<SymbolicExpression>,
+    expressions: &[SymbolicExpression],
     position: &Position,
     active_contract_defined_data: &ContractDefinedData,
     contract_calls: Vec<CompletionItem>,
