@@ -1012,28 +1012,27 @@ pub fn main() {
                 let manifest = load_manifest_or_exit(cmd.manifest_path, true);
 
                 // Trim quotes from contract_id
-                let mut contract_id = cmd.contract_id.trim();
-                contract_id = contract_id.trim_matches('"');
-                contract_id = contract_id.trim_matches('\'');
-
-                let parts: Vec<&str> = contract_id.split('.').collect();
-                let final_contract_id = if parts.len() == 3 {
-                    format!("{}.{}", parts[0], parts[1])
-                } else {
-                    contract_id.to_string()
+                let contract_id = {
+                    let cleaned = cmd.contract_id.trim().trim_matches('"').trim_matches('\'');
+                    let parts: Vec<&str> = cleaned.split('.').collect();
+                    if parts.len() == 3 {
+                        format!("{}.{}", parts[0], parts[1])
+                    } else {
+                        cleaned.to_string()
+                    }
                 };
 
                 let change = TOMLEdition {
                     comment: format!(
                         "{} with requirement {}",
                         yellow!("Updated Clarinet.toml"),
-                        green!(format!("{}", final_contract_id))
+                        green!(format!("{}", contract_id))
                     ),
                     manifest_location: manifest.location,
                     contracts_to_rm: vec![],
                     contracts_to_add: HashMap::new(),
                     requirements_to_add: vec![RequirementConfig {
-                        contract_id: final_contract_id.to_string(),
+                        contract_id: contract_id.to_string(),
                     }],
                 };
                 if !execute_changes(vec![Changes::EditTOML(change)]) {
