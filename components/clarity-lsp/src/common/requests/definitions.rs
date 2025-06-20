@@ -76,8 +76,8 @@ impl Definitions {
         Some(())
     }
 
-    /// Replace transient principal (`S1G2081040G2081040G2081040G208105NK8PE5`)
-    fn replace_transient(
+    /// Return `QualifiedContractIdentifier` with transient principal (`S1G2081040G2081040G2081040G208105NK8PE5`) replaced
+    fn clone_and_replace_transient(
         &self,
         identifier: &QualifiedContractIdentifier,
     ) -> QualifiedContractIdentifier {
@@ -141,7 +141,8 @@ impl<'a> ASTVisitor<'a> for Definitions {
         let Some(keyword) = expr.match_list().and_then(|expr| expr.get(1)) else {
             return true;
         };
-        let contract_identifier = self.replace_transient(&trait_identifier.contract_identifier);
+        let contract_identifier =
+            self.clone_and_replace_transient(&trait_identifier.contract_identifier);
 
         eprintln!(
             "Insert use trait '{_name}' at ({}, {}), defined at {contract_identifier:?}",
@@ -162,7 +163,8 @@ impl<'a> ASTVisitor<'a> for Definitions {
         let Some(keyword) = expr.match_list().and_then(|expr| expr.get(1)) else {
             return true;
         };
-        let contract_identifier = self.replace_transient(&trait_identifier.contract_identifier);
+        let contract_identifier =
+            self.clone_and_replace_transient(&trait_identifier.contract_identifier);
 
         eprintln!(
             "Insert inpl trait '{}' at ({}, {}), defined at {contract_identifier:?}",
@@ -384,7 +386,7 @@ impl<'a> ASTVisitor<'a> for Definitions {
     ) -> bool {
         if let Some(list) = expr.match_list() {
             if let Some(SymbolicExpression { span, .. }) = list.get(2) {
-                let identifier = self.replace_transient(identifier);
+                let identifier = self.clone_and_replace_transient(identifier);
 
                 eprintln!(
                     "Insert function '{function_name}' at ({}, {}), defined at {identifier:?}",
@@ -608,10 +610,9 @@ pub fn get_definitions(
 }
 
 pub fn get_public_function_definitions(
+    definitions: &mut HashMap<ClarityName, Range>,
     expressions: &[SymbolicExpression],
-) -> HashMap<ClarityName, Range> {
-    let mut definitions = HashMap::new();
-
+) {
     for expression in expressions {
         if let Some((function_name, args)) = expression
             .match_list()
@@ -631,7 +632,39 @@ pub fn get_public_function_definitions(
             }
         }
     }
+}
 
+pub fn get_trait_definitions(
+    definitions: &mut HashMap<ClarityName, Range>,
+    expressions: &[SymbolicExpression],
+) {
+    for expression in expressions {
+        expression
+            .match_list()
+            .and_then(|list| list.split_first())
+            .and_then(|(function_name, args)| Some((function_name.match_atom()?, args)))
+            .filter(|(function_name, _)| {
+                matches!(
+                    DefineFunctions::lookup_by_name(function_name),
+                    Some(DefineFunctions::Trait)
+                )
+            })
+            .map(|(_, args)| args) // Throw away `define-trait`
+            .inspect(|args| eprintln!("Found trait definition: {args:?}"))
+            .and_then(|args| args.split_first())
+            .and_then(|(trait_name, _)| trait_name.match_atom())
+            .inspect(|&trait_name| {
+                definitions.insert(trait_name.to_owned(), span_to_range(&expression.span));
+            });
+    }
+}
+
+pub fn get_public_function_and_trait_definitions(
+    expressions: &[SymbolicExpression],
+) -> HashMap<ClarityName, Range> {
+    let mut definitions = HashMap::new();
+    get_public_function_definitions(&mut definitions, expressions);
+    get_trait_definitions(&mut definitions, expressions);
     definitions
 }
 

@@ -27,7 +27,7 @@ use super::requests::completion::{
     build_completion_item_list, get_contract_calls, ContractDefinedData,
 };
 use super::requests::definitions::{
-    get_definitions, get_public_function_definitions, DefinitionLocation,
+    get_definitions, get_public_function_and_trait_definitions, DefinitionLocation,
 };
 use super::requests::document_symbols::ASTSymbols;
 use super::requests::helpers::get_atom_start_at_position;
@@ -372,12 +372,13 @@ impl EditorState {
                 uri: contract_location.try_into().ok()?,
                 range: *range,
             }),
-            DefinitionLocation::External(contract_identifier, function_name) => {
-                eprintln!("External definition at {contract_identifier}::{function_name}");
+            DefinitionLocation::External(contract_identifier, name) => {
+                eprintln!("External definition at {contract_identifier}::{name}");
                 let metadata = self.contracts_lookup.get(contract_location)?;
                 let protocol = self.protocols.get(&metadata.manifest_location)?;
                 let definition_contract_location =
                     protocol.locations_lookup.get(contract_identifier)?;
+                let uri = definition_contract_location.try_into().ok()?;
 
                 // if the contract is opened and eventually contains unsaved changes,
                 // its public definitions are computed on the fly, which is fairly fast
@@ -386,20 +387,20 @@ impl EditorState {
                     .get(definition_contract_location)
                     .and_then(|c| c.expressions.as_ref())
                 {
-                    let public_definitions = get_public_function_definitions(expressions);
+                    let public_definitions = get_public_function_and_trait_definitions(expressions);
                     return Some(Location {
-                        uri: definition_contract_location.try_into().ok()?,
-                        range: *public_definitions.get(function_name)?,
+                        uri,
+                        range: *public_definitions.get(name)?,
                     });
                 };
 
                 Some(Location {
-                    uri: definition_contract_location.try_into().ok()?,
+                    uri,
                     range: *protocol
                         .contracts
                         .get(definition_contract_location)?
                         .definitions
-                        .get(function_name)?,
+                        .get(name)?,
                 })
             }
         }
@@ -673,7 +674,7 @@ pub async fn build_state(
                     if let Some(ast) = artifacts.asts.get(&contract_id) {
                         definitions.insert(
                             contract_id.clone(),
-                            get_public_function_definitions(&ast.expressions),
+                            get_public_function_and_trait_definitions(&ast.expressions),
                         );
                     }
                     analyses.insert(contract_id.clone(), Some(contract_result.contract.analysis));
