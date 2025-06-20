@@ -144,10 +144,6 @@ impl<'a> ASTVisitor<'a> for Definitions {
         let contract_identifier =
             self.clone_and_replace_transient(&trait_identifier.contract_identifier);
 
-        eprintln!(
-            "Insert use trait '{_name}' at ({}, {}), defined at {contract_identifier:?}",
-            keyword.span.start_line, keyword.span.start_column
-        );
         self.tokens.insert(
             (keyword.span.start_line, keyword.span.start_column),
             DefinitionLocation::External(contract_identifier, trait_identifier.name.clone()),
@@ -166,10 +162,6 @@ impl<'a> ASTVisitor<'a> for Definitions {
         let contract_identifier =
             self.clone_and_replace_transient(&trait_identifier.contract_identifier);
 
-        eprintln!(
-            "Insert inpl trait '{}' at ({}, {}), defined at {contract_identifier:?}",
-            trait_identifier.name, keyword.span.start_line, keyword.span.start_column
-        );
         self.tokens.insert(
             (keyword.span.start_line, keyword.span.start_column),
             DefinitionLocation::External(contract_identifier, trait_identifier.name.clone()),
@@ -388,10 +380,6 @@ impl<'a> ASTVisitor<'a> for Definitions {
             if let Some(SymbolicExpression { span, .. }) = list.get(2) {
                 let identifier = self.clone_and_replace_transient(identifier);
 
-                eprintln!(
-                    "Insert function '{function_name}' at ({}, {}), defined at {identifier:?}",
-                    span.start_line, span.start_column
-                );
                 self.tokens.insert(
                     (span.start_line, span.start_column),
                     DefinitionLocation::External(identifier, function_name.to_owned()),

@@ -692,7 +692,6 @@ pub trait ASTVisitor<'a> {
         name: &'a ClarityName,
         trait_def: &TraitDefinition,
     ) -> bool {
-        eprintln!("visit_trait_reference() empty");
         true
     }
 
