@@ -1032,24 +1032,25 @@ rpcport={bitcoin_node_rpc_port}
         // Copy cache data if available
         let global_cache_dir = get_global_snapshot_dir();
         let bitcoin_cache = global_cache_dir.join("bitcoin").join("regtest");
+        // XXX This shouldn't be needed
+        let exec_config = bollard::exec::CreateExecOptions {
+            cmd: Some(vec!["mkdir", "-p", "/root/.bitcoin"]),
+            attach_stdout: Some(false),
+            attach_stderr: Some(false),
+            ..Default::default()
+        };
+
+        let exec = docker
+            .create_exec(&container, exec_config)
+            .await
+            .map_err(|e| format!("Failed to create exec for mkdir: {}", e))?;
+
+        docker
+            .start_exec(&exec.id, None)
+            .await
+            .map_err(|e| format!("Failed to create bitcoin directory: {}", e))?;
         if !no_snapshot {
             // Ensure the destination directory exists in the container
-            let exec_config = bollard::exec::CreateExecOptions {
-                cmd: Some(vec!["mkdir", "-p", "/root/.bitcoin"]),
-                attach_stdout: Some(false),
-                attach_stderr: Some(false),
-                ..Default::default()
-            };
-
-            let exec = docker
-                .create_exec(&container, exec_config)
-                .await
-                .map_err(|e| format!("Failed to create exec for mkdir: {}", e))?;
-
-            docker
-                .start_exec(&exec.id, None)
-                .await
-                .map_err(|e| format!("Failed to create bitcoin directory: {}", e))?;
 
             copy_cache_to_container(
                 docker,
@@ -1062,9 +1063,9 @@ rpcport={bitcoin_node_rpc_port}
             .await?;
         }
 
-        // if bitcoin_cache.exists() {
-        //     fix_bitcoin_permissions(docker, &container, devnet_event_tx).await?;
-        // }
+        if !no_snapshot {
+            fix_bitcoin_permissions(docker, &container, devnet_event_tx).await?;
+        }
 
         Ok(())
     }
@@ -1437,6 +1438,7 @@ start_height = {epoch_3_1}
             )
             .await?;
         }
+        //     fix_stacks_permissions(docker, &container, devnet_event_tx).await?;
 
         docker
             .start_container::<String>(&container, None)
