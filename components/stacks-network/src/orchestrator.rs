@@ -418,7 +418,7 @@ impl DevnetOrchestrator {
             Status::Yellow,
             "preparing container",
         );
-        match self.prepare_bitcoin_node_container(ctx).await {
+        match self.prepare_bitcoin_node_container(ctx, no_snapshot).await {
             Ok(_) => {}
             Err(message) => {
                 let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
@@ -760,7 +760,7 @@ impl DevnetOrchestrator {
 
                     let _ = event_tx.send(DevnetEvent::debug("Restarting containers".into()));
                     let (bitcoin_node_c_id, stacks_node_c_id) = self
-                        .start_containers(boot_index)
+                        .start_containers(boot_index, no_snapshot)
                         .await
                         .map_err(|e| format!("unable to reboot: {:?}", e))?;
                     self.bitcoin_node_container_id = Some(bitcoin_node_c_id);
@@ -774,7 +774,11 @@ impl DevnetOrchestrator {
         Ok(())
     }
 
-    pub fn prepare_bitcoin_node_config(&self, boot_index: u32) -> Result<Config<String>, String> {
+    pub fn prepare_bitcoin_node_config(
+        &self,
+        boot_index: u32,
+        no_snapshot: bool,
+    ) -> Result<Config<String>, String> {
         let devnet_config = match &self.network_config {
             Some(ref network_config) => match network_config.devnet {
                 Some(ref devnet_config) => devnet_config,
@@ -874,12 +878,22 @@ rpcport={bitcoin_node_rpc_port}
             ));
         }
 
+        let mut cmd_args = vec![
+            "/usr/local/bin/bitcoind".into(),
+            "-conf=/etc/bitcoin/bitcoin.conf".into(),
+            // "-nodebuglogfile".into(),
+            "-pid=/run/bitcoind.pid".into(),
+            "-datadir=/root/.bitcoin".into(),
+        ];
+        if !no_snapshot {
+            cmd_args.push("-reindex".into());
+        }
         let uid = unsafe { libc::getuid() };
         let gid = unsafe { libc::getgid() };
         let config = Config {
             labels: Some(labels),
             image: Some(devnet_config.bitcoin_node_image_url.clone()),
-            // domainname: Some(self.network_name.to_string()),
+            domainname: Some(self.network_name.to_string()),
             tty: None,
             exposed_ports: Some(exposed_ports),
             entrypoint: Some(vec![]),
@@ -893,21 +907,18 @@ rpcport={bitcoin_node_rpc_port}
                 userns_mode: Some(format!("{}:{}", uid, gid)),
                 ..Default::default()
             }),
-            cmd: Some(vec![
-                "/usr/local/bin/bitcoind".into(),
-                "-conf=/etc/bitcoin/bitcoin.conf".into(),
-                "-nodebuglogfile".into(),
-                "-pid=/run/bitcoind.pid".into(),
-                "-reindex".into(), // TODO make this only for cached startups
-                "-datadir=/root/.bitcoin".into(),
-            ]),
+            cmd: Some(cmd_args),
             ..Default::default()
         };
 
         Ok(config)
     }
 
-    pub async fn prepare_bitcoin_node_container(&mut self, ctx: &Context) -> Result<(), String> {
+    pub async fn prepare_bitcoin_node_container(
+        &mut self,
+        ctx: &Context,
+        no_snapshot: bool,
+    ) -> Result<(), String> {
         let (docker, devnet_config) = match (&self.docker_client, &self.network_config) {
             (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
                 Some(ref devnet_config) => (docker, devnet_config),
@@ -930,7 +941,7 @@ rpcport={bitcoin_node_rpc_port}
             .await
             .map_err(|e| formatted_docker_error("unable to create bitcoind image", e))?;
 
-        let config = self.prepare_bitcoin_node_config(1)?;
+        let config = self.prepare_bitcoin_node_config(1, no_snapshot)?;
         let container_name = format!("bitcoin-node.{}", self.network_name);
         let options = CreateContainerOptions {
             name: container_name.as_str(),
@@ -1014,11 +1025,32 @@ rpcport={bitcoin_node_rpc_port}
         let Some(docker) = &self.docker_client else {
             return Err("unable to get Docker client".into());
         };
+        docker
+            .start_container::<String>(&container, None)
+            .await
+            .map_err(|e| formatted_docker_error("unable to start bitcoind container", e))?;
         // Copy cache data if available
         let global_cache_dir = get_global_snapshot_dir();
         let bitcoin_cache = global_cache_dir.join("bitcoin").join("regtest");
-
         if !no_snapshot {
+            // Ensure the destination directory exists in the container
+            let exec_config = bollard::exec::CreateExecOptions {
+                cmd: Some(vec!["mkdir", "-p", "/root/.bitcoin"]),
+                attach_stdout: Some(false),
+                attach_stderr: Some(false),
+                ..Default::default()
+            };
+
+            let exec = docker
+                .create_exec(&container, exec_config)
+                .await
+                .map_err(|e| format!("Failed to create exec for mkdir: {}", e))?;
+
+            docker
+                .start_exec(&exec.id, None)
+                .await
+                .map_err(|e| format!("Failed to create bitcoin directory: {}", e))?;
+
             copy_cache_to_container(
                 docker,
                 &container,
@@ -1030,10 +1062,6 @@ rpcport={bitcoin_node_rpc_port}
             .await?;
         }
 
-        docker
-            .start_container::<String>(&container, None)
-            .await
-            .map_err(|e| formatted_docker_error("unable to start bitcoind container", e))?;
         // if bitcoin_cache.exists() {
         //     fix_bitcoin_permissions(docker, &container, devnet_event_tx).await?;
         // }
@@ -2712,7 +2740,11 @@ events_keys = ["*"]
         Ok(())
     }
 
-    pub async fn start_containers(&self, boot_index: u32) -> Result<(String, String), String> {
+    pub async fn start_containers(
+        &self,
+        boot_index: u32,
+        no_snapshot: bool,
+    ) -> Result<(String, String), String> {
         let containers_ids = match (
             &self.stacks_api_container_id,
             &self.stacks_explorer_container_id,
@@ -2746,7 +2778,7 @@ events_keys = ["*"]
             .prune_containers(Some(PruneContainersOptions { filters }))
             .await;
 
-        let bitcoin_node_config = self.prepare_bitcoin_node_config(boot_index)?;
+        let bitcoin_node_config = self.prepare_bitcoin_node_config(boot_index, no_snapshot)?;
 
         let platform = self
             .network_config
@@ -3522,118 +3554,26 @@ pub async fn copy_cache_to_container(
         service_name
     )));
 
-    // ⚠️ First, let's verify the source files exist
-    let _ = devnet_event_tx.send(DevnetEvent::debug(
-        "=== VERIFYING SOURCE FILES ===".to_string(),
-    ));
+    // Use docker cp command which handles directory creation better
+    let copy_command = format!(
+        "docker cp {}/ {}:{}",
+        source_path.display(),
+        container_id,
+        dest_path
+    );
 
-    // Check burnchain specifically
-    let burnchain_dir = source_path.join("krypton/burnchain");
-    if burnchain_dir.exists() {
-        if let Ok(output) = std::process::Command::new("ls")
-            .args(["-la", burnchain_dir.to_str().unwrap()])
-            .output()
-        {
-            let _ = devnet_event_tx.send(DevnetEvent::debug(format!(
-                "Burnchain dir contents: {}",
-                String::from_utf8_lossy(&output.stdout)
-            )));
-        }
-
-        if let Ok(output) = std::process::Command::new("find")
-            .args([burnchain_dir.to_str().unwrap(), "-name", "*.sqlite*", "-ls"])
-            .output()
-        {
-            let _ = devnet_event_tx.send(DevnetEvent::debug(format!(
-                "Burnchain sqlite files: {}",
-                String::from_utf8_lossy(&output.stdout)
-            )));
-        }
-    } else {
-        let _ = devnet_event_tx.send(DevnetEvent::error(format!(
-            "Burnchain directory doesn't exist: {}",
-            burnchain_dir.display()
-        )));
-    }
-    // Create a tar archive of the source directory
-    let temp_dir = std::env::temp_dir().join(format!("clarinet_cache_{}", rand::random::<u32>()));
-    fs::create_dir_all(&temp_dir).map_err(|e| format!("Failed to create temp directory: {}", e))?;
-
-    let tar_path = temp_dir.join("cache.tar");
-
-    let dir_name = source_path
-        .file_name()
-        .ok_or("Source path must have a directory name")?
-        .to_string_lossy();
-    let _ = devnet_event_tx.send(DevnetEvent::debug(format!(
-        "Creating tar with root ownership for directory: {}",
-        dir_name
-    )));
-
-    // Create tar with root ownership using system command
-    let output = std::process::Command::new("tar")
-        .args([
-            "-cvf",
-            tar_path.to_str().unwrap(),
-            "--format=posix",
-            "--no-xattrs", // ⚠️ This strips macOS extended attributes
-            "--no-same-owner",
-            "--owner=root",
-            "--group=root",
-            "-C",
-            source_path.parent().unwrap().to_str().unwrap(),
-            &dir_name,
-        ])
+    let output = std::process::Command::new("sh")
+        .arg("-c")
+        .arg(&copy_command)
         .output()
-        .map_err(|e| format!("Failed to create tar: {}", e))?;
+        .map_err(|e| format!("Failed to execute docker cp: {}", e))?;
 
     if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        let stdout = String::from_utf8_lossy(&output.stdout);
         return Err(format!(
-            "tar command failed:\nstderr: {}\nstdout: {}",
-            stderr, stdout
+            "docker cp failed: {}",
+            String::from_utf8_lossy(&output.stderr)
         ));
     }
-
-    // ⚠️ Show what tar actually archived
-    let tar_output = String::from_utf8_lossy(&output.stdout);
-    let _ = devnet_event_tx.send(DevnetEvent::debug("=== TAR VERBOSE OUTPUT ===".to_string()));
-    for line in tar_output.lines().take(20) {
-        let _ = devnet_event_tx.send(DevnetEvent::debug(format!("TAR: {}", line)));
-    }
-
-    // ⚠️ Also show stderr in case there are warnings
-    let tar_stderr = String::from_utf8_lossy(&output.stderr);
-    if !tar_stderr.is_empty() {
-        let _ = devnet_event_tx.send(DevnetEvent::debug("=== TAR STDERR ===".to_string()));
-        for line in tar_stderr.lines() {
-            let _ = devnet_event_tx.send(DevnetEvent::debug(format!("TAR ERR: {}", line)));
-        }
-    }
-
-    let tar_content = fs::read(&tar_path).map_err(|e| format!("Failed to read tar file: {}", e))?;
-
-    let _ = devnet_event_tx.send(DevnetEvent::debug(format!(
-        "Uploading {} bytes to container at {}",
-        tar_content.len(),
-        dest_path
-    )));
-    // Upload to container
-    docker
-        .upload_to_container(
-            container_id,
-            Some(UploadToContainerOptions {
-                path: dest_path,
-                ..Default::default()
-            }),
-            tar_content.into(),
-        )
-        .await
-        .map_err(|e| format!("Failed to upload cache to container: {}", e))?;
-
-    // Clean up temp files
-    let _ = fs::remove_dir_all(temp_dir);
 
     let _ = devnet_event_tx.send(DevnetEvent::success(format!(
         "{} cache data copied to container successfully",

@@ -84,10 +84,10 @@ impl DevnetDiffConfig {
                 extractor: make_extractor(|config| config.epoch_3_1),
             },
             // Container configuration
-            SignificantField {
-                name: "bind_containers_volumes".to_string(),
-                extractor: make_extractor(|config| config.bind_containers_volumes),
-            },
+            // SignificantField {
+            //     name: "bind_containers_volumes".to_string(),
+            //     extractor: make_extractor(|config| config.bind_containers_volumes),
+            // },
             // Image URLs
             SignificantField {
                 name: "bitcoin_node_image_url".to_string(),
