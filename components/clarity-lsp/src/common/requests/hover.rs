@@ -5,7 +5,7 @@ use super::{api_ref::API_REF, helpers::get_expression_name_at_position};
 
 pub fn get_expression_documentation(
     position: &Position,
-    expressions: &Vec<SymbolicExpression>,
+    expressions: &[SymbolicExpression],
 ) -> Option<String> {
     let expression_name = get_expression_name_at_position(position, expressions)?;
 
