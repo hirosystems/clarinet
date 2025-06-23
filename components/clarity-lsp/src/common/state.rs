@@ -360,11 +360,11 @@ impl EditorState {
             character: position.character + 1,
         };
 
-        let position_hash =
-            get_atom_or_field_start_at_position(&position, contract.expressions.as_ref()?)?;
+        let expressions = contract.expressions.as_ref()?;
+        let position_hash = get_atom_or_field_start_at_position(&position, expressions)?;
         let definitions = match &contract.definitions {
             Some(definitions) => definitions.to_owned(),
-            None => get_definitions(contract.expressions.as_ref()?, contract.issuer.clone()),
+            None => get_definitions(expressions, contract.issuer.clone()),
         };
 
         match definitions.get(&position_hash)? {
