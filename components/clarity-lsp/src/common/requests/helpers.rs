@@ -1,6 +1,8 @@
 use std::cmp::Ordering;
 
-use clarity_repl::clarity::{representations::Span, ClarityName, SymbolicExpression};
+use clarity_repl::clarity::{
+    representations::Span, ClarityName, SymbolicExpression, SymbolicExpressionType,
+};
 use lsp_types::{Position, Range};
 
 pub fn span_to_range(span: &Span) -> Range {
@@ -37,10 +39,14 @@ pub fn get_expression_name_at_position(
 ) -> Option<ClarityName> {
     for expr in expressions {
         if is_position_within_span(position, &expr.span, 0) {
-            if let Some(function_name) = expr.match_atom() {
-                return Some(function_name.to_owned());
-            } else if let Some(expressions) = expr.match_list() {
-                return get_expression_name_at_position(position, expressions);
+            match &expr.expr {
+                SymbolicExpressionType::Atom(function_name) => {
+                    return Some(function_name.to_owned())
+                }
+                SymbolicExpressionType::List(expressions) => {
+                    return get_expression_name_at_position(position, expressions)
+                }
+                _ => {}
             }
         }
     }
@@ -80,16 +86,20 @@ pub fn get_function_at_position(
     ))
 }
 
-pub fn get_atom_start_at_position(
+pub fn get_atom_or_field_start_at_position(
     position: &Position,
     expressions: &[SymbolicExpression],
 ) -> Option<(u32, u32)> {
     for expr in expressions {
         if is_position_within_span(position, &expr.span, 1) {
-            if let Some(_function_name) = expr.match_atom() {
-                return Some((expr.span.start_line, expr.span.start_column));
-            } else if let Some(expressions) = expr.match_list() {
-                return get_atom_start_at_position(position, expressions);
+            match &expr.expr {
+                SymbolicExpressionType::Atom(_) | SymbolicExpressionType::Field(_) => {
+                    return Some((expr.span.start_line, expr.span.start_column))
+                }
+                SymbolicExpressionType::List(expressions) => {
+                    return get_atom_or_field_start_at_position(position, expressions)
+                }
+                _ => {}
             }
         }
     }

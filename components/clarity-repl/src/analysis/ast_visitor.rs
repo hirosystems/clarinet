@@ -2552,12 +2552,7 @@ pub trait ASTVisitor<'a> {
 }
 
 pub fn traverse<'a>(visitor: &mut impl ASTVisitor<'a>, exprs: &'a [SymbolicExpression]) -> bool {
-    for expr in exprs {
-        if !visitor.traverse_expr(expr) {
-            return false;
-        }
-    }
-    true
+    exprs.iter().all(|expr| visitor.traverse_expr(expr))
 }
 
 fn match_tuple(
