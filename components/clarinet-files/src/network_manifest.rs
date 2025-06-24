@@ -228,6 +228,22 @@ pub struct NetworkManifest {
     pub devnet: Option<DevnetConfig>,
 }
 
+impl Default for NetworkManifest {
+    fn default() -> Self {
+        Self {
+            network: NetworkConfig {
+                name: "Default".to_string(),
+                stacks_node_rpc_address: None,
+                bitcoin_node_rpc_address: None,
+                deployment_fee_rate: 1,
+                sats_per_bytes: 1,
+            },
+            accounts: BTreeMap::new(),
+            devnet: Some(DevnetConfig::default()), // this is not really optional
+        }
+    }
+}
+
 pub mod accounts_serde {
     use std::collections::BTreeMap;
 
@@ -365,6 +381,115 @@ pub struct DevnetConfig {
     pub epoch_3_1: u64,
     pub use_docker_gateway_routing: bool,
     pub docker_platform: String,
+}
+
+// Note: Ideally this should be used to merge with file reading code so that we don't have to unwrap_or the defaults everywhere
+impl Default for DevnetConfig {
+    fn default() -> Self {
+        let (miner_stx_address, miner_btc_address, miner_secret_key_hex) =
+            compute_default_addresses(DEFAULT_STACKS_MINER_MNEMONIC, DEFAULT_DERIVATION_PATH);
+
+        let (faucet_stx_address, faucet_btc_address, faucet_secret_key_hex) =
+            compute_default_addresses(DEFAULT_FAUCET_MNEMONIC, DEFAULT_DERIVATION_PATH);
+
+        let (subnet_stx_address, subnet_btc_address, subnet_secret_key_hex) =
+            compute_default_addresses(DEFAULT_SUBNET_MNEMONIC, DEFAULT_DERIVATION_PATH);
+
+        DevnetConfig {
+            name: "default.devnet".to_string(),
+            network_id: None,
+            orchestrator_ingestion_port: 20445,
+            orchestrator_control_port: 20446,
+            bitcoin_node_p2p_port: 18444,
+            bitcoin_node_rpc_port: 18443,
+            bitcoin_node_username: "devnet".to_string(),
+            bitcoin_node_password: "devnet".to_string(),
+            stacks_node_p2p_port: 18445,
+            stacks_node_rpc_port: 18445,
+            stacks_node_wait_time_for_microblocks: 50,
+            stacks_node_first_attempt_time_ms: 500,
+            disable_postgres: false,
+            epoch_3_1: DEFAULT_EPOCH_3_1,
+            pre_nakamoto_mock_signing: false,
+            stacker_derivation_path: DEFAULT_DERIVATION_PATH.to_string(),
+            stacker_mnemonic: DEFAULT_STACKER_MNEMONIC.to_string(),
+            stacks_signers_env_vars: vec![],
+            stacks_signers_keys: vec![],
+            stacks_node_events_observers: vec![],
+            stacks_node_env_vars: vec![],
+            stacks_api_port: 3999,
+            stacks_api_events_port: 3700,
+            stacks_api_env_vars: vec![],
+            stacks_explorer_port: 8000,
+            stacks_explorer_env_vars: vec![],
+            bitcoin_explorer_port: 8001,
+            bitcoin_controller_block_time: 60_000,
+            bitcoin_controller_automining_disabled: false,
+            miner_stx_address: miner_stx_address.clone(),
+            miner_secret_key_hex,
+            miner_btc_address,
+            miner_mnemonic: DEFAULT_STACKS_MINER_MNEMONIC.to_string(),
+            miner_derivation_path: DEFAULT_DERIVATION_PATH.to_string(),
+            miner_coinbase_recipient: miner_stx_address.clone(),
+            miner_wallet_name: "default".to_string(),
+            faucet_stx_address,
+            faucet_secret_key_hex,
+            faucet_btc_address: faucet_btc_address.clone(),
+            faucet_mnemonic: DEFAULT_FAUCET_MNEMONIC.to_string(),
+            faucet_derivation_path: DEFAULT_DERIVATION_PATH.to_string(),
+            working_dir: "./.cache".to_string(),
+            postgres_port: 5432,
+            postgres_username: "postgres".to_string(),
+            postgres_password: "postgres".to_string(),
+            stacks_api_postgres_database: "stacks_api".to_string(),
+            subnet_api_postgres_database: "subnet_api".to_string(),
+            pox_stacking_orders: vec![],
+            execute_script: vec![],
+            bitcoin_node_image_url: DEFAULT_BITCOIN_NODE_IMAGE.to_string(),
+            stacks_node_image_url: DEFAULT_STACKS_NODE_IMAGE.to_string(),
+            stacks_signer_image_url: DEFAULT_STACKS_SIGNER_IMAGE.to_string(),
+            stacks_api_image_url: DEFAULT_STACKS_API_IMAGE.to_string(),
+            stacks_explorer_image_url: DEFAULT_STACKS_EXPLORER_IMAGE.to_string(),
+            postgres_image_url: DEFAULT_POSTGRES_IMAGE.to_string(),
+            bitcoin_explorer_image_url: DEFAULT_BITCOIN_EXPLORER_IMAGE.to_string(),
+            disable_bitcoin_explorer: true,
+            disable_stacks_explorer: true,
+            disable_stacks_api: false,
+            bind_containers_volumes: true,
+            enable_subnet_node: true,
+            stacks_node_next_initiative_delay: 4000,
+            subnet_node_image_url: DEFAULT_SUBNET_NODE_IMAGE.to_string(),
+            subnet_leader_stx_address: subnet_stx_address,
+            subnet_leader_secret_key_hex: subnet_secret_key_hex,
+            subnet_leader_btc_address: subnet_btc_address,
+            subnet_leader_mnemonic: DEFAULT_SUBNET_MNEMONIC.to_string(),
+            subnet_leader_derivation_path: DEFAULT_DERIVATION_PATH.to_string(),
+            subnet_node_p2p_port: 30444,
+            subnet_node_rpc_port: 30443,
+            subnet_events_ingestion_port: 30445,
+            subnet_node_events_observers: vec![],
+            subnet_contract_id: "".to_string(),
+            remapped_subnet_contract_id: "".to_string(),
+            subnet_node_env_vars: vec![],
+            subnet_api_image_url: DEFAULT_SUBNET_API_IMAGE.to_string(),
+            subnet_api_port: 13999,
+            subnet_api_events_port: 13700,
+            subnet_api_env_vars: vec![],
+            disable_subnet_api: true,
+            docker_host: DEFAULT_DOCKER_SOCKET.to_string(),
+            components_host: "127.0.0.1".into(),
+            epoch_2_0: DEFAULT_EPOCH_2_0,
+            epoch_2_05: DEFAULT_EPOCH_2_05,
+            epoch_2_1: DEFAULT_EPOCH_2_1,
+            epoch_2_2: DEFAULT_EPOCH_2_2,
+            epoch_2_3: DEFAULT_EPOCH_2_3,
+            epoch_2_4: DEFAULT_EPOCH_2_4,
+            epoch_2_5: DEFAULT_EPOCH_2_5,
+            epoch_3_0: DEFAULT_EPOCH_3_0,
+            use_docker_gateway_routing: true,
+            docker_platform: "linux/amd64".to_string(),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -1115,6 +1240,17 @@ impl NetworkManifest {
 
         Ok(config)
     }
+}
+
+fn compute_default_addresses(
+    default_mnemonic: &str,
+    default_derivation_path: &str,
+) -> (String, String, String) {
+    compute_addresses(
+        default_mnemonic,
+        default_derivation_path,
+        &(BitcoinNetwork::Regtest, StacksNetwork::Devnet),
+    )
 }
 
 pub fn compute_addresses(

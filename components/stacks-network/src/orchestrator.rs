@@ -133,7 +133,7 @@ impl DevnetOrchestrator {
                     .map_err(|e| format!("unable to connect to docker: {:?}", e))?;
                     Some(client)
                 }
-                None => unreachable!(),
+                None => None,
             },
             false => None,
         };
