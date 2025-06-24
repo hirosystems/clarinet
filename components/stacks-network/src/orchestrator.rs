@@ -1,6 +1,6 @@
 use bollard::container::{
     Config, CreateContainerOptions, KillContainerOptions, ListContainersOptions,
-    PruneContainersOptions, UploadToContainerOptions, WaitContainerOptions,
+    PruneContainersOptions, WaitContainerOptions,
 };
 use bollard::errors::Error as DockerError;
 use bollard::exec::CreateExecOptions;
@@ -17,14 +17,12 @@ use clarity::types::chainstate::StacksPrivateKey;
 use clarity::types::PrivateKey;
 use futures::stream::TryStreamExt;
 use hiro_system_kit::{slog, slog_term, Drain};
-#[cfg(target_os = "linux")]
-use libc;
 use reqwest::RequestBuilder;
 use serde_json::Value as JsonValue;
 use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::Write;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::mpsc::{Receiver, Sender};
 use std::time::Duration;
 
@@ -881,15 +879,13 @@ rpcport={bitcoin_node_rpc_port}
         let mut cmd_args = vec![
             "/usr/local/bin/bitcoind".into(),
             "-conf=/etc/bitcoin/bitcoin.conf".into(),
-            // "-nodebuglogfile".into(),
+            "-nodebuglogfile".into(),
             "-pid=/run/bitcoind.pid".into(),
             "-datadir=/root/.bitcoin".into(),
         ];
         if !no_snapshot {
             cmd_args.push("-reindex".into());
         }
-        let uid = unsafe { libc::getuid() };
-        let gid = unsafe { libc::getgid() };
         let config = Config {
             labels: Some(labels),
             image: Some(devnet_config.bitcoin_node_image_url.clone()),
@@ -904,7 +900,6 @@ rpcport={bitcoin_node_rpc_port}
                 network_mode: Some(self.network_name.clone()),
                 port_bindings: Some(port_bindings),
                 extra_hosts: Some(vec!["host.docker.internal:host-gateway".into()]),
-                userns_mode: Some(format!("{}:{}", uid, gid)),
                 ..Default::default()
             }),
             cmd: Some(cmd_args),
@@ -1029,9 +1024,9 @@ rpcport={bitcoin_node_rpc_port}
             .start_container::<String>(&container, None)
             .await
             .map_err(|e| formatted_docker_error("unable to start bitcoind container", e))?;
-        // Copy cache data if available
-        let global_cache_dir = get_global_snapshot_dir();
-        let bitcoin_cache = global_cache_dir.join("bitcoin").join("regtest");
+        // Copy snapshot if available
+        let global_snapshot_dir = get_global_snapshot_dir();
+        let bitcoin_snapshot = global_snapshot_dir.join("bitcoin").join("regtest");
         // XXX This shouldn't be needed
         let exec_config = bollard::exec::CreateExecOptions {
             cmd: Some(vec!["mkdir", "-p", "/root/.bitcoin"]),
@@ -1052,10 +1047,9 @@ rpcport={bitcoin_node_rpc_port}
         if !no_snapshot {
             // Ensure the destination directory exists in the container
 
-            copy_cache_to_container(
-                docker,
+            copy_snapshot_to_container(
                 &container,
-                &bitcoin_cache,
+                &bitcoin_snapshot,
                 "/root/.bitcoin/",
                 devnet_event_tx,
                 "Bitcoin",
@@ -1063,9 +1057,9 @@ rpcport={bitcoin_node_rpc_port}
             .await?;
         }
 
-        if !no_snapshot {
-            fix_bitcoin_permissions(docker, &container, devnet_event_tx).await?;
-        }
+        // if !no_snapshot {
+        //     fix_bitcoin_permissions(docker, &container, devnet_event_tx).await?;
+        // }
 
         Ok(())
     }
@@ -1424,30 +1418,24 @@ start_height = {epoch_3_1}
         let Some(docker) = &self.docker_client else {
             return Err("unable to get Docker client".into());
         };
-        let global_cache_dir = get_global_snapshot_dir();
-        let stacks_cache = global_cache_dir.join("stacks").join("krypton");
+        let global_snapshot_dir = get_global_snapshot_dir();
+        let stacks_snapshot = global_snapshot_dir.join("stacks").join("krypton");
 
         if !no_snapshot {
-            copy_cache_to_container(
-                docker,
+            copy_snapshot_to_container(
                 &container,
-                &stacks_cache,
+                &stacks_snapshot,
                 "/devnet",
                 devnet_event_tx,
                 "Stacks",
             )
             .await?;
         }
-        //     fix_stacks_permissions(docker, &container, devnet_event_tx).await?;
 
         docker
             .start_container::<String>(&container, None)
             .await
             .map_err(|e| formatted_docker_error("unable to start stacks-node container", e))?;
-
-        // if stacks_cache.exists() {
-        //     fix_stacks_permissions(docker, &container, devnet_event_tx).await?;
-        // }
 
         Ok(())
     }
@@ -3545,20 +3533,19 @@ pub fn copy_directory(
     Ok(())
 }
 
-pub async fn copy_cache_to_container(
-    docker: &Docker,
+pub async fn copy_snapshot_to_container(
     container_id: &str,
-    source_path: &PathBuf,
+    source_path: &Path,
     dest_path: &str,
     devnet_event_tx: &Sender<DevnetEvent>,
     service_name: &str,
 ) -> Result<(), String> {
     if !source_path.exists() {
-        return Ok(()); // No cache to copy
+        return Ok(()); // No snapshot to copy
     }
 
     let _ = devnet_event_tx.send(DevnetEvent::info(format!(
-        "Copying {} cache data to container...",
+        "Copying {} snapshot to container...",
         service_name
     )));
 
@@ -3584,139 +3571,9 @@ pub async fn copy_cache_to_container(
     }
 
     let _ = devnet_event_tx.send(DevnetEvent::success(format!(
-        "{} cache data copied to container successfully",
+        "{} snapshot copied to container successfully",
         service_name
     )));
-
-    Ok(())
-}
-
-// Fix permissions for Bitcoin node after copying cache
-pub async fn fix_bitcoin_permissions(
-    docker: &Docker,
-    container_id: &str,
-    devnet_event_tx: &Sender<DevnetEvent>,
-) -> Result<(), String> {
-    let _ = devnet_event_tx.send(DevnetEvent::info(
-        "Fixing Bitcoin node file permissions...".to_string(),
-    ));
-
-    // Change ownership to root:root and set proper permissions
-    let commands = vec![
-        // Change ownership of the entire bitcoin directory
-        vec!["chown", "-R", "root:root", "/root/.bitcoin"],
-        // Set directory permissions
-        vec![
-            "find",
-            "/root/.bitcoin",
-            "-type",
-            "d",
-            "-exec",
-            "chmod",
-            "755",
-            "{}",
-            "+",
-        ],
-        // Set file permissions
-        vec![
-            "find",
-            "/root/.bitcoin",
-            "-type",
-            "f",
-            "-exec",
-            "chmod",
-            "644",
-            "{}",
-            "+",
-        ],
-        // Make sure wallet files are properly permissioned
-        vec!["chmod", "-f", "600", "/root/.bitcoin/wallets/*/wallet.dat"],
-    ];
-
-    for cmd in commands {
-        let exec_config = bollard::exec::CreateExecOptions {
-            cmd: Some(cmd),
-            attach_stdout: Some(false),
-            attach_stderr: Some(false),
-            ..Default::default()
-        };
-
-        let exec = docker
-            .create_exec(container_id, exec_config)
-            .await
-            .map_err(|e| format!("Failed to create exec for permission fix: {}", e))?;
-
-        let _ = docker
-            .start_exec(&exec.id, None)
-            .await
-            .map_err(|e| format!("Failed to fix permissions: {}", e))?;
-    }
-
-    let _ = devnet_event_tx.send(DevnetEvent::success(
-        "Bitcoin node permissions fixed".to_string(),
-    ));
-
-    Ok(())
-}
-
-// Fix permissions for Stacks node after copying cache
-pub async fn fix_stacks_permissions(
-    docker: &Docker,
-    container_id: &str,
-    devnet_event_tx: &Sender<DevnetEvent>,
-) -> Result<(), String> {
-    let _ = devnet_event_tx.send(DevnetEvent::info(
-        "Fixing Stacks node file permissions...".to_string(),
-    ));
-
-    // Commands to fix permissions and rename directory
-    let commands = vec![
-        // Change ownership to root:root
-        vec!["chown", "-R", "root:root", "/devnet"],
-        // Set directory permissions
-        vec![
-            "find", "/devnet", "-type", "d", "-exec", "chmod", "777", "{}", "+",
-        ],
-        // Set file permissions
-        vec![
-            "find", "/devnet", "-type", "f", "-exec", "chmod", "666", "{}", "+",
-        ],
-        vec![
-            "find", "/devnet", "-name", "*.sqlite", "-type", "f", "-exec", "chmod", "666", "{}",
-            "+",
-        ],
-        // Make sure database files are properly permissioned
-        vec![
-            "chmod",
-            "-f",
-            "666",
-            "/devnet/krypton/chainstate/*/marf",
-            "/devnet/krypton/chainstate/*/vm_state.db",
-        ],
-    ];
-
-    for cmd in commands {
-        let exec_config = bollard::exec::CreateExecOptions {
-            cmd: Some(cmd),
-            attach_stdout: Some(false),
-            attach_stderr: Some(false),
-            ..Default::default()
-        };
-
-        let exec = docker
-            .create_exec(container_id, exec_config)
-            .await
-            .map_err(|e| format!("Failed to create exec for permission fix: {}", e))?;
-
-        let _ = docker
-            .start_exec(&exec.id, None)
-            .await
-            .map_err(|e| format!("Failed to fix permissions: {}", e))?;
-    }
-
-    let _ = devnet_event_tx.send(DevnetEvent::success(
-        "Stacks node permissions fixed".to_string(),
-    ));
 
     Ok(())
 }

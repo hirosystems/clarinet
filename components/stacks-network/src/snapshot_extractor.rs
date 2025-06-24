@@ -5,7 +5,7 @@ use std::path::Path;
 use std::sync::mpsc::Sender;
 use tar::Archive;
 
-/// Extract embedded devnet cache to the specified directory
+/// Extract embedded devnet snapshot to the specified directory
 pub fn extract_embedded_snapshot(
     snapshot_dir: &Path,
     devnet_event_tx: &Sender<DevnetEvent>,

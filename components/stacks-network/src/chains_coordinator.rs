@@ -810,12 +810,12 @@ pub async fn create_global_snapshot(
             match std::fs::File::create(&global_marker) {
                 Ok(_) => {
                     let _ = devnet_event_tx.send(DevnetEvent::success(
-                        "Global template cache data prepared. Future project initializations will be faster.".to_string()
+                        "Global template snapshot data prepared. Future project initializations will be faster.".to_string()
                     ));
                 }
                 Err(e) => {
                     let _ = devnet_event_tx.send(DevnetEvent::warning(format!(
-                        "Failed to create global cache marker file: {}",
+                        "Failed to create global snapshot marker file: {}",
                         e
                     )));
                 }
