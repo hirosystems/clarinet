@@ -3099,40 +3099,8 @@ events_keys = ["*"]
             }
         } else {
             let _ = devnet_event_tx.send(DevnetEvent::info(
-                "Using cached blockchain data - mining one block".to_string(),
+                "Using snapshot - skipping initial address seeding".to_string(),
             ));
-
-            loop {
-                let rpc_call = base_builder(
-                    &bitcoin_node_url,
-                    &devnet_config.bitcoin_node_username,
-                    &devnet_config.bitcoin_node_password,
-                )
-                .json(&json!({
-                "jsonrpc": "1.0",
-                "id": "stacks-network",
-                "method": "generatetoaddress",
-                "params": [json!(1), json!(miner_address)]
-                }))
-                .send()
-                .await
-                .map_err(|e| format!("unable to send 'generatetoaddress' request ({})", e));
-
-                match rpc_call {
-                    Ok(_r) => break,
-                    Err(e) => {
-                        error_count += 1;
-                        if error_count > max_errors {
-                            return Err(e);
-                        } else if error_count > 1 {
-                            let _ = devnet_event_tx.send(DevnetEvent::error(e));
-                        }
-                    }
-                }
-                std::thread::sleep(std::time::Duration::from_secs(1));
-                let _ =
-                    devnet_event_tx.send(DevnetEvent::info("Waiting for bitcoin-node".to_string()));
-            }
         }
 
         let mut error_count = 0;
@@ -3453,6 +3421,44 @@ events_keys = ["*"]
                     Ok(_r) => {
                         break;
                     }
+                    Err(e) => {
+                        error_count += 1;
+                        if error_count > max_errors {
+                            return Err(e);
+                        } else if error_count > 1 {
+                            let _ = devnet_event_tx.send(DevnetEvent::error(e));
+                        }
+                    }
+                }
+                std::thread::sleep(std::time::Duration::from_secs(1));
+                let _ =
+                    devnet_event_tx.send(DevnetEvent::info("Waiting for bitcoin-node".to_string()));
+            }
+        }
+
+        if !no_snapshot {
+            let _ = devnet_event_tx.send(DevnetEvent::info(
+                "Using cached blockchain data - mining one block".to_string(),
+            ));
+
+            loop {
+                let rpc_call = base_builder(
+                    &bitcoin_node_url,
+                    &devnet_config.bitcoin_node_username,
+                    &devnet_config.bitcoin_node_password,
+                )
+                .json(&json!({
+                "jsonrpc": "1.0",
+                "id": "stacks-network",
+                "method": "generatetoaddress",
+                "params": [json!(1), json!(miner_address)]
+                }))
+                .send()
+                .await
+                .map_err(|e| format!("unable to send 'generatetoaddress' request ({})", e));
+
+                match rpc_call {
+                    Ok(_r) => break,
                     Err(e) => {
                         error_count += 1;
                         if error_count > max_errors {
