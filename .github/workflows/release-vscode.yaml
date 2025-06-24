@@ -3,6 +3,10 @@
 
 name: Publish VSCode Extension
 on:
+  # remove before merging
+  pull_request:
+    branches:
+      - main
   repository_dispatch:
     types:
       - released
@@ -42,5 +46,5 @@ jobs:
         continue-on-error: true
         run: npx vsce publish --packagePath clarity-lsp.vsix --pat ${{ secrets.VSCE_TOKEN }}
 
-      - name: Publish to Open VSX
-        run: npx ovsx publish --packagePath clarity-lsp.vsix --pat ${{ secrets.OVSX_TOKEN }}
+      # - name: Publish to Open VSX
+      #   run: npx ovsx publish --packagePath clarity-lsp.vsix --pat ${{ secrets.OVSX_TOKEN }}
