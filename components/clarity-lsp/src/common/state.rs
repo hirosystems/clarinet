@@ -362,10 +362,11 @@ impl EditorState {
 
         let expressions = contract.expressions.as_ref()?;
         let position_hash = get_atom_or_field_start_at_position(&position, expressions)?;
-        let definitions = match &contract.definitions {
-            Some(definitions) => definitions.to_owned(),
-            None => get_definitions(expressions, contract.issuer.clone()),
-        };
+        // Use holder variable to make sure temporary definitions live long enough
+        let mut definitions_holder = None;
+        let definitions = contract.definitions.as_ref().unwrap_or_else(|| {
+            definitions_holder.insert(get_definitions(expressions, contract.issuer.clone()))
+        });
 
         match definitions.get(&position_hash)? {
             DefinitionLocation::Internal(range) => Some(Location {
