@@ -2,7 +2,7 @@
 macro_rules! green {
     ($($arg:tt)*) => ({
         use colored::Colorize;
-        format!("{}", format!("{}", $($arg)*).green().bold())
+        format!($($arg)*).green().bold().to_string()
     })
 }
 
@@ -10,7 +10,7 @@ macro_rules! green {
 macro_rules! red {
     ($($arg:tt)*) => ({
         use colored::Colorize;
-        format!("{}", format!("{}", $($arg)*).red().bold())
+        format!($($arg)*).red().bold().to_string()
     })
 }
 
@@ -18,7 +18,7 @@ macro_rules! red {
 macro_rules! yellow {
     ($($arg:tt)*) => ({
         use colored::Colorize;
-        format!("{}", format!("{}", $($arg)*).yellow().bold())
+        format!($($arg)*).yellow().bold().to_string()
     })
 }
 
@@ -26,7 +26,7 @@ macro_rules! yellow {
 macro_rules! blue {
     ($($arg:tt)*) => ({
         use colored::Colorize;
-        format!("{}", format!("{}", $($arg)*).blue().bold())
+        format!($($arg)*).blue().bold().to_string()
     })
 }
 
@@ -34,7 +34,7 @@ macro_rules! blue {
 macro_rules! purple {
     ($($arg:tt)*) => ({
         use colored::Colorize;
-        format!("{}", format!("{}", $($arg)*).purple().bold())
+        format!($($arg)*).purple().bold().to_string()
     })
 }
 
@@ -42,7 +42,7 @@ macro_rules! purple {
 macro_rules! black {
     ($($arg:tt)*) => ({
         use colored::Colorize;
-        format!("{}", format!("{}", $($arg)*).black().bold())
+        format!($($arg)*).black().bold().to_string()
     })
 }
 
