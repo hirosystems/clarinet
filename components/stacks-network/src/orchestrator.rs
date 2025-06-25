@@ -3424,6 +3424,59 @@ events_keys = ["*"]
             }
         }
 
+        // before generating a block, hit the getblockchaininfo and check that
+        // verificationprogress == 1 before you generate the first block.
+        let mut error_count = 0;
+        loop {
+            let rpc_result: JsonValue = base_builder(
+                &bitcoin_node_url,
+                &devnet_config.bitcoin_node_username,
+                &devnet_config.bitcoin_node_password,
+            )
+            .json(&json!({
+                "jsonrpc": "1.0",
+                "id": "stacks-network",
+                "method": "getblockchaininfo",
+                "params": []
+            }))
+            .send()
+            .await
+            .map_err(|e| format!("unable to send 'getblockchaininfo' request ({})", e))?
+            .json()
+            .await
+            .map_err(|e| format!("unable to parse 'getblockchaininfo' result: {}", e))?;
+
+            let verification_progress = rpc_result
+                .as_object()
+                .ok_or("unable to parse 'getblockchaininfo'".to_string())?
+                .get("result")
+                .ok_or("unable to parse 'getblockchaininfo'".to_string())?
+                .as_object()
+                .ok_or("unable to parse 'getblockchaininfo'".to_string())?
+                .get("verificationprogress")
+                .ok_or("unable to parse 'getblockchaininfo'".to_string())?
+                .as_f64()
+                .ok_or("unable to parse verificationprogress".to_string())?;
+
+            if verification_progress >= 1.0 {
+                let _ = devnet_event_tx.send(DevnetEvent::info(
+                    "Blockchain verification completed".to_string(),
+                ));
+                break;
+            }
+
+            error_count += 1;
+            if error_count > max_errors {
+                return Err("Blockchain verification timeout".to_string());
+            }
+
+            std::thread::sleep(std::time::Duration::from_millis(500));
+            let _ = devnet_event_tx.send(DevnetEvent::info(format!(
+                "Verification progress: {:.2}%",
+                verification_progress * 100.0
+            )));
+        }
+
         if !no_snapshot {
             let _ = devnet_event_tx.send(DevnetEvent::info(
                 "Using cached blockchain data - mining one block".to_string(),
