@@ -684,7 +684,6 @@ pub async fn build_state(
                 if let Some(entry) = artifacts.diags.get_mut(&contract_id) {
                     entry.append(diags);
                 }
-                continue;
             }
         };
     }

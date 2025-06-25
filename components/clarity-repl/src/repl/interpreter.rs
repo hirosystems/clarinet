@@ -136,12 +136,12 @@ impl ClarityInterpreter {
             return Err(diagnostics.to_vec());
         }
 
-        let mut result = match self.execute(contract, &ast, analysis, cost_track, eval_hooks) {
+        let mut result = match self.execute(contract, &ast, &analysis, cost_track, eval_hooks) {
             Ok(result) => result,
             Err(e) => {
                 diagnostics.push(Diagnostic {
                     level: Level::Error,
-                    message: format!("Runtime Error: {}", e),
+                    message: format!("Runtime Error: {e}"),
                     spans: vec![],
                     suggestion: None,
                 });
@@ -203,7 +203,7 @@ impl ClarityInterpreter {
         let mut result = match self.execute_wasm(
             contract,
             &ast,
-            analysis,
+            &analysis,
             &mut module,
             cost_track,
             eval_hooks,
@@ -431,7 +431,7 @@ impl ClarityInterpreter {
         &mut self,
         contract: &ClarityContract,
         contract_ast: &ContractAST,
-        analysis: ContractAnalysis,
+        analysis: &ContractAnalysis,
         cost_track: bool,
         eval_hooks: Option<Vec<&mut dyn EvalHook>>,
     ) -> Result<ExecutionResult, String> {
@@ -625,7 +625,7 @@ impl ClarityInterpreter {
         if contract_saved {
             let mut analysis_db = AnalysisDatabase::new(&mut self.clarity_datastore);
             analysis_db
-                .execute(|db| db.insert_contract(&contract_id, &analysis))
+                .execute(|db| db.insert_contract(&contract_id, analysis))
                 .expect("Unable to save data");
         }
 
@@ -637,7 +637,7 @@ impl ClarityInterpreter {
         &mut self,
         contract: &ClarityContract,
         contract_ast: &ContractAST,
-        analysis: ContractAnalysis,
+        analysis: &ContractAnalysis,
         wasm_module: &mut clar2wasm::Module,
         cost_track: bool,
         eval_hooks: Option<Vec<&mut dyn EvalHook>>,
@@ -727,7 +727,7 @@ impl ClarityInterpreter {
 
                 let start = std::time::Instant::now();
                 contract_context.set_wasm_module(wasm_module.emit_wasm());
-                let result = initialize_contract(g, &mut contract_context, None, &analysis)
+                let result = initialize_contract(g, &mut contract_context, None, analysis)
                     .map(|v| v.unwrap_or(Value::none()));
                 if show_timings {
                     println!("execution time (wasm): {:?}μs", start.elapsed().as_micros());
@@ -738,7 +738,7 @@ impl ClarityInterpreter {
 
             // deploy a contract
             contract_context.set_wasm_module(wasm_module.emit_wasm());
-            initialize_contract(g, &mut contract_context, None, &analysis)
+            initialize_contract(g, &mut contract_context, None, analysis)
         });
 
         let value = result.map_err(|e| {
@@ -1051,7 +1051,7 @@ impl ClarityInterpreter {
 
     pub fn mint_stx_balance(
         &mut self,
-        recipient: PrincipalData,
+        recipient: &PrincipalData,
         amount: u64,
     ) -> Result<String, String> {
         let final_balance = {
@@ -1060,7 +1060,7 @@ impl ClarityInterpreter {
             global_context.begin();
             let mut cur_balance = global_context
                 .database
-                .get_stx_balance_snapshot(&recipient)
+                .get_stx_balance_snapshot(recipient)
                 .expect("failed to get balance snapshot");
             cur_balance
                 .credit(amount as u128)
@@ -1077,7 +1077,7 @@ impl ClarityInterpreter {
             final_balance
         };
         self.credit_token(recipient.to_string(), "STX".to_string(), amount.into());
-        Ok(format!("→ {}: {} µSTX", recipient, final_balance))
+        Ok(format!("→ {recipient}: {final_balance} µSTX"))
     }
 
     pub fn set_tx_sender(&mut self, tx_sender: StandardPrincipalData) {
@@ -1225,7 +1225,7 @@ mod tests {
             .run_analysis(contract, &ast, &annotations)
             .unwrap();
 
-        let result = interpreter.execute(contract, &ast, analysis, false, None);
+        let result = interpreter.execute(contract, &ast, &analysis, false, None);
         assert!(result.is_ok());
         result
     }
@@ -1420,7 +1420,7 @@ mod tests {
         let recipient = PrincipalData::Standard(StandardPrincipalData::transient());
         let amount = 1000;
 
-        let result = interpreter.mint_stx_balance(recipient.clone(), amount);
+        let result = interpreter.mint_stx_balance(&recipient.clone(), amount);
         assert!(result.is_ok());
 
         let balance = interpreter.get_balance_for_account(&recipient.to_string(), "STX");
@@ -1515,7 +1515,7 @@ mod tests {
             .run_analysis(&contract, &ast, &annotations)
             .unwrap();
 
-        let result = interpreter.execute(&contract, &ast, analysis, false, None);
+        let result = interpreter.execute(&contract, &ast, &analysis, false, None);
         assert!(result.is_ok());
         let ExecutionResult {
             diagnostics,
@@ -1591,7 +1591,7 @@ mod tests {
     fn test_execute_stx_events() {
         let mut interpreter = get_interpreter(None);
         let account = PrincipalData::parse("S1G2081040G2081040G2081040G208105NK8PE5").unwrap();
-        let _ = interpreter.mint_stx_balance(account, 100000);
+        let _ = interpreter.mint_stx_balance(&account, 100000);
 
         let contract = ClarityContractBuilder::default()
             .code_source(

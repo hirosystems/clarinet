@@ -12,7 +12,7 @@ pub struct GetChangesForRmContract {
 }
 
 impl GetChangesForRmContract {
-    pub fn new(manifest_location: FileLocation, contract_name: String) -> Self {
+    pub fn new(manifest_location: FileLocation, contract_name: &str) -> Self {
         Self {
             manifest_location,
             contract_name: contract_name.replace('.', "_"),
@@ -84,7 +84,7 @@ pub struct GetChangesForNewContract {
 impl GetChangesForNewContract {
     pub fn new(
         manifest_location: FileLocation,
-        contract_name: String,
+        contract_name: &str,
         source: Option<String>,
     ) -> Self {
         Self {

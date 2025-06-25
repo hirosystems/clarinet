@@ -239,13 +239,8 @@ pub fn update_deployment_costs(
                     );
 
                     match stacks_rpc.estimate_transaction_fee(&transaction_payload, priority) {
-                        Ok(fee) => {
-                            tx.cost = fee;
-                        }
-                        Err(e) => {
-                            println!("unable to estimate fee for transaction: {}", e);
-                            continue;
-                        }
+                        Ok(fee) => tx.cost = fee,
+                        Err(e) => println!("unable to estimate fee for transaction: {e}"),
                     };
                 }
                 TransactionSpecification::ContractCall(tx) => {
@@ -270,13 +265,8 @@ pub fn update_deployment_costs(
                         });
 
                     match stacks_rpc.estimate_transaction_fee(&transaction_payload, priority) {
-                        Ok(fee) => {
-                            tx.cost = fee;
-                        }
-                        Err(e) => {
-                            println!("unable to estimate fee for transaction: {}", e);
-                            continue;
-                        }
+                        Ok(fee) => tx.cost = fee,
+                        Err(e) => println!("unable to estimate fee for transaction: {e}"),
                     };
                 }
                 TransactionSpecification::ContractPublish(tx) => {
@@ -289,19 +279,14 @@ pub fn update_deployment_costs(
                     );
 
                     match stacks_rpc.estimate_transaction_fee(&transaction_payload, priority) {
-                        Ok(fee) => {
-                            tx.cost = fee;
-                        }
-                        Err(e) => {
-                            println!("unable to estimate fee for transaction: {}", e);
-                            continue;
-                        }
+                        Ok(fee) => tx.cost = fee,
+                        Err(e) => println!("unable to estimate fee for transaction: {e}"),
                     };
                 }
                 TransactionSpecification::RequirementPublish(_)
                 | TransactionSpecification::BtcTransfer(_)
                 | TransactionSpecification::EmulatedContractPublish(_)
-                | TransactionSpecification::EmulatedContractCall(_) => continue,
+                | TransactionSpecification::EmulatedContractCall(_) => {}
             };
         }
     }

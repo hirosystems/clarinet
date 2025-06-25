@@ -66,7 +66,7 @@ impl CLIDebugger {
             .unwrap();
     }
 
-    fn print_source_from_str(&self, contract_id: &str, contract_source: &str, span: Span) {
+    fn print_source_from_str(&self, contract_id: &str, contract_source: &str, span: &Span) {
         if span.start_line != 0 {
             println!(
                 "{}:{}:{}",
@@ -105,18 +105,14 @@ impl CLIDebugger {
     fn print_source(&mut self, env: &mut Environment, expr: &SymbolicExpression) {
         let contract_id = &env.contract_context.contract_identifier;
         if contract_id == &self.state.debug_cmd_contract {
-            self.print_source_from_str(
-                "<command>",
-                &self.state.debug_cmd_source,
-                expr.span.clone(),
-            );
+            self.print_source_from_str("<command>", &self.state.debug_cmd_source, &expr.span);
         } else {
             match env.global_context.database.get_contract_src(contract_id) {
                 Some(contract_source) => {
                     self.print_source_from_str(
                         &contract_id.to_string(),
                         &contract_source,
-                        expr.span.clone(),
+                        &expr.span,
                     );
                 }
                 None => {

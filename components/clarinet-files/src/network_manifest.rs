@@ -961,7 +961,7 @@ impl NetworkManifest {
                 miner_coinbase_recipient: devnet_config
                     .miner_coinbase_recipient
                     .unwrap_or(miner_stx_address),
-                miner_wallet_name: devnet_config.miner_wallet_name.unwrap_or("".to_string()),
+                miner_wallet_name: devnet_config.miner_wallet_name.unwrap_or(String::new()),
                 pre_nakamoto_mock_signing: devnet_config
                     .pre_nakamoto_mock_signing
                     .unwrap_or_default(),

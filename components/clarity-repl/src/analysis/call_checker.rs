@@ -219,8 +219,7 @@ mod tests {
 (define-public (main)
     (ok (foo u1 u2))
 )
-"
-        .to_string();
+";
         match session.formatted_interpretation(snippet, Some("checker".to_string()), false, None) {
             Err((output, _)) => {
                 assert_eq!(output.len(), 3);
@@ -251,8 +250,7 @@ mod tests {
 (define-public (main)
     (ok (foo))
 )
-"
-        .to_string();
+";
         match session.formatted_interpretation(snippet, Some("checker".to_string()), false, None) {
             Err((output, _)) => {
                 assert_eq!(output.len(), 3);
@@ -283,8 +281,7 @@ mod tests {
 (define-public (main)
     (ok (foo u1 u2))
 )
-"
-        .to_string();
+";
         match session.formatted_interpretation(snippet, Some("checker".to_string()), false, None) {
             Err((output, _)) => {
                 assert_eq!(output.len(), 3);
@@ -315,8 +312,7 @@ mod tests {
 (define-public (main)
     (ok (foo u1))
 )
-"
-        .to_string();
+";
         match session.formatted_interpretation(snippet, Some("checker".to_string()), false, None) {
             Ok((_, result)) => {
                 assert_eq!(result.diagnostics.len(), 0);
@@ -332,8 +328,8 @@ mod tests {
 (define-map kv-store { key: int } { value: int })
 (define-private (incompatible-tuple) (tuple (k 1)))
 (define-private (kv-set (key int) (value int))
-    (map-set kv-store { key: key } { value: value } {value: 0}))"
-            .to_string();
+    (map-set kv-store { key: key } { value: value } {value: 0}))";
+
         if let Err((err_output, _)) =
             session.formatted_interpretation(snippet, Some("checker".to_string()), false, None)
         {
@@ -354,8 +350,8 @@ mod tests {
 (define-map kv-store { key: int } { value: int })
 (define-private (incompatible-tuple) (tuple (k 1)))
 (define-private (kv-add (key int) (value int))
-    (map-insert kv-store { key: key } { value: value } { value: 0}))"
-            .to_string();
+    (map-insert kv-store { key: key } { value: value } { value: 0}))";
+
         if let Err((err_output, _)) =
             session.formatted_interpretation(snippet, Some("checker".to_string()), false, None)
         {
@@ -376,8 +372,8 @@ mod tests {
 (define-map kv-store { key: int } { value: int })
 (define-private (incompatible-tuple) (tuple (k 1)))
 (define-private (kv-del (key int))
-    (map-delete kv-store { key: 1 } {value: 0}))"
-            .to_string();
+    (map-delete kv-store { key: 1 } {value: 0}))";
+
         if let Err((err_output, _)) =
             session.formatted_interpretation(snippet, Some("checker".to_string()), false, None)
         {

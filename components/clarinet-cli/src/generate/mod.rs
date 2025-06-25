@@ -26,7 +26,7 @@ pub fn get_changes_for_new_project(
 
 pub fn get_changes_for_new_contract(
     manifest_location: &FileLocation,
-    contract_name: String,
+    contract_name: &str,
     source: Option<String>,
     include_test: bool,
 ) -> Result<Vec<Changes>, String> {
@@ -37,7 +37,7 @@ pub fn get_changes_for_new_contract(
 
 pub fn get_changes_for_rm_contract(
     manifest_location: &FileLocation,
-    contract_name: String,
+    contract_name: &str,
 ) -> Result<Vec<Changes>, String> {
     let mut command = GetChangesForRmContract::new(manifest_location.clone(), contract_name);
     command.run()

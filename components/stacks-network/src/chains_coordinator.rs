@@ -750,7 +750,7 @@ pub async fn publish_stacking_orders(
                 );
 
                 let tx = stacks_codec::codec::build_contract_call_transaction(
-                    pox_contract_id_moved,
+                    &pox_contract_id_moved,
                     method,
                     arguments,
                     nonce,
@@ -889,7 +889,7 @@ fn fund_genesis_account(
                 sweep_txid,
             ];
             let tx = stacks_codec::codec::build_contract_call_transaction(
-                contract_id.clone(),
+                &contract_id,
                 "complete-deposit-wrapper".to_string(),
                 args,
                 deployer_nonce,
@@ -1174,7 +1174,7 @@ mod test_rpc_client {
     #[test]
     fn test_fund_genesis_account() {
         let mut stacks_rpc = MockStacksRpc::new();
-        let info_mock = stacks_rpc.get_info_mock(NodeInfo {
+        let info_mock = stacks_rpc.get_info_mock(&NodeInfo {
             peer_version: 4207599116,
             pox_consensus: "4f4de3d4ab3246299c039084a12c801c9dc70323".to_string(),
             burn_block_height: 100,

@@ -371,7 +371,7 @@ pub fn build_completion_item_list(
         if let Some(completion_strings) = completion_strings {
             return completion_strings
                 .iter()
-                .map(|s| CompletionItem::new_simple(String::from(s), String::from("")))
+                .map(|s| CompletionItem::new_simple(String::from(s), String::new()))
                 .collect();
         }
 
@@ -382,7 +382,7 @@ pub fn build_completion_item_list(
                 &mut active_contract_defined_data
                     .functions_completion_items
                     .iter()
-                    .map(|f| CompletionItem::new_simple(f.label.clone(), String::from("")))
+                    .map(|f| CompletionItem::new_simple(f.label.clone(), String::new()))
                     .collect::<Vec<CompletionItem>>(),
             );
             completion_items.append(&mut get_iterator_cb_completion_item(

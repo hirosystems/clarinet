@@ -352,7 +352,7 @@ impl<const MAX_SIZE: u16> StacksMessageCodec for BitVec<MAX_SIZE> {
 impl<const MAX_SIZE: u16> BitVec<MAX_SIZE> {
     /// Return the number of bytes needed to store `len` bits.
     fn data_len(len: u16) -> u16 {
-        len / 8 + if len % 8 == 0 { 0 } else { 1 }
+        len.div_ceil(8)
     }
 }
 
@@ -1022,11 +1022,7 @@ impl TransactionSpendingCondition {
     pub fn num_signatures(&self) -> u16 {
         match *self {
             TransactionSpendingCondition::Singlesig(ref data) => {
-                if data.signature != MessageSignature::empty() {
-                    1
-                } else {
-                    0
-                }
+                u16::from(data.signature != MessageSignature::empty())
             }
             TransactionSpendingCondition::Multisig(ref data) => {
                 let mut num_sigs: u16 = 0;
@@ -2975,7 +2971,7 @@ pub const MAX_EPOCH_SIZE: u32 = 2 * 1024 * 1024;
 pub const MAX_MICROBLOCK_SIZE: u32 = 65536;
 
 pub fn build_contract_call_transaction(
-    contract_id: String,
+    contract_id: &str,
     function_name: String,
     args: Vec<Value>,
     nonce: u64,
@@ -2983,7 +2979,7 @@ pub fn build_contract_call_transaction(
     sender_secret_key: &[u8],
 ) -> StacksTransaction {
     let contract_id =
-        QualifiedContractIdentifier::parse(&contract_id).expect("Contract identifier invalid");
+        QualifiedContractIdentifier::parse(contract_id).expect("Contract identifier invalid");
 
     let payload = TransactionContractCall {
         address: contract_id.issuer.into(),

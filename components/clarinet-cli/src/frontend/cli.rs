@@ -957,7 +957,7 @@ pub fn main() {
 
                 let changes = match generate::get_changes_for_new_contract(
                     &manifest.location,
-                    cmd.name,
+                    &cmd.name,
                     None,
                     true,
                 ) {
@@ -979,7 +979,7 @@ pub fn main() {
                 let manifest = load_manifest_or_exit(cmd.manifest_path, true);
                 let contract_name = cmd.name.clone();
                 let changes =
-                    match generate::get_changes_for_rm_contract(&manifest.location, cmd.name) {
+                    match generate::get_changes_for_rm_contract(&manifest.location, &cmd.name) {
                         Ok(changes) => changes,
                         Err(message) => {
                             eprintln!("{}", format_err!(message));

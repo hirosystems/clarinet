@@ -912,7 +912,7 @@ rpcport={bitcoin_node_rpc_port}
             )
             .try_collect::<Vec<_>>()
             .await
-            .map_err(|e| formatted_docker_error("unable to create bitcoind image", e))?;
+            .map_err(|e| formatted_docker_error("unable to create bitcoind image", &e))?;
 
         let config = self.prepare_bitcoin_node_config(1)?;
         let container_name = format!("bitcoin-node.{}", self.network_name);
@@ -924,7 +924,7 @@ rpcport={bitcoin_node_rpc_port}
         let container = match docker
             .create_container::<&str, String>(Some(options.clone()), config.clone())
             .await
-            .map_err(|e| formatted_docker_error("unable to create bitcoind container", e))
+            .map_err(|e| formatted_docker_error("unable to create bitcoind container", &e))
         {
             Ok(container) => container.id,
             Err(_e) => {
@@ -933,7 +933,7 @@ rpcport={bitcoin_node_rpc_port}
                 docker
                     .create_container::<&str, String>(Some(options), config)
                     .await
-                    .map_err(|e| formatted_docker_error("unable to create bitcoind container", e))?
+                    .map_err(|e| formatted_docker_error("unable to create bitcoind container", &e))?
                     .id
             }
         };
@@ -998,7 +998,7 @@ rpcport={bitcoin_node_rpc_port}
         docker
             .start_container::<String>(&container, None)
             .await
-            .map_err(|e| formatted_docker_error("unable to start bitcoind container", e))?;
+            .map_err(|e| formatted_docker_error("unable to start bitcoind container", &e))?;
 
         Ok(())
     }
@@ -1357,7 +1357,7 @@ start_height = {epoch_3_1}
         docker
             .start_container::<String>(&container, None)
             .await
-            .map_err(|e| formatted_docker_error("unable to start stacks-node container", e))?;
+            .map_err(|e| formatted_docker_error("unable to start stacks-node container", &e))?;
 
         Ok(())
     }
@@ -1515,7 +1515,7 @@ db_path = "stacks-signer-{signer_id}.sqlite"
         docker
             .start_container::<String>(&container, None)
             .await
-            .map_err(|e| formatted_docker_error("unable to start stacks-signer container", e))?;
+            .map_err(|e| formatted_docker_error("unable to start stacks-signer container", &e))?;
 
         Ok(())
     }
@@ -1886,7 +1886,7 @@ events_keys = ["*"]
         docker
             .start_container::<String>(&container, None)
             .await
-            .map_err(|e| formatted_docker_error("unable to start stacks-api container", e))?;
+            .map_err(|e| formatted_docker_error("unable to start stacks-api container", &e))?;
 
         Ok(())
     }
@@ -2026,7 +2026,7 @@ events_keys = ["*"]
         let exec = docker
             .create_exec::<&str>(&postgres_container, config)
             .await
-            .map_err(|e| formatted_docker_error("unable to create exec command", e))?;
+            .map_err(|e| formatted_docker_error("unable to create exec command", &e))?;
 
         // Pause to ensure the postgres container is ready.
         // TODO
@@ -2035,7 +2035,7 @@ events_keys = ["*"]
         let _res = docker
             .start_exec(&exec.id, None)
             .await
-            .map_err(|e| formatted_docker_error("unable to start exec command", e))?;
+            .map_err(|e| formatted_docker_error("unable to start exec command", &e))?;
 
         let container = match &self.subnet_api_container_id {
             Some(container) => container.clone(),
@@ -2049,7 +2049,7 @@ events_keys = ["*"]
         docker
             .start_container::<String>(&container, None)
             .await
-            .map_err(|e| formatted_docker_error("unable to start stacks-api container", e))?;
+            .map_err(|e| formatted_docker_error("unable to start stacks-api container", &e))?;
 
         Ok(())
     }
@@ -2141,7 +2141,7 @@ events_keys = ["*"]
         docker
             .start_container::<String>(&container, None)
             .await
-            .map_err(|e| formatted_docker_error("unable to start postgres container", e))?;
+            .map_err(|e| formatted_docker_error("unable to start postgres container", &e))?;
 
         Ok(())
     }
@@ -3068,13 +3068,13 @@ events_keys = ["*"]
     }
 }
 
-fn formatted_docker_error(message: &str, error: DockerError) -> String {
+fn formatted_docker_error(message: &str, error: &DockerError) -> String {
     let error = match &error {
         DockerError::DockerResponseServerError {
             status_code: _c,
             message: m,
         } => m.to_string(),
-        _ => format!("{:?}", error),
+        _ => format!("{error:?}"),
     };
-    format!("{}: {}", message, error)
+    format!("{message}: {error}")
 }
