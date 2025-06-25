@@ -3,10 +3,6 @@
 
 name: Publish VSCode Extension
 on:
-  # remove before merging
-  pull_request:
-    branches:
-      - main
   repository_dispatch:
     types:
       - released
