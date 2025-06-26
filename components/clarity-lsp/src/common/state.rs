@@ -27,10 +27,10 @@ use super::requests::completion::{
     build_completion_item_list, get_contract_calls, ContractDefinedData,
 };
 use super::requests::definitions::{
-    get_definitions, get_public_function_definitions, DefinitionLocation,
+    get_definitions, get_public_function_and_trait_definitions, DefinitionLocation,
 };
 use super::requests::document_symbols::ASTSymbols;
-use super::requests::helpers::get_atom_start_at_position;
+use super::requests::helpers::get_atom_or_field_start_at_position;
 use super::requests::hover::get_expression_documentation;
 use super::requests::signature_help::get_signatures;
 
@@ -39,8 +39,8 @@ pub struct ActiveContractData {
     pub clarity_version: ClarityVersion,
     pub epoch: StacksEpochId,
     pub issuer: Option<StandardPrincipalData>,
-    pub expressions: Option<Vec<SymbolicExpression>>,
     pub definitions: Option<HashMap<(u32, u32), DefinitionLocation>>,
+    pub expressions: Option<Vec<SymbolicExpression>>,
     pub diagnostic: Option<ClarityDiagnostic>,
     pub source: String,
 }
@@ -50,11 +50,11 @@ impl ActiveContractData {
         clarity_version: ClarityVersion,
         epoch: StacksEpochId,
         issuer: Option<StandardPrincipalData>,
-        source: &str,
+        source: String,
     ) -> Self {
         match build_ast_with_rules(
             &QualifiedContractIdentifier::transient(),
-            source,
+            &source,
             &mut (),
             clarity_version,
             epoch,
@@ -64,29 +64,28 @@ impl ActiveContractData {
                 clarity_version,
                 epoch,
                 issuer: issuer.clone(),
-                expressions: Some(ast.expressions.clone()),
                 definitions: Some(get_definitions(&ast.expressions, issuer)),
+                expressions: Some(ast.expressions),
                 diagnostic: None,
-                source: source.to_string(),
+                source,
             },
             Err(err) => ActiveContractData {
                 clarity_version,
                 epoch,
                 issuer,
-                expressions: None,
                 definitions: None,
+                expressions: None,
                 diagnostic: Some(err.diagnostic),
-                source: source.to_string(),
+                source,
             },
         }
     }
 
-    pub fn update_sources(&mut self, source: &str, with_definitions: bool) {
-        self.source = source.to_string();
+    pub fn update_expressions(&mut self, with_definitions: bool) {
         self.definitions = None;
         match build_ast_with_rules(
             &QualifiedContractIdentifier::transient(),
-            source,
+            &self.source,
             &mut (),
             self.clarity_version,
             self.epoch,
@@ -106,6 +105,11 @@ impl ActiveContractData {
         };
     }
 
+    pub fn update_sources(&mut self, source: &str, with_definitions: bool) {
+        source.clone_into(&mut self.source);
+        self.update_expressions(with_definitions);
+    }
+
     pub fn update_definitions(&mut self) {
         if let Some(expressions) = &self.expressions {
             self.definitions = Some(get_definitions(expressions, self.issuer.clone()));
@@ -114,7 +118,7 @@ impl ActiveContractData {
 
     pub fn update_clarity_version(&mut self, clarity_version: ClarityVersion) {
         self.clarity_version = clarity_version;
-        self.update_sources(&self.source.clone(), true);
+        self.update_expressions(true);
     }
 
     pub fn update_issuer(&mut self, issuer: Option<StandardPrincipalData>) {
@@ -356,22 +360,25 @@ impl EditorState {
             character: position.character + 1,
         };
 
-        let position_hash = get_atom_start_at_position(&position, contract.expressions.as_ref()?)?;
-        let definitions = match &contract.definitions {
-            Some(definitions) => definitions.to_owned(),
-            None => get_definitions(contract.expressions.as_ref()?, contract.issuer.clone()),
-        };
+        let expressions = contract.expressions.as_ref()?;
+        let position_hash = get_atom_or_field_start_at_position(&position, expressions)?;
+        // Use holder variable to make sure temporary definitions live long enough
+        let mut definitions_holder = None;
+        let definitions = contract.definitions.as_ref().unwrap_or_else(|| {
+            definitions_holder.insert(get_definitions(expressions, contract.issuer.clone()))
+        });
 
         match definitions.get(&position_hash)? {
             DefinitionLocation::Internal(range) => Some(Location {
                 uri: contract_location.try_into().ok()?,
                 range: *range,
             }),
-            DefinitionLocation::External(contract_identifier, function_name) => {
+            DefinitionLocation::External(contract_identifier, name) => {
                 let metadata = self.contracts_lookup.get(contract_location)?;
                 let protocol = self.protocols.get(&metadata.manifest_location)?;
                 let definition_contract_location =
                     protocol.locations_lookup.get(contract_identifier)?;
+                let uri = definition_contract_location.try_into().ok()?;
 
                 // if the contract is opened and eventually contains unsaved changes,
                 // its public definitions are computed on the fly, which is fairly fast
@@ -380,20 +387,21 @@ impl EditorState {
                     .get(definition_contract_location)
                     .and_then(|c| c.expressions.as_ref())
                 {
-                    let public_definitions = get_public_function_definitions(expressions);
+                    let mut definitions = HashMap::new();
+                    get_public_function_and_trait_definitions(&mut definitions, expressions);
                     return Some(Location {
-                        uri: contract_location.try_into().ok()?,
-                        range: *public_definitions.get(function_name)?,
+                        uri,
+                        range: *definitions.get(name)?,
                     });
                 };
 
                 Some(Location {
-                    uri: contract_location.try_into().ok()?,
+                    uri,
                     range: *protocol
                         .contracts
                         .get(definition_contract_location)?
                         .definitions
-                        .get(function_name)?,
+                        .get(name)?,
                 })
             }
         }
@@ -518,7 +526,7 @@ impl EditorState {
         contract_location: FileLocation,
         clarity_version: ClarityVersion,
         issuer: Option<StandardPrincipalData>,
-        source: &str,
+        source: String,
     ) {
         let epoch = StacksEpochId::Epoch21;
         let contract = ActiveContractData::new(clarity_version, epoch, issuer, source);
@@ -665,10 +673,9 @@ pub async fn build_state(
 
                 if let EvaluationResult::Contract(contract_result) = execution_result.result {
                     if let Some(ast) = artifacts.asts.get(&contract_id) {
-                        definitions.insert(
-                            contract_id.clone(),
-                            get_public_function_definitions(&ast.expressions),
-                        );
+                        let mut v = HashMap::new();
+                        get_public_function_and_trait_definitions(&mut v, &ast.expressions);
+                        definitions.insert(contract_id.clone(), v);
                     }
                     analyses.insert(contract_id.clone(), Some(contract_result.contract.analysis));
                 };

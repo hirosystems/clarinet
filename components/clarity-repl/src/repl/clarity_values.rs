@@ -67,7 +67,7 @@ pub fn value_to_string(value: &Value) -> String {
                 .join(" ");
             format!("(list {})", data)
         }
-        _ => format!("{}", value),
+        _ => value.to_string(),
     }
 }
 

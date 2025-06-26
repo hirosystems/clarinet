@@ -4,7 +4,9 @@ use super::helpers::span_to_range;
 
 use clarity_repl::analysis::ast_visitor::{traverse, ASTVisitor, TypedVar};
 use clarity_repl::clarity::functions::define::DefineFunctions;
-use clarity_repl::clarity::vm::types::{QualifiedContractIdentifier, StandardPrincipalData};
+use clarity_repl::clarity::vm::types::{
+    QualifiedContractIdentifier, StandardPrincipalData, TraitIdentifier,
+};
 use clarity_repl::clarity::{ClarityName, SymbolicExpression};
 use lsp_types::Range;
 
@@ -73,6 +75,21 @@ impl Definitions {
         );
         Some(())
     }
+
+    /// Return `QualifiedContractIdentifier` with transient principal (`S1G2081040G2081040G2081040G208105NK8PE5`) replaced
+    fn clone_and_replace_transient(
+        &self,
+        identifier: &QualifiedContractIdentifier,
+    ) -> QualifiedContractIdentifier {
+        if identifier.issuer == StandardPrincipalData::transient() {
+            if let Some(deployer) = &self.deployer {
+                let contract = &format!("{deployer}.{}", identifier.name);
+                return QualifiedContractIdentifier::parse(contract)
+                    .expect("Failed to set contract name");
+            }
+        }
+        identifier.to_owned()
+    }
 }
 
 impl<'a> ASTVisitor<'a> for Definitions {
@@ -112,6 +129,43 @@ impl<'a> ASTVisitor<'a> for Definitions {
                 DefinitionLocation::Internal(*range),
             );
         }
+        true
+    }
+
+    fn visit_use_trait(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        _name: &'a ClarityName,
+        trait_identifier: &TraitIdentifier,
+    ) -> bool {
+        let Some(keyword) = expr.match_list().and_then(|expr| expr.get(1)) else {
+            return true;
+        };
+        let contract_identifier =
+            self.clone_and_replace_transient(&trait_identifier.contract_identifier);
+
+        self.tokens.insert(
+            (keyword.span.start_line, keyword.span.start_column),
+            DefinitionLocation::External(contract_identifier, trait_identifier.name.clone()),
+        );
+        true
+    }
+
+    fn visit_impl_trait(
+        &mut self,
+        expr: &'a SymbolicExpression,
+        trait_identifier: &TraitIdentifier,
+    ) -> bool {
+        let Some(keyword) = expr.match_list().and_then(|expr| expr.get(1)) else {
+            return true;
+        };
+        let contract_identifier =
+            self.clone_and_replace_transient(&trait_identifier.contract_identifier);
+
+        self.tokens.insert(
+            (keyword.span.start_line, keyword.span.start_column),
+            DefinitionLocation::External(contract_identifier, trait_identifier.name.clone()),
+        );
         true
     }
 
@@ -324,18 +378,7 @@ impl<'a> ASTVisitor<'a> for Definitions {
     ) -> bool {
         if let Some(list) = expr.match_list() {
             if let Some(SymbolicExpression { span, .. }) = list.get(2) {
-                let identifier = if identifier.issuer == StandardPrincipalData::transient() {
-                    match &self.deployer {
-                        Some(deployer) => QualifiedContractIdentifier::parse(&format!(
-                            "{}.{}",
-                            deployer, identifier.name
-                        ))
-                        .expect("failed to set contract name"),
-                        None => identifier.to_owned(),
-                    }
-                } else {
-                    identifier.to_owned()
-                };
+                let identifier = self.clone_and_replace_transient(identifier);
 
                 self.tokens.insert(
                     (span.start_line, span.start_column),
@@ -555,10 +598,9 @@ pub fn get_definitions(
 }
 
 pub fn get_public_function_definitions(
-    expressions: &Vec<SymbolicExpression>,
-) -> HashMap<ClarityName, Range> {
-    let mut definitions = HashMap::new();
-
+    definitions: &mut HashMap<ClarityName, Range>,
+    expressions: &[SymbolicExpression],
+) {
     for expression in expressions {
         if let Some((function_name, args)) = expression
             .match_list()
@@ -578,8 +620,37 @@ pub fn get_public_function_definitions(
             }
         }
     }
+}
 
-    definitions
+pub fn get_trait_definitions(
+    definitions: &mut HashMap<ClarityName, Range>,
+    expressions: &[SymbolicExpression],
+) {
+    for expression in expressions {
+        expression
+            .match_list()
+            .and_then(|list| list.split_first())
+            .and_then(|(function_name, args)| Some((function_name.match_atom()?, args)))
+            .filter(|(function_name, _)| {
+                matches!(
+                    DefineFunctions::lookup_by_name(function_name),
+                    Some(DefineFunctions::Trait)
+                )
+            })
+            .and_then(|(_, args)| args.split_first()) // Throw away `define-trait`
+            .and_then(|(trait_name, _)| trait_name.match_atom())
+            .inspect(|&trait_name| {
+                definitions.insert(trait_name.to_owned(), span_to_range(&expression.span));
+            });
+    }
+}
+
+pub fn get_public_function_and_trait_definitions(
+    definitions: &mut HashMap<ClarityName, Range>,
+    expressions: &[SymbolicExpression],
+) {
+    get_public_function_definitions(definitions, expressions);
+    get_trait_definitions(definitions, expressions);
 }
 
 #[cfg(test)]
