@@ -8,7 +8,6 @@ license = "GPL-3.0"
 [dependencies]
 dirs = "6.0"
 libsecp256k1 = "0.7.0"
-indoc = "2.0.6"
 serde = "1"
 serde_derive = "1"
 serde_json = "1.0.114"
