@@ -70,7 +70,7 @@ impl CLIDebugger {
         if span.start_line != 0 {
             println!(
                 "{}:{}:{}",
-                blue!("{contract_id}"),
+                blue!(contract_id),
                 span.start_line,
                 span.start_column
             );

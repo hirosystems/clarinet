@@ -1,49 +1,73 @@
 #[macro_export]
 macro_rules! green {
+    ($i:ident)  => ({
+        use colored::{ColoredString, Colorize};
+        ColoredString::from($i).green().bold().to_string()
+    });
     ($($arg:tt)*) => ({
-        use colored::Colorize;
-        format!($($arg)*).green().bold().to_string()
-    })
+        let s = format!($($arg)*);
+        green!(s)
+    });
 }
 
 #[macro_export]
 macro_rules! red {
-    ($($arg:tt)*) => ({
+    ($i:ident)  => ({
         use colored::Colorize;
-        format!($($arg)*).red().bold().to_string()
-    })
+        $i.red().bold().to_string()
+    });
+    ($($arg:tt)*) => ({
+        let s = format!($($arg)*);
+        red!(s)
+    });
 }
 
 #[macro_export]
 macro_rules! yellow {
-    ($($arg:tt)*) => ({
+    ($i:ident)  => ({
         use colored::Colorize;
-        format!($($arg)*).yellow().bold().to_string()
-    })
+        $i.yellow().bold().to_string()
+    });
+    ($($arg:tt)*) => ({
+        let s = format!($($arg)*);
+        yellow!(s)
+    });
 }
 
 #[macro_export]
 macro_rules! blue {
-    ($($arg:tt)*) => ({
+    ($i:ident)  => ({
         use colored::Colorize;
-        format!($($arg)*).blue().bold().to_string()
-    })
+        $i.blue().bold().to_string()
+    });
+    ($($arg:tt)*) => ({
+        let s = format!($($arg)*);
+        blue!(s)
+    });
 }
 
 #[macro_export]
 macro_rules! purple {
-    ($($arg:tt)*) => ({
+    ($i:ident)  => ({
         use colored::Colorize;
-        format!($($arg)*).purple().bold().to_string()
-    })
+        $i.purple().bold().to_string()
+    });
+    ($($arg:tt)*) => ({
+        let s = format!($($arg)*);
+        purple!(s)
+    });
 }
 
 #[macro_export]
 macro_rules! black {
-    ($($arg:tt)*) => ({
+    ($i:ident)  => ({
         use colored::Colorize;
-        format!($($arg)*).black().bold().to_string()
-    })
+        $i.black().bold().to_string()
+    });
+    ($($arg:tt)*) => ({
+        let s = format!($($arg)*);
+        black!(s)
+    });
 }
 
 #[macro_export]

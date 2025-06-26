@@ -804,7 +804,7 @@ pub fn main() {
                                 let (deployment, _) = match generate_default_deployment(&manifest, network, false) {
                                     Ok(deployment) => deployment,
                                     Err(message) => {
-                                        eprintln!("{}", red!("{message}"));
+                                        eprintln!("{}", red!(message));
                                         std::process::exit(1);
                                     }
                                 };
@@ -1272,7 +1272,7 @@ pub fn main() {
         Command::DAP => match super::dap::run_dap() {
             Ok(_) => (),
             Err(e) => {
-                eprintln!("{}", red!("{e}"));
+                eprintln!("{}", red!(e));
                 process::exit(1);
             }
         },
@@ -1558,6 +1558,8 @@ fn load_deployment_if_exists(
                             ChangeTag::Equal => format!("  {change}"),
                         };
                         print!("{formatted_change}");
+                        use colored::Colorize;
+                        String::from("x").red();
                     }
 
                     println!("{}", yellow!("Overwrite? [Y/n]"));
@@ -1961,7 +1963,7 @@ fn devnet_start(cmd: DevnetStart, clarinetrc: ClarinetRC) {
                         {
                             Ok(deployment) => deployment,
                             Err(message) => {
-                                eprintln!("{}", red!("{message}"));
+                                eprintln!("{}", red!(message));
                                 std::process::exit(1);
                             }
                         };
