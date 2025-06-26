@@ -560,9 +560,21 @@ impl Session {
             Ok(result) => result,
             Err(e) => {
                 self.set_tx_sender(&initial_tx_sender);
+                let mut user_friendly_message =
+                    format!("Error calling contract function '{method}': {e}");
+                if e.contains("Failed to read non-consensus contract metadata") {
+                    user_friendly_message = format!("Contract '{contract_id_str}' does not exist");
+                } else if e.contains("NoSuchPublicFunction")
+                    || e.contains("NoSuchPrivateFunction")
+                    || e.contains("UndefinedFunction")
+                    || e.contains("Unchecked(UndefinedFunction")
+                {
+                    user_friendly_message =
+                        format!("Method '{method}' does not exist on contract '{contract_id_str}'");
+                }
                 return Err(vec![Diagnostic {
                     level: Level::Error,
-                    message: format!("Error calling contract function: {e}"),
+                    message: user_friendly_message,
                     spans: vec![],
                     suggestion: None,
                 }]);
@@ -1915,5 +1927,38 @@ mod tests {
 
         let result = session.process_console_input(&format!("::set_tx_sender {sender}     "));
         assert!(result.1[0].contains(sender));
+    }
+
+    #[test]
+    fn test_call_contract_fn_undefined_function() {
+        let settings = SessionSettings::default();
+        let mut session = Session::new(settings);
+        session.start().expect("session could not start");
+        session.update_epoch(DEFAULT_EPOCH);
+
+        // deploy a simple contract
+        let contract = ClarityContractBuilder::default().build();
+        let _ = session.deploy_contract(&contract, false, None);
+
+        // try to call a non-existent function
+        let result = session.call_contract_fn(
+            "contract",
+            "doesnt-exist",
+            &[],
+            &session.get_tx_sender(),
+            false,
+            false,
+        );
+
+        assert!(result.is_err());
+        let diagnostics = result.unwrap_err();
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(
+            diagnostics[0].message,
+            format!(
+                "Method 'doesnt-exist' does not exist on contract '{}.contract'",
+                session.get_tx_sender()
+            )
+        );
     }
 }
