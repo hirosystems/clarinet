@@ -79,10 +79,6 @@ impl DevnetDiffConfig {
                 name: "epoch_3_0".to_string(),
                 extractor: make_extractor(|config| config.epoch_3_0),
             },
-            SignificantField {
-                name: "epoch_3_1".to_string(),
-                extractor: make_extractor(|config| config.epoch_3_1),
-            },
             // Stacking orders
             SignificantField {
                 name: "pox_stacking_orders".to_string(),
@@ -251,18 +247,18 @@ mod tests {
 
     #[test]
     fn test_custom_fields() {
-        let custom_fields = vec![("epoch_3_1", make_extractor(|c| c.epoch_3_1.to_string()))];
+        let custom_fields = vec![("epoch_3_0", make_extractor(|c| c.epoch_3_0.to_string()))];
 
         let differ = DevnetDiffConfig::with_fields(custom_fields);
 
         let default_config = DevnetConfig::default();
         let mut user_config = default_config.clone();
-        user_config.epoch_3_1 = 146;
+        user_config.epoch_3_0 = 145;
 
         let different_fields = differ.is_compatible(&user_config);
         assert!(different_fields.is_err());
         let incompatibles = different_fields.unwrap_err();
         assert_eq!(incompatibles.len(), 1);
-        assert_eq!(incompatibles[0].0, "epoch_3_1");
+        assert_eq!(incompatibles[0].0, "epoch_3_0");
     }
 }
