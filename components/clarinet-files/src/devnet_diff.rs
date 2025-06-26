@@ -83,24 +83,6 @@ impl DevnetDiffConfig {
                 name: "epoch_3_1".to_string(),
                 extractor: make_extractor(|config| config.epoch_3_1),
             },
-            // Container configuration
-            // SignificantField {
-            //     name: "bind_containers_volumes".to_string(),
-            //     extractor: make_extractor(|config| config.bind_containers_volumes),
-            // },
-            // Image URLs
-            SignificantField {
-                name: "bitcoin_node_image_url".to_string(),
-                extractor: make_extractor(|config| config.bitcoin_node_image_url.clone()),
-            },
-            SignificantField {
-                name: "stacks_node_image_url".to_string(),
-                extractor: make_extractor(|config| config.stacks_node_image_url.clone()),
-            },
-            SignificantField {
-                name: "stacks_api_image_url".to_string(),
-                extractor: make_extractor(|config| config.stacks_api_image_url.clone()),
-            },
             // Stacking orders
             SignificantField {
                 name: "pox_stacking_orders".to_string(),
