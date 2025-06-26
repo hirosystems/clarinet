@@ -1,14 +1,15 @@
-use bollard::container::{
-    Config, CreateContainerOptions, KillContainerOptions, ListContainersOptions,
-    PruneContainersOptions, WaitContainerOptions,
-};
 use bollard::errors::Error as DockerError;
 use bollard::exec::CreateExecOptions;
-use bollard::image::CreateImageOptions;
+use bollard::models::ContainerCreateBody;
 use bollard::models::{HostConfig, PortBinding};
-use bollard::network::{CreateNetworkOptions, PruneNetworksOptions};
+#[allow(deprecated)]
+use bollard::network::CreateNetworkOptions;
+use bollard::query_parameters::{
+    CreateContainerOptions, CreateImageOptions, KillContainerOptions, ListContainersOptions,
+    PruneContainersOptions, PruneNetworksOptions, WaitContainerOptions,
+};
 use bollard::service::Ipam;
-use bollard::Docker;
+use bollard::{body_full, Docker};
 use chainhook_sdk::bitcoin::hex::DisplayHex;
 use chainhook_sdk::utils::Context;
 use clarinet_files::{DevnetConfig, StacksNetwork};
@@ -193,6 +194,7 @@ impl DevnetOrchestrator {
         Ok(services_map_hosts)
     }
 
+    #[allow(deprecated)]
     pub async fn prepare_local_network(&mut self) -> Result<ServicesMapHosts, String> {
         let (docker, devnet_config) = match (&self.docker_client, &self.network_config) {
             (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
@@ -206,26 +208,45 @@ impl DevnetOrchestrator {
         // self.clean_previous_session().await?;
 
         let mut labels = HashMap::new();
-        labels.insert("project", self.network_name.as_str());
+        labels.insert("project".to_string(), self.network_name.clone());
 
         let mut options = HashMap::new();
-        options.insert("enable_ip_masquerade", "true");
-        options.insert("enable_icc", "true");
-        options.insert("host_binding_ipv4", "0.0.0.0");
-        options.insert("com.docker.network.bridge.enable_icc", "true");
-        options.insert("com.docker.network.bridge.enable_ip_masquerade", "true");
-        options.insert("com.docker.network.bridge.host_binding_ipv4", "0.0.0.0");
+        options.insert("enable_ip_masquerade".to_string(), "true".to_string());
+        options.insert("enable_icc".to_string(), "true".to_string());
+        options.insert("host_binding_ipv4".to_string(), "0.0.0.0".to_string());
+        options.insert(
+            "com.docker.network.bridge.enable_icc".to_string(),
+            "true".to_string(),
+        );
+        options.insert(
+            "com.docker.network.bridge.enable_ip_masquerade".to_string(),
+            "true".to_string(),
+        );
+        options.insert(
+            "com.docker.network.bridge.host_binding_ipv4".to_string(),
+            "0.0.0.0".to_string(),
+        );
 
+        // Convert labels and options to HashMap<&String, &String>
+        let labels_ref: std::collections::HashMap<&String, &String> =
+            labels.iter().map(|(k, v)| (k, v)).collect();
+        let options_ref: std::collections::HashMap<&String, &String> =
+            options.iter().map(|(k, v)| (k, v)).collect();
+        let driver = String::from("bridge");
         let network_id = docker
-            .create_network::<&str>(CreateNetworkOptions {
+            .create_network(CreateNetworkOptions {
                 name: &self.network_name,
-                driver: "bridge",
+                driver: &driver,
                 ipam: Ipam {
                     ..Default::default()
                 },
-                labels,
-                options,
-                ..Default::default()
+                labels: labels_ref,
+                options: options_ref,
+                check_duplicate: false,
+                internal: false,
+                attachable: false,
+                ingress: false,
+                enable_ipv6: false,
             })
             .await
             .map_err(|e| {
@@ -234,11 +255,16 @@ impl DevnetOrchestrator {
                     e
                 )
             })?
-            .id
-            .ok_or("unable to retrieve network_id")?;
+            .id;
+        if network_id.is_empty() {
+            return Err("unable to retrieve network_id".to_string());
+        }
 
         let res = docker
-            .inspect_network::<&str>(&network_id, None)
+            .inspect_network(
+                &network_id,
+                None::<bollard::query_parameters::InspectNetworkOptions>,
+            )
             .await
             .map_err(|e| format!("unable to retrieve network: {}", e))?;
 
@@ -776,7 +802,7 @@ impl DevnetOrchestrator {
         &self,
         boot_index: u32,
         no_snapshot: bool,
-    ) -> Result<Config<String>, String> {
+    ) -> Result<ContainerCreateBody, String> {
         let devnet_config = match &self.network_config {
             Some(ref network_config) => match network_config.devnet {
                 Some(ref devnet_config) => devnet_config,
@@ -886,7 +912,7 @@ rpcport={bitcoin_node_rpc_port}
         if !no_snapshot {
             cmd_args.push("-reindex".into());
         }
-        let config = Config {
+        let config = ContainerCreateBody {
             labels: Some(labels),
             image: Some(devnet_config.bitcoin_node_image_url.clone()),
             domainname: Some(self.network_name.to_string()),
@@ -925,7 +951,7 @@ rpcport={bitcoin_node_rpc_port}
         let _info = docker
             .create_image(
                 Some(CreateImageOptions {
-                    from_image: devnet_config.bitcoin_node_image_url.clone(),
+                    from_image: Some(devnet_config.bitcoin_node_image_url.clone()),
                     platform: devnet_config.docker_platform.clone(),
                     ..Default::default()
                 }),
@@ -934,31 +960,20 @@ rpcport={bitcoin_node_rpc_port}
             )
             .try_collect::<Vec<_>>()
             .await
-            .map_err(|e| formatted_docker_error("unable to create bitcoind image", e))?;
+            .map_err(|e| format!("unable to create image: {}", e))?;
 
         let config = self.prepare_bitcoin_node_config(1, no_snapshot)?;
         let container_name = format!("bitcoin-node.{}", self.network_name);
         let options = CreateContainerOptions {
-            name: container_name.as_str(),
-            platform: Some(&devnet_config.docker_platform),
+            name: Some(container_name),
+            platform: devnet_config.docker_platform.clone(),
         };
 
-        let container = match docker
-            .create_container::<&str, String>(Some(options.clone()), config.clone())
+        let container = docker
+            .create_container(Some(options), config)
             .await
-            .map_err(|e| formatted_docker_error("unable to create bitcoind container", e))
-        {
-            Ok(container) => container.id,
-            Err(_e) => {
-                // Attempt to clean eventual subsequent artifacts
-                let _ = docker.kill_container::<String>(&container_name, None).await;
-                docker
-                    .create_container::<&str, String>(Some(options), config)
-                    .await
-                    .map_err(|e| formatted_docker_error("unable to create bitcoind container", e))?
-                    .id
-            }
-        };
+            .map_err(|e| format!("unable to create container: {}", e))?
+            .id;
         ctx.try_log(|logger| slog::info!(logger, "Created container bitcoin-node: {}", container));
         self.bitcoin_node_container_id = Some(container);
 
@@ -973,7 +988,7 @@ rpcport={bitcoin_node_rpc_port}
         );
         let options = Some(ListContainersOptions {
             all: true,
-            filters,
+            filters: Some(filters),
             ..Default::default()
         });
 
@@ -988,7 +1003,9 @@ rpcport={bitcoin_node_rpc_port}
                 return Err(err);
             }
         };
-        let options = KillContainerOptions { signal: "SIGKILL" };
+        let options = KillContainerOptions {
+            signal: "SIGKILL".to_string(),
+        };
 
         for container in containers.iter() {
             let Some(container_id) = &container.id else {
@@ -999,7 +1016,7 @@ rpcport={bitcoin_node_rpc_port}
                 .await;
 
             let _ = docker
-                .wait_container(container_id, None::<WaitContainerOptions<String>>)
+                .wait_container(container_id, None::<WaitContainerOptions>)
                 .try_collect::<Vec<_>>()
                 .await;
         }
@@ -1021,7 +1038,10 @@ rpcport={bitcoin_node_rpc_port}
             return Err("unable to get Docker client".into());
         };
         docker
-            .start_container::<String>(&container, None)
+            .start_container(
+                &container,
+                None::<bollard::query_parameters::StartContainerOptions>,
+            )
             .await
             .map_err(|e| formatted_docker_error("unable to start bitcoind container", e))?;
         // Copy snapshot if available
@@ -1060,7 +1080,10 @@ rpcport={bitcoin_node_rpc_port}
         Ok(())
     }
 
-    pub fn prepare_stacks_node_config(&self, boot_index: u32) -> Result<Config<String>, String> {
+    pub fn prepare_stacks_node_config(
+        &self,
+        boot_index: u32,
+    ) -> Result<ContainerCreateBody, String> {
         let (network_config, devnet_config) = match &self.network_config {
             Some(ref network_config) => match network_config.devnet {
                 Some(ref devnet_config) => (network_config, devnet_config),
@@ -1328,7 +1351,7 @@ start_height = {epoch_3_1}
         ];
         env.append(&mut devnet_config.stacks_node_env_vars.clone());
 
-        let config = Config {
+        let config = ContainerCreateBody {
             labels: Some(labels),
             image: Some(devnet_config.stacks_node_image_url.clone()),
             // domainname: Some(self.network_name.to_string()),
@@ -1367,11 +1390,10 @@ start_height = {epoch_3_1}
             },
             _ => return Err("unable to get Docker client".into()),
         };
-
         let _info = docker
             .create_image(
                 Some(CreateImageOptions {
-                    from_image: devnet_config.stacks_node_image_url.clone(),
+                    from_image: Some(devnet_config.stacks_node_image_url.clone()),
                     platform: devnet_config.docker_platform.clone(),
                     ..Default::default()
                 }),
@@ -1381,23 +1403,19 @@ start_height = {epoch_3_1}
             .try_collect::<Vec<_>>()
             .await
             .map_err(|e| format!("unable to create image: {}", e))?;
-
         let config = self.prepare_stacks_node_config(boot_index)?;
-
         let options = CreateContainerOptions {
-            name: format!("stacks-node.{}", self.network_name),
-            platform: Some(devnet_config.docker_platform.to_string()),
+            name: Some(format!("stacks-node.{}", self.network_name)),
+            platform: devnet_config.docker_platform.clone(),
+            ..Default::default()
         };
-
         let container = docker
-            .create_container::<String, String>(Some(options), config)
+            .create_container(Some(options), config)
             .await
             .map_err(|e| format!("unable to create container: {}", e))?
             .id;
-
         ctx.try_log(|logger| slog::info!(logger, "Created container stacks-node: {}", container));
         self.stacks_node_container_id = Some(container);
-
         Ok(())
     }
 
@@ -1429,7 +1447,10 @@ start_height = {epoch_3_1}
         }
 
         docker
-            .start_container::<String>(&container, None)
+            .start_container(
+                &container,
+                None::<bollard::query_parameters::StartContainerOptions>,
+            )
             .await
             .map_err(|e| formatted_docker_error("unable to start stacks-node container", e))?;
 
@@ -1441,7 +1462,7 @@ start_height = {epoch_3_1}
         boot_index: u32,
         signer_id: u32,
         signer_key: &StacksPrivateKey,
-    ) -> Result<Config<String>, String> {
+    ) -> Result<ContainerCreateBody, String> {
         let devnet_config = match &self.network_config {
             Some(ref network_config) => match network_config.devnet {
                 Some(ref devnet_config) => devnet_config,
@@ -1498,7 +1519,7 @@ db_path = "stacks-signer-{signer_id}.sqlite"
 
         let env = devnet_config.stacks_signers_env_vars.clone();
 
-        let config = Config {
+        let config = ContainerCreateBody {
             labels: Some(labels),
             image: Some(devnet_config.stacks_signer_image_url.clone()),
             // domainname: Some(self.network_name.to_string()),
@@ -1543,7 +1564,7 @@ db_path = "stacks-signer-{signer_id}.sqlite"
         let _info = docker
             .create_image(
                 Some(CreateImageOptions {
-                    from_image: devnet_config.stacks_signer_image_url.clone(),
+                    from_image: Some(devnet_config.stacks_signer_image_url.clone()),
                     platform: devnet_config.docker_platform.clone(),
                     ..Default::default()
                 }),
@@ -1557,12 +1578,12 @@ db_path = "stacks-signer-{signer_id}.sqlite"
         let config = self.prepare_stacks_signer_config(boot_index, signer_id, signer_key)?;
 
         let options = CreateContainerOptions {
-            name: format!("stacks-signer-{signer_id}.{}", self.network_name),
-            platform: Some(devnet_config.docker_platform.to_string()),
+            name: Some(format!("stacks-signer-{signer_id}.{}", self.network_name)),
+            platform: devnet_config.docker_platform.clone(),
         };
 
         let container = docker
-            .create_container::<String, String>(Some(options), config)
+            .create_container(Some(options), config)
             .await
             .map_err(|e| format!("unable to create container: {}", e))?
             .id;
@@ -1587,14 +1608,20 @@ db_path = "stacks-signer-{signer_id}.sqlite"
         };
 
         docker
-            .start_container::<String>(&container, None)
+            .start_container(
+                &container,
+                None::<bollard::query_parameters::StartContainerOptions>,
+            )
             .await
             .map_err(|e| formatted_docker_error("unable to start stacks-signer container", e))?;
 
         Ok(())
     }
 
-    pub fn prepare_subnet_node_config(&self, boot_index: u32) -> Result<Config<String>, String> {
+    pub fn prepare_subnet_node_config(
+        &self,
+        boot_index: u32,
+    ) -> Result<ContainerCreateBody, String> {
         let devnet_config = match &self.network_config {
             Some(network_config) => match &network_config.devnet {
                 Some(devnet_config) => devnet_config,
@@ -1759,7 +1786,7 @@ events_keys = ["*"]
         ];
         env.append(&mut devnet_config.subnet_node_env_vars.clone());
 
-        let config = Config {
+        let config = ContainerCreateBody {
             labels: Some(labels),
             image: Some(devnet_config.subnet_node_image_url.clone()),
             // domainname: Some(self.network_name.to_string()),
@@ -1801,7 +1828,7 @@ events_keys = ["*"]
         let _info = docker
             .create_image(
                 Some(CreateImageOptions {
-                    from_image: devnet_config.subnet_node_image_url.clone(),
+                    from_image: Some(devnet_config.subnet_node_image_url.clone()),
                     platform: devnet_config.docker_platform.clone(),
                     ..Default::default()
                 }),
@@ -1815,12 +1842,12 @@ events_keys = ["*"]
         let config = self.prepare_subnet_node_config(boot_index)?;
 
         let options = CreateContainerOptions {
-            name: format!("subnet-node.{}", self.network_name),
-            platform: Some(devnet_config.docker_platform.to_string()),
+            name: Some(format!("subnet-node.{}", self.network_name)),
+            platform: devnet_config.docker_platform.clone(),
         };
 
         let container = docker
-            .create_container::<String, String>(Some(options), config)
+            .create_container(Some(options), config)
             .await
             .map_err(|e| format!("unable to create container: {}", e))?
             .id;
@@ -1842,9 +1869,12 @@ events_keys = ["*"]
         };
 
         docker
-            .start_container::<String>(&container, None)
+            .start_container(
+                &container,
+                None::<bollard::query_parameters::StartContainerOptions>,
+            )
             .await
-            .map_err(|e| format!("unable to start container - {}", e))?;
+            .map_err(|e| formatted_docker_error("unable to start subnet-node container", e))?;
 
         Ok(())
     }
@@ -1861,7 +1891,7 @@ events_keys = ["*"]
         let _info = docker
             .create_image(
                 Some(CreateImageOptions {
-                    from_image: devnet_config.stacks_api_image_url.clone(),
+                    from_image: Some(devnet_config.stacks_api_image_url.clone()),
                     platform: devnet_config.docker_platform.clone(),
                     ..Default::default()
                 }),
@@ -1920,7 +1950,7 @@ events_keys = ["*"]
         ];
         env.append(&mut devnet_config.stacks_api_env_vars.clone());
 
-        let config = Config {
+        let config = ContainerCreateBody {
             labels: Some(labels),
             image: Some(devnet_config.stacks_api_image_url.clone()),
             // domainname: Some(self.network_name.to_string()),
@@ -1938,12 +1968,12 @@ events_keys = ["*"]
         };
 
         let options = CreateContainerOptions {
-            name: format!("stacks-api.{}", self.network_name),
-            platform: Some(devnet_config.docker_platform.to_string()),
+            name: Some(format!("stacks-api.{}", self.network_name)),
+            platform: devnet_config.docker_platform.clone(),
         };
 
         let container = docker
-            .create_container::<String, String>(Some(options), config)
+            .create_container(Some(options), config)
             .await
             .map_err(|e| format!("unable to create container: {}", e))?
             .id;
@@ -1984,7 +2014,10 @@ events_keys = ["*"]
         };
 
         docker
-            .start_container::<String>(&container, None)
+            .start_container(
+                &container,
+                None::<bollard::query_parameters::StartContainerOptions>,
+            )
             .await
             .map_err(|e| formatted_docker_error("unable to start stacks-api container", e))?;
 
@@ -2038,7 +2071,6 @@ events_keys = ["*"]
                 .arg(&import_command)
                 .output()
                 .map_err(|e| format!("Failed to import events: {}", e))?;
-
             if !output.status.success() {
                 ctx.try_log(|logger| {
                     slog::warn!(
@@ -2066,7 +2098,7 @@ events_keys = ["*"]
         let _info = docker
             .create_image(
                 Some(CreateImageOptions {
-                    from_image: devnet_config.subnet_api_image_url.clone(),
+                    from_image: Some(devnet_config.subnet_api_image_url.clone()),
                     platform: devnet_config.docker_platform.clone(),
                     ..Default::default()
                 }),
@@ -2125,10 +2157,9 @@ events_keys = ["*"]
         ];
         env.append(&mut devnet_config.subnet_api_env_vars.clone());
 
-        let config = Config {
+        let config = ContainerCreateBody {
             labels: Some(labels),
             image: Some(devnet_config.subnet_api_image_url.clone()),
-            // domainname: Some(self.network_name.to_string()),
             tty: None,
             exposed_ports: Some(exposed_ports),
             env: Some(env),
@@ -2143,12 +2174,12 @@ events_keys = ["*"]
         };
 
         let options = CreateContainerOptions {
-            name: format!("subnet-api.{}", self.network_name),
-            platform: Some(devnet_config.docker_platform.to_string()),
+            name: Some(format!("subnet-api.{}", self.network_name)),
+            platform: devnet_config.docker_platform.clone(),
         };
 
         let container = docker
-            .create_container::<String, String>(Some(options), config)
+            .create_container(Some(options), config)
             .await
             .map_err(|e| format!("unable to create container: {}", e))?
             .id;
@@ -2209,11 +2240,11 @@ events_keys = ["*"]
                 docker
                     .upload_to_container(
                         &container_id,
-                        Some(bollard::container::UploadToContainerOptions {
-                            path: "/tmp",
+                        Some(bollard::query_parameters::UploadToContainerOptions {
+                            path: "/tmp".to_string(),
                             ..Default::default()
                         }),
-                        tar_content.into(),
+                        body_full(tar_content.into()),
                     )
                     .await
                     .map_err(|e| format!("unable to copy tar to container: {}", e))?;
@@ -2305,7 +2336,7 @@ events_keys = ["*"]
         };
 
         let exec = docker
-            .create_exec::<&str>(&postgres_container, config)
+            .create_exec(&postgres_container, config)
             .await
             .map_err(|e| formatted_docker_error("unable to create exec command", e))?;
 
@@ -2328,7 +2359,10 @@ events_keys = ["*"]
         };
 
         docker
-            .start_container::<String>(&container, None)
+            .start_container(
+                &container,
+                None::<bollard::query_parameters::StartContainerOptions>,
+            )
             .await
             .map_err(|e| formatted_docker_error("unable to start stacks-api container", e))?;
 
@@ -2347,7 +2381,7 @@ events_keys = ["*"]
         let _info = docker
             .create_image(
                 Some(CreateImageOptions {
-                    from_image: devnet_config.postgres_image_url.clone(),
+                    from_image: Some(devnet_config.postgres_image_url.clone()),
                     platform: devnet_config.docker_platform.clone(),
                     ..Default::default()
                 }),
@@ -2372,10 +2406,9 @@ events_keys = ["*"]
         let mut labels = HashMap::new();
         labels.insert("project".to_string(), self.network_name.to_string());
 
-        let config = Config {
+        let config = ContainerCreateBody {
             labels: Some(labels),
             image: Some(devnet_config.postgres_image_url.clone()),
-            // domainname: Some(self.network_name.to_string()),
             tty: None,
             exposed_ports: Some(exposed_ports),
             env: Some(vec![
@@ -2393,12 +2426,12 @@ events_keys = ["*"]
         };
 
         let options = CreateContainerOptions {
-            name: format!("postgres.{}", self.network_name),
-            platform: Some(devnet_config.docker_platform.to_string()),
+            name: Some(format!("postgres.{}", self.network_name)),
+            platform: devnet_config.docker_platform.clone(),
         };
 
         let container = docker
-            .create_container::<String, String>(Some(options), config)
+            .create_container(Some(options), config)
             .await
             .map_err(|e| format!("unable to create container: {}", e))?
             .id;
@@ -2420,7 +2453,10 @@ events_keys = ["*"]
         };
 
         docker
-            .start_container::<String>(&container, None)
+            .start_container(
+                &container,
+                None::<bollard::query_parameters::StartContainerOptions>,
+            )
             .await
             .map_err(|e| formatted_docker_error("unable to start postgres container", e))?;
 
@@ -2439,7 +2475,7 @@ events_keys = ["*"]
         let _info = docker
             .create_image(
                 Some(CreateImageOptions {
-                    from_image: devnet_config.stacks_explorer_image_url.clone(),
+                    from_image: Some(devnet_config.stacks_explorer_image_url.clone()),
                     platform: devnet_config.docker_platform.clone(),
                     ..Default::default()
                 }),
@@ -2483,7 +2519,7 @@ events_keys = ["*"]
         ];
         env.append(&mut devnet_config.stacks_explorer_env_vars.clone());
 
-        let config = Config {
+        let config = ContainerCreateBody {
             labels: Some(labels),
             image: Some(devnet_config.stacks_explorer_image_url.clone()),
             // domainname: Some(self.network_name.to_string()),
@@ -2501,12 +2537,12 @@ events_keys = ["*"]
         };
 
         let options = CreateContainerOptions {
-            name: format!("stacks-explorer.{}", self.network_name),
-            platform: Some(devnet_config.docker_platform.to_string()),
+            name: Some(format!("stacks-explorer.{}", self.network_name)),
+            platform: devnet_config.docker_platform.clone(),
         };
 
         let container = docker
-            .create_container::<String, String>(Some(options), config)
+            .create_container(Some(options), config)
             .await
             .map_err(|e| format!("unable to create container: {}", e))?
             .id;
@@ -2530,9 +2566,12 @@ events_keys = ["*"]
         };
 
         docker
-            .start_container::<String>(&container, None)
+            .start_container(
+                &container,
+                None::<bollard::query_parameters::StartContainerOptions>,
+            )
             .await
-            .map_err(|e| format!("unable to create container: {}", e))?;
+            .map_err(|e| formatted_docker_error("unable to start stacks-explorer container", e))?;
 
         Ok(())
     }
@@ -2552,7 +2591,7 @@ events_keys = ["*"]
         let _info = docker
             .create_image(
                 Some(CreateImageOptions {
-                    from_image: devnet_config.bitcoin_explorer_image_url.clone(),
+                    from_image: Some(devnet_config.bitcoin_explorer_image_url.clone()),
                     platform: devnet_config.docker_platform.clone(),
                     ..Default::default()
                 }),
@@ -2581,7 +2620,7 @@ events_keys = ["*"]
         let mut labels = HashMap::new();
         labels.insert("project".to_string(), self.network_name.to_string());
 
-        let config = Config {
+        let config = ContainerCreateBody {
             labels: Some(labels),
             image: Some(devnet_config.bitcoin_explorer_image_url.clone()),
             // domainname: Some(self.network_name.to_string()),
@@ -2620,12 +2659,12 @@ events_keys = ["*"]
         };
 
         let options = CreateContainerOptions {
-            name: format!("bitcoin-explorer.{}", self.network_name),
-            platform: Some(devnet_config.docker_platform.to_string()),
+            name: Some(format!("bitcoin-explorer.{}", self.network_name)),
+            platform: devnet_config.docker_platform.clone(),
         };
 
         let container = docker
-            .create_container::<String, String>(Some(options), config)
+            .create_container(Some(options), config)
             .await
             .map_err(|e| format!("unable to create container: {}", e))?
             .id;
@@ -2649,7 +2688,10 @@ events_keys = ["*"]
         };
 
         docker
-            .start_container::<String>(&container, None)
+            .start_container(
+                &container,
+                None::<bollard::query_parameters::StartContainerOptions>,
+            )
             .await
             .map_err(|e| format!("unable to create container: {}", e))?;
 
@@ -2684,7 +2726,9 @@ events_keys = ["*"]
             return Err("unable to get Docker client".into());
         };
 
-        let options = KillContainerOptions { signal: "SIGKILL" };
+        let options = KillContainerOptions {
+            signal: "SIGKILL".to_string(),
+        };
 
         // kill all signers
         for container_id in &self.stacks_signers_containers_ids {
@@ -2719,7 +2763,7 @@ events_keys = ["*"]
             .await;
 
         let _ = docker
-            .wait_container(stacks_node_c_id, None::<WaitContainerOptions<String>>)
+            .wait_container(stacks_node_c_id, None::<WaitContainerOptions>)
             .try_collect::<Vec<_>>()
             .await;
 
@@ -2761,7 +2805,9 @@ events_keys = ["*"]
             ],
         );
         let _ = docker
-            .prune_containers(Some(PruneContainersOptions { filters }))
+            .prune_containers(Some(PruneContainersOptions {
+                filters: Some(filters.clone()),
+            }))
             .await;
 
         let bitcoin_node_config = self.prepare_bitcoin_node_config(boot_index, no_snapshot)?;
@@ -2770,14 +2816,14 @@ events_keys = ["*"]
             .network_config
             .as_ref()
             .and_then(|c| c.devnet.as_ref())
-            .map(|c| c.docker_platform.to_string());
+            .map(|c| c.docker_platform.clone());
 
         let options = CreateContainerOptions {
-            name: format!("bitcoin-node.{}", self.network_name),
-            platform: platform.clone(),
+            name: Some(format!("bitcoin-node.{}", self.network_name)),
+            platform: platform.clone().unwrap_or_default(),
         };
         let bitcoin_node_c_id = docker
-            .create_container::<String, String>(Some(options), bitcoin_node_config)
+            .create_container(Some(options), bitcoin_node_config)
             .await
             .map_err(|e| format!("unable to create container: {}", e))?
             .id;
@@ -2785,36 +2831,57 @@ events_keys = ["*"]
         let stacks_node_config = self.prepare_stacks_node_config(boot_index)?;
 
         let options = CreateContainerOptions {
-            name: format!("stacks-node.{}", self.network_name),
-            platform,
+            name: Some(format!("stacks-node.{}", self.network_name)),
+            platform: platform.clone().unwrap_or_default(),
+            ..Default::default()
         };
         let stacks_node_c_id = docker
-            .create_container::<String, String>(Some(options), stacks_node_config)
+            .create_container(Some(options), stacks_node_config)
             .await
             .map_err(|e| format!("unable to create container: {}", e))?
             .id;
 
         // Start all the containers
         let _ = docker
-            .start_container::<String>(&bitcoin_node_c_id, None)
+            .start_container(
+                &bitcoin_node_c_id,
+                None::<bollard::query_parameters::StartContainerOptions>,
+            )
             .await;
 
         let _ = docker
-            .start_container::<String>(bitcoin_explorer_c_id, None)
-            .await;
-
-        let _ = docker.start_container::<String>(postgres_c_id, None).await;
-
-        let _ = docker
-            .start_container::<String>(stacks_api_c_id, None)
+            .start_container(
+                &bitcoin_explorer_c_id,
+                None::<bollard::query_parameters::StartContainerOptions>,
+            )
             .await;
 
         let _ = docker
-            .start_container::<String>(stacks_explorer_c_id, None)
+            .start_container(
+                &postgres_c_id,
+                None::<bollard::query_parameters::StartContainerOptions>,
+            )
             .await;
 
         let _ = docker
-            .start_container::<String>(&stacks_node_c_id, None)
+            .start_container(
+                &stacks_api_c_id,
+                None::<bollard::query_parameters::StartContainerOptions>,
+            )
+            .await;
+
+        let _ = docker
+            .start_container(
+                &stacks_explorer_c_id,
+                None::<bollard::query_parameters::StartContainerOptions>,
+            )
+            .await;
+
+        let _ = docker
+            .start_container(
+                &stacks_node_c_id,
+                None::<bollard::query_parameters::StartContainerOptions>,
+            )
             .await;
 
         Ok((bitcoin_node_c_id, stacks_node_c_id))
@@ -2828,7 +2895,9 @@ events_keys = ["*"]
             },
             _ => return,
         };
-        let options = Some(KillContainerOptions { signal: "SIGKILL" });
+        let options = Some(KillContainerOptions {
+            signal: "SIGKILL".to_string(),
+        });
 
         // Terminate containers
         let container_ids = vec![
@@ -2851,7 +2920,12 @@ events_keys = ["*"]
         {
             let _ = docker.kill_container(&container_id, options.clone()).await;
             ctx.try_log(|logger| slog::info!(logger, "Terminating container: {}", &container_id));
-            let _ = docker.remove_container(&container_id, None).await;
+            let _ = docker
+                .remove_container(
+                    &container_id,
+                    None::<bollard::query_parameters::RemoveContainerOptions>,
+                )
+                .await;
         }
 
         // Delete network
@@ -2891,12 +2965,14 @@ events_keys = ["*"]
         );
         let _ = docker
             .prune_containers(Some(PruneContainersOptions {
-                filters: filters.clone(),
+                filters: Some(filters.clone()),
             }))
             .await;
 
         let _ = docker
-            .prune_networks(Some(PruneNetworksOptions { filters }))
+            .prune_networks(Some(PruneNetworksOptions {
+                filters: Some(filters.clone()),
+            }))
             .await;
     }
 

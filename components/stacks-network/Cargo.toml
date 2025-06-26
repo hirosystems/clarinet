@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 colored = { workspace = true }
-bollard = "0.17"
+bollard = "0.19.1"
 bitcoincore-rpc = "0.18.0"
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1.0.79", features = ["preserve_order"] }
