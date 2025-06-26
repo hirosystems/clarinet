@@ -623,10 +623,10 @@ pub fn main() {
                             );
                             println!(
                                 "{}",
-                                blue!(format!(
+                                blue!(
                                     "  $ mkdir -p ~/.clarinet; echo \"enable_telemetry = true\" >> {}",
                                     ClarinetRC::get_settings_file_path()
-                                ))
+                                )
                             );
                             // TODO(lgalabru): once we have a privacy policy available, add a link
                             // println!("{}", yellow!("Visit http://hiro.so/clarinet-privacy for details."));
@@ -1015,7 +1015,7 @@ pub fn main() {
                     comment: format!(
                         "{} with requirement {}",
                         yellow!("Updated Clarinet.toml"),
-                        green!(format!("{}", cmd.contract_id))
+                        green!("{}", cmd.contract_id)
                     ),
                     manifest_location: manifest.location,
                     contracts_to_rm: vec![],
@@ -1489,14 +1489,14 @@ fn should_existing_plan_be_replaced(
     for change in diffs.iter_all_changes() {
         let formatted_change = match change.tag() {
             ChangeTag::Delete => {
-                format!("{} {}", red!("-"), red!(format!("{}", change)))
+                format!("{} {}", red!("-"), red!("{change}"))
             }
             ChangeTag::Insert => {
-                format!("{} {}", green!("+"), green!(format!("{}", change)))
+                format!("{} {}", green!("+"), green!("{change}"))
             }
-            ChangeTag::Equal => format!("  {}", change),
+            ChangeTag::Equal => format!("  {change}"),
         };
-        print!("{}", formatted_change);
+        print!("{formatted_change}");
     }
 
     println!("{}", yellow!("Overwrite? [Y/n]"));
@@ -1532,9 +1532,7 @@ fn load_deployment_if_exists(
 
                 let updated_version = match deployment.to_file_content() {
                     Ok(res) => res,
-                    Err(err) => {
-                        return Some(Err(format!("failed serializing deployment\n{}", err)))
-                    }
+                    Err(err) => return Some(Err(format!("failed serializing deployment\n{err}"))),
                 };
 
                 if updated_version == current_version {
@@ -1552,14 +1550,14 @@ fn load_deployment_if_exists(
                     for change in diffs.iter_all_changes() {
                         let formatted_change = match change.tag() {
                             ChangeTag::Delete => {
-                                format!("{} {}", red!("-"), red!(format!("{}", change)))
+                                format!("{} {}", red!("-"), red!("{change}"))
                             }
                             ChangeTag::Insert => {
-                                format!("{} {}", green!("+"), green!(format!("{}", change)))
+                                format!("{} {}", green!("+"), green!("{change}"))
                             }
-                            ChangeTag::Equal => format!("  {}", change),
+                            ChangeTag::Equal => format!("  {change}"),
                         };
-                        print!("{}", formatted_change);
+                        print!("{formatted_change}");
                     }
 
                     println!("{}", yellow!("Overwrite? [Y/n]"));
@@ -1830,17 +1828,17 @@ fn display_hint_header() {
 fn display_hint_footer() {
     println!(
         "{}",
-        yellow!(format!(
+        yellow!(
             "These hints can be disabled in the {} file.",
             ClarinetRC::get_settings_file_path()
-        ))
+        )
     );
     println!(
         "{}",
-        blue!(format!(
+        blue!(
             "  $ mkdir -p ~/.clarinet; echo \"enable_hints = false\" >> {}",
             ClarinetRC::get_settings_file_path()
-        ))
+        )
     );
     display_separator();
 }
@@ -1870,7 +1868,7 @@ fn display_contract_new_hint(project_name: Option<&str>) {
             "{}",
             yellow!("Switch to the newly created directory with:\n")
         );
-        println!("{}", blue!(format!("  $ cd {}\n", project_name)));
+        println!("{}", blue!("  $ cd {project_name}\n"));
     }
     println!(
         "{}",

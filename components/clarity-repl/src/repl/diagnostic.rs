@@ -6,6 +6,7 @@ fn level_to_string(level: &Level) -> String {
         Level::Warning => yellow!("warning:"),
         Level::Error => red!("error:"),
     }
+    .to_string()
 }
 
 // Generate the formatted output for this diagnostic, given the source code.
