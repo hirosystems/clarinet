@@ -1855,10 +1855,7 @@ fn display_devnet_incompatibilities(incompatibles: Vec<(String, String, String)>
     for (field, user_value, default_value) in incompatibles {
         println!(
             "{}",
-            yellow!(format!(
-                "{}:\n{}\n{} (default)",
-                field, user_value, default_value
-            ))
+            yellow!("{}:\n{}\n{} (default)", field, user_value, default_value)
         );
     }
 }
