@@ -33,6 +33,31 @@ use super::remote_data::HttpClient;
 use super::settings::{ApiUrl, RemoteNetworkInfo};
 use super::{ClarityContract, DEFAULT_EPOCH};
 
+#[derive(Debug, Clone)]
+pub enum ContractCallError {
+    NoSuchContract(String),
+    NoSuchFunction(String),
+    Uncategorized(String),
+}
+
+impl std::fmt::Display for ContractCallError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ContractCallError::NoSuchContract(contract_id) => {
+                write!(f, "NoSuchContract({})", contract_id)
+            }
+            ContractCallError::NoSuchFunction(function_name) => {
+                write!(f, "NoSuchFunction({})", function_name)
+            }
+            ContractCallError::Uncategorized(message) => {
+                write!(f, "Uncategorized({})", message)
+            }
+        }
+    }
+}
+
+impl std::error::Error for ContractCallError {}
+
 pub const BLOCK_LIMIT_MAINNET: ExecutionCost = ExecutionCost {
     write_length: 15_000_000,
     write_count: 15_000,
@@ -740,7 +765,6 @@ impl ClarityInterpreter {
             contract_context.set_wasm_module(wasm_module.emit_wasm());
             initialize_contract(g, &mut contract_context, None, &analysis)
         });
-
         let value = result.map_err(|e| {
             let err = format!("Runtime error while interpreting {}: {:?}", contract_id, e);
             if let Some(mut eval_hooks) = global_context.eval_hooks.take() {
@@ -859,10 +883,12 @@ impl ClarityInterpreter {
         track_costs: bool,
         allow_private: bool,
         eval_hooks: Vec<&mut dyn EvalHook>,
-    ) -> Result<ExecutionResult, String> {
+    ) -> Result<ExecutionResult, ContractCallError> {
         let tx_sender: PrincipalData = self.tx_sender.clone().into();
 
-        let mut global_context = self.get_global_context(epoch, track_costs)?;
+        let mut global_context = self
+            .get_global_context(epoch, track_costs)
+            .map_err(|e| to_contract_call_error(e.to_string()))?;
 
         let mut hooks: Vec<&mut dyn EvalHook> = Vec::new();
         for hook in eval_hooks {
@@ -901,7 +927,7 @@ impl ClarityInterpreter {
                 global_context.eval_hooks = Some(eval_hooks);
             }
             err
-        })?;
+        });
 
         let mut cost = None;
         if track_costs {
@@ -914,7 +940,12 @@ impl ClarityInterpreter {
             .flat_map(|b| b.events.clone())
             .collect::<Vec<_>>();
 
-        let eval_result = EvaluationResult::Snippet(SnippetEvaluationResult { result: value });
+        let eval_result = match value {
+            Ok(value) => EvaluationResult::Snippet(SnippetEvaluationResult { result: value }),
+            Err(e) => {
+                return Err(to_contract_call_error(e.to_string()));
+            }
+        };
         global_context.commit().unwrap();
 
         let (events, accounts_to_credit, accounts_to_debit) =
@@ -1192,6 +1223,15 @@ impl ClarityInterpreter {
     }
 }
 
+fn to_contract_call_error(error: String) -> ContractCallError {
+    if error.contains("UndefinedFunction") {
+        ContractCallError::NoSuchFunction(error)
+    } else if error.contains("Failed to read non-consensus contract metadata") {
+        ContractCallError::NoSuchContract(error)
+    } else {
+        ContractCallError::Uncategorized(error)
+    }
+}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1216,7 +1256,7 @@ mod tests {
     fn deploy_contract(
         interpreter: &mut ClarityInterpreter,
         contract: &ClarityContract,
-    ) -> Result<ExecutionResult, String> {
+    ) -> Result<ExecutionResult, ContractCallError> {
         let source = contract.expect_in_memory_code_source();
         let (ast, ..) = interpreter.build_ast(contract);
         let (annotations, _) = interpreter.collect_annotations(source);
@@ -1225,14 +1265,16 @@ mod tests {
             .run_analysis(contract, &ast, &annotations)
             .unwrap();
 
-        let result = interpreter.execute(contract, &ast, analysis, false, None);
+        let result = interpreter
+            .execute(contract, &ast, analysis, false, None)
+            .map_err(to_contract_call_error);
         assert!(result.is_ok());
         result
     }
 
     #[track_caller]
     fn assert_execution_result_value(
-        result: Result<ExecutionResult, String>,
+        result: Result<ExecutionResult, ContractCallError>,
         expected_value: Value,
     ) {
         assert!(result.is_ok());
@@ -2157,9 +2199,8 @@ mod tests {
 
         assert!(result.is_err());
         let err = result.unwrap_err();
-        assert_eq!(
-            err.to_string(),
-            "Runtime error while interpreting S1G2081040G2081040G2081040G208105NK8PE5.contract: Unchecked(NoSuchPublicFunction(\"S1G2081040G2081040G2081040G208105NK8PE5.contract\", \"private-func\"))"
+        assert!(
+            matches!(err, ContractCallError::NoSuchFunction(function_name) if function_name == "private-func")
         );
     }
 }
