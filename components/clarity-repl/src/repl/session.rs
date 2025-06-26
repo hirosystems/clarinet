@@ -2,6 +2,7 @@ use super::boot::{
     BOOT_CODE_MAINNET, BOOT_CODE_TESTNET, BOOT_MAINNET_PRINCIPAL, BOOT_TESTNET_PRINCIPAL,
 };
 use super::diagnostic::output_diagnostic;
+use super::interpreter::ContractCallError;
 use super::{ClarityCodeSource, ClarityContract, ClarityInterpreter, ContractDeployer};
 use crate::analysis::coverage::CoverageHook;
 use crate::repl::clarity_values::value_to_string;
@@ -560,18 +561,17 @@ impl Session {
             Ok(result) => result,
             Err(e) => {
                 self.set_tx_sender(&initial_tx_sender);
-                let mut user_friendly_message =
-                    format!("Error calling contract function '{method}': {e}");
-                if e.contains("Failed to read non-consensus contract metadata") {
-                    user_friendly_message = format!("Contract '{contract_id_str}' does not exist");
-                } else if e.contains("NoSuchPublicFunction")
-                    || e.contains("NoSuchPrivateFunction")
-                    || e.contains("UndefinedFunction")
-                    || e.contains("Unchecked(UndefinedFunction")
-                {
-                    user_friendly_message =
-                        format!("Method '{method}' does not exist on contract '{contract_id_str}'");
-                }
+                let user_friendly_message = match e {
+                    ContractCallError::NoSuchContract(_) => {
+                        format!("Contract '{contract_id_str}' does not exist")
+                    }
+                    ContractCallError::NoSuchFunction(_) => {
+                        format!("Method '{method}' does not exist on contract '{contract_id_str}'")
+                    }
+                    ContractCallError::Uncategorized(message) => {
+                        format!("Error calling contract function '{method}': {message}")
+                    }
+                };
                 return Err(vec![Diagnostic {
                     level: Level::Error,
                     message: user_friendly_message,
