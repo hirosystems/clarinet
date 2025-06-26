@@ -1558,8 +1558,6 @@ fn load_deployment_if_exists(
                             ChangeTag::Equal => format!("  {change}"),
                         };
                         print!("{formatted_change}");
-                        use colored::Colorize;
-                        String::from("x").red();
                     }
 
                     println!("{}", yellow!("Overwrite? [Y/n]"));
