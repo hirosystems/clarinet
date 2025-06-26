@@ -1057,10 +1057,6 @@ rpcport={bitcoin_node_rpc_port}
             .await?;
         }
 
-        // if !no_snapshot {
-        //     fix_bitcoin_permissions(docker, &container, devnet_event_tx).await?;
-        // }
-
         Ok(())
     }
 
