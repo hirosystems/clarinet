@@ -550,11 +550,8 @@ pub mod source_serde {
         let bytes = b64
             .decode(encoded)
             .map_err(|e| format!("unable to decode contract source: {e}"))?;
-        let decoded = from_utf8(&bytes).map_err(|e| {
-            format!(
-                "invalid UTF-8 sequence when decoding contract source: {e}"
-            )
-        })?;
+        let decoded = from_utf8(&bytes)
+            .map_err(|e| format!("invalid UTF-8 sequence when decoding contract source: {e}"))?;
         Ok(decoded.to_owned())
     }
 }
@@ -1223,14 +1220,12 @@ impl DeploymentSpecificationFile {
     ) -> Result<DeploymentSpecificationFile, String> {
         let spec_file_content = file_accesor.read_file(path.to_string()).await?;
 
-        serde_yaml::from_str(&spec_file_content)
-            .map_err(|msg| format!("unable to read file {msg}"))
+        serde_yaml::from_str(&spec_file_content).map_err(|msg| format!("unable to read file {msg}"))
     }
     pub fn from_file_content(
         spec_file_content: &str,
     ) -> Result<DeploymentSpecificationFile, String> {
-        serde_yaml::from_str(spec_file_content)
-            .map_err(|msg| format!("unable to read file {msg}"))
+        serde_yaml::from_str(spec_file_content).map_err(|msg| format!("unable to read file {msg}"))
     }
 }
 

@@ -397,9 +397,7 @@ impl ClarityDatastore {
             return Ok(Some(cached));
         }
 
-        let url = format!(
-            "/v2/clarity/metadata/{addr}/{contract}/{key}?tip={tip}"
-        );
+        let url = format!("/v2/clarity/metadata/{addr}/{contract}/{key}?tip={tip}");
         let response = self.client.fetch_clarity_data(&url)?;
 
         // Save response to cache if successful

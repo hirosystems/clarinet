@@ -3532,8 +3532,8 @@ impl StacksMessageCodec for SinglesigSpendingCondition {
         let key_encoding_u8: u8 = read_next(fd)?;
         let key_encoding = TransactionPublicKeyEncoding::from_u8(key_encoding_u8).ok_or(
             CodecError::DeserializeError(format!(
-                "Failed to parse singlesig spending condition: unknown key encoding {key_encoding_u8}"
-            )),
+            "Failed to parse singlesig spending condition: unknown key encoding {key_encoding_u8}"
+        )),
         )?;
 
         let signature: MessageSignature = read_next(fd)?;

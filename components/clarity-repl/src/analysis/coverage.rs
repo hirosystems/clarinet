@@ -187,9 +187,8 @@ impl CoverageHook {
                     for ((line, block_id, branch_nb), count) in branch_execution_counts.iter() {
                         // the ast can contain elements with a span starting at line 0 that we want to ignore
                         if line > &&0 {
-                            file_content.push_str(&format!(
-                                "BRDA:{line},{block_id},{branch_nb},{count}\n"
-                            ));
+                            file_content
+                                .push_str(&format!("BRDA:{line},{block_id},{branch_nb},{count}\n"));
                         }
                     }
                 }

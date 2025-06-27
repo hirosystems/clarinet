@@ -120,21 +120,18 @@ fn it_handles_at_block() {
     let result = eval_snippet(&mut session, &snippet);
     assert_eq!(result, Value::UInt(42000));
 
-    let snippet_get_count_at_10k = format!(
-        "(contract-call? '{COUNTER_ADDR} get-count-at-block u10000)"
-    );
+    let snippet_get_count_at_10k =
+        format!("(contract-call? '{COUNTER_ADDR} get-count-at-block u10000)");
     let result = eval_snippet(&mut session, &snippet_get_count_at_10k);
     assert_eq!(result, Value::okay(Value::none()).unwrap());
 
-    let snippet_get_count_at_42k = format!(
-        "(contract-call? '{COUNTER_ADDR} get-count-at-block u42000)"
-    );
+    let snippet_get_count_at_42k =
+        format!("(contract-call? '{COUNTER_ADDR} get-count-at-block u42000)");
     let result = eval_snippet(&mut session, &snippet_get_count_at_42k);
     assert_eq!(result, Value::okay(Value::UInt(0)).unwrap());
 
-    let snippet_get_count_at_57k = format!(
-        "(contract-call? '{COUNTER_ADDR} get-count-at-block u57000)"
-    );
+    let snippet_get_count_at_57k =
+        format!("(contract-call? '{COUNTER_ADDR} get-count-at-block u57000)");
     let result = eval_snippet(&mut session, &snippet_get_count_at_57k);
     assert_eq!(result, Value::okay(Value::UInt(1)).unwrap());
 }
@@ -212,9 +209,7 @@ fn it_can_fetch_burn_chain_info() {
 fn it_keeps_track_of_historical_data() {
     let mut session = init_session(57000);
 
-    let snippet = format!(
-        "(contract-call? '{COUNTER_ADDR} get-count-at-block u42000)"
-    );
+    let snippet = format!("(contract-call? '{COUNTER_ADDR} get-count-at-block u42000)");
     let result = eval_snippet(&mut session, &snippet);
     assert_eq!(result, Value::okay(Value::UInt(0)).unwrap());
 

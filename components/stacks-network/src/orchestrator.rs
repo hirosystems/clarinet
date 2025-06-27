@@ -3142,9 +3142,7 @@ events_keys = ["*"]
                                             let _ = devnet_event_tx.send(DevnetEvent::error(
                                                 format!("Failed to read error text: {e}"),
                                             ));
-                                            return Err(format!(
-                                                "Failed to read error text: {e}"
-                                            ));
+                                            return Err(format!("Failed to read error text: {e}"));
                                         }
                                     }
                                 }

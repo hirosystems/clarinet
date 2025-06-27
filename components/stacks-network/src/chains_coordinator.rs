@@ -307,8 +307,8 @@ pub async fn start_chains_coordinator(
                                 events.push(block);
                             }
                             Err(e) => {
-                                let _ = devnet_event_tx
-                                    .send(DevnetEvent::debug(format!("Error: {e}")));
+                                let _ =
+                                    devnet_event_tx.send(DevnetEvent::debug(format!("Error: {e}")));
                             }
                         }
                     }
@@ -621,8 +621,8 @@ pub async fn start_chains_coordinator(
             ObserverEvent::PredicateDeregistered(_hook) => {}
             ObserverEvent::PredicatesTriggered(count) => {
                 if count > 0 {
-                    let _ = devnet_event_tx
-                        .send(DevnetEvent::info(format!("{count} hooks triggered")));
+                    let _ =
+                        devnet_event_tx.send(DevnetEvent::info(format!("{count} hooks triggered")));
                 }
             }
             ObserverEvent::Terminate => {
@@ -1018,9 +1018,8 @@ fn fund_genesis_account(
         let info = match stacks_rpc.call_with_retry(|client| client.get_info(), 5) {
             Ok(info) => info,
             Err(e) => {
-                let _ = devnet_event_tx_moved.send(DevnetEvent::error(format!(
-                    "Failed to retrieve info: {e}"
-                )));
+                let _ = devnet_event_tx_moved
+                    .send(DevnetEvent::error(format!("Failed to retrieve info: {e}")));
                 return;
             }
         };
@@ -1044,9 +1043,8 @@ fn fund_genesis_account(
             match stacks_rpc.call_with_retry(|client| client.get_nonce(&deployer.stx_address), 5) {
                 Ok(n) => n,
                 Err(e) => {
-                    let _ = devnet_event_tx_moved.send(DevnetEvent::error(format!(
-                        "Failed to retrieve nonce: {e}"
-                    )));
+                    let _ = devnet_event_tx_moved
+                        .send(DevnetEvent::error(format!("Failed to retrieve nonce: {e}")));
                     return;
                 }
             };
