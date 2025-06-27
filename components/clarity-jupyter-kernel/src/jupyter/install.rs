@@ -18,7 +18,10 @@ pub fn install() -> Result<(), Error> {
         "interrupt_mode" => "message",
     };
     let kernel_json_filename = kernel_dir.join("kernel.json");
-    println!("Writing {}", kernel_json_filename.to_string_lossy());
+    println!(
+        "Writing {path}",
+        path = kernel_json_filename.to_string_lossy()
+    );
     kernel_json.write_pretty(&mut fs::File::create(kernel_json_filename)?, 2)?;
     println!("Installation complete");
     Ok(())
@@ -26,7 +29,7 @@ pub fn install() -> Result<(), Error> {
 
 pub fn install_resource(dir: &PathBuf, filename: &str, bytes: &'static [u8]) -> Result<(), Error> {
     let res_path = dir.join(filename);
-    println!("Writing {}", res_path.to_string_lossy());
+    println!("Writing {path}", path = res_path.to_string_lossy());
     let mut file = fs::File::create(res_path)?;
     file.write_all(bytes)?;
     Ok(())
@@ -34,7 +37,7 @@ pub fn install_resource(dir: &PathBuf, filename: &str, bytes: &'static [u8]) -> 
 
 pub fn uninstall() -> Result<(), Error> {
     let kernel_dir = get_kernel_dir()?;
-    println!("Deleting {}", kernel_dir.to_string_lossy());
+    println!("Deleting {path}", path = kernel_dir.to_string_lossy());
     fs::remove_dir_all(kernel_dir)?;
     println!("Uninstall complete");
     Ok(())

@@ -536,7 +536,8 @@ export default defineConfig({
     }
 
     fn get_changes_for_new_root_dir(&self, name: String) -> Changes {
-        let dir = format!("{}/{}", self.project_path, name);
+        let project_path = &self.project_path;
+        let dir = format!("{project_path}/{name}");
         Changes::AddDirectory(DirectoryCreation {
             comment: format!("{} {}", green!("Created directory"), name),
             path: dir,
@@ -544,7 +545,8 @@ export default defineConfig({
     }
 
     fn get_changes_for_new_file(&self, name: String, content: String) -> Changes {
-        let path = format!("{}/{}", self.project_path, name);
+        let project_path = &self.project_path;
+        let path = format!("{project_path}/{name}");
 
         Changes::AddFile(FileCreation {
             comment: format!("{} {}", green!("Created file"), name),

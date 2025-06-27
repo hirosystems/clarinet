@@ -176,7 +176,7 @@ impl StacksRpc {
     }
 
     pub fn get_nonce(&self, address: &str) -> Result<u64, RpcError> {
-        let request_url = format!("{}/v2/accounts/{addr}", self.url, addr = address,);
+        let request_url = format!("{}/v2/accounts/{address}", self.url);
 
         let res: Balance = self
             .client
@@ -217,8 +217,8 @@ impl StacksRpc {
         contract_name: &str,
     ) -> Result<Contract, RpcError> {
         let request_url = format!(
-            "{}/v2/contracts/source/{}/{}",
-            self.url, principal, contract_name
+            "{}/v2/contracts/source/{principal}/{contract_name}",
+            self.url
         );
 
         let res = self.client.get(request_url).send();
@@ -241,8 +241,8 @@ impl StacksRpc {
         sender: &str,
     ) -> Result<Value, RpcError> {
         let path = format!(
-            "{}/v2/contracts/call-read/{}/{}/{}",
-            self.url, contract_addr, contract_name, method
+            "{}/v2/contracts/call-read/{contract_addr}/{contract_name}/{method}",
+            self.url
         );
 
         let arguments = args
@@ -290,7 +290,7 @@ impl StacksRpc {
     }
 
     pub fn get_burn_block(&self, height: u32) -> Result<BurnBlock, RpcError> {
-        let request_url = format!("{}/extended/v2/burn-blocks/{}", self.url, height);
+        let request_url = format!("{}/extended/v2/burn-blocks/{height}", self.url);
         self.client
             .get(request_url)
             .send()

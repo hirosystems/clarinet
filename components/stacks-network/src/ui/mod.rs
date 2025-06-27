@@ -70,7 +70,7 @@ pub fn do_start_ui(
     let backend = CrosstermBackend::new(stdout);
 
     let mut terminal =
-        Terminal::new(backend).map_err(|e| format!("unable to start terminal ui: {}", e))?;
+        Terminal::new(backend).map_err(|e| format!("unable to start terminal ui: {e}"))?;
 
     // Setup input handling
     let tick_rate = Duration::from_millis(500);
@@ -99,20 +99,20 @@ pub fn do_start_ui(
 
     terminal
         .clear()
-        .map_err(|e| format!("unable to start terminal ui: {}", e))?;
+        .map_err(|e| format!("unable to start terminal ui: {e}"))?;
 
     let mut mining_command_tx: Option<Sender<BitcoinMiningCommand>> = None;
 
     loop {
         terminal
             .draw(|f| ui::draw(f, &mut app))
-            .map_err(|e| format!("unable to update ui: {}", e))?;
+            .map_err(|e| format!("unable to update ui: {e}"))?;
 
         let event = match devnet_events_rx.recv() {
             Ok(event) => event,
             Err(e) => {
                 app.display_log(
-                    DevnetEvent::log_error(format!("Error receiving event: {}", e)),
+                    DevnetEvent::log_error(format!("Error receiving event: {e}")),
                     ctx,
                 );
                 let _ = terminate(
@@ -242,7 +242,7 @@ pub fn do_start_ui(
                 // Display something
             }
             DevnetEvent::FatalError(message) => {
-                app.display_log(DevnetEvent::log_error(format!("Fatal: {}", message)), ctx);
+                app.display_log(DevnetEvent::log_error(format!("Fatal: {message}")), ctx);
                 let _ = terminate(
                     &mut terminal,
                     chains_coordinator_commands_tx,
@@ -281,11 +281,11 @@ fn terminate(
     let _ = execute!(terminal.backend_mut(), LeaveAlternateScreen);
     let res = chains_coordinator_commands_tx.send(ChainsCoordinatorCommand::Terminate);
     if let Err(e) = res {
-        println!("Error sending terminate command: {}", e);
+        println!("Error sending terminate command: {e}");
     }
     let res = orchestrator_terminated_rx.recv();
     if let Err(e) = res {
-        println!("Error sending terminate command: {}", e);
+        println!("Error sending terminate command: {e}");
     }
     let _ = terminal.show_cursor();
     Ok(())

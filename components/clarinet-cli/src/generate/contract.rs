@@ -34,7 +34,7 @@ impl GetChangesForRmContract {
             return Ok(());
         }
         let change = FileDeletion {
-            comment: format!("{} tests/{}", red!("Deleted file"), name),
+            comment: format!("{} tests/{name}", red!("Deleted file")),
             path: f.to_string(),
         };
         self.changes.push(Changes::RemoveFile(change));
@@ -46,10 +46,10 @@ impl GetChangesForRmContract {
         f.append_path("contracts")?;
         f.append_path(&name)?;
         if !f.exists() {
-            return Err(format!("{} doesn't exist", f));
+            return Err(format!("{f} doesn't exist"));
         }
         let change = FileDeletion {
-            comment: format!("{} contracts/{}", red!("Deleted file"), name),
+            comment: format!("{} contracts/{name}", red!("Deleted file")),
             path: f.to_string(),
         };
         self.changes.push(Changes::RemoveFile(change));
@@ -147,10 +147,10 @@ impl GetChangesForNewContract {
         new_file.append_path("contracts")?;
         new_file.append_path(&name)?;
         if new_file.exists() {
-            return Err(format!("{} already exists", new_file));
+            return Err(format!("{new_file} already exists"));
         }
         let change = FileCreation {
-            comment: format!("{} contracts/{}", green!("Created file"), name),
+            comment: format!("{} contracts/{name}", green!("Created file")),
             content,
             path: new_file.to_string(),
         };
@@ -188,10 +188,10 @@ describe("example tests", () => {
         new_file.append_path("tests")?;
         new_file.append_path(&name)?;
         if new_file.exists() {
-            return Err(format!("{} already exists", new_file));
+            return Err(format!("{new_file} already exists"));
         }
         let change = FileCreation {
-            comment: format!("{} tests/{}", green!("Created file"), name),
+            comment: format!("{} tests/{name}", green!("Created file")),
             content,
             path: new_file.to_string(),
         };
@@ -202,10 +202,8 @@ describe("example tests", () => {
     fn index_contract_in_clarinet_toml(&mut self) {
         let contract_file_name = format!("{}.clar", self.contract_name);
         let manifest_location = self.manifest_location.clone();
-        let contract_path = {
-            let path = format!("contracts/{}", contract_file_name);
-            PathBuf::from_str(&path).unwrap()
-        };
+        let path = format!("contracts/{contract_file_name}");
+        let contract_path = PathBuf::from_str(&path).unwrap();
         let contract_config = ClarityContract {
             code_source: ClarityCodeSource::ContractOnDisk(contract_path),
             deployer: ContractDeployer::DefaultDeployer,

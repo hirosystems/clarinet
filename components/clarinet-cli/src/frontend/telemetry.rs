@@ -81,7 +81,7 @@ async fn send_event(event: DeveloperUsageEvent) {
                 "clarinet_version": clarinet_version,
                 "ci_mode": ci_mode,
                 "operating_system": os,
-                "network": format!("{:?}", network),
+                "network": format!("{network:?}"),
             }),
         ),
         DeveloperUsageEvent::CheckExecuted(digest) => (

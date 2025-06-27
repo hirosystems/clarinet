@@ -62,7 +62,7 @@ impl std::str::FromStr for WarningKind {
         match s {
             "unchecked_data" => Ok(WarningKind::UncheckedData),
             "unchecked_params" => Ok(WarningKind::UncheckedParams),
-            _ => Err(format!("'{}' is not a valid warning identifier", s)),
+            _ => Err(format!("'{s}' is not a valid warning identifier")),
         }
     }
 }

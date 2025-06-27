@@ -243,7 +243,7 @@ pub fn update_deployment_costs(
                             tx.cost = fee;
                         }
                         Err(e) => {
-                            println!("unable to estimate fee for transaction: {}", e);
+                            println!("unable to estimate fee for transaction: {e}");
                             continue;
                         }
                     };
@@ -274,7 +274,7 @@ pub fn update_deployment_costs(
                             tx.cost = fee;
                         }
                         Err(e) => {
-                            println!("unable to estimate fee for transaction: {}", e);
+                            println!("unable to estimate fee for transaction: {e}");
                             continue;
                         }
                     };
@@ -293,7 +293,7 @@ pub fn update_deployment_costs(
                             tx.cost = fee;
                         }
                         Err(e) => {
-                            println!("unable to estimate fee for transaction: {}", e);
+                            println!("unable to estimate fee for transaction: {e}");
                             continue;
                         }
                     };
@@ -418,7 +418,7 @@ pub fn apply_on_chain_deployment(
                         Ok(res) => res,
                         Err(e) => {
                             let _ = deployment_event_tx.send(DeploymentEvent::Interrupted(
-                                format!("unable to encode stx_transfer ({})", e),
+                                format!("unable to encode stx_transfer ({e})"),
                             ));
                             return;
                         }

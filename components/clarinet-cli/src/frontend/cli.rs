@@ -798,7 +798,7 @@ pub fn main() {
                                 println!(
                                     "{} using existing deployments/default.{}-plan.yaml",
                                     yellow!("note:"),
-                                    format!("{:?}", network).to_lowercase(),
+                                    format!("{network:?}").to_lowercase(),
                                 );
                                 Ok(deployment)
                             }
@@ -1452,7 +1452,7 @@ fn load_deployment_and_artifacts_or_exit(
                     let artifacts = setup_session_with_deployment(manifest, &deployment, None);
                     Ok((deployment, Some(deployment_location.to_string()), artifacts))
                 }
-                Err(e) => Err(format!("loading {} failed with error: {}", path, e)),
+                Err(e) => Err(format!("loading {path} failed with error: {e}")),
             }
         }
     };

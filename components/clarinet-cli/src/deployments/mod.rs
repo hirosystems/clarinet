@@ -37,7 +37,7 @@ pub fn check_deployments(manifest: &ProjectManifest) -> Result<(), String> {
         ) {
             Ok(spec) => spec,
             Err(msg) => {
-                println!("{} {} syntax incorrect\n{}", red!("x"), relative_path, msg);
+                println!("{} {} syntax incorrect\n{msg}", red!("x"), relative_path);
                 continue;
             }
         };

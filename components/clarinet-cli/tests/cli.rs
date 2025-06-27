@@ -105,9 +105,9 @@ fn test_contract_new() {
     assert!(output.status.success(), "clarinet contract new failed");
 
     let expected_lines = [
-        format!("Created file contracts/{}.clar", contract_name),
-        format!("Created file tests/{}.test.ts", contract_name),
-        format!("Updated Clarinet.toml with contract {}", contract_name),
+        format!("Created file contracts/{contract_name}.clar"),
+        format!("Created file tests/{contract_name}.test.ts"),
+        format!("Updated Clarinet.toml with contract {contract_name}"),
     ];
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stdout_lines: Vec<_> = stdout.lines().map(str::trim).collect();
@@ -120,7 +120,7 @@ fn test_contract_new() {
     assert!(contract_path.is_file(), "Contract file missing");
 
     let contract_str = fs::read_to_string(&contract_path).expect("Failed to read contract file");
-    let expected = format!(";; title: {}", contract_name);
+    let expected = format!(";; title: {contract_name}");
     assert_eq!(contract_str.lines().next().unwrap_or(""), expected);
 
     let expected_files = [

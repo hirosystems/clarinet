@@ -20,7 +20,7 @@ fn draw_contracts_status(f: &mut Frame, app: &mut App, area: Rect) {
                 ("🟦", "Transaction encoded and queued".to_string())
             }
             TransactionStatus::Broadcasted(_, txid) => {
-                ("🟨", format!("Transaction broadcasted (txid: {})", txid))
+                ("🟨", format!("Transaction broadcasted (txid: {txid})"))
             }
             TransactionStatus::Confirmed => ("🟩", "Transaction confirmed".to_string()),
             TransactionStatus::Error(message) => ("🟥", message.to_string()),
@@ -35,8 +35,9 @@ fn draw_contracts_status(f: &mut Frame, app: &mut App, area: Rect) {
         .bottom_margin(0)
     });
 
+    let node_url = &app.node_url;
     let t = Table::new(rows, vec![] as Vec<&Constraint>)
-        .block(Block::default().title(format!("Broadcasting transactions to {}", app.node_url)))
+        .block(Block::default().title(format!("Broadcasting transactions to {node_url}")))
         .style(Style::default().fg(Color::White))
         .widths([
             Constraint::Length(3),

@@ -154,7 +154,7 @@ pub fn send_transaction_spec(
     let (mut transaction, selected_utxos) = build_transaction_spec(tx_spec, &mut utxos);
     sign_transaction(&mut transaction, selected_utxos, signer);
 
-    println!("-> Transaction\n{:?}", transaction);
+    println!("-> Transaction\n{transaction:?}");
 
     let encoded_tx = encode::serialize(&transaction);
 

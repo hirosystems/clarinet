@@ -549,13 +549,9 @@ pub mod source_serde {
     pub fn base64_decode(encoded: &str) -> Result<String, String> {
         let bytes = b64
             .decode(encoded)
-            .map_err(|e| format!("unable to decode contract source: {}", e))?;
-        let decoded = from_utf8(&bytes).map_err(|e| {
-            format!(
-                "invalid UTF-8 sequence when decoding contract source: {}",
-                e
-            )
-        })?;
+            .map_err(|e| format!("unable to decode contract source: {e}"))?;
+        let decoded = from_utf8(&bytes)
+            .map_err(|e| format!("invalid UTF-8 sequence when decoding contract source: {e}"))?;
         Ok(decoded.to_owned())
     }
 }
