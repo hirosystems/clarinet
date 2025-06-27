@@ -1,8 +1,6 @@
-##
-## Bumps the Clarinet version listed on various package managers.
-##
+# Release the CLI to homebrew and winget.
 
-name: Package Version Bump
+name: Release CLI
 on:
   workflow_dispatch:
     inputs:
