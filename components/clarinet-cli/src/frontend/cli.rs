@@ -23,6 +23,7 @@ use clarinet_deployments::{
     get_default_deployment_path, load_deployment, setup_session_with_deployment,
 };
 use clarinet_files::clarinetrc::ClarinetRC;
+use clarinet_files::devnet_diff::DevnetDiffConfig;
 use clarinet_files::StacksNetwork;
 use clarinet_files::{
     get_manifest_location, FileLocation, NetworkManifest, ProjectManifest, ProjectManifestFile,
@@ -456,6 +457,9 @@ struct DevnetStart {
     /// Display streams of logs instead of terminal UI dashboard
     #[clap(long = "no-dashboard")]
     pub no_dashboard: bool,
+    /// Start from genesis rather than using snapshot
+    #[clap(long = "from-genesis")]
+    pub no_snapshot: bool,
     /// If specified, use this deployment file
     #[clap(long = "deployment-plan-path", short = 'p')]
     pub deployment_plan_path: Option<String>,
@@ -623,10 +627,10 @@ pub fn main() {
                             );
                             println!(
                                 "{}",
-                                blue!(format!(
+                                blue!(
                                     "  $ mkdir -p ~/.clarinet; echo \"enable_telemetry = true\" >> {}",
                                     ClarinetRC::get_settings_file_path()
-                                ))
+                                )
                             );
                             // TODO(lgalabru): once we have a privacy policy available, add a link
                             // println!("{}", yellow!("Visit http://hiro.so/clarinet-privacy for details."));
@@ -1015,7 +1019,7 @@ pub fn main() {
                     comment: format!(
                         "{} with requirement {}",
                         yellow!("Updated Clarinet.toml"),
-                        green!(format!("{}", cmd.contract_id))
+                        green!("{}", cmd.contract_id)
                     ),
                     manifest_location: manifest.location,
                     contracts_to_rm: vec![],
@@ -1489,14 +1493,14 @@ fn should_existing_plan_be_replaced(
     for change in diffs.iter_all_changes() {
         let formatted_change = match change.tag() {
             ChangeTag::Delete => {
-                format!("{} {}", red!("-"), red!(format!("{}", change)))
+                format!("{} {}", red!("-"), red!("{change}"))
             }
             ChangeTag::Insert => {
-                format!("{} {}", green!("+"), green!(format!("{}", change)))
+                format!("{} {}", green!("+"), green!("{change}"))
             }
-            ChangeTag::Equal => format!("  {}", change),
+            ChangeTag::Equal => format!("  {change}"),
         };
-        print!("{}", formatted_change);
+        print!("{formatted_change}");
     }
 
     println!("{}", yellow!("Overwrite? [Y/n]"));
@@ -1532,9 +1536,7 @@ fn load_deployment_if_exists(
 
                 let updated_version = match deployment.to_file_content() {
                     Ok(res) => res,
-                    Err(err) => {
-                        return Some(Err(format!("failed serializing deployment\n{}", err)))
-                    }
+                    Err(err) => return Some(Err(format!("failed serializing deployment\n{err}"))),
                 };
 
                 if updated_version == current_version {
@@ -1552,14 +1554,14 @@ fn load_deployment_if_exists(
                     for change in diffs.iter_all_changes() {
                         let formatted_change = match change.tag() {
                             ChangeTag::Delete => {
-                                format!("{} {}", red!("-"), red!(format!("{}", change)))
+                                format!("{} {}", red!("-"), red!("{change}"))
                             }
                             ChangeTag::Insert => {
-                                format!("{} {}", green!("+"), green!(format!("{}", change)))
+                                format!("{} {}", green!("+"), green!("{change}"))
                             }
-                            ChangeTag::Equal => format!("  {}", change),
+                            ChangeTag::Equal => format!("  {change}"),
                         };
-                        print!("{}", formatted_change);
+                        print!("{formatted_change}");
                     }
 
                     println!("{}", yellow!("Overwrite? [Y/n]"));
@@ -1830,19 +1832,43 @@ fn display_hint_header() {
 fn display_hint_footer() {
     println!(
         "{}",
-        yellow!(format!(
+        yellow!(
             "These hints can be disabled in the {} file.",
             ClarinetRC::get_settings_file_path()
-        ))
+        )
     );
     println!(
         "{}",
-        blue!(format!(
+        blue!(
             "  $ mkdir -p ~/.clarinet; echo \"enable_hints = false\" >> {}",
             ClarinetRC::get_settings_file_path()
-        ))
+        )
     );
     display_separator();
+}
+
+fn display_devnet_incompatibilities(incompatibles: Vec<(String, String, String)>) {
+    println!(
+        "{}",
+        yellow!("The default snapshot can not be used because the following Devnet.toml fields are incompatible with the snapshot:")
+    );
+    for (field, user_value, default_value) in incompatibles {
+        println!(
+            "{}",
+            yellow!("{}:\n{}\n{} (default)", field, user_value, default_value)
+        );
+    }
+}
+
+fn display_devnet_incompatibilities_continue() {
+    println!(
+        "{}",
+        yellow!("Continuing with startup, no snapshot will be used")
+    );
+    println!(
+        "{}",
+        yellow!("You can use the --from-genesis flag to skip the snapshot")
+    );
 }
 
 fn display_post_check_hint() {
@@ -1870,7 +1896,7 @@ fn display_contract_new_hint(project_name: Option<&str>) {
             "{}",
             yellow!("Switch to the newly created directory with:\n")
         );
-        println!("{}", blue!(format!("  $ cd {}\n", project_name)));
+        println!("{}", blue!("  $ cd {project_name}\n"));
     }
     println!(
         "{}",
@@ -2013,7 +2039,28 @@ fn devnet_start(cmd: DevnetStart, clarinetrc: ClarinetRC) {
             ),
         ));
     }
-    match start(orchestrator, deployment, None, !cmd.no_dashboard) {
+
+    let devnet_config = match orchestrator.network_config {
+        Some(ref network_config) => match &network_config.devnet {
+            Some(devnet_config) => Ok(devnet_config.clone()),
+            _ => Err("Unable to retrieve config"),
+        },
+        _ => Err("Unable to retrieve config"),
+    };
+    let differ = DevnetDiffConfig::new();
+    let compatible = differ.is_compatible(&devnet_config.unwrap());
+    if let Err(incompatibles) = compatible {
+        display_devnet_incompatibilities(incompatibles);
+        prompt_user_to_continue();
+        display_devnet_incompatibilities_continue()
+    }
+    match start(
+        orchestrator,
+        deployment,
+        None,
+        !cmd.no_dashboard,
+        cmd.no_snapshot,
+    ) {
         Err(e) => {
             eprintln!("{}", format_err!(e));
             process::exit(1);

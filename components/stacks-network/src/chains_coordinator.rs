@@ -4,20 +4,25 @@ use crate::event::send_status_update;
 use crate::event::DevnetEvent;
 use crate::event::Status;
 use crate::orchestrator::ServicesMapHosts;
+use crate::orchestrator::EXCLUDED_STACKS_SNAPSHOT_FILES;
+use crate::orchestrator::{copy_directory, get_global_snapshot_dir, get_project_snapshot_dir};
 
 use base58::FromBase58;
 use bitcoincore_rpc::bitcoin::Address;
 use chainhook_sdk::chainhooks::types::ChainhookStore;
+use chainhook_sdk::indexer::stacks::standardize_stacks_serialized_block;
+use chainhook_sdk::indexer::StacksChainContext;
 use chainhook_sdk::observer::PredicatesConfig;
 use chainhook_sdk::observer::{
     start_event_observer, EventObserverConfig, ObserverCommand, ObserverEvent,
-    StacksChainMempoolEvent,
+    StacksChainMempoolEvent, StacksObserverStartupContext,
 };
 use chainhook_sdk::types::BitcoinBlockSignaling;
 use chainhook_sdk::types::BitcoinChainEvent;
 use chainhook_sdk::types::StacksChainEvent;
 use chainhook_sdk::types::StacksNodeConfig;
 use chainhook_sdk::utils::Context;
+use chainhook_types::StacksBlockData;
 use chainhook_types::StacksTransactionKind;
 use clarinet_deployments::onchain::TransactionStatus;
 use clarinet_deployments::onchain::{
@@ -48,12 +53,17 @@ use stackslib::types::chainstate::StacksPublicKey;
 use stackslib::util_lib::signed_structured_data::pox4::make_pox_4_signer_key_signature;
 use stackslib::util_lib::signed_structured_data::pox4::Pox4SignatureTopic;
 use std::convert::TryFrom;
+use std::fs;
+use std::path::PathBuf;
 use std::str;
 use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Arc;
 use std::time::Duration;
+
+const SNAPSHOT_STACKS_START_HEIGHT: u64 = 38;
+const SNAPSHOT_BURN_START_HEIGHT: u64 = 143;
 
 #[derive(Deserialize)]
 pub struct NewTransaction {
@@ -167,7 +177,6 @@ impl DevnetEventObserverConfig {
         }
     }
 }
-
 pub async fn start_chains_coordinator(
     config: DevnetEventObserverConfig,
     devnet_event_tx: Sender<DevnetEvent>,
@@ -178,11 +187,29 @@ pub async fn start_chains_coordinator(
     observer_command_rx: Receiver<ObserverCommand>,
     mining_command_tx: Sender<BitcoinMiningCommand>,
     mining_command_rx: Receiver<BitcoinMiningCommand>,
+    using_snapshot: bool,
     ctx: Context,
 ) -> Result<(), String> {
     let mut should_deploy_protocol = true; // Will change when `stacks-network` components becomes compatible with Testnet / Mainnet setups
     let boot_completed = Arc::new(AtomicBool::new(false));
-    let mut current_burn_height = 0;
+    let mut current_burn_height = if using_snapshot {
+        SNAPSHOT_BURN_START_HEIGHT
+    } else {
+        0
+    };
+    let starting_block_height = if using_snapshot {
+        SNAPSHOT_STACKS_START_HEIGHT
+    } else {
+        0
+    };
+
+    let global_snapshot_dir = get_global_snapshot_dir();
+    let project_snapshot_dir = get_project_snapshot_dir(&config.devnet_config);
+    // Ensure directories exist
+    fs::create_dir_all(&global_snapshot_dir)
+        .map_err(|e| format!("unable to create global snapshot directory: {:?}", e))?;
+    fs::create_dir_all(&project_snapshot_dir)
+        .map_err(|e| format!("unable to create project snapshot directory: {:?}", e))?;
 
     let (deployment_commands_tx, deployments_command_rx) = channel();
     let (deployment_events_tx, deployment_events_rx) = channel();
@@ -234,6 +261,68 @@ pub async fn start_chains_coordinator(
     let observer_event_tx_moved = observer_event_tx.clone();
     let observer_command_tx_moved = observer_command_tx.clone();
     let ctx_moved = ctx.clone();
+
+    let stacks_startup_context = if using_snapshot {
+        // Load events from snapshot if available
+        let event_pool: Vec<StacksBlockData> = {
+            let mut events = vec![];
+            let events_cache_path = get_global_snapshot_dir()
+                .join("events_export")
+                .join("events_cache.tsv");
+
+            let mut chain_ctx = StacksChainContext::new(&chainhook_types::StacksNetwork::Devnet);
+            if let Ok(file_content) = fs::read_to_string(&events_cache_path) {
+                for line in file_content.lines() {
+                    let parts: Vec<&str> = line.split('\t').collect();
+                    if parts.get(2).unwrap_or(&"") == &"/new_block" {
+                        let maybe_block = standardize_stacks_serialized_block(
+                            &chainhook_sdk::indexer::IndexerConfig {
+                                bitcoin_network: chainhook_types::BitcoinNetwork::Regtest,
+                                stacks_network: chainhook_types::StacksNetwork::Devnet,
+                                bitcoind_rpc_url: config
+                                    .devnet_config
+                                    .bitcoin_node_image_url
+                                    .clone(),
+                                bitcoind_rpc_username: config
+                                    .devnet_config
+                                    .bitcoin_node_username
+                                    .clone(),
+                                bitcoind_rpc_password: config
+                                    .devnet_config
+                                    .bitcoin_node_password
+                                    .clone(),
+                                bitcoin_block_signaling: BitcoinBlockSignaling::Stacks(
+                                    StacksNodeConfig {
+                                        rpc_url: config.devnet_config.stacks_node_image_url.clone(),
+                                        ingestion_port: 3999,
+                                    },
+                                ),
+                            },
+                            parts.get(3).unwrap_or(&""),
+                            &mut chain_ctx,
+                            &ctx,
+                        );
+                        match maybe_block {
+                            Ok(block) => {
+                                events.push(block);
+                            }
+                            Err(e) => {
+                                let _ = devnet_event_tx
+                                    .send(DevnetEvent::debug(format!("Error: {}", e)));
+                            }
+                        }
+                    }
+                }
+            }
+            events
+        };
+        Some(StacksObserverStartupContext {
+            block_pool_seed: event_pool,
+            last_block_height_appended: starting_block_height,
+        })
+    } else {
+        None
+    };
     let _ = hiro_system_kit::thread_named("Event observer").spawn(move || {
         let _ = start_event_observer(
             event_observer_config,
@@ -241,7 +330,7 @@ pub async fn start_chains_coordinator(
             observer_command_rx,
             Some(observer_event_tx_moved),
             None,
-            None,
+            stacks_startup_context,
             ctx_moved,
         );
     });
@@ -326,9 +415,20 @@ pub async fn start_chains_coordinator(
                         let comment =
                             format!("mining blocks (chain_tip = #{})", bitcoin_block_height);
 
+                        // Check if we've reached the target height for database export (142)
+                        // If we've reached epoch 3.0, create the global snapshot
+                        if bitcoin_block_height == config.devnet_config.epoch_3_0 {
+                            let _ = create_global_snapshot(
+                                &config,
+                                &devnet_event_tx,
+                                mining_command_tx.clone(),
+                            )
+                            .await;
+                        }
                         // Stacking orders can't be published until devnet is ready
                         if !stacks_signers_keys.is_empty()
                             && bitcoin_block_height >= DEFAULT_FIRST_BURN_HEADER_HEIGHT + 10
+                            && !using_snapshot
                         {
                             let res = publish_stacking_orders(
                                 &config.devnet_config,
@@ -380,7 +480,7 @@ pub async fn start_chains_coordinator(
             ObserverEvent::StacksChainEvent((chain_event, _)) => {
                 if should_deploy_protocol {
                     if let Some(block_identifier) = chain_event.get_latest_block_identifier() {
-                        if block_identifier.index == 1 {
+                        if block_identifier.index == starting_block_height {
                             should_deploy_protocol = false;
                             if let Some(deployment_commands_tx) = deployment_commands_tx.take() {
                                 deployment_commands_tx
@@ -644,6 +744,110 @@ fn should_publish_stacking_orders(
     }
 
     true
+}
+
+pub async fn create_global_snapshot(
+    devnet_event_observer_config: &DevnetEventObserverConfig,
+    devnet_event_tx: &Sender<DevnetEvent>,
+    mining_command_tx: Sender<BitcoinMiningCommand>,
+) {
+    let devnet_config = &devnet_event_observer_config.devnet_config;
+    let global_snapshot_dir = get_global_snapshot_dir();
+    let project_snapshot_dir = get_project_snapshot_dir(devnet_config);
+
+    // Project snapshot marker
+    let project_marker = project_snapshot_dir.join("epoch_3_ready");
+    if !project_marker.exists() {
+        match std::fs::File::create(&project_marker) {
+            Ok(_) => {
+                let _ = devnet_event_tx.send(DevnetEvent::success(
+                    "Project snapshot data prepared up to epoch 3.0. Future project starts will be faster.".to_string(),
+                ));
+            }
+            Err(e) => {
+                let _ = devnet_event_tx.send(DevnetEvent::warning(format!(
+                    "Failed to create project snapshot marker file: {}",
+                    e
+                )));
+            }
+        }
+    }
+
+    let global_marker = global_snapshot_dir.join("epoch_3_ready");
+    if !global_marker.exists() {
+        // Copy project snapshot to global snapshot as a template
+        if project_snapshot_dir != global_snapshot_dir {
+            // Copy bitcoin data
+            let project_bitcoin_snapshot = project_snapshot_dir.join("bitcoin");
+            let global_bitcoin_snapshot = global_snapshot_dir.join("bitcoin");
+            if project_bitcoin_snapshot.exists() {
+                let _ = copy_directory(&project_bitcoin_snapshot, &global_bitcoin_snapshot, None)
+                    .inspect_err(|e| {
+                        let _ = devnet_event_tx.send(DevnetEvent::warning(format!(
+                            "Failed to copy bitcoin snapshot: {}",
+                            e
+                        )));
+                    });
+            }
+
+            // Copy stacks data
+            let project_stacks_snapshot = project_snapshot_dir.join("stacks");
+            let global_stacks_snapshot = global_snapshot_dir.join("stacks");
+            if project_stacks_snapshot.exists() {
+                let _ = copy_directory(
+                    &project_stacks_snapshot,
+                    &global_stacks_snapshot,
+                    Some(EXCLUDED_STACKS_SNAPSHOT_FILES),
+                )
+                .inspect_err(|e| {
+                    let _ = devnet_event_tx.send(DevnetEvent::warning(format!(
+                        "Failed to copy stacks snapshot: {}",
+                        e
+                    )));
+                });
+            }
+
+            match std::fs::File::create(&global_marker) {
+                Ok(_) => {
+                    let _ = devnet_event_tx.send(DevnetEvent::success(
+                        "Global template snapshot data prepared. Future project initializations will be faster.".to_string()
+                    ));
+                }
+                Err(e) => {
+                    let _ = devnet_event_tx.send(DevnetEvent::warning(format!(
+                        "Failed to create global snapshot marker file: {}",
+                        e
+                    )));
+                }
+            }
+        }
+    }
+    let _ = devnet_event_tx.send(DevnetEvent::info(
+        "Reached block height 142, preparing to export Stacks API events...".to_string(),
+    ));
+
+    // To properly export, we need to:
+    // 1. Stop mining to prevent further blocks
+    let _ = mining_command_tx.send(BitcoinMiningCommand::Pause);
+    // 2. Wait a moment for pausing to complete
+    std::thread::sleep(Duration::from_secs(3));
+
+    // Export the events
+    match export_stacks_api_events(devnet_event_observer_config, devnet_event_tx).await {
+        Ok(_) => {
+            let _ = devnet_event_tx.send(DevnetEvent::success(
+                "Stacks API events exported successfully".to_string(),
+            ));
+        }
+        Err(e) => {
+            let _ = devnet_event_tx.send(DevnetEvent::warning(format!(
+                "Failed to export Stacks API events: {}. Continuing without export.",
+                e
+            )));
+        }
+    }
+    // 3. Resume mining after presumed export completion
+    let _ = mining_command_tx.send(BitcoinMiningCommand::Start);
 }
 
 pub async fn publish_stacking_orders(
@@ -1110,6 +1314,83 @@ fn get_stacking_tx_method_and_args(
     };
 
     (method.to_string(), arguments)
+}
+
+async fn export_stacks_api_events(
+    config: &DevnetEventObserverConfig,
+    devnet_event_tx: &Sender<DevnetEvent>,
+) -> Result<(), String> {
+    // Get container name
+    let container_name = format!("stacks-api.{}.devnet", config.manifest.project.name);
+
+    // Create exec command to export events
+    let export_command = format!(
+        "docker exec {} node /app/lib/index.js export-events --file /tmp/events_cache.tsv --overwrite-file",
+        container_name
+    );
+
+    let _ = devnet_event_tx.send(DevnetEvent::info(
+        "Exporting Stacks API events...".to_string(),
+    ));
+
+    // Execute the export command
+    let output = std::process::Command::new("sh")
+        .arg("-c")
+        .arg(&export_command)
+        .output()
+        .map_err(|e| format!("Failed to execute export command: {}", e))?;
+
+    if !output.status.success() {
+        return Err(format!(
+            "Export command failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
+
+    // Wait for export to complete
+    std::thread::sleep(Duration::from_secs(5));
+
+    // Copy the exported file from container to host
+    let export_path = PathBuf::from(&config.devnet_config.working_dir).join("events_export");
+    fs::create_dir_all(&export_path)
+        .map_err(|e| format!("unable to create events export directory: {:?}", e))?;
+
+    let copy_command = format!(
+        "docker cp {}:/tmp/events_cache.tsv {}",
+        container_name,
+        export_path.join("events_cache.tsv").display()
+    );
+
+    let output = std::process::Command::new("sh")
+        .arg("-c")
+        .arg(&copy_command)
+        .output()
+        .map_err(|e| format!("Failed to copy events file: {}", e))?;
+
+    if !output.status.success() {
+        return Err(format!(
+            "Copy command failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
+
+    // Also copy to global cache
+    let global_snapshot_dir = get_global_snapshot_dir();
+    let global_export_path = global_snapshot_dir.join("events_export");
+    fs::create_dir_all(&global_export_path)
+        .map_err(|e| format!("unable to create global events export directory: {:?}", e))?;
+
+    fs::copy(
+        export_path.join("events_cache.tsv"),
+        global_export_path.join("events_cache.tsv"),
+    )
+    .map_err(|e| format!("unable to copy to global cache: {:?}", e))?;
+
+    let _ = devnet_event_tx.send(DevnetEvent::success(
+        "Successfully exported Stacks API events".to_string(),
+    ));
+
+    Ok(())
 }
 
 #[cfg(test)]

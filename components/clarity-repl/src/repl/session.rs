@@ -257,8 +257,8 @@ impl Session {
         ) {
             Ok((mut output, result)) => {
                 if let EvaluationResult::Contract(contract_result) = result.result.clone() {
-                    let snippet = format!("→ .{} contract successfully stored. Use (contract-call? ...) for invoking the public functions:", contract_result.contract.contract_identifier);
-                    output.push(green!(snippet));
+                    let snippet = green!("→ .{} contract successfully stored. Use (contract-call? ...) for invoking the public functions:", contract_result.contract.contract_identifier);
+                    output.push(snippet.to_string());
                 };
                 (output, result.cost.clone(), Ok(result))
             }
@@ -305,7 +305,7 @@ impl Session {
                 &cost.limit.write_length.to_string(),
                 &(Self::get_costs_percentage(&cost.total.write_length, &cost.limit.write_length)),
             ]);
-            output.push(format!("{}", table));
+            output.push(table.to_string());
         }
         output.append(&mut result);
         execution_result
@@ -340,9 +340,9 @@ impl Session {
                     ));
                 }
                 if !result.events.is_empty() {
-                    output.push(black!("Events emitted"));
+                    output.push(black!("Events emitted").to_string());
                     for event in result.events.iter() {
-                        output.push(black!(format!("{}", serialize_event(event))));
+                        output.push(black!("{}", serialize_event(event)).to_string());
                     }
                 }
                 match &result.result {

@@ -1,49 +1,73 @@
 #[macro_export]
 macro_rules! green {
+    ($i:ident)  => ({
+        use colored::{ColoredString, Colorize};
+        ColoredString::from($i).green().bold()
+    });
     ($($arg:tt)*) => ({
-        use colored::Colorize;
-        format!("{}", format!("{}", $($arg)*).green().bold())
-    })
+        let s = format!($($arg)*);
+        green!(s)
+    });
 }
 
 #[macro_export]
 macro_rules! red {
+    ($i:ident)  => ({
+        use colored::{ColoredString, Colorize};
+        ColoredString::from($i).red().bold()
+    });
     ($($arg:tt)*) => ({
-        use colored::Colorize;
-        format!("{}", format!("{}", $($arg)*).red().bold())
-    })
+        let s = format!($($arg)*);
+        red!(s)
+    });
 }
 
 #[macro_export]
 macro_rules! yellow {
+    ($i:ident)  => ({
+        use colored::{ColoredString, Colorize};
+        ColoredString::from($i).yellow().bold()
+    });
     ($($arg:tt)*) => ({
-        use colored::Colorize;
-        format!("{}", format!("{}", $($arg)*).yellow().bold())
-    })
+        let s = format!($($arg)*);
+        yellow!(s)
+    });
 }
 
 #[macro_export]
 macro_rules! blue {
+    ($i:ident)  => ({
+        use colored::{ColoredString, Colorize};
+        ColoredString::from($i).blue().bold()
+    });
     ($($arg:tt)*) => ({
-        use colored::Colorize;
-        format!("{}", format!("{}", $($arg)*).blue().bold())
-    })
+        let s = format!($($arg)*);
+        blue!(s)
+    });
 }
 
 #[macro_export]
 macro_rules! purple {
+    ($i:ident)  => ({
+        use colored::{ColoredString, Colorize};
+        ColoredString::from($i).purple().bold()
+    });
     ($($arg:tt)*) => ({
-        use colored::Colorize;
-        format!("{}", format!("{}", $($arg)*).purple().bold())
-    })
+        let s = format!($($arg)*);
+        purple!(s)
+    });
 }
 
 #[macro_export]
 macro_rules! black {
+    ($i:ident)  => ({
+        use colored::{ColoredString, Colorize};
+        ColoredString::from($i).black().bold()
+    });
     ($($arg:tt)*) => ({
-        use colored::Colorize;
-        format!("{}", format!("{}", $($arg)*).black().bold())
-    })
+        let s = format!($($arg)*);
+        black!(s)
+    });
 }
 
 #[macro_export]

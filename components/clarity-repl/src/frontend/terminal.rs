@@ -102,7 +102,7 @@ impl Terminal {
     }
 
     pub fn start(&mut self) -> bool {
-        println!("{}", green!(format!("clarity-repl v{}", VERSION.unwrap())));
+        println!("{}", green!("clarity-repl v{}", VERSION.unwrap()));
         println!("{}", black!("Enter \"::help\" for usage hints."));
         println!("{}", black!("Connected to a transient in-memory database."));
 
