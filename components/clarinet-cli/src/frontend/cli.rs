@@ -535,7 +535,7 @@ pub fn main() {
                             &manifest.project.name,
                             &manifest.project.authors,
                         ),
-                        format!("{e}"),
+                        e.to_string(),
                     ));
                 }
             }

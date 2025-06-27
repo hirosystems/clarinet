@@ -17,6 +17,7 @@ use clarity::types::chainstate::StacksPrivateKey;
 use clarity::types::PrivateKey;
 use futures::stream::TryStreamExt;
 use hiro_system_kit::{slog, slog_term, Drain};
+use indoc::formatdoc;
 use reqwest::RequestBuilder;
 use serde_json::Value as JsonValue;
 use std::collections::HashMap;
@@ -983,7 +984,10 @@ rpcport={bitcoin_node_rpc_port}
         let containers = match res {
             Ok(containers) => containers,
             Err(e) => {
-                let err = format!("unable to communicate with Docker: {e}\nvisit https://docs.hiro.so/clarinet/troubleshooting#i-am-unable-to-start-devnet-though-my-docker-is-running to resolve this issue.");
+                let err = formatdoc!("
+                    unable to communicate with Docker: {e}
+                    visit https://docs.hiro.so/clarinet/troubleshooting#i-am-unable-to-start-devnet-though-my-docker-is-running to resolve this issue.
+                ");
                 return Err(err);
             }
         };
@@ -1473,7 +1477,7 @@ db_path = "stacks-signer-{signer_id}.sqlite"
 
         let mut stacks_signer_data_path = PathBuf::from(&devnet_config.working_dir);
         stacks_signer_data_path.push("data");
-        stacks_signer_data_path.push(format!("{boot_index}"));
+        stacks_signer_data_path.push(boot_index.to_string());
         stacks_signer_data_path.push("signer");
         fs::create_dir_all(stacks_signer_data_path)
             .map_err(|e| format!("unable to create stacks directory: {e:?}"))?;
@@ -1709,7 +1713,7 @@ events_keys = ["*"]
 
         let mut stacks_node_data_path = PathBuf::from(&devnet_config.working_dir);
         stacks_node_data_path.push("data");
-        stacks_node_data_path.push(format!("{boot_index}"));
+        stacks_node_data_path.push(boot_index.to_string());
         let _ = fs::create_dir(stacks_node_data_path.clone()).map_err(|e| {
             format!(
                 "unable to create stacks node data path ({}): {:?}",
