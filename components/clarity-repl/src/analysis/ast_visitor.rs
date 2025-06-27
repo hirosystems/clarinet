@@ -1,14 +1,15 @@
 #![allow(unused_variables)]
 #![allow(clippy::get_first)]
 
+use std::collections::HashMap;
+use std::sync::LazyLock;
+
 use clarity::vm::functions::define::DefineFunctions;
 use clarity::vm::functions::NativeFunctions;
 use clarity::vm::representations::SymbolicExpressionType::*;
 use clarity::vm::representations::{Span, TraitDefinition};
 use clarity::vm::types::{PrincipalData, QualifiedContractIdentifier, TraitIdentifier, Value};
 use clarity::vm::{ClarityName, ClarityVersion, SymbolicExpression, SymbolicExpressionType};
-use std::collections::HashMap;
-use std::sync::LazyLock;
 
 #[derive(Clone)]
 pub struct TypedVar<'a> {

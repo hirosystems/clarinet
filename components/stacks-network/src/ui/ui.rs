@@ -1,9 +1,11 @@
-use super::{app::BlockData, App};
-
-use crate::{event::Status, log::LogLevel};
-
 use chainhook_sdk::types::{StacksBlockData, StacksMicroblockData, StacksTransactionData};
-use ratatui::{prelude::*, widgets::*};
+use ratatui::prelude::*;
+use ratatui::widgets::*;
+
+use super::app::BlockData;
+use super::App;
+use crate::event::Status;
+use crate::log::LogLevel;
 
 pub fn draw(f: &mut Frame, app: &mut App) {
     let page_components = Layout::default()

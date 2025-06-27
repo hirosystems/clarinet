@@ -1,7 +1,5 @@
-use clarity_repl::clarity::{
-    events::{FTEventType, NFTEventType, STXEventType},
-    vm::events::StacksTransactionEvent,
-};
+use clarity_repl::clarity::events::{FTEventType, NFTEventType, STXEventType};
+use clarity_repl::clarity::vm::events::StacksTransactionEvent;
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize)]

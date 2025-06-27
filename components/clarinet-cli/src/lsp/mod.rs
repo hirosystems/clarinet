@@ -1,14 +1,16 @@
 mod native_bridge;
 
-use self::native_bridge::LspNativeBridge;
+use std::sync::mpsc;
+
 use clarity_lsp::utils;
 use clarity_repl::clarity::vm::diagnostic::{
     Diagnostic as ClarityDiagnostic, Level as ClarityLevel,
 };
 use crossbeam_channel::unbounded;
-use std::sync::mpsc;
 use tower_lsp::lsp_types::{Diagnostic, DiagnosticSeverity, Position, Range};
 use tower_lsp::{LspService, Server};
+
+use self::native_bridge::LspNativeBridge;
 
 pub fn run_lsp() {
     if let Err(_e) = block_on(do_run_lsp()) {
@@ -91,11 +93,13 @@ pub fn clarity_diagnostic_to_tower_lsp_type(
 
 #[test]
 fn test_opening_counter_contract_should_return_fresh_analysis() {
-    use crate::lsp::native_bridge::LspResponse;
+    use std::sync::mpsc::channel;
+
     use clarinet_files::FileLocation;
     use clarity_lsp::backend::{LspNotification, LspNotificationResponse};
     use crossbeam_channel::unbounded;
-    use std::sync::mpsc::channel;
+
+    use crate::lsp::native_bridge::LspResponse;
 
     let (notification_tx, notification_rx) = unbounded();
     let (_request_tx, request_rx) = unbounded();
@@ -140,11 +144,13 @@ fn test_opening_counter_contract_should_return_fresh_analysis() {
 
 #[test]
 fn test_opening_counter_manifest_should_return_fresh_analysis() {
-    use crate::lsp::native_bridge::LspResponse;
+    use std::sync::mpsc::channel;
+
     use clarinet_files::FileLocation;
     use clarity_lsp::backend::{LspNotification, LspNotificationResponse};
     use crossbeam_channel::unbounded;
-    use std::sync::mpsc::channel;
+
+    use crate::lsp::native_bridge::LspResponse;
 
     let (notification_tx, notification_rx) = unbounded();
     let (_request_tx, request_rx) = unbounded();
@@ -187,11 +193,13 @@ fn test_opening_counter_manifest_should_return_fresh_analysis() {
 
 #[test]
 fn test_opening_simple_nft_manifest_should_return_fresh_analysis() {
-    use crate::lsp::native_bridge::LspResponse;
+    use std::sync::mpsc::channel;
+
     use clarinet_files::FileLocation;
     use clarity_lsp::backend::LspNotification;
     use crossbeam_channel::unbounded;
-    use std::sync::mpsc::channel;
+
+    use crate::lsp::native_bridge::LspResponse;
 
     let (notification_tx, notification_rx) = unbounded();
     let (_request_tx, request_rx) = unbounded();

@@ -1,7 +1,8 @@
-use clarinet_format::formatter::{ClarityFormatter, Indentation, Settings};
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
+
+use clarinet_format::formatter::{ClarityFormatter, Indentation, Settings};
 
 /// This is strictly for reading top metadata from golden tests
 fn from_metadata(metadata: &str) -> Settings {

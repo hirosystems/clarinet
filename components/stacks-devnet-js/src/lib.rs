@@ -4,6 +4,14 @@ extern crate error_chain;
 
 mod serde;
 
+use core::panic;
+use std::collections::BTreeMap;
+use std::fs::OpenOptions;
+use std::path::PathBuf;
+use std::str::FromStr;
+use std::sync::mpsc;
+use std::{env, process, thread};
+
 use clarinet_deployments::{get_default_deployment_path, load_deployment};
 use clarinet_files::{
     compute_addresses, AccountConfig, DevnetConfigFile, FileLocation, PoxStackingOrder,
@@ -12,22 +20,13 @@ use clarinet_files::{
 use clarinet_utils::mnemonic_from_phrase;
 use hiro_system_kit::{o, slog, slog_async, slog_term, Drain};
 use neon::context::Context as NeonContext;
+use neon::prelude::*;
 use stacks_network::chainhook_sdk::types::{
     BitcoinChainEvent, BitcoinChainUpdatedWithBlocksData, StacksChainEvent,
     StacksChainUpdatedWithBlocksData,
 };
 use stacks_network::chains_coordinator::BitcoinMiningCommand;
 use stacks_network::{self, Context, DevnetEvent, DevnetOrchestrator, LogLevel};
-
-use core::panic;
-use neon::prelude::*;
-use std::collections::BTreeMap;
-use std::fs::OpenOptions;
-use std::path::PathBuf;
-use std::str::FromStr;
-use std::sync::mpsc;
-use std::thread;
-use std::{env, process};
 
 type DevnetCallback = Box<dyn FnOnce(&Channel) + Send>;
 

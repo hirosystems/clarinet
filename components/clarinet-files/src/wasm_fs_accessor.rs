@@ -1,5 +1,3 @@
-use super::{FileAccessor, FileAccessorResult};
-
 use std::collections::HashMap;
 
 use js_sys::{Function as JsFunction, Promise};
@@ -7,6 +5,8 @@ use serde::{Deserialize, Serialize};
 use serde_wasm_bindgen::{from_value as decode_from_js, to_value as encode_to_js};
 use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::JsFuture;
+
+use super::{FileAccessor, FileAccessorResult};
 
 #[derive(Serialize, Deserialize)]
 struct WFSRequest {

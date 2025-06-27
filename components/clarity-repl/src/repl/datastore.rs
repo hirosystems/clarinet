@@ -3,9 +3,6 @@ use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;
 use std::rc::Rc;
 
-use super::remote_data::fs::{get_file_from_cache, write_file_to_cache};
-use super::remote_data::{epoch_for_height, Block, HttpClient, Sortition};
-
 use clarity::types::chainstate::{
     BlockHeaderHash, BurnchainHeaderHash, ConsensusHash, SortitionId, StacksAddress, StacksBlockId,
     TrieHash, VRFSeed,
@@ -13,8 +10,7 @@ use clarity::types::chainstate::{
 use clarity::types::StacksEpochId;
 use clarity::util::hash::Sha512Trunc256Sum;
 use clarity::vm::analysis::AnalysisDatabase;
-use clarity::vm::database::BurnStateDB;
-use clarity::vm::database::{ClarityBackingStore, HeadersDB};
+use clarity::vm::database::{BurnStateDB, ClarityBackingStore, HeadersDB};
 use clarity::vm::errors::InterpreterResult as Result;
 use clarity::vm::types::{
     PrincipalData, QualifiedContractIdentifier, StandardPrincipalData, TupleData,
@@ -24,6 +20,8 @@ use pox_locking::handle_contract_call_special_cases;
 use sha2::{Digest, Sha512_256};
 
 use super::interpreter::BLOCK_LIMIT_MAINNET;
+use super::remote_data::fs::{get_file_from_cache, write_file_to_cache};
+use super::remote_data::{epoch_for_height, Block, HttpClient, Sortition};
 use super::settings::RemoteNetworkInfo;
 
 const SECONDS_BETWEEN_BURN_BLOCKS: u64 = 600;
@@ -1230,9 +1228,8 @@ impl BurnStateDB for Datastore {
 mod tests {
     use clarity::types::StacksEpoch;
 
-    use crate::repl::settings::ApiUrl;
-
     use super::*;
+    use crate::repl::settings::ApiUrl;
 
     fn get_datastores() -> (ClarityDatastore, Datastore) {
         let client = HttpClient::new(ApiUrl("https://api.tesnet.hiro.so".to_string()));

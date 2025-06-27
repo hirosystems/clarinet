@@ -4,15 +4,17 @@ mod app;
 #[allow(clippy::module_inception)]
 mod ui;
 
-use app::App;
-use clarinet_deployments::onchain::{DeploymentEvent, TransactionTracker};
-use crossterm::{
-    execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
-};
-use ratatui::{backend::CrosstermBackend, Terminal};
 use std::io::stdout;
 use std::sync::mpsc::Receiver;
+
+use app::App;
+use clarinet_deployments::onchain::{DeploymentEvent, TransactionTracker};
+use crossterm::execute;
+use crossterm::terminal::{
+    disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
+};
+use ratatui::backend::CrosstermBackend;
+use ratatui::Terminal;
 
 pub fn start_ui(
     node_url: &str,

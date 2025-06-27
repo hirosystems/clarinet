@@ -2,9 +2,7 @@ use clarinet_files::FileLocation;
 use clarity_repl::clarity::vm::diagnostic::{
     Diagnostic as ClarityDiagnostic, Level as ClarityLevel,
 };
-use lsp_types::Diagnostic as LspDiagnostic;
-use lsp_types::Url;
-use lsp_types::{DiagnosticSeverity, Position, Range};
+use lsp_types::{Diagnostic as LspDiagnostic, DiagnosticSeverity, Position, Range, Url};
 
 #[allow(unused_macros)]
 #[cfg(target_arch = "wasm32")]

@@ -1,15 +1,14 @@
-use std::{collections::BTreeMap, sync::LazyLock};
+use std::collections::BTreeMap;
+use std::sync::LazyLock;
 
-use clarinet_deployments::{types::*, update_session_with_deployment_plan};
+use clarinet_deployments::types::*;
+use clarinet_deployments::update_session_with_deployment_plan;
 use clarinet_files::{FileLocation, StacksNetwork};
-use clarity::{
-    types::{chainstate::StacksAddress, Address},
-    vm::types::StandardPrincipalData,
-};
-use clarity_repl::{
-    clarity::{ClarityVersion, ContractName},
-    repl::{Session, SessionSettings},
-};
+use clarity::types::chainstate::StacksAddress;
+use clarity::types::Address;
+use clarity::vm::types::StandardPrincipalData;
+use clarity_repl::clarity::{ClarityVersion, ContractName};
+use clarity_repl::repl::{Session, SessionSettings};
 
 static SBTC_DEPLOYER: LazyLock<StandardPrincipalData> = LazyLock::new(|| {
     StandardPrincipalData::from(

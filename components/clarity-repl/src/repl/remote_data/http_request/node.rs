@@ -1,6 +1,7 @@
+use std::sync::LazyLock;
+
 use js_sys::Reflect;
 use serde::de::DeserializeOwned;
-use std::sync::LazyLock;
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen(module = "child_process")]

@@ -1,11 +1,8 @@
+use clarinet_files::StacksNetwork;
 use clarity_repl::clarity::util::hash::{bytes_to_hex, Hash160};
 use mac_address::get_mac_address;
-use segment::{
-    message::{Message, Track, User},
-    Client, HttpClient,
-};
-
-use clarinet_files::StacksNetwork;
+use segment::message::{Message, Track, User};
+use segment::{Client, HttpClient};
 
 pub enum DeveloperUsageEvent {
     NewProject(DeveloperUsageDigest),

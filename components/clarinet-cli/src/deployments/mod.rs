@@ -3,10 +3,10 @@ mod ui;
 
 use std::fs::{self};
 use std::path::PathBuf;
-pub use ui::start_ui;
 
 use clarinet_deployments::types::{DeploymentGenerationArtifacts, DeploymentSpecification};
 use clarinet_files::{FileLocation, ProjectManifest, StacksNetwork};
+pub use ui::start_ui;
 
 pub fn get_absolute_deployment_path(
     manifest: &ProjectManifest,

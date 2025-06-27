@@ -1,6 +1,6 @@
-use wasm_bindgen::prelude::*;
-
 use std::path::Path;
+
+use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen(module = "fs")]
 extern "C" {
