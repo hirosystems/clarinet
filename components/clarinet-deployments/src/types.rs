@@ -269,7 +269,7 @@ pub mod memo_serde {
         let mut str = String::with_capacity((bytes.len() * 2) + 1);
         write!(&mut str, "0x").unwrap();
         for &b in bytes {
-            write!(&mut str, "{:02x}", b).unwrap();
+            write!(&mut str, "{b:02x}").unwrap();
         }
         s.serialize_str(&str)
     }
@@ -549,11 +549,10 @@ pub mod source_serde {
     pub fn base64_decode(encoded: &str) -> Result<String, String> {
         let bytes = b64
             .decode(encoded)
-            .map_err(|e| format!("unable to decode contract source: {}", e))?;
+            .map_err(|e| format!("unable to decode contract source: {e}"))?;
         let decoded = from_utf8(&bytes).map_err(|e| {
             format!(
-                "invalid UTF-8 sequence when decoding contract source: {}",
-                e
+                "invalid UTF-8 sequence when decoding contract source: {e}"
             )
         })?;
         Ok(decoded.to_owned())
@@ -924,7 +923,7 @@ pub mod contracts_serde {
         for entry in container {
             let contract_id = match entry.get("contract_id") {
                 Some(contract_id) => QualifiedContractIdentifier::parse(contract_id).map_err(|e| {
-                    serde::de::Error::custom(format!("failed to parse contract id: {}", e))
+                    serde::de::Error::custom(format!("failed to parse contract id: {e}"))
                 }),
                 None => Err(serde::de::Error::custom(
                     "Contract entry must have `contract_id` field",
@@ -966,7 +965,7 @@ impl DeploymentSpecification {
         let specification_file: DeploymentSpecificationFile =
             match serde_yaml::from_slice(&spec_file_content[..]) {
                 Ok(res) => res,
-                Err(msg) => return Err(format!("unable to read file {}", msg)),
+                Err(msg) => return Err(format!("unable to read file {msg}")),
             };
 
         let network = match specification_file.network.to_lowercase().as_str() {
@@ -1142,7 +1141,7 @@ impl DeploymentSpecification {
 
     pub fn to_file_content(&self) -> Result<Vec<u8>, String> {
         serde_yaml::to_vec(&self.to_specification_file())
-            .map_err(|err| format!("failed to serialize deployment\n{}", err))
+            .map_err(|err| format!("failed to serialize deployment\n{err}"))
     }
 
     pub fn sort_batches_by_epoch(&mut self) {
@@ -1225,13 +1224,13 @@ impl DeploymentSpecificationFile {
         let spec_file_content = file_accesor.read_file(path.to_string()).await?;
 
         serde_yaml::from_str(&spec_file_content)
-            .map_err(|msg| format!("unable to read file {}", msg))
+            .map_err(|msg| format!("unable to read file {msg}"))
     }
     pub fn from_file_content(
         spec_file_content: &str,
     ) -> Result<DeploymentSpecificationFile, String> {
         serde_yaml::from_str(spec_file_content)
-            .map_err(|msg| format!("unable to read file {}", msg))
+            .map_err(|msg| format!("unable to read file {msg}"))
     }
 }
 

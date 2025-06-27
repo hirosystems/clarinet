@@ -19,7 +19,7 @@ pub fn extract_embedded_snapshot(
 
     // Create the snapshot directory if it doesn't exist
     fs::create_dir_all(snapshot_dir)
-        .map_err(|e| format!("Failed to create snapshot directory: {}", e))?;
+        .map_err(|e| format!("Failed to create snapshot directory: {e}"))?;
 
     // Decompress and extract the tar archive
     let decoder = GzDecoder::new(DEVNET_SNAPSHOT);
@@ -28,12 +28,12 @@ pub fn extract_embedded_snapshot(
     // Extract to the snapshot directory, stripping the top-level "devnet" directory
     for entry in archive
         .entries()
-        .map_err(|e| format!("Failed to read archive entries: {}", e))?
+        .map_err(|e| format!("Failed to read archive entries: {e}"))?
     {
-        let mut entry = entry.map_err(|e| format!("Failed to read archive entry: {}", e))?;
+        let mut entry = entry.map_err(|e| format!("Failed to read archive entry: {e}"))?;
         let path = entry
             .path()
-            .map_err(|e| format!("Failed to get entry path: {}", e))?;
+            .map_err(|e| format!("Failed to get entry path: {e}"))?;
 
         // Strip the leading "devnet/" from the path
         if let Ok(stripped_path) = path.strip_prefix("devnet") {
@@ -48,10 +48,10 @@ pub fn extract_embedded_snapshot(
     let marker_path = snapshot_dir.join("epoch_3_ready");
     if let Some(parent) = marker_path.parent() {
         fs::create_dir_all(parent)
-            .map_err(|e| format!("Failed to create marker directory: {}", e))?;
+            .map_err(|e| format!("Failed to create marker directory: {e}"))?;
     }
 
-    fs::write(&marker_path, "").map_err(|e| format!("Failed to create snapshot marker: {}", e))?;
+    fs::write(&marker_path, "").map_err(|e| format!("Failed to create snapshot marker: {e}"))?;
 
     let _ = devnet_event_tx.send(DevnetEvent::success(
         "Embedded devnet snapshot extracted successfully".to_string(),

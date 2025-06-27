@@ -261,7 +261,7 @@ impl FileLocation {
 
                 match manifest_found {
                     true => Ok(project_root_location),
-                    false => Err(format!("unable to find root location from {}", self)),
+                    false => Err(format!("unable to find root location from {self}")),
                 }
             }
             _ => {
@@ -338,7 +338,7 @@ impl FileLocation {
                 "file" => {
                     let path = url
                         .to_file_path()
-                        .map_err(|e| format!("unable to convert url {} to path\n{:?}", url, e))?;
+                        .map_err(|e| format!("unable to convert url {url} to path\n{e:?}"))?;
                     FileLocation::fs_read_content(&path)
                 }
                 "http" | "https" => {

@@ -48,13 +48,13 @@ pub static SBTC_TESTNET_ADDRESS_PRINCIPAL: LazyLock<StandardPrincipalData> =
 
 pub static SBTC_DEPOSIT_MAINNET_ADDRESS: LazyLock<QualifiedContractIdentifier> =
     LazyLock::new(|| {
-        QualifiedContractIdentifier::parse(&format!("{}.sbtc-deposit", SBTC_MAINNET_ADDRESS))
+        QualifiedContractIdentifier::parse(&format!("{SBTC_MAINNET_ADDRESS}.sbtc-deposit"))
             .unwrap()
     });
 
 pub static SBTC_TOKEN_MAINNET_ADDRESS: LazyLock<QualifiedContractIdentifier> =
     LazyLock::new(|| {
-        QualifiedContractIdentifier::parse(&format!("{}.sbtc-token", SBTC_MAINNET_ADDRESS)).unwrap()
+        QualifiedContractIdentifier::parse(&format!("{SBTC_MAINNET_ADDRESS}.sbtc-token")).unwrap()
     });
 
 use std::{collections::BTreeMap, sync::LazyLock};
@@ -87,17 +87,17 @@ fn make_testnet_cost_voting() -> String {
 }
 
 static BOOT_CODE_POX_MAINNET: LazyLock<String> =
-    LazyLock::new(|| format!("{}\n{}", POX_MAINNET, POX_BODY));
+    LazyLock::new(|| format!("{POX_MAINNET}\n{POX_BODY}"));
 static BOOT_CODE_POX_TESTNET: LazyLock<String> =
-    LazyLock::new(|| format!("{}\n{}", POX_TESTNET, POX_BODY));
+    LazyLock::new(|| format!("{POX_TESTNET}\n{POX_BODY}"));
 static BOOT_CODE_POX_2_MAINNET: LazyLock<String> =
-    LazyLock::new(|| format!("{}\n{}", POX_MAINNET, POX_2_BODY));
+    LazyLock::new(|| format!("{POX_MAINNET}\n{POX_2_BODY}"));
 static BOOT_CODE_POX_2_TESTNET: LazyLock<String> =
-    LazyLock::new(|| format!("{}\n{}", POX_TESTNET, POX_2_BODY));
+    LazyLock::new(|| format!("{POX_TESTNET}\n{POX_2_BODY}"));
 static BOOT_CODE_POX_3_MAINNET: LazyLock<String> =
-    LazyLock::new(|| format!("{}\n{}", POX_MAINNET, POX_3_BODY));
+    LazyLock::new(|| format!("{POX_MAINNET}\n{POX_3_BODY}"));
 static BOOT_CODE_POX_3_TESTNET: LazyLock<String> =
-    LazyLock::new(|| format!("{}\n{}", POX_TESTNET, POX_3_BODY));
+    LazyLock::new(|| format!("{POX_TESTNET}\n{POX_3_BODY}"));
 static BOOT_CODE_COST_VOTING_TESTNET: LazyLock<String> = LazyLock::new(make_testnet_cost_voting);
 
 pub static BOOT_CODE_MAINNET: LazyLock<[(&'static str, &'static str); 13]> = LazyLock::new(|| {

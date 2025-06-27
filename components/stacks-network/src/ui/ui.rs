@@ -99,7 +99,7 @@ fn draw_devnet_status(f: &mut Frame, app: &mut App, area: Rect) {
             };
 
             let log = Line::from(vec![
-                Span::styled(format!("{:<5}", label), style),
+                Span::styled(format!("{label:<5}"), style),
                 Span::styled(&log.occurred_at, Style::default().fg(Color::DarkGray)),
                 Span::raw(" "),
                 Span::styled(log.message.clone(), Style::default().fg(Color::White)),

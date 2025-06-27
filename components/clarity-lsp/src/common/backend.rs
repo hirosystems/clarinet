@@ -68,7 +68,7 @@ impl LspNotificationResponse {
     pub fn error(message: &str) -> LspNotificationResponse {
         LspNotificationResponse {
             aggregated_diagnostics: vec![],
-            notification: Some((MessageType::ERROR, format!("Internal error: {}", message))),
+            notification: Some((MessageType::ERROR, format!("Internal error: {message}"))),
         }
     }
 }

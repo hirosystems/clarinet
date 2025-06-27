@@ -535,7 +535,7 @@ pub fn main() {
                             &manifest.project.name,
                             &manifest.project.authors,
                         ),
-                        format!("{}", e),
+                        format!("{e}"),
                     ));
                 }
             }
@@ -609,7 +609,7 @@ pub fn main() {
             let project_path = if relative_dir == "." {
                 current_path
             } else {
-                format!("{}/{}", current_path, relative_dir)
+                format!("{current_path}/{relative_dir}")
             };
 
             let telemetry_enabled = if cfg!(feature = "telemetry") {
@@ -798,7 +798,7 @@ pub fn main() {
                                 println!(
                                     "{} using existing deployments/default.{}-plan.yaml",
                                     yellow!("note:"),
-                                    format!("{:?}", network).to_lowercase(),
+                                    format!("{network:?}").to_lowercase(),
                                 );
                                 Ok(deployment)
                             }
@@ -832,7 +832,7 @@ pub fn main() {
                 let deployment = match result {
                     Ok(deployment) => deployment,
                     Err(e) => {
-                        eprintln!("{}", e);
+                        eprintln!("{e}");
                         std::process::exit(1);
                     }
                 };
@@ -1193,7 +1193,7 @@ pub fn main() {
             let formatted_lines: Vec<String> = lines.map(|l| l.to_string()).collect();
             for d in diagnostics {
                 for line in output_diagnostic(&d, &file, &formatted_lines) {
-                    println!("{}", line);
+                    println!("{line}");
                 }
             }
 
@@ -1418,8 +1418,7 @@ fn load_deployment_and_artifacts_or_exit(
                     Ok((deployment, None, artifacts))
                 }
                 Some(Err(e)) => Err(format!(
-                    "loading deployments/default.simnet-plan.yaml failed with error: {}",
-                    e
+                    "loading deployments/default.simnet-plan.yaml failed with error: {e}"
                 )),
                 None => {
                     match generate_default_deployment(manifest, &StacksNetwork::Simnet, false) {
@@ -1452,7 +1451,7 @@ fn load_deployment_and_artifacts_or_exit(
                     let artifacts = setup_session_with_deployment(manifest, &deployment, None);
                     Ok((deployment, Some(deployment_location.to_string()), artifacts))
                 }
-                Err(e) => Err(format!("loading {} failed with error: {}", path, e)),
+                Err(e) => Err(format!("loading {path} failed with error: {e}")),
             }
         }
     };
@@ -1772,7 +1771,7 @@ fn execute_changes(changes: Vec<Changes>) -> bool {
                 }
                 match fs::remove_file(&options.path) {
                     Ok(_) => println!("{}", options.comment),
-                    Err(e) => eprintln!("error {}", e),
+                    Err(e) => eprintln!("error {e}"),
                 }
             }
         }

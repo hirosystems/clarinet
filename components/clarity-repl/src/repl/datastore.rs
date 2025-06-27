@@ -220,7 +220,7 @@ impl ClarityDatastore {
 
     fn new_with_remote_data(remote_network_info: RemoteNetworkInfo, client: HttpClient) -> Self {
         let height = remote_network_info.initial_height;
-        let path = format!("/extended/v2/blocks/{}", height);
+        let path = format!("/extended/v2/blocks/{height}");
         let block = client.fetch_block(&path);
         let sortition = client.fetch_sortition(block.burn_block_height);
         let block_cache = HashMap::from([(block.index_block_hash, block.clone())]);
@@ -350,14 +350,14 @@ impl ClarityDatastore {
         if let Some(hash) = self.chain_tip_at_height.get(&height) {
             return self.get_remote_block_info_from_hash(&hash.clone());
         }
-        self.fetch_block(&format!("/extended/v2/blocks/{}", height))
+        self.fetch_block(&format!("/extended/v2/blocks/{height}"))
     }
 
     fn get_remote_block_info_from_hash(&mut self, hash: &StacksBlockId) -> Block {
         if let Some(cached) = self.remote_block_info_cache.borrow().get(hash) {
             return cached.clone();
         }
-        self.fetch_block(&format!("/extended/v2/blocks/{}", hash))
+        self.fetch_block(&format!("/extended/v2/blocks/{hash}"))
     }
 
     fn get_remote_chaintip(&mut self) -> String {
@@ -371,7 +371,7 @@ impl ClarityDatastore {
     fn fetch_clarity_marf_value(&mut self, key: &str) -> Result<Option<String>> {
         let key_hash = TrieHash::from_key(key);
         let tip = self.get_remote_chaintip();
-        let url = format!("/v2/clarity/marf/{}?tip={}&proof=false", key_hash, tip);
+        let url = format!("/v2/clarity/marf/{key_hash}?tip={tip}&proof=false");
         self.client.fetch_clarity_data(&url)
     }
 
@@ -398,8 +398,7 @@ impl ClarityDatastore {
         }
 
         let url = format!(
-            "/v2/clarity/metadata/{}/{}/{}?tip={}",
-            addr, contract, key, tip
+            "/v2/clarity/metadata/{addr}/{contract}/{key}?tip={tip}"
         );
         let response = self.client.fetch_clarity_data(&url)?;
 

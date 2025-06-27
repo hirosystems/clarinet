@@ -92,12 +92,12 @@ impl CoverageHook {
         for (test_name, test_reports) in reports_per_tests.iter() {
             file_content.push_str(&format!("TN:{}\n", **test_name));
             for (contract_name, contract_path) in contract_paths.iter() {
-                file_content.push_str(&format!("SF:{}\n", contract_path));
+                file_content.push_str(&format!("SF:{contract_path}\n"));
 
                 if let Some((contract_id, functions, executable)) = filtered_asts.get(contract_name)
                 {
                     for (function, line_start, _) in functions.iter() {
-                        file_content.push_str(&format!("FN:{},{}\n", line_start, function));
+                        file_content.push_str(&format!("FN:{line_start},{function}\n"));
                     }
                     let (executable_lines, executables_branches) = executable;
 
@@ -169,7 +169,7 @@ impl CoverageHook {
                     }
 
                     for (function, hits) in function_hits.iter() {
-                        file_content.push_str(&format!("FNDA:{},{}\n", hits, function));
+                        file_content.push_str(&format!("FNDA:{hits},{function}\n"));
                     }
                     file_content.push_str(&format!("FNF:{}\n", functions.len()));
                     file_content.push_str(&format!("FNH:{}\n", function_hits.len()));
@@ -177,7 +177,7 @@ impl CoverageHook {
                     for (line, count) in line_execution_counts.iter() {
                         // the ast can contain elements with a span starting at line 0 that we want to ignore
                         if line > &&0 {
-                            file_content.push_str(&format!("DA:{},{}\n", line, count));
+                            file_content.push_str(&format!("DA:{line},{count}\n"));
                         }
                     }
 
@@ -188,8 +188,7 @@ impl CoverageHook {
                         // the ast can contain elements with a span starting at line 0 that we want to ignore
                         if line > &&0 {
                             file_content.push_str(&format!(
-                                "BRDA:{},{},{},{}\n",
-                                line, block_id, branch_nb, count
+                                "BRDA:{line},{block_id},{branch_nb},{count}\n"
                             ));
                         }
                     }

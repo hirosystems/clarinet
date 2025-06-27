@@ -243,7 +243,7 @@ pub fn update_deployment_costs(
                             tx.cost = fee;
                         }
                         Err(e) => {
-                            println!("unable to estimate fee for transaction: {}", e);
+                            println!("unable to estimate fee for transaction: {e}");
                             continue;
                         }
                     };
@@ -274,7 +274,7 @@ pub fn update_deployment_costs(
                             tx.cost = fee;
                         }
                         Err(e) => {
-                            println!("unable to estimate fee for transaction: {}", e);
+                            println!("unable to estimate fee for transaction: {e}");
                             continue;
                         }
                     };
@@ -293,7 +293,7 @@ pub fn update_deployment_costs(
                             tx.cost = fee;
                         }
                         Err(e) => {
-                            println!("unable to estimate fee for transaction: {}", e);
+                            println!("unable to estimate fee for transaction: {e}");
                             continue;
                         }
                     };
@@ -373,15 +373,15 @@ pub fn apply_on_chain_deployment(
 
     for contract in BOOT_CONTRACTS_NAMES {
         contracts_ids_to_remap.insert((
-            format!("{}:{}", BOOT_MAINNET_ADDRESS, contract),
-            format!("{}:{}", BOOT_TESTNET_ADDRESS, contract),
+            format!("{BOOT_MAINNET_ADDRESS}:{contract}"),
+            format!("{BOOT_TESTNET_ADDRESS}:{contract}"),
         ));
     }
 
     for contract_name in SBTC_CONTRACTS_NAMES.iter() {
         contracts_ids_to_remap.insert((
-            format!("{}:{}", SBTC_MAINNET_ADDRESS, contract_name),
-            format!("{}:{}", SBTC_TESTNET_ADDRESS, contract_name),
+            format!("{SBTC_MAINNET_ADDRESS}:{contract_name}"),
+            format!("{SBTC_TESTNET_ADDRESS}:{contract_name}"),
         ));
     }
 
@@ -418,7 +418,7 @@ pub fn apply_on_chain_deployment(
                         Ok(res) => res,
                         Err(e) => {
                             let _ = deployment_event_tx.send(DeploymentEvent::Interrupted(
-                                format!("unable to encode stx_transfer ({})", e),
+                                format!("unable to encode stx_transfer ({e})"),
                             ));
                             return;
                         }
@@ -805,7 +805,7 @@ pub fn apply_on_chain_deployment(
                     ongoing_batch.insert(res.txid, tracker);
                 }
                 Err(e) => {
-                    let message = format!("unable to post transaction\n{}", e);
+                    let message = format!("unable to post transaction\n{e}");
                     tracker.status = TransactionStatus::Error(message.clone());
 
                     let _ = deployment_event_tx

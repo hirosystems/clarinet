@@ -202,7 +202,7 @@ impl HttpClient {
     }
 
     pub fn fetch_sortition(&self, height: u32) -> Sortition {
-        let url = format!("/v3/sortitions/burn_height/{}", height);
+        let url = format!("/v3/sortitions/burn_height/{height}");
         let sortitions = self.get::<Vec<Sortition>>(&url).unwrap();
         sortitions.into_iter().next().unwrap()
     }

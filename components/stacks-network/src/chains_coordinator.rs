@@ -207,9 +207,9 @@ pub async fn start_chains_coordinator(
     let project_snapshot_dir = get_project_snapshot_dir(&config.devnet_config);
     // Ensure directories exist
     fs::create_dir_all(&global_snapshot_dir)
-        .map_err(|e| format!("unable to create global snapshot directory: {:?}", e))?;
+        .map_err(|e| format!("unable to create global snapshot directory: {e:?}"))?;
     fs::create_dir_all(&project_snapshot_dir)
-        .map_err(|e| format!("unable to create project snapshot directory: {:?}", e))?;
+        .map_err(|e| format!("unable to create project snapshot directory: {e:?}"))?;
 
     let (deployment_commands_tx, deployments_command_rx) = channel();
     let (deployment_events_tx, deployment_events_rx) = channel();
@@ -308,7 +308,7 @@ pub async fn start_chains_coordinator(
                             }
                             Err(e) => {
                                 let _ = devnet_event_tx
-                                    .send(DevnetEvent::debug(format!("Error: {}", e)));
+                                    .send(DevnetEvent::debug(format!("Error: {e}")));
                             }
                         }
                     }
@@ -411,9 +411,9 @@ pub async fn start_chains_coordinator(
                         let tip = event.new_blocks.last().unwrap();
                         let bitcoin_block_height = tip.block_identifier.index;
                         current_burn_height = bitcoin_block_height;
-                        let log = format!("Bitcoin block #{} received", bitcoin_block_height);
+                        let log = format!("Bitcoin block #{bitcoin_block_height} received");
                         let comment =
-                            format!("mining blocks (chain_tip = #{})", bitcoin_block_height);
+                            format!("mining blocks (chain_tip = #{bitcoin_block_height})");
 
                         // Check if we've reached the target height for database export (142)
                         // If we've reached epoch 3.0, create the global snapshot
@@ -441,8 +441,7 @@ pub async fn start_chains_coordinator(
                             .await;
                             if let Some(tx_count) = res {
                                 let _ = devnet_event_tx.send(DevnetEvent::success(format!(
-                                    "Broadcasted {} stacking orders",
-                                    tx_count
+                                    "Broadcasted {tx_count} stacking orders"
                                 )));
                             }
                         }
@@ -485,7 +484,7 @@ pub async fn start_chains_coordinator(
                             if let Some(deployment_commands_tx) = deployment_commands_tx.take() {
                                 deployment_commands_tx
                                     .send(DeploymentCommand::Start)
-                                    .map_err(|e| format!("unable to start deployment: {}", e))
+                                    .map_err(|e| format!("unable to start deployment: {e}"))
                                     .unwrap();
                             }
                         }
@@ -623,7 +622,7 @@ pub async fn start_chains_coordinator(
             ObserverEvent::PredicatesTriggered(count) => {
                 if count > 0 {
                     let _ = devnet_event_tx
-                        .send(DevnetEvent::info(format!("{} hooks triggered", count)));
+                        .send(DevnetEvent::info(format!("{count} hooks triggered")));
                 }
             }
             ObserverEvent::Terminate => {
@@ -766,8 +765,7 @@ pub async fn create_global_snapshot(
             }
             Err(e) => {
                 let _ = devnet_event_tx.send(DevnetEvent::warning(format!(
-                    "Failed to create project snapshot marker file: {}",
-                    e
+                    "Failed to create project snapshot marker file: {e}"
                 )));
             }
         }
@@ -784,8 +782,7 @@ pub async fn create_global_snapshot(
                 let _ = copy_directory(&project_bitcoin_snapshot, &global_bitcoin_snapshot, None)
                     .inspect_err(|e| {
                         let _ = devnet_event_tx.send(DevnetEvent::warning(format!(
-                            "Failed to copy bitcoin snapshot: {}",
-                            e
+                            "Failed to copy bitcoin snapshot: {e}"
                         )));
                     });
             }
@@ -801,8 +798,7 @@ pub async fn create_global_snapshot(
                 )
                 .inspect_err(|e| {
                     let _ = devnet_event_tx.send(DevnetEvent::warning(format!(
-                        "Failed to copy stacks snapshot: {}",
-                        e
+                        "Failed to copy stacks snapshot: {e}"
                     )));
                 });
             }
@@ -815,8 +811,7 @@ pub async fn create_global_snapshot(
                 }
                 Err(e) => {
                     let _ = devnet_event_tx.send(DevnetEvent::warning(format!(
-                        "Failed to create global snapshot marker file: {}",
-                        e
+                        "Failed to create global snapshot marker file: {e}"
                     )));
                 }
             }
@@ -841,8 +836,7 @@ pub async fn create_global_snapshot(
         }
         Err(e) => {
             let _ = devnet_event_tx.send(DevnetEvent::warning(format!(
-                "Failed to export Stacks API events: {}. Continuing without export.",
-                e
+                "Failed to export Stacks API events: {e}. Continuing without export."
             )));
         }
     }
@@ -859,21 +853,19 @@ pub async fn publish_stacking_orders(
     bitcoin_block_height: u32,
 ) -> Option<usize> {
     let node_rpc_url = format!("http://{}", &services_map_hosts.stacks_node_host);
-    let pox_info: PoxInfo = match reqwest::get(format!("{}/v2/pox", node_rpc_url)).await {
+    let pox_info: PoxInfo = match reqwest::get(format!("{node_rpc_url}/v2/pox")).await {
         Ok(result) => match result.json().await {
             Ok(pox_info) => Some(pox_info),
             Err(e) => {
                 let _ = devnet_event_tx.send(DevnetEvent::warning(format!(
-                    "unable to parse pox info: {}",
-                    e
+                    "unable to parse pox info: {e}"
                 )));
                 None
             }
         },
         Err(e) => {
             let _ = devnet_event_tx.send(DevnetEvent::warning(format!(
-                "unable to retrieve pox info: {}",
-                e
+                "unable to retrieve pox info: {e}"
             )));
             None
         }
@@ -971,19 +963,18 @@ pub async fn publish_stacking_orders(
                     match result {
                         Ok(_) => {
                             let _ = devnet_event_tx.send(DevnetEvent::success(format!(
-                                "Stacking order for {} STX submitted",
-                                stx_amount
+                                "Stacking order for {stx_amount} STX submitted"
                             )));
                         }
                         Err(e) => {
                             let _ = devnet_event_tx
-                                .send(DevnetEvent::error(format!("Unable to stack: {}", e)));
+                                .send(DevnetEvent::error(format!("Unable to stack: {e}")));
                         }
                     }
                 };
             }
             Err(e) => {
-                let _ = devnet_event_tx.send(DevnetEvent::error(format!("Unable to stack: {}", e)));
+                let _ = devnet_event_tx.send(DevnetEvent::error(format!("Unable to stack: {e}")));
             }
         }
     }
@@ -1028,8 +1019,7 @@ fn fund_genesis_account(
             Ok(info) => info,
             Err(e) => {
                 let _ = devnet_event_tx_moved.send(DevnetEvent::error(format!(
-                    "Failed to retrieve info: {}",
-                    e
+                    "Failed to retrieve info: {e}"
                 )));
                 return;
             }
@@ -1044,8 +1034,7 @@ fn fund_genesis_account(
             Ok(b) => b,
             Err(e) => {
                 let _ = devnet_event_tx_moved.send(DevnetEvent::error(format!(
-                    "Failed to retrieve burn block: {}",
-                    e
+                    "Failed to retrieve burn block: {e}"
                 )));
                 return;
             }
@@ -1056,8 +1045,7 @@ fn fund_genesis_account(
                 Ok(n) => n,
                 Err(e) => {
                     let _ = devnet_event_tx_moved.send(DevnetEvent::error(format!(
-                        "Failed to retrieve nonce: {}",
-                        e
+                        "Failed to retrieve nonce: {e}"
                     )));
                     return;
                 }
@@ -1114,8 +1102,7 @@ fn fund_genesis_account(
             }
         }
         let _ = devnet_event_tx_moved.send(DevnetEvent::info(format!(
-            "Funded {} accounts with sBTC",
-            nb_of_founded_accounts
+            "Funded {nb_of_founded_accounts} accounts with sBTC"
         )));
     });
 }
@@ -1139,7 +1126,7 @@ pub async fn mine_bitcoin_block(
         .timeout(Duration::from_secs(2))
         .build()
         .expect("Unable to build http client")
-        .post(format!("http://{}", bitcoin_node_host))
+        .post(format!("http://{bitcoin_node_host}"))
         .basic_auth(bitcoin_node_username, Some(bitcoin_node_password))
         .header("Content-Type", "application/json")
         .header("Host", bitcoin_node_host)
@@ -1151,10 +1138,10 @@ pub async fn mine_bitcoin_block(
         }))
         .send()
         .await
-        .map_err(|e| format!("unable to send request ({})", e))?
+        .map_err(|e| format!("unable to send request ({e})"))?
         .json::<bitcoincore_rpc::jsonrpc::Response>()
         .await
-        .map_err(|e| format!("unable to generate bitcoin block: ({})", e))?;
+        .map_err(|e| format!("unable to generate bitcoin block: ({e})"))?;
     Ok(())
 }
 
@@ -1325,8 +1312,7 @@ async fn export_stacks_api_events(
 
     // Create exec command to export events
     let export_command = format!(
-        "docker exec {} node /app/lib/index.js export-events --file /tmp/events_cache.tsv --overwrite-file",
-        container_name
+        "docker exec {container_name} node /app/lib/index.js export-events --file /tmp/events_cache.tsv --overwrite-file"
     );
 
     let _ = devnet_event_tx.send(DevnetEvent::info(
@@ -1338,7 +1324,7 @@ async fn export_stacks_api_events(
         .arg("-c")
         .arg(&export_command)
         .output()
-        .map_err(|e| format!("Failed to execute export command: {}", e))?;
+        .map_err(|e| format!("Failed to execute export command: {e}"))?;
 
     if !output.status.success() {
         return Err(format!(
@@ -1353,7 +1339,7 @@ async fn export_stacks_api_events(
     // Copy the exported file from container to host
     let export_path = PathBuf::from(&config.devnet_config.working_dir).join("events_export");
     fs::create_dir_all(&export_path)
-        .map_err(|e| format!("unable to create events export directory: {:?}", e))?;
+        .map_err(|e| format!("unable to create events export directory: {e:?}"))?;
 
     let copy_command = format!(
         "docker cp {}:/tmp/events_cache.tsv {}",
@@ -1365,7 +1351,7 @@ async fn export_stacks_api_events(
         .arg("-c")
         .arg(&copy_command)
         .output()
-        .map_err(|e| format!("Failed to copy events file: {}", e))?;
+        .map_err(|e| format!("Failed to copy events file: {e}"))?;
 
     if !output.status.success() {
         return Err(format!(
@@ -1378,13 +1364,13 @@ async fn export_stacks_api_events(
     let global_snapshot_dir = get_global_snapshot_dir();
     let global_export_path = global_snapshot_dir.join("events_export");
     fs::create_dir_all(&global_export_path)
-        .map_err(|e| format!("unable to create global events export directory: {:?}", e))?;
+        .map_err(|e| format!("unable to create global events export directory: {e:?}"))?;
 
     fs::copy(
         export_path.join("events_cache.tsv"),
         global_export_path.join("events_cache.tsv"),
     )
-    .map_err(|e| format!("unable to copy to global cache: {:?}", e))?;
+    .map_err(|e| format!("unable to copy to global cache: {e:?}"))?;
 
     let _ = devnet_event_tx.send(DevnetEvent::success(
         "Successfully exported Stacks API events".to_string(),

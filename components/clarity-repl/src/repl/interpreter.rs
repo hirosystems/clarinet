@@ -141,7 +141,7 @@ impl ClarityInterpreter {
             Err(e) => {
                 diagnostics.push(Diagnostic {
                     level: Level::Error,
-                    message: format!("Runtime Error: {}", e),
+                    message: format!("Runtime Error: {e}"),
                     spans: vec![],
                     suggestion: None,
                 });
@@ -192,7 +192,7 @@ impl ClarityInterpreter {
             Err(e) => {
                 diagnostics.push(Diagnostic {
                     level: Level::Error,
-                    message: format!("Wasm Generator Error: {:?}", e),
+                    message: format!("Wasm Generator Error: {e:?}"),
                     spans: vec![],
                     suggestion: None,
                 });
@@ -212,7 +212,7 @@ impl ClarityInterpreter {
             Err(e) => {
                 diagnostics.push(Diagnostic {
                     level: Level::Error,
-                    message: format!("Wasm Runtime Error: {}", e),
+                    message: format!("Wasm Runtime Error: {e}"),
                     spans: vec![],
                     suggestion: None,
                 });
@@ -525,7 +525,7 @@ impl ClarityInterpreter {
         });
 
         let value = result.map_err(|e| {
-            let err = format!("Runtime error while interpreting {}: {:?}", contract_id, e);
+            let err = format!("Runtime error while interpreting {contract_id}: {e:?}");
             if let Some(mut eval_hooks) = global_context.eval_hooks.take() {
                 for hook in eval_hooks.iter_mut() {
                     hook.did_complete(Err(err.clone()));
@@ -742,7 +742,7 @@ impl ClarityInterpreter {
         });
 
         let value = result.map_err(|e| {
-            let err = format!("Runtime error while interpreting {}: {:?}", contract_id, e);
+            let err = format!("Runtime error while interpreting {contract_id}: {e:?}");
             if let Some(mut eval_hooks) = global_context.eval_hooks.take() {
                 for hook in eval_hooks.iter_mut() {
                     hook.did_complete(Err(err.clone()));
@@ -893,7 +893,7 @@ impl ClarityInterpreter {
         });
 
         let value = result.map_err(|e| {
-            let err = format!("Runtime error while interpreting {}: {:?}", contract_id, e);
+            let err = format!("Runtime error while interpreting {contract_id}: {e:?}");
             if let Some(mut eval_hooks) = global_context.eval_hooks.take() {
                 for hook in eval_hooks.iter_mut() {
                     hook.did_complete(Err(err.clone()));
@@ -1077,7 +1077,7 @@ impl ClarityInterpreter {
             final_balance
         };
         self.credit_token(recipient.to_string(), "STX".to_string(), amount.into());
-        Ok(format!("→ {}: {} µSTX", recipient, final_balance))
+        Ok(format!("→ {recipient}: {final_balance} µSTX"))
     }
 
     pub fn set_tx_sender(&mut self, tx_sender: StandardPrincipalData) {
