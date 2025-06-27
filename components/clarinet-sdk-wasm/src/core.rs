@@ -354,7 +354,7 @@ impl SDK {
     ) -> Result<(), String> {
         let config: Option<RemoteDataSettings> =
             serde_wasm_bindgen::from_value(remote_data_settings)
-                .map_err(|e| format!("Failed to parse remote data settings: {}", e))?;
+                .map_err(|e| format!("Failed to parse remote data settings: {e}"))?;
 
         let mut settings = SessionSettings::default();
         settings.repl_settings.remote_data = config.unwrap_or_default();
@@ -725,7 +725,7 @@ impl SDK {
             .functions
             .iter()
             .find(|func| func.name == method)
-            .ok_or(format!("contract {} has no function {}", contract, method))
+            .ok_or(format!("contract {contract} has no function {method}"))
     }
 
     fn call_contract_fn(
@@ -937,7 +937,7 @@ impl SDK {
 
         let txs: Vec<TxArgs> = js_txs
             .into_serde()
-            .map_err(|e| format!("Failed to parse js txs: {:}", e))?;
+            .map_err(|e| format!("Failed to parse js txs: {e}"))?;
 
         {
             let session = self.get_session_mut();
@@ -959,7 +959,7 @@ impl SDK {
             results.push(result);
         }
 
-        encode_to_js(&results).map_err(|e| format!("error: {}", e))
+        encode_to_js(&results).map_err(|e| format!("error: {e}"))
     }
 
     #[wasm_bindgen(js_name=mineEmptyBlock)]
@@ -1030,7 +1030,7 @@ impl SDK {
                     .map(|d| d.message.to_string())
                     .collect::<Vec<String>>()
                     .join("\n");
-                Err(format!("error: {}", message))
+                Err(format!("error: {message}"))
             }
         }
     }
