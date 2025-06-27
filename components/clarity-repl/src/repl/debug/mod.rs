@@ -582,12 +582,10 @@ pub fn extract_watch_variable<'a>(
     };
 
     let contract = if env.global_context.database.has_contract(&contract_id) {
-        match env.global_context.database.get_contract(&contract_id) {
-            Ok(contract) => contract,
-            Err(e) => {
-                return Err(format!("{e}"));
-            }
-        }
+        env.global_context
+            .database
+            .get_contract(&contract_id)
+            .map_err(|e| e.to_string())?
     } else {
         return Err(format!("{contract_id} does not exist"));
     };

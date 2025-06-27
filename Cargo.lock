@@ -4698,6 +4698,7 @@ dependencies = [
  "flate2",
  "futures",
  "hiro-system-kit",
+ "indoc",
  "libc",
  "rand",
  "ratatui",

@@ -688,7 +688,7 @@ impl SDK {
         session
             .interpreter
             .get_data_var(&contract_id, var_name)
-            .ok_or("value not found".into())
+            .ok_or_else(|| "value not found".into())
     }
 
     #[wasm_bindgen(js_name=getBlockTime)]
@@ -708,7 +708,7 @@ impl SDK {
         session
             .interpreter
             .get_map_entry(&contract_id, map_name, &uint8_to_value(&map_key))
-            .ok_or("value not found".into())
+            .ok_or_else(|| "value not found".into())
     }
 
     fn get_function_interface(
@@ -720,12 +720,12 @@ impl SDK {
         let contract_interface = self
             .contracts_interfaces
             .get(&contract_id)
-            .ok_or(format!("unable to get contract interface for {contract}"))?;
+            .ok_or_else(|| format!("unable to get contract interface for {contract}"))?;
         contract_interface
             .functions
             .iter()
             .find(|func| func.name == method)
-            .ok_or(format!("contract {contract} has no function {method}"))
+            .ok_or_else(|| format!("contract {contract} has no function {method}"))
     }
 
     fn call_contract_fn(
@@ -758,17 +758,14 @@ impl SDK {
             )
             .map_err(|diagnostics| {
                 let mut message = format!(
-                    "{}: {}::{}({})",
-                    "Call contract function error",
-                    contract,
-                    method,
+                    "Call contract function error: {contract}::{method}({})",
                     args.iter()
                         .map(|a| uint8_to_string(a))
                         .collect::<Vec<String>>()
                         .join(", ")
                 );
                 if let Some(diag) = diagnostics.last() {
-                    message = format!("{} -> {}", message, diag.message);
+                    message = format!("{message} -> {}", diag.message);
                 }
                 message
             })?;
@@ -778,7 +775,7 @@ impl SDK {
                 let contract_id = if contract.starts_with('S') {
                     contract.to_string()
                 } else {
-                    format!("{}.{}", self.deployer, contract)
+                    format!("{}.{contract}", self.deployer)
                 };
                 self.costs_reports.push(CostsReport {
                     test_name,

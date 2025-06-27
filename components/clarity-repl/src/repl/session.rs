@@ -1057,11 +1057,11 @@ impl Session {
 
             for token in tokens.iter() {
                 let balance = self.interpreter.get_balance_for_account(account, token);
-                cells.push(format!("{balance}"));
+                cells.push(balance.to_string());
             }
             table.add_row(cells);
         }
-        Some(format!("{table}"))
+        Some(table.to_string())
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -1096,7 +1096,7 @@ impl Session {
                 table.add_row(vec![&contract_id_str, &formatted_spec]);
             }
         }
-        Some(format!("{table}"))
+        Some(table.to_string())
     }
 
     #[cfg(target_arch = "wasm32")]
