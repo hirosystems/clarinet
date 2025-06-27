@@ -120,7 +120,7 @@ impl StacksDevnet {
                 Ok(devnet) => devnet,
                 Err(message) => {
                     if logs_enabled {
-                        println!("Fatal error: {}", message);
+                        println!("Fatal error: {message}");
                     }
                     std::process::exit(1);
                 }
@@ -149,7 +149,7 @@ impl StacksDevnet {
                         }
                         Err(e) => {
                             if logs_enabled {
-                                println!("unable to create log file {}", e);
+                                println!("unable to create log file {e}");
                             }
                             None
                         }
@@ -157,10 +157,7 @@ impl StacksDevnet {
                 }
                 Err(e) => {
                     if logs_enabled {
-                        println!(
-                            "incorrectly formatted working_dir {}. error: {}",
-                            working_dir, e
-                        )
+                        println!("incorrectly formatted working_dir {working_dir}. error: {e}")
                     }
                     None
                 }
@@ -215,7 +212,7 @@ impl StacksDevnet {
                             )) => (devnet_events_rx, chains_coordinator_command_tx),
                             Err(e) => {
                                 if logs_enabled {
-                                    println!("Fatal error: {}", e);
+                                    println!("Fatal error: {e}");
                                 }
                                 return;
                             }
@@ -238,7 +235,7 @@ impl StacksDevnet {
                     }
                     Err(e) => {
                         if logs_enabled {
-                            println!("Fatal error: {}", e);
+                            println!("Fatal error: {e}");
                         }
                         return;
                     }
@@ -260,7 +257,7 @@ impl StacksDevnet {
                     Ok(DevnetCommand::Start(_)) => {}
                     Err(e) => {
                         if logs_enabled {
-                            println!("Fatal error: {}", e);
+                            println!("Fatal error: {e}");
                         }
                         return;
                     }
@@ -293,8 +290,7 @@ impl StacksDevnet {
                                         "{} {}",
                                         log,
                                         match network_id {
-                                            Some(network_id) =>
-                                                format!("(network #{})", network_id),
+                                            Some(network_id) => format!("(network #{network_id})"),
                                             None => "".into(),
                                         }
                                     );
@@ -325,7 +321,7 @@ impl StacksDevnet {
                             DevnetEvent::FatalError(error) => {
                                 let _ = devnet_ready_tx.send(Err(error.clone()));
                                 if logs_enabled {
-                                    println!("[erro] {}", error);
+                                    println!("[erro] {error}");
                                 }
                                 break;
                             }
@@ -374,7 +370,7 @@ impl StacksDevnet {
         let _ = self.tx.send(DevnetCommand::Start(None));
         self.devnet_ready_rx
             .recv_timeout(std::time::Duration::from_secs(timeout))
-            .map_err(|e| format!("broken channel: {}", e))??;
+            .map_err(|e| format!("broken channel: {e}"))??;
         Ok(true)
     }
 }

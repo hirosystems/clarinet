@@ -115,8 +115,7 @@ async fn do_run_devnet(
                 }
                 Err(e) => {
                     let _ = devnet_events_tx.send(DevnetEvent::warning(format!(
-                        "Failed to extract embedded snapshot: {}. Continuing without snapshot.",
-                        e
+                        "Failed to extract embedded snapshot: {e}. Continuing without snapshot."
                     )));
                 }
             }

@@ -1639,7 +1639,7 @@ impl StacksString {
 #[test]
 fn test_display() {
     let stxstr = StacksString::from_string(&"hello".to_string()).unwrap();
-    println!("log: {:#?}", stxstr);
+    println!("log: {stxstr:#?}");
     println!("log: {:#?}", stxstr.to_string());
 }
 
@@ -2387,8 +2387,7 @@ impl StacksTransaction {
             x if x == TransactionAnchorMode::Any as u8 => TransactionAnchorMode::Any,
             _ => {
                 return Err(CodecError::DeserializeError(format!(
-                    "Failed to parse transaction: invalid anchor mode {}",
-                    anchor_mode_u8
+                    "Failed to parse transaction: invalid anchor mode {anchor_mode_u8}"
                 )));
             }
         };
@@ -2424,8 +2423,7 @@ impl StacksTransaction {
             }
             _ => {
                 return Err(CodecError::DeserializeError(format!(
-                    "Failed to parse transaction: invalid post-condition mode {}",
-                    post_condition_mode_u8
+                    "Failed to parse transaction: invalid post-condition mode {post_condition_mode_u8}"
                 )));
             }
         };
@@ -3324,8 +3322,7 @@ impl StacksMessageCodec for PostConditionPrincipal {
             }
             _ => {
                 return Err(CodecError::DeserializeError(format!(
-                    "Failed to parse transaction: unknown post condition principal ID {}",
-                    principal_id
+                    "Failed to parse transaction: unknown post condition principal ID {principal_id}"
                 )));
             }
         };
@@ -3380,8 +3377,7 @@ impl StacksMessageCodec for TransactionPostCondition {
 
                 let condition_code = FungibleConditionCode::from_u8(condition_u8).ok_or(
                     CodecError::DeserializeError(format!(
-                    "Failed to parse transaction: Failed to parse STX fungible condition code {}",
-                    condition_u8
+                    "Failed to parse transaction: Failed to parse STX fungible condition code {condition_u8}"
                 )),
                 )?;
 
@@ -3395,8 +3391,7 @@ impl StacksMessageCodec for TransactionPostCondition {
 
                 let condition_code = FungibleConditionCode::from_u8(condition_u8).ok_or(
                     CodecError::DeserializeError(format!(
-                    "Failed to parse transaction: Failed to parse FungibleAsset condition code {}",
-                    condition_u8
+                    "Failed to parse transaction: Failed to parse FungibleAsset condition code {condition_u8}"
                 )),
                 )?;
 
@@ -3410,16 +3405,14 @@ impl StacksMessageCodec for TransactionPostCondition {
 
                 let condition_code = NonfungibleConditionCode::from_u8(condition_u8)
                     .ok_or(CodecError::DeserializeError(format!(
-                        "Failed to parse transaction: Failed to parse NonfungibleAsset condition code {}",
-                        condition_u8
+                        "Failed to parse transaction: Failed to parse NonfungibleAsset condition code {condition_u8}"
                     )))?;
 
                 TransactionPostCondition::Nonfungible(principal, asset, asset_value, condition_code)
             }
             _ => {
                 return Err(CodecError::DeserializeError(format!(
-                    "Failed to parse transaction: unknown asset info ID {}",
-                    asset_info_id
+                    "Failed to parse transaction: unknown asset info ID {asset_info_id}"
                 )));
             }
         };
@@ -3458,8 +3451,7 @@ impl StacksMessageCodec for TransactionAuth {
             }
             _ => {
                 return Err(CodecError::DeserializeError(format!(
-                    "Failed to parse transaction authorization: unrecognized auth flags {}",
-                    type_id
+                    "Failed to parse transaction authorization: unrecognized auth flags {type_id}"
                 )));
             }
         };
@@ -3503,8 +3495,7 @@ impl StacksMessageCodec for TransactionSpendingCondition {
                 TransactionSpendingCondition::OrderIndependentMultisig(cond)
             } else {
                 return Err(CodecError::DeserializeError(format!(
-                    "Failed to parse spending condition: invalid hash mode {}",
-                    hash_mode_u8
+                    "Failed to parse spending condition: invalid hash mode {hash_mode_u8}"
                 )));
             }
         };
@@ -3530,8 +3521,7 @@ impl StacksMessageCodec for SinglesigSpendingCondition {
         let hash_mode_u8: u8 = read_next(fd)?;
         let hash_mode = SinglesigHashMode::from_u8(hash_mode_u8).ok_or(
             CodecError::DeserializeError(format!(
-                "Failed to parse singlesig spending condition: unknown hash mode {}",
-                hash_mode_u8
+                "Failed to parse singlesig spending condition: unknown hash mode {hash_mode_u8}"
             )),
         )?;
 
@@ -3542,9 +3532,8 @@ impl StacksMessageCodec for SinglesigSpendingCondition {
         let key_encoding_u8: u8 = read_next(fd)?;
         let key_encoding = TransactionPublicKeyEncoding::from_u8(key_encoding_u8).ok_or(
             CodecError::DeserializeError(format!(
-                "Failed to parse singlesig spending condition: unknown key encoding {}",
-                key_encoding_u8
-            )),
+            "Failed to parse singlesig spending condition: unknown key encoding {key_encoding_u8}"
+        )),
         )?;
 
         let signature: MessageSignature = read_next(fd)?;
@@ -3582,8 +3571,7 @@ impl StacksMessageCodec for MultisigSpendingCondition {
         let hash_mode_u8: u8 = read_next(fd)?;
         let hash_mode = MultisigHashMode::from_u8(hash_mode_u8).ok_or(
             CodecError::DeserializeError(format!(
-                "Failed to parse multisig spending condition: unknown hash mode {}",
-                hash_mode_u8
+                "Failed to parse multisig spending condition: unknown hash mode {hash_mode_u8}"
             )),
         )?;
 
@@ -3625,8 +3613,7 @@ impl StacksMessageCodec for MultisigSpendingCondition {
         // must be given the right number of signatures
         if num_sigs_given != signatures_required {
             return Err(CodecError::DeserializeError(format!(
-                "Failed to parse multisig spending condition: got {} sigs, expected {}",
-                num_sigs_given, signatures_required
+                "Failed to parse multisig spending condition: got {num_sigs_given} sigs, expected {signatures_required}"
             )));
         }
 
@@ -3666,8 +3653,7 @@ impl StacksMessageCodec for OrderIndependentMultisigSpendingCondition {
         let hash_mode_u8: u8 = read_next(fd)?;
         let hash_mode = OrderIndependentMultisigHashMode::from_u8(hash_mode_u8).ok_or(
             CodecError::DeserializeError(format!(
-                "Failed to parse multisig spending condition: unknown hash mode {}",
-                hash_mode_u8
+                "Failed to parse multisig spending condition: unknown hash mode {hash_mode_u8}"
             )),
         )?;
 
@@ -3809,8 +3795,7 @@ impl StacksMessageCodec for TransactionAuthField {
             }
             _ => {
                 return Err(CodecError::DeserializeError(format!(
-                    "Failed to parse auth field: unknown auth field ID {}",
-                    field_id
+                    "Failed to parse auth field: unknown auth field ID {field_id}"
                 )));
             }
         };

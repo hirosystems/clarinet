@@ -1072,7 +1072,7 @@ impl EvalHook for DAPDebugger {
                 proceed = match self.wait_for_command(Some(env), Some(context)) {
                     Ok(proceed) => proceed,
                     Err(e) => {
-                        self.log(format!("error: {}", e));
+                        self.log(format!("error: {e}"));
                         false
                     }
                 };
@@ -1115,7 +1115,7 @@ impl EvalHook for DAPDebugger {
                         self.log("\nContract published.");
                         if let Some(value) = &contract.result {
                             self.log("\nReturn value:");
-                            self.stdout(format!("{}\n", value))
+                            self.stdout(format!("{value}\n"))
                         }
                     }
                 }
@@ -1149,7 +1149,7 @@ fn type_for_value(value: &Value) -> String {
         Value::Sequence(SequenceData::List(_)) => "list".to_string(),
         Value::CallableContract(callable) => {
             if let Some(trait_id) = &callable.trait_identifier {
-                format!("<{}>", trait_id)
+                format!("<{trait_id}>")
             } else {
                 "principal".to_string()
             }

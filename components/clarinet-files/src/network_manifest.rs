@@ -759,9 +759,9 @@ impl NetworkManifest {
 
             let now = clarity::util::get_epoch_time_secs();
             let devnet_dir = if let Some(network_id) = devnet_config.network_id {
-                format!("stacks-devnet-{}-{}/", now, network_id)
+                format!("stacks-devnet-{now}-{network_id}/")
             } else {
-                format!("stacks-devnet-{}/", now)
+                format!("stacks-devnet-{now}/")
             };
             let default_working_dir = match cache_location {
                 Some(cache_location) => {
@@ -845,8 +845,7 @@ impl NetworkManifest {
                 &epoch_3_0,
             ) {
                 return Err(format!(
-                    "Epoch 3.0 must start *during* a reward phase, not a prepare phase. Epoch 3.0 start set to: {}. Reward Cycle Length: {}. Prepare Phase Length: {}",
-                    epoch_3_0, DEFAULT_POX_REWARD_LENGTH, DEFAULT_POX_PREPARE_LENGTH
+                    "Epoch 3.0 must start *during* a reward phase, not a prepare phase. Epoch 3.0 start set to: {epoch_3_0}. Reward Cycle Length: {DEFAULT_POX_REWARD_LENGTH}. Prepare Phase Length: {DEFAULT_POX_PREPARE_LENGTH}"
                 ));
             }
 

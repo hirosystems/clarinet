@@ -32,19 +32,19 @@ impl MockStacksRpc {
     pub fn get_nonce_mock(&mut self, address: &str, nonce: u64) -> Mock {
         self.client.mock(
             "GET",
-            format!("/v2/accounts/{}", address).as_str(),
+            format!("/v2/accounts/{address}").as_str(),
         )
             .with_status(200)
             .with_header("content-type", "application/json")
-            .with_body(format!(r#"{{"balance":"10000000","nonce":{}, "nonce_proof":"0x123", "balance_proof":"0x123"}}"#, nonce))
+            .with_body(format!(r#"{{"balance":"10000000","nonce":{nonce}, "nonce_proof":"0x123", "balance_proof":"0x123"}}"#))
             .create()
     }
 
     pub fn get_burn_block_mock(&mut self, burn_block_height: u64) -> Mock {
-        self.client.mock("GET", format!("/extended/v2/burn-blocks/{}", burn_block_height).as_str())
+        self.client.mock("GET", format!("/extended/v2/burn-blocks/{burn_block_height}").as_str())
             .with_status(200)
             .with_header("content-type", "application/json")
-            .with_body(format!(r#"{{"burn_block_time":1234567890,"burn_block_hash":"0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef","burn_block_height":{}}}"#, burn_block_height))
+            .with_body(format!(r#"{{"burn_block_time":1234567890,"burn_block_hash":"0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef","burn_block_height":{burn_block_height}}}"#))
             .create()
     }
 
@@ -53,7 +53,7 @@ impl MockStacksRpc {
             .mock("POST", "/v2/transactions")
             .with_status(200)
             .with_header("content-type", "application/json")
-            .with_body(format!(r#""{}""#, tx_id))
+            .with_body(format!(r#""{tx_id}""#))
             .create()
     }
 }

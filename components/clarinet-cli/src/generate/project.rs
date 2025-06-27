@@ -28,7 +28,7 @@ impl GetChangesForNewProject {
         let project_path = if use_current_dir {
             project_path
         } else {
-            format!("{}/{}", project_path, project_name)
+            format!("{project_path}/{project_name}")
         };
 
         Self {
@@ -314,12 +314,12 @@ disable_stacks_api = false
 # disable_bitcoin_explorer = true
 # working_dir = "tmp/devnet"
 # stacks_node_events_observers = ["host.docker.internal:8002"]
-# miner_mnemonic = "{default_stacks_miner_mnemonic}"
-# miner_derivation_path = "{default_derivation_path}"
-# faucet_mnemonic = "{default_stacks_faucet_mnemonic}"
-# faucet_derivation_path = "{default_derivation_path}"
-# stacker_mnemonic = "{default_stacks_stacker_mnemonic}"
-# stacker_derivation_path = "{default_derivation_path}"
+# miner_mnemonic = "{DEFAULT_STACKS_MINER_MNEMONIC}"
+# miner_derivation_path = "{DEFAULT_DERIVATION_PATH}"
+# faucet_mnemonic = "{DEFAULT_FAUCET_MNEMONIC}"
+# faucet_derivation_path = "{DEFAULT_DERIVATION_PATH}"
+# stacker_mnemonic = "{DEFAULT_STACKER_MNEMONIC}"
+# stacker_derivation_path = "{DEFAULT_DERIVATION_PATH}"
 # orchestrator_port = 20445
 # bitcoin_node_p2p_port = 18444
 # bitcoin_node_rpc_port = 18443
@@ -336,23 +336,23 @@ disable_stacks_api = false
 # postgres_username = "postgres"
 # postgres_password = "postgres"
 # postgres_database = "postgres"
-# bitcoin_node_image_url = "{default_bitcoin_node_image}"
-# stacks_node_image_url = "{default_stacks_node_image}"
-# stacks_signer_image_url = "{default_stacks_signer_image}"
-# stacks_api_image_url = "{default_stacks_api_image}"
-# stacks_explorer_image_url = "{default_stacks_explorer_image}"
-# bitcoin_explorer_image_url = "{default_bitcoin_explorer_image}"
-# postgres_image_url = "{default_postgres_image}"
+# bitcoin_node_image_url = "{DEFAULT_BITCOIN_NODE_IMAGE}"
+# stacks_node_image_url = "{DEFAULT_STACKS_NODE_IMAGE}"
+# stacks_signer_image_url = "{DEFAULT_STACKS_SIGNER_IMAGE}"
+# stacks_api_image_url = "{DEFAULT_STACKS_API_IMAGE}"
+# stacks_explorer_image_url = "{DEFAULT_STACKS_EXPLORER_IMAGE}"
+# bitcoin_explorer_image_url = "{DEFAULT_BITCOIN_EXPLORER_IMAGE}"
+# postgres_image_url = "{DEFAULT_POSTGRES_IMAGE}"
 # enable_subnet_node = true
-# subnet_node_image_url = "{default_subnet_node_image}"
-# subnet_leader_mnemonic = "{default_subnet_mnemonic}"
-# subnet_leader_derivation_path = "{default_derivation_path}"
-# subnet_contract_id = "{default_subnet_contract_id}"
+# subnet_node_image_url = "{DEFAULT_SUBNET_NODE_IMAGE}"
+# subnet_leader_mnemonic = "{DEFAULT_SUBNET_MNEMONIC}"
+# subnet_leader_derivation_path = "{DEFAULT_DERIVATION_PATH}"
+# subnet_contract_id = "{DEFAULT_SUBNET_CONTRACT_ID}"
 # subnet_node_rpc_port = 30443
 # subnet_node_p2p_port = 30444
 # subnet_events_ingestion_port = 30445
 # subnet_node_events_observers = ["host.docker.internal:8002"]
-# subnet_api_image_url = "{default_subnet_api_image}"
+# subnet_api_image_url = "{DEFAULT_SUBNET_API_IMAGE}"
 # subnet_api_postgres_database = "subnet_api"
 
 # epoch_2_0 = {DEFAULT_EPOCH_2_0}
@@ -391,21 +391,6 @@ slots = 2
 btc_address = "mvZtbibDAAA3WLpY7zXXFqRa3T4XSknBX7"
 
 "#,
-            default_derivation_path = DEFAULT_DERIVATION_PATH,
-            default_bitcoin_node_image = DEFAULT_BITCOIN_NODE_IMAGE,
-            default_stacks_node_image = DEFAULT_STACKS_NODE_IMAGE,
-            default_stacks_signer_image = DEFAULT_STACKS_SIGNER_IMAGE,
-            default_bitcoin_explorer_image = DEFAULT_BITCOIN_EXPLORER_IMAGE,
-            default_stacks_api_image = DEFAULT_STACKS_API_IMAGE,
-            default_stacks_explorer_image = DEFAULT_STACKS_EXPLORER_IMAGE,
-            default_postgres_image = DEFAULT_POSTGRES_IMAGE,
-            default_subnet_node_image = DEFAULT_SUBNET_NODE_IMAGE,
-            default_subnet_mnemonic = DEFAULT_SUBNET_MNEMONIC,
-            default_subnet_contract_id = DEFAULT_SUBNET_CONTRACT_ID,
-            default_subnet_api_image = DEFAULT_SUBNET_API_IMAGE,
-            default_stacks_miner_mnemonic = DEFAULT_STACKS_MINER_MNEMONIC,
-            default_stacks_faucet_mnemonic = DEFAULT_FAUCET_MNEMONIC,
-            default_stacks_stacker_mnemonic = DEFAULT_STACKER_MNEMONIC,
         );
         let name = "settings/Devnet.toml".into();
         self.changes

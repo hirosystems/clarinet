@@ -20,7 +20,7 @@ fn draw_contracts_status(f: &mut Frame, app: &mut App, area: Rect) {
                 ("🟦", "Transaction encoded and queued".to_string())
             }
             TransactionStatus::Broadcasted(_, txid) => {
-                ("🟨", format!("Transaction broadcasted (txid: {})", txid))
+                ("🟨", format!("Transaction broadcasted (txid: {txid})"))
             }
             TransactionStatus::Confirmed => ("🟩", "Transaction confirmed".to_string()),
             TransactionStatus::Error(message) => ("🟥", message.to_string()),

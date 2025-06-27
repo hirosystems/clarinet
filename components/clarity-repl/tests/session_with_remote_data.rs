@@ -51,13 +51,13 @@ fn it_starts_in_the_right_epoch() {
 fn it_can_fetch_remote() {
     // count at block 42000 is 0
     let mut session = init_session(42000);
-    let snippet = format!("(contract-call? '{} get-count)", COUNTER_ADDR);
+    let snippet = format!("(contract-call? '{COUNTER_ADDR} get-count)");
     let result = eval_snippet(&mut session, &snippet);
     assert_eq!(result, Value::UInt(0));
 
     // count at block 57000 is 1
     let mut session = init_session(57000);
-    let snippet = format!("(contract-call? '{} get-count)", COUNTER_ADDR);
+    let snippet = format!("(contract-call? '{COUNTER_ADDR} get-count)");
     let result = eval_snippet(&mut session, &snippet);
     assert_eq!(result, Value::UInt(1));
 }
@@ -96,13 +96,13 @@ fn it_can_get_stacks_block_info() {
 #[test]
 fn it_can_fork_state() {
     let mut session = init_session(57000);
-    let snippet_get_count = format!("(contract-call? '{} get-count)", COUNTER_ADDR);
+    let snippet_get_count = format!("(contract-call? '{COUNTER_ADDR} get-count)");
 
     let result = eval_snippet(&mut session, &snippet_get_count);
     assert_eq!(result, Value::UInt(1));
 
     session.advance_burn_chain_tip(1);
-    let snippet = format!("(contract-call? '{} increment)", COUNTER_ADDR);
+    let snippet = format!("(contract-call? '{COUNTER_ADDR} increment)");
     let _ = eval_snippet(&mut session, &snippet);
 
     let result = eval_snippet(&mut session, &snippet_get_count);
@@ -116,28 +116,22 @@ fn it_handles_at_block() {
     // block 42000 hash
     let hash = "0xb4678e059aa9b82b1473597087876ef61a5c6a0c35910cd4b797201d6b423a07";
 
-    let snippet = format!("(at-block {} stacks-block-height)", hash);
+    let snippet = format!("(at-block {hash} stacks-block-height)");
     let result = eval_snippet(&mut session, &snippet);
     assert_eq!(result, Value::UInt(42000));
 
-    let snippet_get_count_at_10k = format!(
-        "(contract-call? '{} get-count-at-block u10000)",
-        COUNTER_ADDR
-    );
+    let snippet_get_count_at_10k =
+        format!("(contract-call? '{COUNTER_ADDR} get-count-at-block u10000)");
     let result = eval_snippet(&mut session, &snippet_get_count_at_10k);
     assert_eq!(result, Value::okay(Value::none()).unwrap());
 
-    let snippet_get_count_at_42k = format!(
-        "(contract-call? '{} get-count-at-block u42000)",
-        COUNTER_ADDR
-    );
+    let snippet_get_count_at_42k =
+        format!("(contract-call? '{COUNTER_ADDR} get-count-at-block u42000)");
     let result = eval_snippet(&mut session, &snippet_get_count_at_42k);
     assert_eq!(result, Value::okay(Value::UInt(0)).unwrap());
 
-    let snippet_get_count_at_57k = format!(
-        "(contract-call? '{} get-count-at-block u57000)",
-        COUNTER_ADDR
-    );
+    let snippet_get_count_at_57k =
+        format!("(contract-call? '{COUNTER_ADDR} get-count-at-block u57000)");
     let result = eval_snippet(&mut session, &snippet_get_count_at_57k);
     assert_eq!(result, Value::okay(Value::UInt(1)).unwrap());
 }
@@ -215,14 +209,11 @@ fn it_can_fetch_burn_chain_info() {
 fn it_keeps_track_of_historical_data() {
     let mut session = init_session(57000);
 
-    let snippet = format!(
-        "(contract-call? '{} get-count-at-block u42000)",
-        COUNTER_ADDR
-    );
+    let snippet = format!("(contract-call? '{COUNTER_ADDR} get-count-at-block u42000)");
     let result = eval_snippet(&mut session, &snippet);
     assert_eq!(result, Value::okay(Value::UInt(0)).unwrap());
 
-    let snippet = format!("(contract-call? '{} get-count)", COUNTER_ADDR);
+    let snippet = format!("(contract-call? '{COUNTER_ADDR} get-count)");
     let result = eval_snippet(&mut session, &snippet);
     assert_eq!(result, Value::UInt(1));
 }
@@ -301,7 +292,7 @@ fn it_handles_chain_constants() {
 #[test]
 fn it_saves_metadata_to_cache() {
     let mut session = init_session(57000);
-    let snippet = format!("(contract-call? '{} get-count)", COUNTER_ADDR);
+    let snippet = format!("(contract-call? '{COUNTER_ADDR} get-count)");
     let result = eval_snippet(&mut session, &snippet);
     assert_eq!(result, Value::UInt(1));
 

@@ -196,7 +196,7 @@ impl EvalHook for Tracer {
                         self.pending_call_string
                             .last_mut()
                             .unwrap()
-                            .push_str(format!(" {}", value).as_str());
+                            .push_str(format!(" {value}").as_str());
                     }
 
                     // If this was the last argument, print the pending call and pop the stack
@@ -228,7 +228,7 @@ impl EvalHook for Tracer {
                     }
                 };
             }
-            Err(e) => println!("{}", e),
+            Err(e) => println!("{e}"),
         }
     }
 }

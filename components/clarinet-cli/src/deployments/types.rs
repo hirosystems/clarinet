@@ -32,7 +32,7 @@ impl DeploymentSynthesis {
 
         let content = match deployment.to_file_content() {
             Ok(res) => res,
-            Err(err) => panic!("unable to serialize deployment {}", err),
+            Err(err) => panic!("unable to serialize deployment {err}"),
         };
 
         DeploymentSynthesis {

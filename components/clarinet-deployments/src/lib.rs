@@ -126,10 +126,9 @@ fn update_session_with_genesis_accounts(
 fn fund_genesis_account_with_sbtc(session: &mut Session, deployment: &DeploymentSpecification) {
     if let Some(ref spec) = deployment.genesis {
         let block_height = session.interpreter.get_burn_block_height() - 1;
-        let height = session.eval_clarity_string(&format!("u{}", block_height));
+        let height = session.eval_clarity_string(&format!("u{block_height}"));
         let hash = session.eval_clarity_string(&format!(
-            "(unwrap-panic (get-burn-block-info? header-hash u{}))",
-            block_height
+            "(unwrap-panic (get-burn-block-info? header-hash u{block_height}))"
         ));
         let vout_index = session.eval_clarity_string("u1");
 
@@ -142,12 +141,12 @@ fn fund_genesis_account_with_sbtc(session: &mut Session, deployment: &Deployment
             for _ in 0..32 {
                 write!(&mut random_tx_id, "{:02x}", rand::random::<u8>()).unwrap();
             }
-            let tx_id = session.eval_clarity_string(&format!("0x{}", random_tx_id));
+            let tx_id = session.eval_clarity_string(&format!("0x{random_tx_id}"));
             let mut random_sweep_txid = String::with_capacity(64);
             for _ in 0..32 {
                 write!(&mut random_sweep_txid, "{:02x}", rand::random::<u8>()).unwrap();
             }
-            let sweep_tx_id = session.eval_clarity_string(&format!("0x{}", random_sweep_txid));
+            let sweep_tx_id = session.eval_clarity_string(&format!("0x{random_sweep_txid}"));
             let amount = session.eval_clarity_string(&format!("u{}", wallet.sbtc_balance));
             let recipient = session.eval_clarity_string(&format!("'{}", wallet.address));
 
@@ -639,7 +638,7 @@ pub async fn generate_default_deployment(
                 &contract_epochs,
             ) {
                 Ok(ordered_contracts) => ordered_contracts,
-                Err(e) => return Err(format!("unable to order requirements {}", e)),
+                Err(e) => return Err(format!("unable to order requirements {e}")),
             };
 
             // Filter out boot contracts from requirement dependencies
@@ -649,7 +648,7 @@ pub async fn generate_default_deployment(
                 for contract_id in ordered_contracts_ids.iter() {
                     let data = emulated_contracts_publish
                         .remove(contract_id)
-                        .unwrap_or_else(|| panic!("unable to retrieve contract: {}", contract_id));
+                        .unwrap_or_else(|| panic!("unable to retrieve contract: {contract_id}"));
                     let tx = TransactionSpecification::EmulatedContractPublish(data);
                     add_transaction_to_epoch(
                         &mut transactions,
@@ -661,7 +660,7 @@ pub async fn generate_default_deployment(
                 for contract_id in ordered_contracts_ids.iter() {
                     let data = requirements_publish
                         .remove(contract_id)
-                        .unwrap_or_else(|| panic!("unable to retrieve contract: {}", contract_id));
+                        .unwrap_or_else(|| panic!("unable to retrieve contract: {contract_id}"));
                     let tx = TransactionSpecification::RequirementPublish(data);
                     add_transaction_to_epoch(
                         &mut transactions,
@@ -694,7 +693,7 @@ pub async fn generate_default_deployment(
 
                 let source = contract_location
                     .read_content_as_utf8()
-                    .map_err(|_| format!("unable to find contract at {}", contract_location))?;
+                    .map_err(|_| format!("unable to find contract at {contract_location}"))?;
                 sources.insert(contract_location.to_string(), source);
             }
             sources
@@ -896,7 +895,7 @@ pub async fn generate_default_deployment(
 
     let name = match network {
         StacksNetwork::Simnet => "Simulated deployment, used as a default for `clarinet console`, `clarinet test` and `clarinet check`".to_string(),
-        _ => format!("{:?} deployment", network)
+        _ => format!("{network:?} deployment")
     };
 
     let deployment = DeploymentSpecification {
@@ -972,8 +971,7 @@ pub fn load_deployment(
         Ok(spec) => spec,
         Err(msg) => {
             return Err(format!(
-                "error: {} syntax incorrect\n{}",
-                deployment_plan_location, msg
+                "error: {deployment_plan_location} syntax incorrect\n{msg}"
             ));
         }
     };

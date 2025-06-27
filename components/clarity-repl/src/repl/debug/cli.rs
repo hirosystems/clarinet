@@ -52,7 +52,7 @@ impl CLIDebugger {
                     false
                 }
                 Err(err) => {
-                    println!("Error: {:?}", err);
+                    println!("Error: {err:?}");
                     false
                 }
             };
@@ -179,11 +179,11 @@ impl CLIDebugger {
             "p" | "print" => {
                 match self.state.evaluate(env, context, args) {
                     Ok(value) => {
-                        println!("{}", value);
+                        println!("{value}");
                     }
                     Err(errors) => {
                         for e in errors {
-                            println!("{}", e);
+                            println!("{e}");
                         }
                     }
                 }
@@ -215,7 +215,7 @@ impl CLIDebugger {
                     println!("No breakpoints set.")
                 } else {
                     for breakpoint in self.state.breakpoints.values() {
-                        println!("{}", breakpoint);
+                        println!("{breakpoint}");
                     }
                 }
             }

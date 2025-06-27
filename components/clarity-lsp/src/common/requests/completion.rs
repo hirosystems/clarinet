@@ -150,19 +150,19 @@ impl ContractDefinedData {
     ) -> Option<String> {
         if VAR_FUNCTIONS.contains(name) && !self.vars.is_empty() {
             let choices = self.vars.join(",");
-            return Some(snippet.replace("${1:var}", &format!("${{1|{}|}}", choices)));
+            return Some(snippet.replace("${1:var}", &format!("${{1|{choices}|}}")));
         }
         if MAP_FUNCTIONS.contains(name) && !self.maps.is_empty() {
             let choices = self.maps.join(",");
-            return Some(snippet.replace("${1:map-name}", &format!("${{1|{}|}}", choices)));
+            return Some(snippet.replace("${1:map-name}", &format!("${{1|{choices}|}}")));
         }
         if FT_FUNCTIONS.contains(name) && !self.fts.is_empty() {
             let choices = self.fts.join(",");
-            return Some(snippet.replace("${1:token-name}", &format!("${{1|{}|}}", choices)));
+            return Some(snippet.replace("${1:token-name}", &format!("${{1|{choices}|}}")));
         }
         if NFT_FUNCTIONS.contains(name) && !self.nfts.is_empty() {
             let choices = self.nfts.join(",");
-            return Some(snippet.replace("${1:asset-name}", &format!("${{1|{}|}}", choices)));
+            return Some(snippet.replace("${1:asset-name}", &format!("${{1|{choices}|}}")));
         }
         if ITERATOR_FUNCTIONS.contains(name) && !self.functions_completion_items.is_empty() {
             let mut choices = self
@@ -179,7 +179,7 @@ impl ContractDefinedData {
                     .collect::<Vec<String>>()
                     .join(","),
             );
-            return Some(snippet.replace("${1:func}", &format!("${{1|{}|}}", choices)));
+            return Some(snippet.replace("${1:func}", &format!("${{1|{choices}|}}")));
         }
         None
     }
@@ -461,7 +461,7 @@ pub fn build_completion_item_list(
                 }
 
                 item.insert_text = if should_wrap {
-                    Some(format!("({})", snippet))
+                    Some(format!("({snippet})"))
                 } else {
                     Some(snippet)
                 };
