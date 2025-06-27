@@ -11,26 +11,25 @@ mod orchestrator;
 mod snapshot_extractor;
 mod ui;
 
+use std::sync::mpsc::{self, channel, Receiver, Sender};
+use std::thread::sleep;
+use std::time::Duration;
+
+use chainhook_sdk::chainhooks::types::ChainhookStore;
 pub use chainhook_sdk::observer::MempoolAdmissionData;
-pub use chainhook_sdk::{self, utils::Context};
-use chainhook_sdk::{chainhooks::types::ChainhookStore, observer::ObserverCommand};
+use chainhook_sdk::observer::ObserverCommand;
+pub use chainhook_sdk::utils::Context;
+pub use chainhook_sdk::{self};
 pub use chainhooks::{load_chainhooks, parse_chainhook_full_specification};
-use chains_coordinator::BitcoinMiningCommand;
+use chains_coordinator::{start_chains_coordinator, BitcoinMiningCommand};
+use clarinet_deployments::types::DeploymentSpecification;
 use clarinet_files::devnet_diff::DevnetDiffConfig;
 use clarinet_files::NetworkManifest;
 pub use event::DevnetEvent;
+use hiro_system_kit::slog;
 pub use log::{LogData, LogLevel};
 pub use orchestrator::DevnetOrchestrator;
 use orchestrator::ServicesMapHosts;
-use std::{
-    sync::mpsc::{self, channel, Receiver, Sender},
-    thread::sleep,
-    time::Duration,
-};
-
-use chains_coordinator::start_chains_coordinator;
-use clarinet_deployments::types::DeploymentSpecification;
-use hiro_system_kit::slog;
 
 use self::chains_coordinator::DevnetEventObserverConfig;
 #[allow(dead_code)]

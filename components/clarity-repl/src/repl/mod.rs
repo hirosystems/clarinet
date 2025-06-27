@@ -11,19 +11,17 @@ pub mod tracer;
 #[cfg(any(not(target_arch = "wasm32"), feature = "dap"))]
 pub mod debug;
 
-use serde::ser::{Serialize, SerializeMap, Serializer};
 use std::convert::TryInto;
 use std::fmt::Display;
 use std::path::PathBuf;
 
 use ::clarity::vm::types::{PrincipalData, QualifiedContractIdentifier, StandardPrincipalData};
-pub use interpreter::ClarityInterpreter;
-pub use session::Session;
-pub use settings::SessionSettings;
-pub use settings::{Settings, SettingsFile};
-
 use clarity::types::StacksEpochId;
 use clarity::vm::ClarityVersion;
+pub use interpreter::ClarityInterpreter;
+use serde::ser::{Serialize, SerializeMap, Serializer};
+pub use session::Session;
+pub use settings::{SessionSettings, Settings, SettingsFile};
 
 pub const DEFAULT_CLARITY_VERSION: ClarityVersion = ClarityVersion::Clarity3;
 pub const DEFAULT_EPOCH: StacksEpochId = StacksEpochId::Epoch31;

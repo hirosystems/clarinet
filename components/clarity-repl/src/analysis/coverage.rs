@@ -1,14 +1,10 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
-use clarity::vm::{
-    ast::ContractAST,
-    functions::{
-        define::DefineFunctionsParsed,
-        NativeFunctions::{self, Filter, Fold, Map},
-    },
-    types::QualifiedContractIdentifier,
-    EvalHook, SymbolicExpression,
-};
+use clarity::vm::ast::ContractAST;
+use clarity::vm::functions::define::DefineFunctionsParsed;
+use clarity::vm::functions::NativeFunctions::{self, Filter, Fold, Map};
+use clarity::vm::types::QualifiedContractIdentifier;
+use clarity::vm::{EvalHook, SymbolicExpression};
 
 type ExprCoverage = HashMap<u64, u64>;
 type ExecutableLines = HashMap<u32, Vec<u64>>;

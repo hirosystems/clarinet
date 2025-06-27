@@ -1,7 +1,10 @@
 #![allow(unused_variables)]
 
-use crate::analysis::ast_visitor::{traverse, ASTVisitor};
-use crate::repl::DEFAULT_EPOCH;
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::iter::FromIterator;
+use std::ops::{Deref, DerefMut};
+use std::sync::LazyLock;
+
 use clarity::types::StacksEpochId;
 pub use clarity::vm::analysis::types::ContractAnalysis;
 use clarity::vm::analysis::{CheckErrors, CheckResult};
@@ -13,12 +16,10 @@ use clarity::vm::types::{
     TraitIdentifier, TypeSignature, Value,
 };
 use clarity::vm::{ClarityName, ClarityVersion, SymbolicExpressionType};
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
-use std::iter::FromIterator;
-use std::ops::{Deref, DerefMut};
-use std::sync::LazyLock;
 
 use super::ast_visitor::TypedVar;
+use crate::analysis::ast_visitor::{traverse, ASTVisitor};
+use crate::repl::DEFAULT_EPOCH;
 
 pub static DEFAULT_NAME: LazyLock<ClarityName> = LazyLock::new(|| ClarityName::from("placeholder"));
 
@@ -921,13 +922,14 @@ impl GraphWalker {
 
 #[cfg(test)]
 mod tests {
+    use ::clarity::vm::diagnostic::Diagnostic;
+
     use super::*;
     use crate::repl::session::Session;
     use crate::repl::{
         ClarityCodeSource, ClarityContract, ContractDeployer, SessionSettings,
         DEFAULT_CLARITY_VERSION, DEFAULT_EPOCH,
     };
-    use ::clarity::vm::diagnostic::Diagnostic;
 
     fn build_ast(
         session: &Session,

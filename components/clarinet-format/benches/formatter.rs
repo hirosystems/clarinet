@@ -1,8 +1,9 @@
-use clarinet_format::formatter::{ClarityFormatter, Settings};
-use divan::Bencher;
 use std::fs;
 use std::hint::black_box;
 use std::path::Path;
+
+use clarinet_format::formatter::{ClarityFormatter, Settings};
+use divan::Bencher;
 
 fn get_test_files() -> Vec<String> {
     let golden_dir = Path::new("tests/golden");

@@ -1,5 +1,6 @@
-use super::utils;
-use crate::lsp::clarity_diagnostics_to_tower_lsp_type;
+use std::sync::mpsc::{Receiver, Sender};
+use std::sync::{Arc, Mutex};
+
 use clarity_lsp::backend::{
     process_mutating_request, process_notification, process_request, EditorStateInput,
     LspNotification, LspNotificationResponse, LspRequest, LspRequestResponse,
@@ -11,9 +12,6 @@ use clarity_lsp::lsp_types::{
 use clarity_lsp::state::EditorState;
 use crossbeam_channel::{Receiver as MultiplexableReceiver, Select, Sender as MultiplexableSender};
 use serde_json::Value;
-use std::sync::mpsc::{Receiver, Sender};
-use std::sync::Arc;
-use std::sync::Mutex;
 use tower_lsp::jsonrpc::{Error, ErrorCode, Result};
 use tower_lsp::lsp_types::{
     CompletionParams, CompletionResponse, DidChangeTextDocumentParams, DidCloseTextDocumentParams,
@@ -22,6 +20,9 @@ use tower_lsp::lsp_types::{
     InitializeResult, InitializedParams, MessageType, TextEdit, Url,
 };
 use tower_lsp::{async_trait, Client, LanguageServer};
+
+use super::utils;
+use crate::lsp::clarity_diagnostics_to_tower_lsp_type;
 
 pub enum LspResponse {
     Notification(LspNotificationResponse),

@@ -1,6 +1,5 @@
-use crate::lsp_types::MessageType;
-use crate::state::{build_state, EditorState, ProtocolState};
-use crate::utils::get_contract_location;
+use std::sync::{Arc, RwLock};
+
 use clarinet_files::{FileAccessor, FileLocation, ProjectManifest};
 use clarity_repl::clarity::diagnostic::Diagnostic;
 use clarity_repl::repl::ContractDeployer;
@@ -10,9 +9,11 @@ use lsp_types::{
     InitializeParams, InitializeResult, Location, SignatureHelp, SignatureHelpParams, TextEdit,
 };
 use serde::{Deserialize, Serialize};
-use std::sync::{Arc, RwLock};
 
 use super::requests::capabilities::{get_capabilities, InitializationOptions};
+use crate::lsp_types::MessageType;
+use crate::state::{build_state, EditorState, ProtocolState};
+use crate::utils::get_contract_location;
 
 #[derive(Debug, Clone)]
 pub enum EditorStateInput {
@@ -580,16 +581,18 @@ pub fn process_mutating_request(
 
 #[cfg(test)]
 mod range_formatting_tests {
-    use super::*;
-    use crate::common::state::EditorState;
+    use std::collections::HashMap;
+    use std::path::PathBuf;
+
     use clarinet_files::FileLocation;
     use clarity_repl::clarity::ClarityVersion;
     use lsp_types::{
         DocumentRangeFormattingParams, FormattingOptions, Position, Range, TextDocumentIdentifier,
         Url, WorkDoneProgressParams,
     };
-    use std::collections::HashMap;
-    use std::path::PathBuf;
+
+    use super::*;
+    use crate::common::state::EditorState;
 
     fn create_test_editor_state(source: String) -> EditorStateInput {
         let mut editor_state = EditorState::new();

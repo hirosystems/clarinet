@@ -1,4 +1,6 @@
-use std::{fs, path::Path, process::Command};
+use std::fs;
+use std::path::Path;
+use std::process::Command;
 
 use clarinet_files::{FileLocation, ProjectManifest, ProjectManifestFile};
 use indoc::formatdoc;

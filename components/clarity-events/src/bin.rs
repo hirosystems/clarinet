@@ -11,10 +11,9 @@ use analysis::{EventCollector, Settings};
 use clap::{Parser, Subcommand};
 use clarinet_files::FileLocation;
 use clarity_repl::clarity::analysis::type_checker::v2_05::TypeChecker;
-use clarity_repl::{
-    clarity::{costs::LimitedCostTracker, EvaluationResult},
-    repl::{Session, SessionSettings},
-};
+use clarity_repl::clarity::costs::LimitedCostTracker;
+use clarity_repl::clarity::EvaluationResult;
+use clarity_repl::repl::{Session, SessionSettings};
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]

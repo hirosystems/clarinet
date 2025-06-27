@@ -1,17 +1,18 @@
-use std::{collections::HashMap, sync::LazyLock, vec};
+use std::collections::HashMap;
+use std::sync::LazyLock;
+use std::vec;
 
-use clarity_repl::{
-    analysis::ast_visitor::{traverse, ASTVisitor, TypedVar},
-    clarity::{
-        analysis::ContractAnalysis,
-        docs::{make_api_reference, make_define_reference, make_keyword_reference},
-        functions::{define::DefineFunctions, NativeFunctions},
-        variables::NativeVariables,
-        vm::types::{BlockInfoProperty, FunctionType, TypeSignature},
-        ClarityName, ClarityVersion, SymbolicExpression,
-    },
-    repl::DEFAULT_EPOCH,
+use clarity_repl::analysis::ast_visitor::{traverse, ASTVisitor, TypedVar};
+use clarity_repl::clarity::analysis::ContractAnalysis;
+use clarity_repl::clarity::docs::{
+    make_api_reference, make_define_reference, make_keyword_reference,
 };
+use clarity_repl::clarity::functions::define::DefineFunctions;
+use clarity_repl::clarity::functions::NativeFunctions;
+use clarity_repl::clarity::variables::NativeVariables;
+use clarity_repl::clarity::vm::types::{BlockInfoProperty, FunctionType, TypeSignature};
+use clarity_repl::clarity::{ClarityName, ClarityVersion, SymbolicExpression};
+use clarity_repl::repl::DEFAULT_EPOCH;
 use lsp_types::{
     CompletionItem, CompletionItemKind, Documentation, InsertTextFormat, MarkupContent, MarkupKind,
     Position,
@@ -843,8 +844,8 @@ mod get_contract_global_data_tests {
 #[cfg(test)]
 mod get_contract_local_data_tests {
     use clarity_repl::clarity::ast::build_ast_with_rules;
-    use clarity_repl::clarity::StacksEpochId;
-    use clarity_repl::clarity::{vm::types::QualifiedContractIdentifier, ClarityVersion};
+    use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
+    use clarity_repl::clarity::{ClarityVersion, StacksEpochId};
     use lsp_types::Position;
 
     use super::ContractDefinedData;

@@ -1,11 +1,9 @@
 use clarinet_files::{FileAccessor, FileLocation};
-use clarity_repl::{
-    clarity::{
-        chainstate::StacksAddress, vm::types::QualifiedContractIdentifier, Address, ClarityVersion,
-        StacksEpochId,
-    },
-    repl::{remote_data::epoch_for_height, DEFAULT_CLARITY_VERSION, DEFAULT_EPOCH},
-};
+use clarity_repl::clarity::chainstate::StacksAddress;
+use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
+use clarity_repl::clarity::{Address, ClarityVersion, StacksEpochId};
+use clarity_repl::repl::remote_data::epoch_for_height;
+use clarity_repl::repl::{DEFAULT_CLARITY_VERSION, DEFAULT_EPOCH};
 use reqwest;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

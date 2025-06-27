@@ -1,20 +1,17 @@
-use std::{
-    fs,
-    path::PathBuf,
-    str::FromStr,
-    sync::mpsc::{self, channel, Sender},
-};
+use std::fs;
+use std::fs::OpenOptions;
+use std::path::PathBuf;
+use std::str::FromStr;
+use std::sync::mpsc::{self, channel, Sender};
 
 use clarinet_deployments::types::DeploymentSpecification;
-use hiro_system_kit::Drain;
-use hiro_system_kit::{slog, slog_async, slog_term};
+use hiro_system_kit::{slog, slog_async, slog_term, Drain};
+use stacks_network::chainhook_sdk::types::{BitcoinNetwork, StacksNetwork};
+use stacks_network::chainhook_sdk::utils::Context;
 use stacks_network::{
-    chainhook_sdk::types::{BitcoinNetwork, StacksNetwork},
-    chainhook_sdk::utils::Context,
     do_run_local_devnet, load_chainhooks, ChainsCoordinatorCommand, DevnetEvent,
     DevnetOrchestrator, LogData,
 };
-use std::fs::OpenOptions;
 
 pub fn start(
     devnet: DevnetOrchestrator,

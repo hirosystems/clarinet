@@ -5,25 +5,26 @@ mod ui;
 #[allow(dead_code)]
 mod util;
 
-use super::DevnetEvent;
-
-use crate::{chains_coordinator::BitcoinMiningCommand, ChainsCoordinatorCommand};
+use std::error::Error;
+use std::io::{stdout, Stdout};
+use std::sync::mpsc::{Receiver, Sender};
+use std::thread;
+use std::time::{Duration, Instant};
 
 use app::App;
-use chainhook_sdk::{types::StacksChainEvent, utils::Context};
-use crossterm::{
-    event::{self, Event, KeyCode, KeyModifiers},
-    execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+use chainhook_sdk::types::StacksChainEvent;
+use chainhook_sdk::utils::Context;
+use crossterm::event::{self, Event, KeyCode, KeyModifiers};
+use crossterm::execute;
+use crossterm::terminal::{
+    disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
 };
-use ratatui::{backend::CrosstermBackend, Terminal};
-use std::sync::mpsc::{Receiver, Sender};
-use std::{
-    error::Error,
-    io::{stdout, Stdout},
-    thread,
-    time::{Duration, Instant},
-};
+use ratatui::backend::CrosstermBackend;
+use ratatui::Terminal;
+
+use super::DevnetEvent;
+use crate::chains_coordinator::BitcoinMiningCommand;
+use crate::ChainsCoordinatorCommand;
 
 pub fn start_ui(
     devnet_events_tx: Sender<DevnetEvent>,

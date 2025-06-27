@@ -1,13 +1,13 @@
-use super::util::{StatefulList, TabsState};
-use crate::event::ServiceStatusData;
-use crate::{LogData, MempoolAdmissionData};
-
 use chainhook_sdk::types::{
     StacksBlockData, StacksMicroblockData, StacksTransactionData, StacksTransactionKind,
 };
 use chainhook_sdk::utils::Context;
 use hiro_system_kit::slog;
 use ratatui::prelude::*;
+
+use super::util::{StatefulList, TabsState};
+use crate::event::ServiceStatusData;
+use crate::{LogData, MempoolAdmissionData};
 
 pub enum BlockData {
     Block(Box<StacksBlockData>),

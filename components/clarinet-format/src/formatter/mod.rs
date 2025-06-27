@@ -1,15 +1,16 @@
 pub mod helpers;
 pub mod ignored;
 
+use std::cell::RefCell;
+use std::collections::HashMap;
 use std::iter::Peekable;
+use std::{fmt, slice};
 
-use clarity::vm::functions::{define::DefineFunctions, NativeFunctions};
+use clarity::vm::functions::define::DefineFunctions;
+use clarity::vm::functions::NativeFunctions;
 use clarity::vm::representations::{PreSymbolicExpression, PreSymbolicExpressionType};
 use helpers::t;
 use ignored::ignored_exprs;
-use std::cell::RefCell;
-use std::collections::HashMap;
-use std::{fmt, slice};
 
 pub enum Indentation {
     Space(usize),
@@ -1333,10 +1334,11 @@ fn chars_since_last_newline(acc: &str) -> usize {
 
 #[cfg(test)]
 mod tests_formatter {
-    use super::{ClarityFormatter, Settings};
-    use crate::formatter::Indentation;
     #[allow(unused_imports)]
     use std::assert_eq;
+
+    use super::{ClarityFormatter, Settings};
+    use crate::formatter::Indentation;
     #[macro_export]
     macro_rules! assert_eq {
         ($($arg:tt)*) => {

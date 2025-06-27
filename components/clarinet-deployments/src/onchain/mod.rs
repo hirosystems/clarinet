@@ -1,7 +1,13 @@
+use std::collections::{BTreeMap, HashSet, VecDeque};
+use std::str::FromStr;
+use std::sync::mpsc::{Receiver, Sender};
+
 use bitcoincore_rpc::{Auth, Client};
-use clarinet_files::StacksNetwork;
-use clarinet_files::{AccountConfig, NetworkManifest};
+use clarinet_files::{AccountConfig, NetworkManifest, StacksNetwork};
 use clarinet_utils::get_bip32_keys_from_mnemonic;
+use clarity_repl::clarity::address::{
+    AddressHashMode, C32_ADDRESS_VERSION_MAINNET_SINGLESIG, C32_ADDRESS_VERSION_TESTNET_SINGLESIG,
+};
 use clarity_repl::clarity::chainstate::StacksAddress;
 use clarity_repl::clarity::codec::StacksMessageCodec;
 use clarity_repl::clarity::util::secp256k1::{
@@ -17,23 +23,16 @@ use clarity_repl::repl::boot::{
     SBTC_MAINNET_ADDRESS, SBTC_TESTNET_ADDRESS,
 };
 use clarity_repl::repl::{Session, SessionSettings};
+use libsecp256k1::PublicKey;
 use reqwest::Url;
 use stacks_codec::codec::{
-    SinglesigHashMode, SinglesigSpendingCondition, StacksString, StacksTransactionSigner,
-    TokenTransferMemo, TransactionAuth, TransactionContractCall, TransactionPayload,
-    TransactionPostConditionMode, TransactionPublicKeyEncoding, TransactionSmartContract,
-    TransactionSpendingCondition, TransactionVersion,
+    SinglesigHashMode, SinglesigSpendingCondition, StacksString, StacksTransaction,
+    StacksTransactionSigner, TokenTransferMemo, TransactionAnchorMode, TransactionAuth,
+    TransactionContractCall, TransactionPayload, TransactionPostConditionMode,
+    TransactionPublicKeyEncoding, TransactionSmartContract, TransactionSpendingCondition,
+    TransactionVersion,
 };
-use stacks_codec::codec::{StacksTransaction, TransactionAnchorMode};
 use stacks_rpc_client::StacksRpc;
-use std::collections::{BTreeMap, HashSet, VecDeque};
-use std::str::FromStr;
-use std::sync::mpsc::{Receiver, Sender};
-
-use clarity_repl::clarity::address::{
-    AddressHashMode, C32_ADDRESS_VERSION_MAINNET_SINGLESIG, C32_ADDRESS_VERSION_TESTNET_SINGLESIG,
-};
-use libsecp256k1::PublicKey;
 
 mod bitcoin_deployment;
 

@@ -1,3 +1,5 @@
+use std::collections::{BTreeMap, HashMap};
+
 use clarity_repl::analysis::ast_visitor::{traverse, ASTVisitor, TypedVar};
 use clarity_repl::clarity::analysis::type_checker::v2_05::TypeChecker;
 use clarity_repl::clarity::util::hash;
@@ -12,7 +14,6 @@ use clarity_repl::repl::clarity_values::value_to_string;
 use serde::ser::SerializeMap;
 use serde::{Serialize, Serializer};
 use serde_json::Value as JsonValue;
-use std::collections::{BTreeMap, HashMap};
 
 #[derive(Default)]
 pub struct Settings {}

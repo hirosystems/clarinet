@@ -1,3 +1,7 @@
+use std::collections::{BTreeMap, HashMap};
+use std::panic;
+use std::path::PathBuf;
+
 use clarinet_deployments::diagnostic_digest::DiagnosticsDigest;
 use clarinet_deployments::types::{
     DeploymentSpecification, DeploymentSpecificationFile, EmulatedContractPublishSpecification,
@@ -7,8 +11,9 @@ use clarinet_deployments::{
     generate_default_deployment, initiate_session_from_manifest,
     update_session_with_deployment_plan,
 };
-use clarinet_files::StacksNetwork;
-use clarinet_files::{FileAccessor, FileLocation, ProjectManifest, WASMFileSystemAccessor};
+use clarinet_files::{
+    FileAccessor, FileLocation, ProjectManifest, StacksNetwork, WASMFileSystemAccessor,
+};
 use clarity_repl::clarity::analysis::contract_interface_builder::{
     ContractInterface, ContractInterfaceFunction, ContractInterfaceFunctionAccess,
 };
@@ -31,8 +36,6 @@ use js_sys::Function as JsFunction;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use serde_wasm_bindgen::to_value as encode_to_js;
-use std::collections::{BTreeMap, HashMap};
-use std::{panic, path::PathBuf};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsValue;
 

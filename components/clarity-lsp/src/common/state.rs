@@ -1,11 +1,12 @@
-use crate::common::requests::completion::check_if_should_wrap;
+use std::borrow::BorrowMut;
+use std::collections::{BTreeMap, HashMap, HashSet};
+use std::vec;
+
 use clarinet_deployments::{
     generate_default_deployment, initiate_session_from_manifest,
     update_session_with_deployment_plan, UpdateSessionExecutionResult,
 };
-use clarinet_files::ProjectManifest;
-use clarinet_files::StacksNetwork;
-use clarinet_files::{FileAccessor, FileLocation};
+use clarinet_files::{FileAccessor, FileLocation, ProjectManifest, StacksNetwork};
 use clarity_repl::analysis::ast_dependency_detector::DependencySet;
 use clarity_repl::clarity::analysis::ContractAnalysis;
 use clarity_repl::clarity::ast::{build_ast_with_rules, ASTRules};
@@ -18,9 +19,6 @@ use clarity_repl::repl::{ContractDeployer, DEFAULT_CLARITY_VERSION};
 use lsp_types::{
     CompletionItem, DocumentSymbol, Hover, Location, MessageType, Position, Range, SignatureHelp,
 };
-use std::borrow::BorrowMut;
-use std::collections::{BTreeMap, HashMap, HashSet};
-use std::vec;
 
 use super::requests::capabilities::InitializationOptions;
 use super::requests::completion::{
@@ -33,6 +31,7 @@ use super::requests::document_symbols::ASTSymbols;
 use super::requests::helpers::get_atom_or_field_start_at_position;
 use super::requests::hover::get_expression_documentation;
 use super::requests::signature_help::get_signatures;
+use crate::common::requests::completion::check_if_should_wrap;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ActiveContractData {

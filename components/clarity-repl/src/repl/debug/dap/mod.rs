@@ -1,20 +1,14 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use crate::repl::DEFAULT_EPOCH;
-
-use super::{extract_watch_variable, AccessType, State};
 use clarity::vm::callables::FunctionIdentifier;
-use clarity::vm::contexts::{ContractContext, GlobalContext};
+use clarity::vm::contexts::{ContractContext, Environment, GlobalContext, LocalContext};
 use clarity::vm::errors::Error;
 use clarity::vm::representations::Span;
-use clarity::vm::types::{PrincipalData, SequenceData, StandardPrincipalData, Value};
-use clarity::vm::{
-    contexts::{Environment, LocalContext},
-    types::QualifiedContractIdentifier,
-    EvalHook, SymbolicExpression,
+use clarity::vm::types::{
+    PrincipalData, QualifiedContractIdentifier, SequenceData, StandardPrincipalData, Value,
 };
-use clarity::vm::{EvaluationResult, ExecutionResult};
+use clarity::vm::{EvalHook, EvaluationResult, ExecutionResult, SymbolicExpression};
 use debug_types::events::*;
 use debug_types::requests::*;
 use debug_types::responses::*;
@@ -27,8 +21,8 @@ use tokio::runtime::Runtime;
 use tokio_util::codec::{FramedRead, FramedWrite};
 
 use self::codec::{DebugAdapterCodec, ParseError};
-
-use super::DebugState;
+use super::{extract_watch_variable, AccessType, DebugState, State};
+use crate::repl::DEFAULT_EPOCH;
 
 pub mod codec;
 

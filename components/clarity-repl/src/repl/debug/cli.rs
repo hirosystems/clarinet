@@ -1,9 +1,7 @@
-use crate::repl::debug::extract_watch_variable;
 use clarity::vm::contexts::{Environment, LocalContext};
 use clarity::vm::errors::Error;
 use clarity::vm::representations::Span;
-use clarity::vm::types::QualifiedContractIdentifier;
-use clarity::vm::types::Value;
+use clarity::vm::types::{QualifiedContractIdentifier, Value};
 use clarity::vm::{ContractName, EvalHook, SymbolicExpression};
 use rustyline::error::ReadlineError;
 use rustyline::DefaultEditor;
@@ -12,6 +10,7 @@ use super::{
     AccessType, Breakpoint, BreakpointData, DebugState, FunctionBreakpoint, Source,
     SourceBreakpoint, State,
 };
+use crate::repl::debug::extract_watch_variable;
 
 const HISTORY_FILE: Option<&'static str> = option_env!("CLARITY_DEBUG_HISTORY_FILE");
 
