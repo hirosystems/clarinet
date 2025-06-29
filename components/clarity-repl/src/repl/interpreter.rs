@@ -44,13 +44,13 @@ impl std::fmt::Display for ContractCallError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ContractCallError::NoSuchContract(contract_id) => {
-                write!(f, "NoSuchContract({})", contract_id)
+                write!(f, "NoSuchContract({contract_id})")
             }
             ContractCallError::NoSuchFunction(function_name) => {
-                write!(f, "NoSuchFunction({})", function_name)
+                write!(f, "NoSuchFunction({function_name})")
             }
             ContractCallError::Uncategorized(message) => {
-                write!(f, "Uncategorized({})", message)
+                write!(f, "Uncategorized({message})")
             }
         }
     }
