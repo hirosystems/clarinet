@@ -1224,7 +1224,7 @@ impl ClarityInterpreter {
 }
 
 fn to_contract_call_error(error: String) -> ContractCallError {
-    if error.contains("UndefinedFunction") {
+    if error.contains("UndefinedFunction") || error.contains("NoSuchPublicFunction") {
         ContractCallError::NoSuchFunction(error)
     } else if error.contains("Failed to read non-consensus contract metadata") {
         ContractCallError::NoSuchContract(error)
@@ -2199,8 +2199,11 @@ mod tests {
 
         assert!(result.is_err());
         let err = result.unwrap_err();
-        assert!(
-            matches!(err, ContractCallError::NoSuchFunction(function_name) if function_name == "private-func")
-        );
+        match err {
+            ContractCallError::NoSuchFunction(ref function_name) => {
+                assert!(function_name.contains("private-func"));
+            }
+            _ => panic!("Expected NoSuchFunction error"),
+        }
     }
 }
