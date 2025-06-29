@@ -114,7 +114,19 @@ describe("simnet remote interactions", async () => {
       initial_height: 41000,
     });
     expect(() => simnet.callReadOnlyFn(counterAddress, "get-count", [], sender)).toThrowError(
-      `Call contract function error: ${counterAddress}::get-count() -> Error calling contract function: Runtime error while interpreting ${counterAddress}: Interpreter(Expect("Failed to read non-consensus contract metadata, even though contract exists in MARF."))`,
+      `Call contract function error: ${counterAddress}::get-count() -> Contract '${counterAddress}' does not exist`,
+    );
+  });
+
+  it("throws an error if the method is not available on an existing contract", async () => {
+    await simnet.initEmptySession({
+      enabled: true,
+      api_url: "https://api.testnet.hiro.so",
+      // the counter contract is deployed at 41613
+      initial_height: 56231,
+    });
+    expect(() => simnet.callReadOnlyFn(counterAddress, "doesnt-exist", [], sender)).toThrowError(
+      `Call contract function error: ${counterAddress}::doesnt-exist() -> Method 'doesnt-exist' does not exist on contract '${counterAddress}'`,
     );
   });
 });
