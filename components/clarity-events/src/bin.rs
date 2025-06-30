@@ -40,7 +40,7 @@ pub fn main() {
     let opts: Opts = match Opts::try_parse() {
         Ok(opts) => opts,
         Err(e) => {
-            println!("{}", e);
+            println!("{e}");
             std::process::exit(1);
         }
     };
@@ -59,7 +59,7 @@ pub fn main() {
                     }
                 },
                 Err(e) => {
-                    println!("Error path: {:?}", e);
+                    println!("Error path: {e:?}");
                     std::process::exit(1);
                 }
             };

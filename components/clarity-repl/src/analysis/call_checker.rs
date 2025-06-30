@@ -81,8 +81,7 @@ impl<'a> CallChecker<'a> {
         Diagnostic {
             level: Level::Error,
             message: format!(
-                "incorrect number of arguments in call to '{}' (expected {} got {})",
-                name, expected, got
+                "incorrect number of arguments in call to '{name}' (expected {expected} got {got})"
             ),
             spans: vec![expr.span.clone()],
             suggestion: None,

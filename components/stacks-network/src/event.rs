@@ -103,7 +103,7 @@ pub fn send_status_update(
             }));
         }
         Some(logger) => {
-            let msg = format!("{} - {}", name, comment);
+            let msg = format!("{name} - {comment}");
             match status {
                 Status::Green => slog::info!(logger, "{}", &msg),
                 Status::Yellow => slog::warn!(logger, "{}", &msg),

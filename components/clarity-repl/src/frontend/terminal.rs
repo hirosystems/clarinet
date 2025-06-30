@@ -102,7 +102,7 @@ impl Terminal {
     }
 
     pub fn start(&mut self) -> bool {
-        println!("{}", green!(format!("clarity-repl v{}", VERSION.unwrap())));
+        println!("{}", green!("clarity-repl v{}", VERSION.unwrap()));
         println!("{}", black!("Enter \"::help\" for usage hints."));
         println!("{}", black!("Connected to a transient in-memory database."));
 
@@ -184,7 +184,7 @@ impl Terminal {
                             }
 
                             for line in output {
-                                println!("{}", line);
+                                println!("{line}");
                             }
                             prompt = String::from(">> ");
                             self.session.executed.push(input.to_string());
@@ -195,10 +195,10 @@ impl Terminal {
                             }
                         }
                         Ok(Input::Incomplete(str)) => {
-                            prompt = format!("{}.. ", str);
+                            prompt = format!("{str}.. ");
                         }
                         Err((expected, got)) => {
-                            println!("Error: expected closing {}, got {}", expected, got);
+                            println!("Error: expected closing {expected}, got {got}");
                             prompt = String::from(">> ");
                             input_buffer.pop();
                         }
@@ -217,7 +217,7 @@ impl Terminal {
                     break false;
                 }
                 Err(err) => {
-                    println!("Error: {:?}", err);
+                    println!("Error: {err:?}");
                     break false;
                 }
             }

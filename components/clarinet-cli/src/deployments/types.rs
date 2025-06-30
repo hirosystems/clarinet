@@ -32,7 +32,7 @@ impl DeploymentSynthesis {
 
         let content = match deployment.to_file_content() {
             Ok(res) => res,
-            Err(err) => panic!("unable to serialize deployment {}", err),
+            Err(err) => panic!("unable to serialize deployment {err}"),
         };
 
         DeploymentSynthesis {
@@ -48,13 +48,13 @@ impl Display for DeploymentSynthesis {
         let base: u64 = 10;
         let int_part = self.total_cost / base.pow(6);
         let frac_part = self.total_cost % base.pow(6);
-        let formatted_total_cost = format!("{}.{:06}", int_part, frac_part);
+        let formatted_total_cost = format!("{int_part}.{frac_part:06}");
         write!(
             f,
             "{}\n\n{}\n{}",
-            green!(format!("{}", self.content)),
-            blue!(format!("Total cost:\t{} STX", formatted_total_cost)),
-            blue!(format!("Duration:\t{} blocks", self.blocks_count))
+            green!("{}", self.content),
+            blue!("Total cost:\t{formatted_total_cost} STX"),
+            blue!("Duration:\t{} blocks", self.blocks_count)
         )
     }
 }

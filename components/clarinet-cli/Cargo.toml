@@ -64,7 +64,7 @@ winapi = { version = "0.3.9", features = [
 
 [dev-dependencies]
 tempfile = "3.0.0"
-indoc = "2.0.3"
+indoc = { workspace = true }
 
 [package.metadata.winres]
 OriginalFilename = "clarinet.exe"

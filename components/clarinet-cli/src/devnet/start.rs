@@ -21,6 +21,7 @@ pub fn start(
     deployment: DeploymentSpecification,
     log_tx: Option<Sender<LogData>>,
     display_dashboard: bool,
+    no_snapshot: bool,
 ) -> Result<
     (
         Option<mpsc::Receiver<DevnetEvent>>,
@@ -35,7 +36,7 @@ pub fn start(
     ) {
         Ok(hooks) => hooks,
         Err(e) => {
-            println!("{}", e);
+            println!("{e}");
             std::process::exit(1);
         }
     };
@@ -46,10 +47,9 @@ pub fn start(
         .and_then(|c| c.devnet.as_ref())
         .map(|d| d.working_dir.to_string())
         .ok_or("unable to read settings/Devnet.toml")?;
-    fs::create_dir_all(&working_dir)
-        .map_err(|_| format!("unable to create dir {}", working_dir))?;
+    fs::create_dir_all(&working_dir).map_err(|_| format!("unable to create dir {working_dir}"))?;
     let mut log_path = PathBuf::from_str(&working_dir)
-        .map_err(|e| format!("unable to working_dir {}\n{}", working_dir, e))?;
+        .map_err(|e| format!("unable to working_dir {working_dir}\n{e}"))?;
     log_path.push("devnet.log");
 
     let file = OpenOptions::new()
@@ -57,7 +57,7 @@ pub fn start(
         .write(true)
         .truncate(true)
         .open(log_path)
-        .map_err(|e| format!("unable to create log file {}", e))?;
+        .map_err(|e| format!("unable to create log file {e}"))?;
 
     let decorator = slog_term::PlainDecorator::new(file);
     let drain = slog_term::FullFormat::new(decorator).build().fuse();
@@ -76,6 +76,7 @@ pub fn start(
         &mut Some(hooks),
         log_tx,
         display_dashboard,
+        no_snapshot,
         ctx,
         orchestrator_terminated_tx,
         Some(orchestrator_terminated_rx),

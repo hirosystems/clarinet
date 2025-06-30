@@ -10,7 +10,7 @@ pub fn to_raw_value(value: &Value) -> String {
     let hex = value
         .serialize_to_hex()
         .unwrap_or_else(|_e| panic!("failed to parse clarity value: {}", value));
-    format!("0x{}", hex)
+    format!("0x{hex}")
 }
 
 pub fn uint8_to_string(value: &[u8]) -> String {
@@ -24,7 +24,7 @@ pub fn uint8_to_value(mut value: &[u8]) -> Value {
 
 pub fn value_to_string(value: &Value) -> String {
     match value {
-        Value::Principal(principal_data) => format!("'{}", principal_data),
+        Value::Principal(principal_data) => format!("'{principal_data}"),
         Value::Tuple(tup_data) => {
             let mut data = String::new();
             for (name, value) in &tup_data.data_map {
@@ -56,7 +56,7 @@ pub fn value_to_string(value: &Value) -> String {
                 })
                 .collect::<Vec<_>>()
                 .join("");
-            format!("u\"{}\"", result)
+            format!("u\"{result}\"")
         }
         Value::Sequence(SequenceData::List(list_data)) => {
             let data = list_data
@@ -65,7 +65,7 @@ pub fn value_to_string(value: &Value) -> String {
                 .map(value_to_string)
                 .collect::<Vec<_>>()
                 .join(" ");
-            format!("(list {})", data)
+            format!("(list {data})")
         }
         _ => value.to_string(),
     }

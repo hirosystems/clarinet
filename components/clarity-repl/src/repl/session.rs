@@ -256,8 +256,8 @@ impl Session {
         ) {
             Ok((mut output, result)) => {
                 if let EvaluationResult::Contract(contract_result) = result.result.clone() {
-                    let snippet = format!("→ .{} contract successfully stored. Use (contract-call? ...) for invoking the public functions:", contract_result.contract.contract_identifier);
-                    output.push(green!(snippet));
+                    let snippet = green!("→ .{} contract successfully stored. Use (contract-call? ...) for invoking the public functions:", contract_result.contract.contract_identifier);
+                    output.push(snippet.to_string());
                 };
                 (output, result.cost.clone(), Ok(result))
             }
@@ -304,7 +304,7 @@ impl Session {
                 &cost.limit.write_length.to_string(),
                 &(Self::get_costs_percentage(&cost.total.write_length, &cost.limit.write_length)),
             ]);
-            output.push(format!("{}", table));
+            output.push(table.to_string());
         }
         output.append(&mut result);
         execution_result
@@ -339,15 +339,15 @@ impl Session {
                     ));
                 }
                 if !result.events.is_empty() {
-                    output.push(black!("Events emitted"));
+                    output.push(black!("Events emitted").to_string());
                     for event in result.events.iter() {
-                        output.push(black!(format!("{}", serialize_event(event))));
+                        output.push(black!("{}", serialize_event(event)).to_string());
                     }
                 }
                 match &result.result {
                     EvaluationResult::Contract(contract_result) => {
                         if let Some(value) = &contract_result.result {
-                            output.push(format!("{}", value).green().to_string());
+                            output.push(format!("{value}").green().to_string());
                         }
                     }
                     EvaluationResult::Snippet(snippet_result) => {
@@ -536,7 +536,7 @@ impl Session {
         let contract_id_str = if contract.starts_with('S') {
             contract.to_string()
         } else {
-            format!("{}.{}", initial_tx_sender, contract)
+            format!("{initial_tx_sender}.{contract}")
         };
 
         self.set_tx_sender(sender);
@@ -875,7 +875,7 @@ impl Session {
         match PrincipalData::parse_standard_principal(args[1]) {
             Ok(address) => {
                 self.interpreter.set_tx_sender(address);
-                format!("tx-sender switched to {}", tx_sender)
+                format!("tx-sender switched to {tx_sender}")
             }
             _ => format!("{}", "Unable to parse the address".red()),
         }
@@ -893,12 +893,12 @@ impl Session {
 
     fn get_block_height(&mut self) -> String {
         let height = self.interpreter.get_block_height();
-        format!("Current height: {}", height)
+        format!("Current height: {height}")
     }
 
     fn get_burn_block_height(&mut self) -> String {
         let height = self.interpreter.get_burn_block_height();
-        format!("Current height: {}", height)
+        format!("Current height: {height}")
     }
 
     fn get_account_name(&self, address: &String) -> Option<&String> {
@@ -931,7 +931,7 @@ impl Session {
 
     pub fn get_epoch(&mut self) -> String {
         let current_epoch = self.interpreter.datastore.get_current_epoch();
-        format!("Current epoch: {}", current_epoch)
+        format!("Current epoch: {current_epoch}")
     }
 
     pub fn set_epoch(&mut self, cmd: &str) -> String {
@@ -982,11 +982,11 @@ impl Session {
                     EvaluationResult::Snippet(snippet_result) => snippet_result.result,
                 };
                 if let Err(e) = value.consensus_serialize(&mut tx_bytes) {
-                    return format!("{}", e).red().to_string();
+                    return format!("{e}").red().to_string();
                 };
                 let mut s = String::with_capacity(2 * tx_bytes.len());
                 for byte in tx_bytes {
-                    s = format!("{}{:02x}", s, byte);
+                    s = format!("{s}{byte:02x}");
                 }
                 s.green().to_string()
             }
@@ -1050,18 +1050,18 @@ impl Session {
             let mut cells = vec![];
 
             if let Some(name) = self.get_account_name(account) {
-                cells.push(format!("{} ({})", account, name));
+                cells.push(format!("{account} ({name})"));
             } else {
                 cells.push(account.to_string());
             }
 
             for token in tokens.iter() {
                 let balance = self.interpreter.get_balance_for_account(account, token);
-                cells.push(format!("{}", balance));
+                cells.push(balance.to_string());
             }
             table.add_row(cells);
         }
-        Some(format!("{}", table))
+        Some(table.to_string())
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -1090,13 +1090,13 @@ impl Session {
                     } else {
                         format!("\n    {}", method_args.join("\n    "))
                     };
-                    formatted_methods.push(format!("({}{})", method_name, formatted_args));
+                    formatted_methods.push(format!("({method_name}{formatted_args})"));
                 }
                 let formatted_spec = formatted_methods.join("\n").to_string();
                 table.add_row(vec![&contract_id_str, &formatted_spec]);
             }
         }
-        Some(format!("{}", table))
+        Some(table.to_string())
     }
 
     #[cfg(target_arch = "wasm32")]
@@ -1176,7 +1176,7 @@ enum DecodeHexError {
 impl fmt::Display for DecodeHexError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            DecodeHexError::ParseError(e) => write!(f, "{}", e),
+            DecodeHexError::ParseError(e) => write!(f, "{e}"),
             DecodeHexError::OddLength => write!(f, "odd number of hex digits"),
         }
     }
@@ -1672,7 +1672,7 @@ mod tests {
 
         // call pox4 get-info
         let result = session.call_contract_fn(
-            format!("{}.pox-4", BOOT_MAINNET_ADDRESS).as_str(),
+            format!("{BOOT_MAINNET_ADDRESS}.pox-4").as_str(),
             "get-pox-info",
             &[],
             BOOT_TESTNET_ADDRESS,
@@ -1910,10 +1910,10 @@ mod tests {
         let sender = "ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5";
         session.start().expect("session could not start");
 
-        let result = session.process_console_input(&format!("::set_tx_sender    {}", sender));
+        let result = session.process_console_input(&format!("::set_tx_sender    {sender}"));
         assert!(result.1[0].contains(sender));
 
-        let result = session.process_console_input(&format!("::set_tx_sender {}     ", sender));
+        let result = session.process_console_input(&format!("::set_tx_sender {sender}     "));
         assert!(result.1[0].contains(sender));
     }
 }

@@ -41,7 +41,7 @@ pub fn load_chainhooks(
                     stacks_chainhooks.push(spec)
                 }
             },
-            Err(msg) => return Err(format!("{} syntax incorrect: {}", relative_path, msg)),
+            Err(msg) => return Err(format!("{relative_path} syntax incorrect: {msg}")),
         };
     }
     Ok(ChainhookStore {

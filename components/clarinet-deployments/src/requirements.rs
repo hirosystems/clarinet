@@ -34,8 +34,8 @@ pub async fn retrieve_contract(
     let mut contract_location = cache_location.clone();
     contract_location.append_path("requirements")?;
     let mut metadata_location = contract_location.clone();
-    contract_location.append_path(&format!("{}.{}.clar", contract_deployer, contract_name))?;
-    metadata_location.append_path(&format!("{}.{}.json", contract_deployer, contract_name))?;
+    contract_location.append_path(&format!("{contract_deployer}.{contract_name}.clar"))?;
+    metadata_location.append_path(&format!("{contract_deployer}.{contract_name}.json"))?;
 
     let (contract_source, metadata_json) = match file_accessor {
         None => (
@@ -50,7 +50,7 @@ pub async fn retrieve_contract(
 
     if let (Ok(contract_source), Ok(metadata_json)) = (contract_source, metadata_json) {
         let metadata: ContractMetadata = serde_json::from_str(&metadata_json)
-            .map_err(|e| format!("Unable to parse metadata file: {}", e))?;
+            .map_err(|e| format!("Unable to parse metadata file: {e}"))?;
 
         return Ok((
             contract_source,
@@ -70,10 +70,7 @@ pub async fn retrieve_contract(
     };
 
     let request_url = format!(
-        "{host}/v2/contracts/source/{addr}/{name}?proof=0",
-        host = stacks_node_addr,
-        addr = contract_deployer,
-        name = contract_name
+        "{stacks_node_addr}/v2/contracts/source/{contract_deployer}/{contract_name}?proof=0"
     );
 
     let contract = fetch_contract(request_url).await?;
@@ -132,12 +129,12 @@ struct Contract {
 async fn fetch_contract(request_url: String) -> Result<Contract, String> {
     let response = reqwest::get(&request_url)
         .await
-        .map_err(|_| format!("Unable to retrieve contract {}", request_url))?;
+        .map_err(|_| format!("Unable to retrieve contract {request_url}"))?;
 
     let contract = response
         .json()
         .await
-        .map_err(|_| format!("Unable to parse contract {}", request_url))?;
+        .map_err(|_| format!("Unable to parse contract {request_url}"))?;
 
     Ok(contract)
 }

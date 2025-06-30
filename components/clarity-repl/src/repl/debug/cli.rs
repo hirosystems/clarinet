@@ -52,7 +52,7 @@ impl CLIDebugger {
                     false
                 }
                 Err(err) => {
-                    println!("Error: {:?}", err);
+                    println!("Error: {err:?}");
                     false
                 }
             };
@@ -70,7 +70,7 @@ impl CLIDebugger {
         if span.start_line != 0 {
             println!(
                 "{}:{}:{}",
-                blue!(format!("{}", contract_id)),
+                blue!(contract_id),
                 span.start_line,
                 span.start_column
             );
@@ -84,15 +84,11 @@ impl CLIDebugger {
                 } else {
                     print!("   ");
                 }
-                println!("{} {}", black!(format!("{: <6}", line + 1)), lines[line]);
+                println!("{} {}", black!("{: <6}", line + 1), lines[line]);
                 if line == (span.start_line as usize - 1) {
                     println!(
                         "{}",
-                        blue!(format!(
-                            "          {: <1$}^",
-                            "",
-                            (span.start_column - 1) as usize
-                        ))
+                        blue!("          {: <1$}^", "", (span.start_column - 1) as usize)
                     );
                 }
             }
@@ -183,11 +179,11 @@ impl CLIDebugger {
             "p" | "print" => {
                 match self.state.evaluate(env, context, args) {
                     Ok(value) => {
-                        println!("{}", value);
+                        println!("{value}");
                     }
                     Err(errors) => {
                         for e in errors {
-                            println!("{}", e);
+                            println!("{e}");
                         }
                     }
                 }
@@ -219,7 +215,7 @@ impl CLIDebugger {
                     println!("No breakpoints set.")
                 } else {
                     for breakpoint in self.state.breakpoints.values() {
-                        println!("{}", breakpoint);
+                        println!("{breakpoint}");
                     }
                 }
             }
@@ -487,11 +483,7 @@ impl EvalHook for CLIDebugger {
     ) {
         if self.state.did_finish_eval(env, context, expr, res) {
             match res {
-                Ok(value) => println!(
-                    "{}: {}",
-                    green!("Return value"),
-                    black!(format!("{}", value))
-                ),
+                Ok(value) => println!("{}: {}", green!("Return value"), black!("{value}")),
                 Err(e) => println!("{}", format_err!(e)),
             }
         }

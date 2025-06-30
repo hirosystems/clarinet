@@ -56,12 +56,12 @@ impl EvalHook for Tracer {
                                         .saturating_sub(1)
                                 ),
                                 expr,
-                                black!(format!(
+                                black!(
                                     "{}:{}:{}",
                                     env.contract_context.contract_identifier.name,
                                     expr.span.start_line,
                                     expr.span.start_column,
-                                )),
+                                ),
                             );
 
                             let mut lines = Vec::new();
@@ -75,7 +75,7 @@ impl EvalHook for Tracer {
                                     "{}│ {}",
                                     "│   "
                                         .repeat(self.stack.len() - self.pending_call_string.len()),
-                                    purple!(format!("↳ callee: {}", callee)),
+                                    purple!("↳ callee: {callee}"),
                                 ));
                             }
 
@@ -109,12 +109,12 @@ impl EvalHook for Tracer {
                             (self.stack.len() - self.pending_call_string.len()).saturating_sub(1)
                         ),
                         expr,
-                        black!(format!(
+                        black!(
                             "{}:{}:{}",
                             env.contract_context.contract_identifier.name,
                             expr.span.start_line,
                             expr.span.start_column,
-                        )),
+                        ),
                     );
                     call.push_str(
                         format!(
@@ -162,12 +162,12 @@ impl EvalHook for Tracer {
                     "│   ".repeat(
                         (self.stack.len() - self.pending_call_string.len()).saturating_sub(1)
                     ),
-                    black!(format!(
+                    black!(
                         "✸ {}",
                         event
                             .json_serialize(0, &Txid([0u8; 32]), true)
                             .expect("Failed to serialize event")
-                    )),
+                    ),
                 )
             }
             self.nb_of_emitted_events = emitted_events.len();
@@ -181,7 +181,7 @@ impl EvalHook for Tracer {
                         "│   ".repeat(
                             (self.stack.len() - self.pending_call_string.len()).saturating_sub(1)
                         ),
-                        blue!(value.to_string())
+                        blue!("{value}")
                     );
                 }
                 self.stack.pop();
@@ -196,7 +196,7 @@ impl EvalHook for Tracer {
                         self.pending_call_string
                             .last_mut()
                             .unwrap()
-                            .push_str(format!(" {}", value).as_str());
+                            .push_str(format!(" {value}").as_str());
                     }
 
                     // If this was the last argument, print the pending call and pop the stack
@@ -220,15 +220,15 @@ impl EvalHook for Tracer {
                 match &result.result {
                     EvaluationResult::Contract(contract_result) => {
                         if let Some(value) = &contract_result.result {
-                            println!("└── {}", blue!(format!("{}", value)));
+                            println!("└── {}", blue!("{value}"));
                         }
                     }
                     EvaluationResult::Snippet(snippet_result) => {
-                        println!("└── {}", blue!(format!("{}", snippet_result.result)));
+                        println!("└── {}", blue!("{}", snippet_result.result));
                     }
                 };
             }
-            Err(e) => println!("{}", e),
+            Err(e) => println!("{e}"),
         }
     }
 }

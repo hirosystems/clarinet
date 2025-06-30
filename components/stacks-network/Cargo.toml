@@ -28,6 +28,9 @@ dirs = { version = "6.0.0" }
 clap = { version = "4.4.8", features = ["derive"] }
 serde_yaml = "0.8.23"
 rand = "0.8.5"
+flate2 = "1.1.1"
+tar = "0.4.44"
+indoc = { workspace = true }
 
 clarity = { workspace = true }
 stackslib = { git = "https://github.com/stacks-network/stacks-core.git", branch="feat/clarity-wasm-develop", package = "stackslib" }
@@ -39,6 +42,7 @@ clarinet-files = { path = "../clarinet-files" }
 clarinet-deployments = { path = "../clarinet-deployments" }
 hiro-system-kit = { path = "../hiro-system-kit", features = ["log"] }
 stacks-codec = { path = "../stacks-codec" }
+libc = "0.2.173"
 
 [dev-dependencies]
 stacks-rpc-client = { path = "../stacks-rpc-client", features = ["test"] }

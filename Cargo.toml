@@ -36,6 +36,7 @@ reqwest = { version = "0.12", default-features = false, features = [
 wasm-bindgen = { version = "=0.2.100" }
 wasm-bindgen-futures = { version = "=0.4.50" }
 web-sys = { version = "=0.3.77" }
+indoc = "2.0.3"
 
 [patch.crates-io]
 chainhook-sdk = { git = "https://github.com/hirosystems/chainhook.git", branch = "chore/upgrade-clarinet" }

@@ -17,8 +17,8 @@ pub enum RpcError {
 impl std::fmt::Display for RpcError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self {
-            RpcError::Message(e) => write!(f, "{}", e),
-            RpcError::StatusCode(e) => write!(f, "error status code {}", e),
+            RpcError::Message(e) => write!(f, "{e}"),
+            RpcError::StatusCode(e) => write!(f, "error status code {e}"),
             RpcError::Generic => write!(f, "unknown error"),
         }
     }

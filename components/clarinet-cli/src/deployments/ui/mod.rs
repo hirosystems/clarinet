@@ -42,7 +42,7 @@ pub fn start_ui(
             Ok(DeploymentEvent::Interrupted(message)) => {
                 break Err(message);
             }
-            Err(e) => break Err(format!("{:?}", e)),
+            Err(e) => break Err(format!("{e:?}")),
         }
     };
     let _ = disable_raw_mode();

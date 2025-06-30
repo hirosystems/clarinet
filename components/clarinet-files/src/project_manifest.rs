@@ -86,8 +86,7 @@ where
             Ok(path) => ClarityCodeSource::ContractOnDisk(path),
             Err(e) => {
                 return Err(serde::de::Error::custom(format!(
-                    "unable to parse path {} ({})",
-                    contract_path, e
+                    "unable to parse path {contract_path} ({e})"
                 )))
             }
         };
@@ -190,7 +189,7 @@ impl ProjectManifest {
         {
             Ok(s) => s,
             Err(e) => {
-                return Err(format!("Clarinet.toml file malformatted {:?}", e));
+                return Err(format!("Clarinet.toml file malformatted {e:?}"));
             }
         };
         ProjectManifest::from_project_manifest_file(
@@ -209,7 +208,7 @@ impl ProjectManifest {
             match toml::from_slice(&project_manifest_file_content[..]) {
                 Ok(s) => s,
                 Err(e) => {
-                    return Err(format!("Clarinet.toml file malformatted {:?}", e));
+                    return Err(format!("Clarinet.toml file malformatted {e:?}"));
                 }
             };
 
@@ -245,7 +244,7 @@ impl ProjectManifest {
         let project_root_location = manifest_location.get_parent_location()?;
         let cache_location = match project_manifest_file.project.cache_dir {
             Some(ref path) => FileLocation::try_parse(path, Some(&project_root_location))
-                .ok_or(format!("unable to parse path {}", path))?,
+                .ok_or_else(|| format!("unable to parse path {path}"))?,
             None => {
                 let mut cache_location = project_root_location.clone();
                 cache_location.append_path(".cache")?;

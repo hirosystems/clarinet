@@ -68,7 +68,7 @@ pub fn build_transaction_spec(
         selected_utxos.push(utxo);
     }
 
-    let address = Address::from_str(&tx_spec.recipient).unwrap_or_else(|e| panic!("{:?}", e));
+    let address = Address::from_str(&tx_spec.recipient).unwrap_or_else(|e| panic!("{e:?}"));
 
     let txout = TxOut {
         value: Amount::from_sat(tx_spec.sats_amount),
@@ -154,7 +154,7 @@ pub fn send_transaction_spec(
     let (mut transaction, selected_utxos) = build_transaction_spec(tx_spec, &mut utxos);
     sign_transaction(&mut transaction, selected_utxos, signer);
 
-    println!("-> Transaction\n{:?}", transaction);
+    println!("-> Transaction\n{transaction:?}");
 
     let encoded_tx = encode::serialize(&transaction);
 

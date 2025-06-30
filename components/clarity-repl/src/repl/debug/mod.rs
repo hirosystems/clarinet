@@ -52,9 +52,9 @@ pub enum BreakpointData {
 impl Display for BreakpointData {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            BreakpointData::Source(source) => write!(f, "{}", source),
-            BreakpointData::Function(function) => write!(f, "{}", function),
-            BreakpointData::Data(data) => write!(f, "{}", data),
+            BreakpointData::Source(source) => write!(f, "{source}"),
+            BreakpointData::Function(function) => write!(f, "{function}"),
+            BreakpointData::Data(data) => write!(f, "{data}"),
         }
     }
 }
@@ -68,7 +68,7 @@ pub struct SourceBreakpoint {
 impl Display for SourceBreakpoint {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let column = if let Some(column) = self.column {
-            format!(":{}", column)
+            format!(":{column}")
         } else {
             String::new()
         };
@@ -571,8 +571,7 @@ pub fn extract_watch_variable<'a>(
                     Ok(contract_identifier) => contract_identifier,
                     Err(e) => {
                         return Err(format!(
-                            "unable to parse watchpoint contract identifier: {}",
-                            e
+                            "unable to parse watchpoint contract identifier: {e}"
                         ));
                     }
                 }
@@ -583,20 +582,18 @@ pub fn extract_watch_variable<'a>(
     };
 
     let contract = if env.global_context.database.has_contract(&contract_id) {
-        match env.global_context.database.get_contract(&contract_id) {
-            Ok(contract) => contract,
-            Err(e) => {
-                return Err(format!("{}", e));
-            }
-        }
+        env.global_context
+            .database
+            .get_contract(&contract_id)
+            .map_err(|e| e.to_string())?
     } else {
-        return Err(format!("{} does not exist", contract_id));
+        return Err(format!("{contract_id} does not exist"));
     };
 
     if contract.contract_context.meta_data_var.get(name).is_none()
         && contract.contract_context.meta_data_map.get(name).is_none()
     {
-        return Err(format!("no such variable: {}.{}", contract_id, name));
+        return Err(format!("no such variable: {contract_id}.{name}"));
     }
 
     Ok((contract, name))

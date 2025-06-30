@@ -45,14 +45,14 @@ fn main() {
             match session.start() {
                 Ok(_) => {}
                 Err(e) => {
-                    println!("{}", e);
+                    println!("{e}");
                     std::process::exit(1);
                 }
             };
 
             let (_, output, _) = session.process_console_input(&code_str);
             for line in output {
-                println!("{}", line);
+                println!("{line}");
             }
         }
         None => loop {

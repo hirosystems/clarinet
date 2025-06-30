@@ -28,6 +28,7 @@ struct Args {
     /// Path of the project's root
     #[clap(short, long)]
     project_root_path: Option<String>,
+    no_snapshot: bool,
 }
 
 fn main() {
@@ -38,18 +39,18 @@ fn main() {
 
     let project_manifest_file_content = manifest_location
         .read_content()
-        .unwrap_or_else(|e| panic!("failed to read manifest data {:?}", e));
+        .unwrap_or_else(|e| panic!("failed to read manifest data {e:?}"));
 
     let manifest: ProjectManifest = serde_yaml::from_slice(&project_manifest_file_content[..])
-        .unwrap_or_else(|e| panic!("Clarinet.toml file malformatted {:?}", e));
+        .unwrap_or_else(|e| panic!("Clarinet.toml file malformatted {e:?}"));
 
     let network_manifest_file_content = network_manifest_path
         .read_content()
-        .unwrap_or_else(|e| panic!("failed to read network manifest data {:?}", e));
+        .unwrap_or_else(|e| panic!("failed to read network manifest data {e:?}"));
 
     let network_manifest: NetworkManifest =
         serde_yaml::from_slice(&network_manifest_file_content[..])
-            .unwrap_or_else(|e| panic!("Devnet.toml file malformatted {:?}", e));
+            .unwrap_or_else(|e| panic!("Devnet.toml file malformatted {e:?}"));
 
     let orchestrator =
         DevnetOrchestrator::new(manifest, Some(network_manifest.clone()), None, false, false)
@@ -57,9 +58,9 @@ fn main() {
 
     let deployment_specification_file_content = deployment_location
         .read_content()
-        .unwrap_or_else(|e| panic!("failed to read manifest data {:?}", e));
+        .unwrap_or_else(|e| panic!("failed to read manifest data {e:?}"));
     let deployment = serde_yaml::from_slice(&deployment_specification_file_content)
-        .unwrap_or_else(|e| panic!("deployment plan malformatted {:?}", e));
+        .unwrap_or_else(|e| panic!("deployment plan malformatted {e:?}"));
 
     let chainhooks = match load_chainhooks(
         &manifest_location,
@@ -67,7 +68,7 @@ fn main() {
     ) {
         Ok(hooks) => hooks,
         Err(e) => {
-            panic!("failed to load chainhooks {}", e);
+            panic!("failed to load chainhooks {e}");
         }
     };
 
@@ -85,6 +86,7 @@ fn main() {
         deployment,
         &mut Some(chainhooks),
         None,
+        args.no_snapshot,
         ctx,
         orchestrator_terminated_tx,
         &args.namespace,
