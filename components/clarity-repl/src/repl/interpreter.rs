@@ -889,7 +889,7 @@ impl ClarityInterpreter {
 
         let mut global_context = self
             .get_global_context(epoch, track_costs)
-            .map_err(|e| to_contract_call_error(e))?;
+            .map_err(to_contract_call_error)?;
 
         let mut hooks: Vec<&mut dyn EvalHook> = Vec::new();
         for hook in eval_hooks {
