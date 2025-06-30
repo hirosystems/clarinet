@@ -16,7 +16,7 @@ impl Default for MockStacksRpc {
 impl MockStacksRpc {
     pub fn new() -> Self {
         let client = mockito::Server::new();
-        let url = client.url().to_string();
+        let url = client.url();
         Self { client, url }
     }
 

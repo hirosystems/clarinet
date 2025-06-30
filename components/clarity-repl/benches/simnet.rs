@@ -52,7 +52,7 @@ fn init_session() -> Session {
     .join("\n");
 
     let contract = ClarityContract {
-        code_source: ClarityCodeSource::ContractInMemory(src.to_string()),
+        code_source: ClarityCodeSource::ContractInMemory(src),
         name: "contract".into(),
         deployer: ContractDeployer::DefaultDeployer,
         clarity_version: DEFAULT_CLARITY_VERSION,

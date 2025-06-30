@@ -1268,7 +1268,7 @@ pub fn compute_addresses(
         get_bip32_keys_from_mnemonic(mnemonic, "", derivation_path).unwrap();
 
     // Enforce a 33 bytes secret key format, expected by Stacks
-    let mut secret_key_bytes = secret_bytes.clone();
+    let mut secret_key_bytes = secret_bytes;
     secret_key_bytes.push(1);
     let miner_secret_key_hex = bytes_to_hex(&secret_key_bytes);
 

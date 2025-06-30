@@ -1214,6 +1214,7 @@ pub fn main() {
             );
 
             if cmd.enable_clarity_wasm {
+                #[allow(clippy::redundant_clone)]
                 let mut manifest_wasm = manifest.clone();
                 manifest_wasm.repl_settings.clarity_wasm_mode = true;
                 let (_, _, wasm_artifacts) = load_deployment_and_artifacts_or_exit(

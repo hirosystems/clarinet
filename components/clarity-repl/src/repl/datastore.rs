@@ -1286,7 +1286,7 @@ mod tests {
             Some(RemoteNetworkInfo {
                 initial_height: 10,
                 is_mainnet: false,
-                api_url: ApiUrl(server.url().to_string()),
+                api_url: ApiUrl(server.url()),
                 network_id: 2147483648,
                 cache_location: Some(PathBuf::from("./.cache")),
             }),
@@ -1436,7 +1436,7 @@ mod tests {
         let current_tip = *clarity_datastore.current_chain_tip.borrow();
         assert_ne!(current_tip, initial_tip);
 
-        let clarity_datastore = cache.clone();
+        let clarity_datastore = cache;
         let current_tip = *clarity_datastore.current_chain_tip.borrow();
         assert_eq!(current_tip, initial_tip);
     }

@@ -443,7 +443,7 @@ mod tests {
             ProjectManifest::from_project_manifest_file(manifest_file, &location, true).unwrap();
         assert!(manifest.repl_settings.remote_data.enabled);
 
-        let manifest_file: ProjectManifestFile = manifest_toml.clone().try_into().unwrap();
+        let manifest_file: ProjectManifestFile = manifest_toml.try_into().unwrap();
         let manifest =
             ProjectManifest::from_project_manifest_file(manifest_file, &location, false).unwrap();
         assert!(!manifest.repl_settings.remote_data.enabled);
