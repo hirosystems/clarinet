@@ -177,6 +177,26 @@ impl DevnetOrchestrator {
         })
     }
 
+    /// Helper to get (&Docker, &NetworkManifest, &DevnetConfig)
+    fn docker_and_configs(
+        &self,
+    ) -> Result<
+        (
+            &Docker,
+            &clarinet_files::NetworkManifest,
+            &clarinet_files::DevnetConfig,
+        ),
+        String,
+    > {
+        match (&self.docker_client, &self.network_config) {
+            (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
+                Some(ref devnet_config) => Ok((docker, network_config, devnet_config)),
+                _ => Err("unable to get devnet configuration".into()),
+            },
+            _ => Err("unable to get Docker client".into()),
+        }
+    }
+
     pub fn prepare_network_k8s_coordinator(
         &mut self,
         namespace: &str,
@@ -200,13 +220,7 @@ impl DevnetOrchestrator {
     }
 
     pub async fn prepare_local_network(&mut self) -> Result<ServicesMapHosts, String> {
-        let (docker, devnet_config) = match (&self.docker_client, &self.network_config) {
-            (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
-                Some(ref devnet_config) => (docker, devnet_config),
-                _ => return Err("unable to get devnet config".to_string()),
-            },
-            _ => return Err("unable to get devnet config".to_string()),
-        };
+        let (docker, _, devnet_config) = self.docker_and_configs()?;
 
         // First, let's make sure that we pruned staled resources correctly
         // self.clean_previous_session().await?;
@@ -296,13 +310,7 @@ impl DevnetOrchestrator {
         save_container_logs: bool,
     ) -> Result<(), String> {
         self.save_container_logs = save_container_logs;
-        let (_docker, devnet_config) = match (&self.docker_client, &self.network_config) {
-            (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
-                Some(ref devnet_config) => (docker, devnet_config),
-                _ => return Err("unable to get devnet config".to_string()),
-            },
-            _ => return Err("unable to get devnet config".to_string()),
-        };
+        let (_docker, _, devnet_config) = self.docker_and_configs()?;
 
         let mut boot_index = 1;
 
@@ -927,13 +935,7 @@ rpcport={bitcoin_node_rpc_port}
         ctx: &Context,
         no_snapshot: bool,
     ) -> Result<(), String> {
-        let (docker, devnet_config) = match (&self.docker_client, &self.network_config) {
-            (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
-                Some(ref devnet_config) => (docker, devnet_config),
-                _ => return Err("unable to get devnet configuration".into()),
-            },
-            _ => return Err("unable to get Docker client".into()),
-        };
+        let (docker, _, devnet_config) = self.docker_and_configs()?;
 
         let _info = docker
             .create_image(
@@ -1338,13 +1340,7 @@ peer_port = {bitcoin_node_p2p_port}
         boot_index: u32,
         ctx: &Context,
     ) -> Result<(), String> {
-        let (docker, devnet_config) = match (&self.docker_client, &self.network_config) {
-            (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
-                Some(ref devnet_config) => (docker, devnet_config),
-                _ => return Err("unable to get devnet configuration".into()),
-            },
-            _ => return Err("unable to get Docker client".into()),
-        };
+        let (docker, _, devnet_config) = self.docker_and_configs()?;
 
         let _info = docker
             .create_image(
@@ -1510,13 +1506,7 @@ db_path = "stacks-signer-{signer_id}.sqlite"
         signer_id: u32,
         signer_key: &StacksPrivateKey,
     ) -> Result<(), String> {
-        let (docker, devnet_config) = match (&self.docker_client, &self.network_config) {
-            (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
-                Some(ref devnet_config) => (docker, devnet_config),
-                _ => return Err("unable to get devnet configuration".into()),
-            },
-            _ => return Err("unable to get Docker client".into()),
-        };
+        let (docker, _, devnet_config) = self.docker_and_configs()?;
 
         let _info = docker
             .create_image(
@@ -1767,13 +1757,7 @@ events_keys = ["*"]
         boot_index: u32,
         ctx: &Context,
     ) -> Result<(), String> {
-        let (docker, devnet_config) = match (&self.docker_client, &self.network_config) {
-            (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
-                Some(ref devnet_config) => (docker, devnet_config),
-                _ => return Err("unable to get devnet configuration".into()),
-            },
-            _ => return Err("unable to get Docker client".into()),
-        };
+        let (docker, _, devnet_config) = self.docker_and_configs()?;
 
         let _info = docker
             .create_image(
@@ -1827,13 +1811,7 @@ events_keys = ["*"]
     }
 
     pub async fn prepare_stacks_api_container(&mut self, ctx: &Context) -> Result<(), String> {
-        let (docker, _, devnet_config) = match (&self.docker_client, &self.network_config) {
-            (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
-                Some(ref devnet_config) => (docker, network_config, devnet_config),
-                _ => return Err("unable to get devnet configuration".into()),
-            },
-            _ => return Err("unable to get Docker client".into()),
-        };
+        let (docker, _, devnet_config) = self.docker_and_configs()?;
 
         let _info = docker
             .create_image(
@@ -2031,6 +2009,7 @@ events_keys = ["*"]
     }
 
     pub async fn prepare_subnet_api_container(&mut self, ctx: &Context) -> Result<(), String> {
+        // NOTE: this doesn't use docker_and_configs because of a borrow checker issue
         let (docker, _, devnet_config) = match (&self.docker_client, &self.network_config) {
             (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
                 Some(ref devnet_config) => (docker, network_config, devnet_config),
@@ -2255,13 +2234,7 @@ events_keys = ["*"]
 
     pub async fn boot_subnet_api_container(&self) -> Result<(), String> {
         // Before booting the subnet-api, we need to create an additional DB in the postgres container.
-        let (docker, _, devnet_config) = match (&self.docker_client, &self.network_config) {
-            (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
-                Some(ref devnet_config) => (docker, network_config, devnet_config),
-                _ => return Err("unable to get devnet configuration".into()),
-            },
-            _ => return Err("unable to get Docker client".into()),
-        };
+        let (docker, _, devnet_config) = self.docker_and_configs()?;
 
         let postgres_container = match &self.postgres_container_id {
             Some(container) => container.clone(),
@@ -2312,13 +2285,7 @@ events_keys = ["*"]
     }
 
     pub async fn prepare_postgres_container(&mut self, ctx: &Context) -> Result<(), String> {
-        let (docker, _, devnet_config) = match (&self.docker_client, &self.network_config) {
-            (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
-                Some(ref devnet_config) => (docker, network_config, devnet_config),
-                _ => return Err("unable to get devnet configuration".into()),
-            },
-            _ => return Err("unable to get Docker client".into()),
-        };
+        let (docker, _, devnet_config) = self.docker_and_configs()?;
 
         let _info = docker
             .create_image(
@@ -2404,13 +2371,7 @@ events_keys = ["*"]
     }
 
     pub async fn prepare_stacks_explorer_container(&mut self, ctx: &Context) -> Result<(), String> {
-        let (docker, _, devnet_config) = match (&self.docker_client, &self.network_config) {
-            (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
-                Some(ref devnet_config) => (docker, network_config, devnet_config),
-                _ => return Err("unable to get devnet configuration".into()),
-            },
-            _ => return Err("unable to get Docker client".into()),
-        };
+        let (docker, _, devnet_config) = self.docker_and_configs()?;
 
         let _info = docker
             .create_image(
@@ -2517,13 +2478,7 @@ events_keys = ["*"]
         &mut self,
         ctx: &Context,
     ) -> Result<(), String> {
-        let (docker, _, devnet_config) = match (&self.docker_client, &self.network_config) {
-            (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
-                Some(ref devnet_config) => (docker, network_config, devnet_config),
-                _ => return Err("unable to get devnet configuration".into()),
-            },
-            _ => return Err("unable to get Docker client".into()),
-        };
+        let (docker, _, devnet_config) = self.docker_and_configs()?;
 
         let _info = docker
             .create_image(
@@ -2797,11 +2752,8 @@ events_keys = ["*"]
     }
 
     pub async fn kill(&self, ctx: &Context, fatal_message: Option<&str>) {
-        let (docker, devnet_config) = match (&self.docker_client, &self.network_config) {
-            (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
-                Some(ref devnet_config) => (docker, devnet_config),
-                _ => return,
-            },
+        let (docker, _, devnet_config) = match self.docker_and_configs() {
+            Ok(configs) => configs,
             _ => return,
         };
 
@@ -3493,13 +3445,7 @@ events_keys = ["*"]
             return Ok(());
         }
 
-        let (docker, devnet_config) = match (&self.docker_client, &self.network_config) {
-            (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
-                Some(ref devnet_config) => (docker, devnet_config),
-                _ => return Err("unable to get devnet config".to_string()),
-            },
-            _ => return Err("unable to get Docker client".into()),
-        };
+        let (docker, _, devnet_config) = self.docker_and_configs()?;
 
         // Start streaming stacks-node logs
         if let Some(container_id) = &self.stacks_node_container_id {
