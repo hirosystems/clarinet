@@ -54,34 +54,27 @@ echo "Starting version updates to $NEW_VERSION..."
 echo "Updating root files..."
 update_cargo_toml "./Cargo.toml" "$NEW_VERSION"
 
-# Build SDK WASM
-echo "Building SDK WASM..."
-npm run build:sdk-wasm
+# # Build SDK WASM
+# echo "Building SDK WASM..."
+# npm run build:sdk-wasm
 
-# Update Clarinet SDK packages
-echo "Updating Clarinet SDK packages..."
+# # Update Clarinet SDK packages
+# echo "Updating Clarinet SDK packages..."
 
-# Update stacks-devnet-js
-echo "Updating stacks-devnet-js..."
-cd components/stacks-devnet-js
-update_package_json "package.json" "$NEW_VERSION"
-npm i
-cd "$ROOT_DIR"
+# # SDK wasm
+# echo "Updating SDK wasm"
+# cd components/clarinet-sdk/node
+# update_package_json "package.json" "$NEW_VERSION"
+# npm install "@hirosystems/clarinet-sdk-wasm@$NEW_VERSION" --save
+# npm i
+# cd "$ROOT_DIR"
 
-# SDK wasm
-echo "Updating SDK wasm"
-cd components/clarinet-sdk/node
-update_package_json "package.json" "$NEW_VERSION"
-npm install "@hirosystems/clarinet-sdk-wasm@$NEW_VERSION" --save
-npm i
-cd "$ROOT_DIR"
-
-echo "Updating SDK wasm browser"
-cd components/clarinet-sdk/browser
-update_package_json "package.json" "$NEW_VERSION"
-npm install "@hirosystems/clarinet-sdk-wasm-browser@$NEW_VERSION" --save
-npm i
-cd "$ROOT_DIR"
+# echo "Updating SDK wasm browser"
+# cd components/clarinet-sdk/browser
+# update_package_json "package.json" "$NEW_VERSION"
+# npm install "@hirosystems/clarinet-sdk-wasm-browser@$NEW_VERSION" --save
+# npm i
+# cd "$ROOT_DIR"
 
 # Update stacks-devnet-js
 echo "Updating stacks-devnet-js..."

@@ -1,3 +1,41 @@
+# [3.2.0](https://github.com/hirosystems/clarinet/compare/v3.1.0...v3.2.0) (2025-06-30)
+
+##### New Features
+
+- Devnet snapshot (#1812) (b93870e6)
+- Go to trait definition for `impl-trait` and `use-trait` (#1867) (23fcf541)
+- Add release build for `x86_64-unknown-linux-musl` (#1860) (6640d773)
+- add rate limit retries in native mxs data fetching (#1852) (69baa1a7)
+
+##### Bug Fixes
+
+- Better error messages for contract call failures (#1874)
+- Devnet chainhook event observer (#1881) (8bccd83f)
+- "Go to definition" functionality for native LSP (#1859) (93461dcf)
+- Incorrect contract path in "Go to" reply from copy/paste error in previous PR (#1865) (d4fe76fb)
+- Leading newlines formatting problem (#1856) (06edda41)
+- set_tx_sender (#1861) (98683ab1)
+- Document range formatting (#1847) (c9b58d31)
+
+##### Other Changes
+
+- `iter_with_drain` (#1858) (d4779452)
+
+##### Performance Improvements
+
+- Improve performance and interface of text coloring macros (#1873) (83aed88a)
+- Remove clone of entire definitions hashmap for file during definitions lookup (#1869) (b6ba4764)
+- Remove unnecessary `to_vec()` in recursive functions (#1868) (0196b009)
+- Remove unnecesary `clone()`s and `to_string()`s (#1866) (85487901)
+
+##### Refactors
+
+- Fix clippy uninlined_format_args (#1877) (fb9f9a66)
+
+##### Documentation Changes
+
+- Fix typo in comment (#1863) (10fb1cfc)
+
 # [3.1.0](https://github.com/hirosystems/clarinet/compare/v3.0.2...v3.1.0) (2025-05-14)
 
 ##### New Features
