@@ -16,7 +16,7 @@ fn get_coverage_report(contract: &str, snippets: Vec<String>) -> String {
     let (contract_id, contract) = session.contracts.pop_first().unwrap();
     let ast = contract.ast;
 
-    let asts = BTreeMap::from([(contract_id.clone(), ast.clone())]);
+    let asts = BTreeMap::from([(contract_id.clone(), ast)]);
     let paths = BTreeMap::from([(contract_id.name.to_string(), "/contract-0.clar".into())]);
 
     session.collect_lcov_content(&asts, &paths)
