@@ -1,4 +1,3 @@
-use crate::devnet::start::StartConfig;
 use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::prelude::*;
@@ -44,7 +43,7 @@ use crate::deployments::{
     write_deployment,
 };
 use crate::devnet::package::{self as Package, ConfigurationPackage};
-use crate::devnet::start::start;
+use crate::devnet::start::{start, StartConfig};
 use crate::generate::changes::{Changes, TOMLEdition};
 use crate::generate::{self};
 use crate::lsp::run_lsp;

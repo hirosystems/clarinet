@@ -3456,7 +3456,11 @@ events_keys = ["*"]
 
             // Spawn a background thread to stream logs
             std::thread::spawn(move || {
-                let rt = tokio::runtime::Runtime::new().unwrap();
+                // Create a dedicated runtime for the Docker client to ensure stable connections
+                let rt = tokio::runtime::Builder::new_current_thread()
+                    .enable_all()
+                    .build()
+                    .unwrap();
                 rt.block_on(async {
                     let logs_options = LogsOptions::<String> {
                         stdout: true,
