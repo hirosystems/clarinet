@@ -9,7 +9,7 @@
 
 use std::marker::PhantomData;
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use oxc_allocator::{Allocator, CloneIn};
 use oxc_ast::ast::{
     self, Expression, Function, ObjectPropertyKind, Program, PropertyKey, Statement,
@@ -18,7 +18,7 @@ use oxc_ast::ast::{
 use oxc_parser::Parser;
 use oxc_semantic::SemanticBuilder;
 use oxc_span::SourceType;
-use oxc_traverse::{traverse_mut, Traverse};
+use oxc_traverse::{Traverse, traverse_mut};
 
 use clarity::vm::types::TypeSignature;
 
@@ -345,25 +345,25 @@ pub fn get_ir<'a>(allocator: &'a Allocator, file_name: &str, source: &'a str) ->
 mod test {
     use crate::{
         clarity_std::STD_PKG_NAME,
-        parser::{get_ir, IRConstant, IRDataMap, IRDataVar, IR},
+        parser::{IR, IRConstant, IRDataMap, IRDataVar, get_ir},
         types::{get_ascii_type, get_utf8_type},
     };
 
     use clarity::vm::{
+        ClarityName,
         types::{
             TupleTypeSignature,
             TypeSignature::{self, *},
         },
-        ClarityName,
     };
     use indoc::{formatdoc, indoc};
     use oxc_allocator::{Allocator, Box, FromIn};
     use oxc_ast::{
+        AstBuilder,
         ast::{
             BinaryOperator, Expression, NumberBase, ObjectPropertyKind, PropertyKey, PropertyKind,
             Statement,
         },
-        AstBuilder,
     };
     use oxc_span::{Atom, Span};
 
