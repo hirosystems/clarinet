@@ -458,6 +458,9 @@ struct DevnetStart {
     /// Start from genesis rather than using snapshot
     #[clap(long = "from-genesis")]
     pub no_snapshot: bool,
+    /// Save container logs locally
+    #[clap(long = "save-container-logs")]
+    pub save_container_logs: bool,
     /// If specified, use this deployment file
     #[clap(long = "deployment-plan-path", short = 'p')]
     pub deployment_plan_path: Option<String>,
@@ -2057,6 +2060,7 @@ fn devnet_start(cmd: DevnetStart, clarinetrc: ClarinetRC) {
         None,
         !cmd.no_dashboard,
         cmd.no_snapshot,
+        cmd.save_container_logs,
     ) {
         Err(e) => {
             eprintln!("{}", format_err!(e));

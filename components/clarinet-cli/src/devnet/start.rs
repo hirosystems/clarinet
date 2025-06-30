@@ -19,6 +19,7 @@ pub fn start(
     log_tx: Option<Sender<LogData>>,
     display_dashboard: bool,
     no_snapshot: bool,
+    save_container_logs: bool,
 ) -> Result<
     (
         Option<mpsc::Receiver<DevnetEvent>>,
@@ -77,6 +78,7 @@ pub fn start(
         ctx,
         orchestrator_terminated_tx,
         Some(orchestrator_terminated_rx),
+        save_container_logs,
     ));
     println!(
         "{} logs and chainstate available at location {}",

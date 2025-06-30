@@ -6,7 +6,7 @@ use std::sync::mpsc::{Receiver, Sender};
 use std::time::Duration;
 
 use bollard::container::{
-    Config, CreateContainerOptions, KillContainerOptions, ListContainersOptions,
+    Config, CreateContainerOptions, KillContainerOptions, ListContainersOptions, LogsOptions,
     PruneContainersOptions, WaitContainerOptions,
 };
 use bollard::errors::Error as DockerError;
@@ -52,6 +52,7 @@ pub struct DevnetOrchestrator {
     subnet_api_container_id: Option<String>,
     docker_client: Option<Docker>,
     services_map_hosts: Option<ServicesMapHosts>,
+    save_container_logs: bool,
 }
 #[derive(Clone, Debug)]
 pub struct ServicesMapHosts {
@@ -172,6 +173,7 @@ impl DevnetOrchestrator {
             subnet_node_container_id: None,
             subnet_api_container_id: None,
             services_map_hosts: None,
+            save_container_logs: false,
         })
     }
 
@@ -291,7 +293,9 @@ impl DevnetOrchestrator {
         terminator_rx: Receiver<bool>,
         ctx: &Context,
         no_snapshot: bool,
+        save_container_logs: bool,
     ) -> Result<(), String> {
+        self.save_container_logs = save_container_logs;
         let (_docker, devnet_config) = match (&self.docker_client, &self.network_config) {
             (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
                 Some(ref devnet_config) => (docker, devnet_config),
@@ -603,6 +607,9 @@ impl DevnetOrchestrator {
             }
         };
 
+        // Start streaming container logs if enabled
+        let _ = self.start_container_logs_streaming(ctx).await;
+
         for (i, signer_key) in signers_keys.clone().iter().enumerate() {
             let _ = event_tx.send(DevnetEvent::info(format!("Starting stacks-signer-{i}")));
             send_status_update(
@@ -766,6 +773,9 @@ impl DevnetOrchestrator {
                         .map_err(|e| format!("unable to reboot: {e:?}"))?;
                     self.bitcoin_node_container_id = Some(bitcoin_node_c_id);
                     self.stacks_node_container_id = Some(stacks_node_c_id);
+
+                    // Start streaming container logs for the new containers if enabled
+                    let _ = self.start_container_logs_streaming(ctx).await;
                 }
                 Err(_) => {
                     break;
@@ -2794,6 +2804,7 @@ events_keys = ["*"]
             },
             _ => return,
         };
+
         let options = Some(KillContainerOptions { signal: "SIGKILL" });
 
         // Terminate containers
@@ -3474,6 +3485,87 @@ events_keys = ["*"]
                     devnet_event_tx.send(DevnetEvent::info("Waiting for bitcoin-node".to_string()));
             }
         }
+        Ok(())
+    }
+
+    pub async fn start_container_logs_streaming(&self, ctx: &Context) -> Result<(), String> {
+        if !self.save_container_logs {
+            return Ok(());
+        }
+
+        let (docker, devnet_config) = match (&self.docker_client, &self.network_config) {
+            (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
+                Some(ref devnet_config) => (docker, devnet_config),
+                _ => return Err("unable to get devnet config".to_string()),
+            },
+            _ => return Err("unable to get Docker client".into()),
+        };
+
+        // Start streaming stacks-node logs
+        if let Some(container_id) = &self.stacks_node_container_id {
+            let log_path = PathBuf::from(&devnet_config.working_dir).join("stacks-node.log");
+            let container_id = container_id.clone();
+            let docker = docker.clone();
+            let log_path_clone = log_path.clone();
+
+            // Spawn a background thread to stream logs
+            std::thread::spawn(move || {
+                let rt = tokio::runtime::Runtime::new().unwrap();
+                rt.block_on(async {
+                    let logs_options = LogsOptions::<String> {
+                        stdout: true,
+                        stderr: true,
+                        follow: true,
+                        ..Default::default()
+                    };
+
+                    let mut file = match File::create(&log_path_clone) {
+                        Ok(file) => file,
+                        Err(e) => {
+                            eprintln!("Failed to create log file: {e}");
+                            return;
+                        }
+                    };
+
+                    match docker
+                        .logs(&container_id, Some(logs_options))
+                        .try_for_each(|log| {
+                            match log {
+                                bollard::container::LogOutput::StdOut { message }
+                                | bollard::container::LogOutput::StdErr { message } => {
+                                    if let Ok(log_line) = String::from_utf8(message.to_vec()) {
+                                        let _ = writeln!(file, "{log_line}");
+                                        let _ = file.flush(); // Ensure logs are written immediately
+                                    }
+                                }
+                                bollard::container::LogOutput::StdIn { .. }
+                                | bollard::container::LogOutput::Console { .. } => {
+                                    // Skip these types as they're not relevant for logs
+                                }
+                            }
+                            futures::future::ok(())
+                        })
+                        .await
+                    {
+                        Ok(_) => {
+                            eprintln!("Container logs stream ended for {container_id}");
+                        }
+                        Err(e) => {
+                            eprintln!("Error streaming container logs: {e}");
+                        }
+                    }
+                });
+            });
+
+            ctx.try_log(|logger| {
+                slog::info!(
+                    logger,
+                    "Started streaming stacks-node logs to: {}",
+                    log_path.display()
+                )
+            });
+        }
+
         Ok(())
     }
 }
