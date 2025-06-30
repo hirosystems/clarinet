@@ -201,9 +201,11 @@ impl<'a> Aggregator<'a> {
                 continue;
             }
 
-            if prev_end_line > 0 {
+            if prev_end_line > 0
+                && expr.span().start_line > 0
+                && expr.span().start_line > prev_end_line
+            {
                 let blank_lines = expr.span().start_line - prev_end_line - 1;
-                // Add extra newlines based on original blank lines (limit to 1 consecutive blank lines)
                 let extra_newlines = std::cmp::min(blank_lines, 1);
                 for _ in 0..extra_newlines {
                     result.push('\n');
@@ -555,8 +557,22 @@ impl<'a> Aggregator<'a> {
         let space = format!("{previous_indentation}{indentation}");
 
         let mut iter = exprs.get(1..).unwrap_or_default().iter().peekable();
+        let mut prev_end_line = 0;
+
         while let Some(expr) = iter.next() {
             let trailing = get_trailing_comment(expr, &mut iter);
+
+            // Add extra newlines based on original blank lines (limit to 1 consecutive blank lines)
+            if prev_end_line > 0
+                && expr.span().start_line > 0
+                && expr.span().start_line > prev_end_line
+            {
+                let blank_lines = expr.span().start_line - prev_end_line - 1;
+                let extra_newlines = std::cmp::min(blank_lines, 1);
+                for _ in 0..extra_newlines {
+                    acc.push('\n');
+                }
+            }
 
             // begin body
             acc.push_str(&format!(
@@ -568,6 +584,8 @@ impl<'a> Aggregator<'a> {
                 acc.push(' ');
                 acc.push_str(&self.display_pse(comment, previous_indentation));
             }
+
+            prev_end_line = expr.span().end_line;
         }
         acc.push_str(&format!("\n{previous_indentation})"));
         acc
@@ -587,9 +605,24 @@ impl<'a> Aggregator<'a> {
         let break_up =
             without_comments_len(&exprs[1..]) > BOOLEAN_BREAK_LIMIT || differing_lines(exprs);
         let mut iter = exprs.get(1..).unwrap_or_default().iter().peekable();
+        let mut prev_end_line = 0;
+
         if break_up {
             while let Some(expr) = iter.next() {
                 let trailing = get_trailing_comment(expr, &mut iter);
+
+                // Add extra newlines based on original blank lines (limit to 1 consecutive blank lines)
+                if prev_end_line > 0
+                    && expr.span().start_line > 0
+                    && expr.span().start_line > prev_end_line
+                {
+                    let blank_lines = expr.span().start_line - prev_end_line - 1;
+                    let extra_newlines = std::cmp::min(blank_lines, 1);
+                    for _ in 0..extra_newlines {
+                        acc.push('\n');
+                    }
+                }
+
                 acc.push_str(&format!(
                     "\n{}{}",
                     space,
@@ -599,6 +632,8 @@ impl<'a> Aggregator<'a> {
                     acc.push(' ');
                     acc.push_str(&self.display_pse(comment, previous_indentation));
                 }
+
+                prev_end_line = expr.span().end_line;
             }
         } else {
             while let Some(expr) = iter.next() {
@@ -631,6 +666,7 @@ impl<'a> Aggregator<'a> {
         let mut acc = format!("({func_type} ");
         let mut iter = exprs[1..].iter().peekable();
         let mut index = 0;
+        let mut prev_end_line = 0;
 
         while let Some(expr) = iter.next() {
             let trailing = get_trailing_comment(expr, &mut iter);
@@ -638,12 +674,26 @@ impl<'a> Aggregator<'a> {
                 acc.push('\n');
                 acc.push_str(&space);
             }
+
+            // Add extra newlines based on original blank lines (limit to 1 consecutive blank lines)
+            if prev_end_line > 0 {
+                let blank_lines = expr.span().start_line - prev_end_line - 1;
+                let extra_newlines = std::cmp::min(blank_lines, 1);
+                for _ in 0..extra_newlines {
+                    acc.push('\n');
+                }
+            }
+
+            acc.push('\n');
+            acc.push_str(&space);
             acc.push_str(&self.format_source_exprs(slice::from_ref(expr), &space));
             if let Some(comment) = trailing {
                 acc.push(' ');
                 acc.push_str(&self.display_pse(comment, previous_indentation));
             }
+
             index += 1;
+            prev_end_line = expr.span().end_line;
         }
         acc.push('\n');
         acc.push_str(previous_indentation);
@@ -681,12 +731,24 @@ impl<'a> Aggregator<'a> {
             }
         }
         // start the let body
+        let mut prev_end_line = 0;
         for e in exprs.get(2..).unwrap_or_default() {
+            // Add extra newlines based on original blank lines (limit to 1 consecutive blank lines)
+            if prev_end_line > 0 && e.span().start_line > 0 && e.span().start_line > prev_end_line {
+                let blank_lines = e.span().start_line - prev_end_line - 1;
+                let extra_newlines = std::cmp::min(blank_lines, 1);
+                for _ in 0..extra_newlines {
+                    acc.push('\n');
+                }
+            }
+
             acc.push_str(&format!(
                 "\n{}{}",
                 space,
                 self.format_source_exprs(slice::from_ref(e), &space)
-            ))
+            ));
+
+            prev_end_line = e.span().end_line;
         }
         acc.push_str(&format!("\n{previous_indentation})"));
         acc
@@ -1437,6 +1499,19 @@ mod tests_formatter {
             result,
             "(define-public (my-func\n    (amount uint)\n    (sender principal)\n  )\n  (ok true)\n)\n"
         );
+    }
+    #[test]
+    fn test_preserve_newlines_inner_function() {
+        let src = r#"(define-public (increment)
+  (begin
+    (try! (stx-transfer? (var-get cost) tx-sender (var-get contract-owner)))
+
+    (ok (var-set count (+ (var-get count) u1)))
+  )
+)
+"#;
+        let result = format_with_default(&String::from(src));
+        assert_eq!(result, src);
     }
     #[test]
     fn test_pre_comments_included() {
