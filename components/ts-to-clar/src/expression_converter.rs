@@ -33,6 +33,7 @@ fn atom(name: &str) -> PreSymbolicExpression {
 
 fn get_clarity_binary_operator(operator: &ast::BinaryOperator) -> &str {
     use ast::BinaryOperator::*;
+
     match operator {
         Addition => "+",
         Subtraction => "-",
