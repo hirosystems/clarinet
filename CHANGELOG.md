@@ -9,6 +9,7 @@
 
 ##### Bug Fixes
 
+- Better error messages for contract call failures (#1874)
 - Devnet chainhook event observer (#1881) (8bccd83f)
 - "Go to definition" functionality for native LSP (#1859) (93461dcf)
 - Incorrect contract path in "Go to" reply from copy/paste error in previous PR (#1865) (d4fe76fb)
