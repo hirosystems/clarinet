@@ -1163,9 +1163,10 @@ events_keys = ["stackerdb", "block_proposal", "burn_blocks"]
         stacks_conf.push_str(&format!(
             r#"
 # Add orchestrator (docker-host) as an event observer
+# Also used by the devnet chainhook instance
 [[events_observer]]
 endpoint = "host.docker.internal:{orchestrator_ingestion_port}"
-events_keys = ["burn_blocks", "memtx"]
+events_keys = ["*"]
 "#,
             orchestrator_ingestion_port = devnet_config.orchestrator_ingestion_port,
         ));
