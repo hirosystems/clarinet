@@ -145,10 +145,7 @@ async fn do_run_devnet(
 
     // The event observer should be able to send some events to the UI thread,
     // and should be able to be terminated
-    let hooks = match config.chainhooks {
-        Some(hooks) => hooks,
-        _ => ChainhookStore::new(),
-    };
+    let hooks = config.chainhooks.unwrap_or_default();
     let devnet_path = devnet_config.working_dir.clone();
     let observer_config = DevnetEventObserverConfig::new(
         devnet_config.clone(),

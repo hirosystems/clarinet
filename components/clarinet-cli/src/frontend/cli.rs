@@ -1,3 +1,4 @@
+use crate::devnet::start::StartConfig;
 use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::prelude::*;
@@ -2054,14 +2055,14 @@ fn devnet_start(cmd: DevnetStart, clarinetrc: ClarinetRC) {
         prompt_user_to_continue();
         display_devnet_incompatibilities_continue()
     }
-    match start(
-        orchestrator,
+    match start(StartConfig {
+        devnet: orchestrator,
         deployment,
-        None,
-        !cmd.no_dashboard,
-        cmd.no_snapshot,
-        cmd.save_container_logs,
-    ) {
+        log_tx: None,
+        display_dashboard: !cmd.no_dashboard,
+        no_snapshot: cmd.no_snapshot,
+        save_container_logs: cmd.save_container_logs,
+    }) {
         Err(e) => {
             eprintln!("{}", format_err!(e));
             process::exit(1);
