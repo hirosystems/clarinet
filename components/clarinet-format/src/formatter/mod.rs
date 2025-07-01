@@ -567,7 +567,7 @@ impl<'a> Aggregator<'a> {
                 && expr.span().start_line > 0
                 && expr.span().start_line > prev_end_line
             {
-                let blank_lines = expr.span().start_line - prev_end_line - 1;
+                let blank_lines = expr.span().start_line.saturating_sub(prev_end_line + 1);
                 let extra_newlines = std::cmp::min(blank_lines, 1);
                 for _ in 0..extra_newlines {
                     acc.push('\n');
@@ -616,7 +616,7 @@ impl<'a> Aggregator<'a> {
                     && expr.span().start_line > 0
                     && expr.span().start_line > prev_end_line
                 {
-                    let blank_lines = expr.span().start_line - prev_end_line - 1;
+                    let blank_lines = expr.span().start_line.saturating_sub(prev_end_line + 1);
                     let extra_newlines = std::cmp::min(blank_lines, 1);
                     for _ in 0..extra_newlines {
                         acc.push('\n');
@@ -672,24 +672,18 @@ impl<'a> Aggregator<'a> {
             let trailing = get_trailing_comment(expr, &mut iter);
 
             // Add extra newlines based on original blank lines (limit to 1 consecutive blank lines)
-            push_blank_lines(&mut acc, prev_end_line, expr.span().start_line);
-
-            if index > 0 {
-                acc.push('\n');
-                acc.push_str(&space);
-            }
-
-            // Add extra newlines based on original blank lines (limit to 1 consecutive blank lines)
             if prev_end_line > 0 {
-                let blank_lines = expr.span().start_line - prev_end_line - 1;
+                let blank_lines = expr.span().start_line.saturating_sub(prev_end_line + 1);
                 let extra_newlines = std::cmp::min(blank_lines, 1);
                 for _ in 0..extra_newlines {
                     acc.push('\n');
                 }
             }
 
-            acc.push('\n');
-            acc.push_str(&space);
+            if index > 0 {
+                acc.push('\n');
+                acc.push_str(&space);
+            }
             acc.push_str(&self.format_source_exprs(slice::from_ref(expr), &space));
             if let Some(comment) = trailing {
                 acc.push(' ');
@@ -739,7 +733,7 @@ impl<'a> Aggregator<'a> {
         for e in exprs.get(2..).unwrap_or_default() {
             // Add extra newlines based on original blank lines (limit to 1 consecutive blank lines)
             if prev_end_line > 0 && e.span().start_line > 0 && e.span().start_line > prev_end_line {
-                let blank_lines = e.span().start_line - prev_end_line - 1;
+                let blank_lines = e.span().start_line.saturating_sub(prev_end_line + 1);
                 let extra_newlines = std::cmp::min(blank_lines, 1);
                 for _ in 0..extra_newlines {
                     acc.push('\n');
