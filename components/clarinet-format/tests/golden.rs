@@ -61,7 +61,7 @@ fn test_irl_contracts() {
             let src = fs::read_to_string(&path).expect("Failed to read source file");
 
             let file_name = path.file_name().expect("Failed to get file name");
-            println!("file_name: {file_name:?}");
+            println!("file: {file_name:?}");
             let intended_path = Path::new(intended_dir).join(file_name);
 
             let intended =
