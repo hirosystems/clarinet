@@ -1,9 +1,8 @@
 #![allow(unused_variables)]
 
-use crate::analysis::annotation::{Annotation, AnnotationKind, WarningKind};
-use crate::analysis::ast_visitor::{traverse, ASTVisitor, TypedVar};
-use crate::analysis::{self, AnalysisPass, AnalysisResult};
-use crate::repl::DEFAULT_EPOCH;
+use std::collections::{HashMap, HashSet};
+use std::hash::Hash;
+
 use clarity::vm::analysis::analysis_db::AnalysisDatabase;
 use clarity::vm::analysis::types::ContractAnalysis;
 use clarity::vm::diagnostic::{DiagnosableError, Diagnostic, Level};
@@ -13,8 +12,11 @@ use clarity::vm::representations::Span;
 use clarity::vm::representations::SymbolicExpressionType::*;
 use clarity::vm::types::TypeSignature;
 use clarity::vm::{ClarityName, ClarityVersion, SymbolicExpression};
-use std::collections::{HashMap, HashSet};
-use std::hash::Hash;
+
+use crate::analysis::annotation::{Annotation, AnnotationKind, WarningKind};
+use crate::analysis::ast_visitor::{traverse, ASTVisitor, TypedVar};
+use crate::analysis::{self, AnalysisPass, AnalysisResult};
+use crate::repl::DEFAULT_EPOCH;
 
 #[derive(Debug, Default, Clone, Copy, Serialize, Deserialize)]
 pub struct Settings {

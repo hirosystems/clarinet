@@ -7,9 +7,8 @@ use clarity::types::chainstate::StacksAddress;
 use clarity::types::StacksEpochId;
 use clarity::vm::types::{PrincipalData, QualifiedContractIdentifier, StandardPrincipalData};
 
-use crate::analysis;
-
 use super::remote_data::HttpClient;
+use crate::analysis;
 
 #[derive(Clone, Debug)]
 pub struct InitialContract {

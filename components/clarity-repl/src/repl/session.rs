@@ -1,16 +1,12 @@
-use super::boot::{
-    BOOT_CODE_MAINNET, BOOT_CODE_TESTNET, BOOT_MAINNET_PRINCIPAL, BOOT_TESTNET_PRINCIPAL,
-};
-use super::diagnostic::output_diagnostic;
-use super::interpreter::ContractCallError;
-use super::{ClarityCodeSource, ClarityContract, ClarityInterpreter, ContractDeployer};
-use crate::analysis::coverage::CoverageHook;
-use crate::repl::clarity_values::value_to_string;
-use crate::utils::serialize_event;
+use std::collections::{BTreeMap, HashMap};
+use std::fmt;
+use std::num::ParseIntError;
 
 use clarity::codec::StacksMessageCodec;
 use clarity::types::chainstate::StacksAddress;
 use clarity::types::StacksEpochId;
+#[cfg(not(target_arch = "wasm32"))]
+use clarity::vm::analysis::ContractAnalysis;
 use clarity::vm::ast::ContractAST;
 use clarity::vm::diagnostic::{Diagnostic, Level};
 use clarity::vm::docs::{make_api_reference, make_define_reference, make_keyword_reference};
@@ -25,14 +21,17 @@ use clarity::vm::{
 use colored::Colorize;
 use comfy_table::Table;
 
-use std::collections::{BTreeMap, HashMap};
-use std::fmt;
-use std::num::ParseIntError;
-
-#[cfg(not(target_arch = "wasm32"))]
-use clarity::vm::analysis::ContractAnalysis;
-
-use super::SessionSettings;
+use super::boot::{
+    BOOT_CODE_MAINNET, BOOT_CODE_TESTNET, BOOT_MAINNET_PRINCIPAL, BOOT_TESTNET_PRINCIPAL,
+};
+use super::diagnostic::output_diagnostic;
+use super::interpreter::ContractCallError;
+use super::{
+    ClarityCodeSource, ClarityContract, ClarityInterpreter, ContractDeployer, SessionSettings,
+};
+use crate::analysis::coverage::CoverageHook;
+use crate::repl::clarity_values::value_to_string;
+use crate::utils::serialize_event;
 
 #[derive(Clone, Debug, Serialize)]
 pub struct CostsReport {
@@ -1274,17 +1273,14 @@ fn clarity_keywords() -> HashMap<String, String> {
 #[allow(clippy::items_after_test_module)]
 #[cfg(test)]
 mod tests {
-    use clarity::{util::hash::hex_bytes, vm::types::TupleData};
+    use clarity::util::hash::hex_bytes;
+    use clarity::vm::types::TupleData;
 
     use super::*;
-    use crate::{
-        repl::{
-            boot::{BOOT_MAINNET_ADDRESS, BOOT_TESTNET_ADDRESS},
-            settings::Account,
-            DEFAULT_EPOCH,
-        },
-        test_fixtures::clarity_contract::ClarityContractBuilder,
-    };
+    use crate::repl::boot::{BOOT_MAINNET_ADDRESS, BOOT_TESTNET_ADDRESS};
+    use crate::repl::settings::Account;
+    use crate::repl::DEFAULT_EPOCH;
+    use crate::test_fixtures::clarity_contract::ClarityContractBuilder;
 
     #[track_caller]
     fn run_session_snippet(session: &mut Session, snippet: &str) -> Value {

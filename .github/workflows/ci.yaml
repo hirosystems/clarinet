@@ -89,7 +89,7 @@ jobs:
         run: cargo audit --ignore RUSTSEC-2024-0344 --ignore RUSTSEC-2022-0028 --ignore RUSTSEC-2024-0438
 
       - name: Run rustfmt
-        run: cargo fmt --all -- --check
+        run: cargo fmt-stacks --check
 
       - name: Run clippy
         run: cargo clippy --workspace --exclude clarinet-sdk-wasm

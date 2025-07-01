@@ -1,66 +1,57 @@
-use super::ChainsCoordinatorCommand;
-
-use crate::event::send_status_update;
-use crate::event::DevnetEvent;
-use crate::event::Status;
-use crate::orchestrator::ServicesMapHosts;
-use crate::orchestrator::EXCLUDED_STACKS_SNAPSHOT_FILES;
-use crate::orchestrator::{copy_directory, get_global_snapshot_dir, get_project_snapshot_dir};
+use std::convert::TryFrom;
+use std::path::PathBuf;
+use std::str::FromStr;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc::{channel, Receiver, Sender};
+use std::sync::Arc;
+use std::time::Duration;
+use std::{fs, str};
 
 use base58::FromBase58;
 use bitcoincore_rpc::bitcoin::Address;
 use chainhook_sdk::chainhooks::types::ChainhookStore;
 use chainhook_sdk::indexer::stacks::standardize_stacks_serialized_block;
 use chainhook_sdk::indexer::StacksChainContext;
-use chainhook_sdk::observer::PredicatesConfig;
 use chainhook_sdk::observer::{
-    start_event_observer, EventObserverConfig, ObserverCommand, ObserverEvent,
+    start_event_observer, EventObserverConfig, ObserverCommand, ObserverEvent, PredicatesConfig,
     StacksChainMempoolEvent, StacksObserverStartupContext,
 };
-use chainhook_sdk::types::BitcoinBlockSignaling;
-use chainhook_sdk::types::BitcoinChainEvent;
-use chainhook_sdk::types::StacksChainEvent;
-use chainhook_sdk::types::StacksNodeConfig;
+use chainhook_sdk::types::{
+    BitcoinBlockSignaling, BitcoinChainEvent, StacksChainEvent, StacksNodeConfig,
+};
 use chainhook_sdk::utils::Context;
-use chainhook_types::StacksBlockData;
-use chainhook_types::StacksTransactionKind;
-use clarinet_deployments::onchain::TransactionStatus;
+use chainhook_types::{StacksBlockData, StacksTransactionKind};
 use clarinet_deployments::onchain::{
-    apply_on_chain_deployment, DeploymentCommand, DeploymentEvent,
+    apply_on_chain_deployment, DeploymentCommand, DeploymentEvent, TransactionStatus,
 };
 use clarinet_deployments::types::DeploymentSpecification;
-use clarinet_files::PoxStackingOrder;
-use clarinet_files::StacksNetwork;
-use clarinet_files::DEFAULT_FIRST_BURN_HEADER_HEIGHT;
-use clarinet_files::{self, AccountConfig, DevnetConfig, NetworkManifest, ProjectManifest};
+use clarinet_files::{
+    self, AccountConfig, DevnetConfig, NetworkManifest, PoxStackingOrder, ProjectManifest,
+    StacksNetwork, DEFAULT_FIRST_BURN_HEADER_HEIGHT,
+};
 use clarity::address::AddressHashMode;
 use clarity::types::PublicKey;
 use clarity::util::hash::{hex_bytes, Hash160};
-use clarity::vm::types::PrincipalData;
-use clarity::vm::types::{BuffData, SequenceData, TupleData};
-use clarity::vm::ClarityName;
-use clarity::vm::Value as ClarityValue;
+use clarity::vm::types::{BuffData, PrincipalData, SequenceData, TupleData};
+use clarity::vm::{ClarityName, Value as ClarityValue};
 use hiro_system_kit;
-use hiro_system_kit::slog;
-use hiro_system_kit::yellow;
+use hiro_system_kit::{slog, yellow};
 use serde_json::json;
 use stacks_rpc_client::rpc_client::PoxInfo;
 use stacks_rpc_client::StacksRpc;
 use stackslib::chainstate::stacks::address::PoxAddress;
 use stackslib::core::CHAIN_ID_TESTNET;
-use stackslib::types::chainstate::StacksPrivateKey;
-use stackslib::types::chainstate::StacksPublicKey;
-use stackslib::util_lib::signed_structured_data::pox4::make_pox_4_signer_key_signature;
-use stackslib::util_lib::signed_structured_data::pox4::Pox4SignatureTopic;
-use std::convert::TryFrom;
-use std::fs;
-use std::path::PathBuf;
-use std::str;
-use std::str::FromStr;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::mpsc::{channel, Receiver, Sender};
-use std::sync::Arc;
-use std::time::Duration;
+use stackslib::types::chainstate::{StacksPrivateKey, StacksPublicKey};
+use stackslib::util_lib::signed_structured_data::pox4::{
+    make_pox_4_signer_key_signature, Pox4SignatureTopic,
+};
+
+use super::ChainsCoordinatorCommand;
+use crate::event::{send_status_update, DevnetEvent, Status};
+use crate::orchestrator::{
+    copy_directory, get_global_snapshot_dir, get_project_snapshot_dir, ServicesMapHosts,
+    EXCLUDED_STACKS_SNAPSHOT_FILES,
+};
 
 const SNAPSHOT_STACKS_START_HEIGHT: u64 = 38;
 const SNAPSHOT_BURN_START_HEIGHT: u64 = 143;
@@ -1432,7 +1423,8 @@ mod tests_stacking_orders {
 #[cfg(test)]
 mod test_rpc_client {
     use clarinet_files::DEFAULT_DERIVATION_PATH;
-    use stacks_rpc_client::{mock_stacks_rpc::MockStacksRpc, rpc_client::NodeInfo};
+    use stacks_rpc_client::mock_stacks_rpc::MockStacksRpc;
+    use stacks_rpc_client::rpc_client::NodeInfo;
 
     use super::*;
 

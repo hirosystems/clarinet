@@ -4,7 +4,8 @@ use std::sync::LazyLock;
 use clarinet_utils::{get_bip32_keys_from_mnemonic, mnemonic_from_phrase, random_mnemonic};
 use clarity::address::AddressHashMode;
 use clarity::types::chainstate::{StacksAddress, StacksPrivateKey};
-use clarity::util::{hash::bytes_to_hex, secp256k1::Secp256k1PublicKey};
+use clarity::util::hash::bytes_to_hex;
+use clarity::util::secp256k1::Secp256k1PublicKey;
 use clarity::vm::types::QualifiedContractIdentifier;
 use libsecp256k1::PublicKey;
 use serde::Serialize;
@@ -231,7 +232,8 @@ pub struct NetworkManifest {
 pub mod accounts_serde {
     use std::collections::BTreeMap;
 
-    use serde::{ser::SerializeSeq, Deserializer, Serializer};
+    use serde::ser::SerializeSeq;
+    use serde::{Deserializer, Serializer};
 
     use crate::AccountConfig;
 

@@ -1,8 +1,9 @@
-use crate::repl::{settings::SessionSettings, Session};
-
 use clarity::vm::EvaluationResult;
 use rustyline::error::ReadlineError;
 use rustyline::DefaultEditor;
+
+use crate::repl::settings::SessionSettings;
+use crate::repl::Session;
 
 const VERSION: Option<&'static str> = option_env!("CARGO_PKG_VERSION");
 const HISTORY_FILE: Option<&'static str> = option_env!("CLARITY_REPL_HISTORY_FILE");
@@ -238,8 +239,9 @@ pub fn print_clarity_wasm_warning() {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use test_case::test_case;
+
+    use super::*;
 
     #[test_case(r#"(list (list u1)"# ; "incomplete input missing closing parenthesis")]
     #[test_case(r#"{ a: { b: 1 }"# ; "incomplete input missing closing curly brace")]

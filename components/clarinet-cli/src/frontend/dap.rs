@@ -1,12 +1,12 @@
-use crate::deployments::generate_default_deployment;
-use clarinet_deployments::setup_session_with_deployment;
-use clarinet_files::StacksNetwork;
-use clarinet_files::{FileLocation, ProjectManifest};
-use clarity_repl::repl::debug::dap::DAPDebugger;
 use std::path::PathBuf;
+
+use clarinet_deployments::setup_session_with_deployment;
+use clarinet_files::{FileLocation, ProjectManifest, StacksNetwork};
+use clarity_repl::repl::debug::dap::DAPDebugger;
 
 #[cfg(feature = "telemetry")]
 use super::telemetry::{telemetry_report_event, DeveloperUsageDigest, DeveloperUsageEvent};
+use crate::deployments::generate_default_deployment;
 
 pub fn run_dap() -> Result<(), String> {
     let mut dap = DAPDebugger::new();

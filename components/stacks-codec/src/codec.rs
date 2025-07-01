@@ -4,12 +4,11 @@ use std::io::{Read, Write};
 use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
 
-pub use clarity::codec::StacksMessageCodec;
-
 use clarity::address::{
     AddressHashMode, C32_ADDRESS_VERSION_MAINNET_MULTISIG, C32_ADDRESS_VERSION_MAINNET_SINGLESIG,
     C32_ADDRESS_VERSION_TESTNET_MULTISIG, C32_ADDRESS_VERSION_TESTNET_SINGLESIG,
 };
+pub use clarity::codec::StacksMessageCodec;
 use clarity::codec::{
     read_next, read_next_exact, write_next, Error as CodecError, MAX_MESSAGE_LEN,
 };

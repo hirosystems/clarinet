@@ -1,10 +1,7 @@
 extern crate console_error_panic_hook;
-use crate::backend::{
-    process_mutating_request, process_notification, process_request, EditorStateInput,
-    LspNotification, LspRequest, LspRequestResponse,
-};
-use crate::state::EditorState;
-use crate::utils::{clarity_diagnostics_to_lsp_type, get_contract_location, get_manifest_location};
+use std::panic;
+use std::sync::{Arc, RwLock};
+
 use clarinet_files::{FileAccessor, WASMFileSystemAccessor};
 use js_sys::{Function as JsFunction, Promise};
 use lsp_types::notification::{
@@ -21,13 +18,17 @@ use lsp_types::{
 };
 use serde::Serialize;
 use serde_wasm_bindgen::{from_value as decode_from_js, to_value as encode_to_js, Serializer};
-use std::panic;
-use std::sync::{Arc, RwLock};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::future_to_promise;
 
+use crate::backend::{
+    process_mutating_request, process_notification, process_request, EditorStateInput,
+    LspNotification, LspRequest, LspRequestResponse,
+};
+use crate::state::EditorState;
 #[cfg(debug_assertions)]
 use crate::utils::log;
+use crate::utils::{clarity_diagnostics_to_lsp_type, get_contract_location, get_manifest_location};
 
 #[wasm_bindgen]
 pub struct LspVscodeBridge {

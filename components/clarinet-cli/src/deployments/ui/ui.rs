@@ -1,12 +1,10 @@
 use clarinet_deployments::onchain::TransactionStatus;
+use ratatui::layout::{Constraint, Rect};
+use ratatui::style::{Color, Style};
+use ratatui::widgets::{Block, Cell, Row, Table};
+use ratatui::Frame;
 
 use super::App;
-use ratatui::{
-    layout::{Constraint, Rect},
-    style::{Color, Style},
-    widgets::{Block, Cell, Row, Table},
-    Frame,
-};
 
 pub fn draw(f: &mut Frame, app: &mut App) {
     draw_contracts_status(f, app, f.area());

@@ -11,7 +11,8 @@ use bytes::buf::BufMut;
 use bytes::{Buf, BytesMut};
 use log::{trace, warn};
 use memchr::memmem;
-use serde::{de::DeserializeOwned, Serialize};
+use serde::de::DeserializeOwned;
+use serde::Serialize;
 use tokio_util::codec::{Decoder, Encoder};
 
 /// Errors that can occur when processing a DAP message.

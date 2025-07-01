@@ -1,8 +1,7 @@
-use wasm_bindgen::prelude::*;
-
 use std::path::Path;
 
 use js_sys::{Object, Reflect};
+use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
 extern "C" {

@@ -1,6 +1,7 @@
-use crate::FileAccessor;
+use std::collections::{BTreeMap, HashMap};
+use std::path::PathBuf;
+use std::str::FromStr;
 
-use super::FileLocation;
 use clarity::types::StacksEpochId;
 use clarity::vm::ClarityVersion;
 use clarity_repl::repl;
@@ -8,10 +9,10 @@ use clarity_repl::repl::{ClarityCodeSource, ClarityContract, ContractDeployer};
 use serde::ser::SerializeMap;
 use serde::{Deserializer, Serialize, Serializer};
 use serde_json::Value as JsonValue;
-use std::collections::{BTreeMap, HashMap};
-use std::path::PathBuf;
-use std::str::FromStr;
 use toml::Value as TomlValue;
+
+use super::FileLocation;
+use crate::FileAccessor;
 
 pub const INVALID_CLARITY_VERSION: &str =
     "clarity_version field invalid (value supported: 1, 2, 3)";

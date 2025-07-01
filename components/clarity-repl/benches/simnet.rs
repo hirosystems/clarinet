@@ -1,9 +1,7 @@
 use std::hint::black_box;
 
-use clarity::vm::{
-    types::QualifiedContractIdentifier, EvaluationResult, ExecutionResult, SymbolicExpression,
-    Value as ClarityValue,
-};
+use clarity::vm::types::QualifiedContractIdentifier;
+use clarity::vm::{EvaluationResult, ExecutionResult, SymbolicExpression, Value as ClarityValue};
 use clarity_repl::repl::{
     ClarityCodeSource, ClarityContract, ContractDeployer, Session, SessionSettings,
     DEFAULT_CLARITY_VERSION, DEFAULT_EPOCH,

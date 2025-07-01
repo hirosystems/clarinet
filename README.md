@@ -2,15 +2,15 @@
 
 Clarinet is the fastest way to build, test, and deploy smart contracts on the Stacks blockchain. It gives you a local devnet, REPL, testing framework, and debugging tools to ship high-quality Clarity code with confidence.
 
-- 🧑‍💻 **Leverage a powerful CLI**  
+- 🧑‍💻 **Leverage a powerful CLI**
   Create new projects, manage your smart contracts and their dependencies using clarinet requirements, and interact with your code through the built-in REPL.
 
-- 🧪 **Write unit tests with the SDK**  
+- 🧪 **Write unit tests with the SDK**
   Use the Clarinet SDK to write unit tests in a familiar JS environment and validate contract behavior.
 
-- 🛠️ **Run a private blockchain environment**  
+- 🛠️ **Run a private blockchain environment**
   Spin up a local devnet with nodes, miners, and APIs so you can test and integrate your code.
-  
+
 - 🔍 **VSCode extension**:
   Linter, step by step debugger, helps writing smart contracts (autocompletion, documentation etc)
 
@@ -18,7 +18,7 @@ Clarinet is the fastest way to build, test, and deploy smart contracts on the St
 
 ### Documentation
 
-- [Clarinet CLI](https://docs.hiro.so/stacks/clarinet)  
+- [Clarinet CLI](https://docs.hiro.so/stacks/clarinet)
 - [Clarinet JS SDK and testing framework](https://docs.hiro.so/stacks/clarinet-js-sdk)
 
 ---
@@ -131,7 +131,7 @@ git commit -m "fix: added missing dependency"
    -  `cargo build` runs successfully.
    -  `cargo tst` runs successfully.
       -  `cargo tst` is an alias declared in `./cargo/config`, it runs [cargo-nextest](https://crates.io/crates/cargo-nextest)
-   -  You have formatted your code with `cargo fmt --all --`
+   -  You have formatted your code with `cargo fmt-stacks`
    -  All functional tests in the `examples` directory pass.
       ```bash
       for testdir in $(ls examples); do

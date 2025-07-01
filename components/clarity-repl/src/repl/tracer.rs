@@ -1,14 +1,14 @@
-use crate::repl::interpreter::Txid;
-use crate::repl::tracer::SymbolicExpressionType::List;
+use clarity::vm::contexts::{Environment, LocalContext};
 use clarity::vm::errors::Error;
 use clarity::vm::functions::define::DefineFunctions;
 use clarity::vm::functions::NativeFunctions;
+use clarity::vm::types::Value;
 use clarity::vm::{
-    contexts::{Environment, LocalContext},
-    types::Value,
-    EvalHook, SymbolicExpression, SymbolicExpressionType,
+    eval, ClarityVersion, EvalHook, EvaluationResult, SymbolicExpression, SymbolicExpressionType,
 };
-use clarity::vm::{eval, ClarityVersion, EvaluationResult};
+
+use crate::repl::interpreter::Txid;
+use crate::repl::tracer::SymbolicExpressionType::List;
 
 pub struct Tracer {
     stack: Vec<u64>,

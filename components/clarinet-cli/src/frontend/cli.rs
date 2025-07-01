@@ -1,15 +1,8 @@
-use crate::deployments::types::DeploymentSynthesis;
-use crate::deployments::{
-    self, check_deployments, generate_default_deployment, get_absolute_deployment_path,
-    write_deployment,
-};
-use crate::devnet::package::{self as Package, ConfigurationPackage};
-use crate::devnet::start::start;
-use crate::generate::{
-    self,
-    changes::{Changes, TOMLEdition},
-};
-use crate::lsp::run_lsp;
+use std::collections::HashMap;
+use std::fs::{self, File};
+use std::io::prelude::*;
+use std::io::{self};
+use std::{env, process};
 
 use clap::{CommandFactory, Parser, Subcommand};
 use clap_complete::{Generator, Shell};
@@ -24,10 +17,9 @@ use clarinet_deployments::{
 };
 use clarinet_files::clarinetrc::ClarinetRC;
 use clarinet_files::devnet_diff::DevnetDiffConfig;
-use clarinet_files::StacksNetwork;
 use clarinet_files::{
     get_manifest_location, FileLocation, NetworkManifest, ProjectManifest, ProjectManifestFile,
-    RequirementConfig,
+    RequirementConfig, StacksNetwork,
 };
 use clarinet_format::formatter::{self, ClarityFormatter};
 use clarity_repl::analysis::call_checker::ContractAnalysis;
@@ -41,14 +33,20 @@ use clarity_repl::repl::settings::{ApiUrl, RemoteDataSettings};
 use clarity_repl::repl::{ClarityCodeSource, ClarityContract, ContractDeployer, DEFAULT_EPOCH};
 use clarity_repl::{analysis, repl, Terminal};
 use stacks_network::{self, DevnetOrchestrator};
-use std::collections::HashMap;
-use std::fs::{self, File};
-use std::io::{self, prelude::*};
-use std::{env, process};
 use toml;
 
 #[cfg(feature = "telemetry")]
 use super::telemetry::{telemetry_report_event, DeveloperUsageDigest, DeveloperUsageEvent};
+use crate::deployments::types::DeploymentSynthesis;
+use crate::deployments::{
+    self, check_deployments, generate_default_deployment, get_absolute_deployment_path,
+    write_deployment,
+};
+use crate::devnet::package::{self as Package, ConfigurationPackage};
+use crate::devnet::start::start;
+use crate::generate::changes::{Changes, TOMLEdition};
+use crate::generate::{self};
+use crate::lsp::run_lsp;
 /// Clarinet is a command line tool for Clarity smart contract development.
 ///
 /// For Clarinet documentation, refer to https://docs.hiro.so/clarinet/introduction.

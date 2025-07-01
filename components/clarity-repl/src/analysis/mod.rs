@@ -7,15 +7,14 @@ pub mod coverage;
 #[cfg(test)]
 mod coverage_tests;
 
-use serde::Serialize;
-
-use crate::analysis::annotation::Annotation;
 use clarity::vm::analysis::analysis_db::AnalysisDatabase;
 use clarity::vm::analysis::types::ContractAnalysis;
 use clarity::vm::diagnostic::Diagnostic;
+use serde::Serialize;
 
 use self::call_checker::CallChecker;
 use self::check_checker::CheckChecker;
+use crate::analysis::annotation::Annotation;
 
 pub type AnalysisResult = Result<Vec<Diagnostic>, Vec<Diagnostic>>;
 

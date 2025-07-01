@@ -1,15 +1,11 @@
 use std::sync::mpsc::Sender;
 
-use chainhook_sdk::{
-    observer::MempoolAdmissionData,
-    types::{BitcoinChainEvent, StacksChainEvent},
-};
+use chainhook_sdk::observer::MempoolAdmissionData;
+use chainhook_sdk::types::{BitcoinChainEvent, StacksChainEvent};
 use hiro_system_kit::slog;
 
-use crate::{
-    chains_coordinator::BitcoinMiningCommand,
-    log::{LogData, LogLevel},
-};
+use crate::chains_coordinator::BitcoinMiningCommand;
+use crate::log::{LogData, LogLevel};
 
 #[allow(dead_code)]
 #[derive(Debug)]

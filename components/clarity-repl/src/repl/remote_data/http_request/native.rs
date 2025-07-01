@@ -1,6 +1,9 @@
-use std::{sync::LazyLock, time::Duration};
+use std::sync::LazyLock;
+use std::time::Duration;
 
-use reqwest::{blocking::Client, header::HeaderMap, StatusCode};
+use reqwest::blocking::Client;
+use reqwest::header::HeaderMap;
+use reqwest::StatusCode;
 use serde::de::DeserializeOwned;
 
 static API_KEY: LazyLock<Option<String>> = LazyLock::new(|| std::env::var("HIRO_API_KEY").ok());

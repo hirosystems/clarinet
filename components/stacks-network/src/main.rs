@@ -1,14 +1,11 @@
-use chainhook_sdk::types::{BitcoinNetwork, StacksNetwork};
-
-use clap::Parser;
-use clarinet_files::{FileLocation, NetworkManifest, ProjectManifest};
-use hiro_system_kit::slog;
-
 use std::path::PathBuf;
 use std::sync::mpsc::channel;
 
-use stacks_network::{do_run_chain_coordinator, load_chainhooks};
-use stacks_network::{Context, DevnetOrchestrator};
+use chainhook_sdk::types::{BitcoinNetwork, StacksNetwork};
+use clap::Parser;
+use clarinet_files::{FileLocation, NetworkManifest, ProjectManifest};
+use hiro_system_kit::slog;
+use stacks_network::{do_run_chain_coordinator, load_chainhooks, Context, DevnetOrchestrator};
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]

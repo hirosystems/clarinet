@@ -1,6 +1,7 @@
+use std::collections::HashMap;
+
 use clarinet_files::{FileLocation, RequirementConfig};
 use clarity_repl::repl::ClarityContract;
-use std::collections::HashMap;
 
 #[derive(Clone, Debug)]
 pub struct FileCreation {

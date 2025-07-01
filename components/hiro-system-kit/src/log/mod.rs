@@ -1,10 +1,12 @@
+use std::io;
+use std::io::Write;
+use std::sync::Mutex;
+
 use slog::{o, Drain, FnValue, Logger, PushFnValue, Record, LOG_LEVEL_NAMES};
 use slog_async;
 use slog_atomic::AtomicSwitch;
 use slog_scope::GlobalLoggerGuard;
 use slog_term::{self, CountingWriter, RecordDecorator, ThreadSafeTimestampFn};
-use std::io::Write;
-use std::{io, sync::Mutex};
 
 pub fn setup_global_logger(logger: Logger) -> GlobalLoggerGuard {
     slog_scope::set_global_logger(logger)

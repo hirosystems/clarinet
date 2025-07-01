@@ -1,18 +1,17 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt::Display;
 
-use crate::repl::diagnostic::output_diagnostic;
 use clarity::vm::ast::build_ast_with_diagnostics;
 use clarity::vm::contexts::{Environment, LocalContext};
 use clarity::vm::contracts::Contract;
 use clarity::vm::diagnostic::Level;
 use clarity::vm::errors::Error;
 use clarity::vm::functions::NativeFunctions;
-use clarity::vm::representations::Span;
-use clarity::vm::representations::SymbolicExpression;
+use clarity::vm::representations::{Span, SymbolicExpression};
 use clarity::vm::types::{QualifiedContractIdentifier, StandardPrincipalData, Value};
-use clarity::vm::{eval, ClarityVersion};
-use clarity::vm::{ContractName, SymbolicExpressionType};
+use clarity::vm::{eval, ClarityVersion, ContractName, SymbolicExpressionType};
+
+use crate::repl::diagnostic::output_diagnostic;
 
 #[cfg(not(target_arch = "wasm32"))]
 pub mod cli;

@@ -1,4 +1,5 @@
-use bip32::{secp256k1::elliptic_curve::rand_core::OsRng, Language, Mnemonic, XPrv};
+use bip32::secp256k1::elliptic_curve::rand_core::OsRng;
+use bip32::{Language, Mnemonic, XPrv};
 use libsecp256k1::{PublicKey, SecretKey};
 
 pub fn mnemonic_from_phrase(phrase: &str) -> Result<Mnemonic, String> {

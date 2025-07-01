@@ -1,16 +1,15 @@
 use std::collections::HashMap;
 
-use crate::analysis::annotation::Annotation;
-use crate::analysis::ast_visitor::{traverse, ASTVisitor, TypedVar};
-use crate::analysis::{AnalysisPass, AnalysisResult, Settings};
-
 use clarity::vm::analysis::analysis_db::AnalysisDatabase;
+pub use clarity::vm::analysis::types::ContractAnalysis;
 use clarity::vm::diagnostic::{Diagnostic, Level};
 use clarity::vm::representations::SymbolicExpression;
 use clarity::vm::ClarityName;
 use clarity::vm::SymbolicExpressionType::List;
 
-pub use clarity::vm::analysis::types::ContractAnalysis;
+use crate::analysis::annotation::Annotation;
+use crate::analysis::ast_visitor::{traverse, ASTVisitor, TypedVar};
+use crate::analysis::{AnalysisPass, AnalysisResult, Settings};
 
 pub struct CallChecker<'a> {
     diagnostics: Vec<Diagnostic>,
