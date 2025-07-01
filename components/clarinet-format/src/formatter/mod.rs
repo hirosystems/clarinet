@@ -563,16 +563,7 @@ impl<'a> Aggregator<'a> {
             let trailing = get_trailing_comment(expr, &mut iter);
 
             // Add extra newlines based on original blank lines (limit to 1 consecutive blank lines)
-            if prev_end_line > 0
-                && expr.span().start_line > 0
-                && expr.span().start_line > prev_end_line
-            {
-                let blank_lines = expr.span().start_line.saturating_sub(prev_end_line + 1);
-                let extra_newlines = std::cmp::min(blank_lines, 1);
-                for _ in 0..extra_newlines {
-                    acc.push('\n');
-                }
-            }
+            push_blank_lines(&mut acc, prev_end_line, expr.span().start_line);
 
             // begin body
             acc.push_str(&format!(
@@ -612,16 +603,7 @@ impl<'a> Aggregator<'a> {
                 let trailing = get_trailing_comment(expr, &mut iter);
 
                 // Add extra newlines based on original blank lines (limit to 1 consecutive blank lines)
-                if prev_end_line > 0
-                    && expr.span().start_line > 0
-                    && expr.span().start_line > prev_end_line
-                {
-                    let blank_lines = expr.span().start_line.saturating_sub(prev_end_line + 1);
-                    let extra_newlines = std::cmp::min(blank_lines, 1);
-                    for _ in 0..extra_newlines {
-                        acc.push('\n');
-                    }
-                }
+                push_blank_lines(&mut acc, prev_end_line, expr.span().start_line);
 
                 acc.push_str(&format!(
                     "\n{}{}",
@@ -672,13 +654,7 @@ impl<'a> Aggregator<'a> {
             let trailing = get_trailing_comment(expr, &mut iter);
 
             // Add extra newlines based on original blank lines (limit to 1 consecutive blank lines)
-            if prev_end_line > 0 {
-                let blank_lines = expr.span().start_line.saturating_sub(prev_end_line + 1);
-                let extra_newlines = std::cmp::min(blank_lines, 1);
-                for _ in 0..extra_newlines {
-                    acc.push('\n');
-                }
-            }
+            push_blank_lines(&mut acc, prev_end_line, expr.span().start_line);
 
             if index > 0 {
                 acc.push('\n');
@@ -732,13 +708,7 @@ impl<'a> Aggregator<'a> {
         let mut prev_end_line = 0;
         for e in exprs.get(2..).unwrap_or_default() {
             // Add extra newlines based on original blank lines (limit to 1 consecutive blank lines)
-            if prev_end_line > 0 && e.span().start_line > 0 && e.span().start_line > prev_end_line {
-                let blank_lines = e.span().start_line.saturating_sub(prev_end_line + 1);
-                let extra_newlines = std::cmp::min(blank_lines, 1);
-                for _ in 0..extra_newlines {
-                    acc.push('\n');
-                }
-            }
+            push_blank_lines(&mut acc, prev_end_line, e.span().start_line);
 
             acc.push_str(&format!(
                 "\n{}{}",
@@ -1399,14 +1369,12 @@ fn chars_since_last_newline(acc: &str) -> usize {
 }
 
 // Helper to insert at most one blank line if there are blank lines between two expressions
-fn push_blank_lines(acc: &mut String, prev_end_line: Option<u32>, curr_start_line: u32) {
-    if let Some(prev_end) = prev_end_line {
-        if curr_start_line > prev_end {
-            let blank_lines = curr_start_line.saturating_sub(prev_end + 1);
-            let extra_newlines = std::cmp::min(blank_lines, 1);
-            for _ in 0..extra_newlines {
-                acc.push('\n');
-            }
+fn push_blank_lines(acc: &mut String, prev_end_line: u32, curr_start_line: u32) {
+    if prev_end_line > 0 && curr_start_line > 0 && curr_start_line > prev_end_line {
+        let blank_lines = curr_start_line.saturating_sub(prev_end_line + 1);
+        let extra_newlines = std::cmp::min(blank_lines, 1);
+        for _ in 0..extra_newlines {
+            acc.push('\n');
         }
     }
 }
