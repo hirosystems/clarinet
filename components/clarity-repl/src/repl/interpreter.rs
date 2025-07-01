@@ -1,37 +1,38 @@
-use std::collections::{btree_map::Entry, BTreeMap, BTreeSet};
+use std::collections::btree_map::Entry;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 
-use crate::analysis::annotation::{Annotation, AnnotationKind};
-use crate::analysis::ast_dependency_detector::{ASTDependencyDetector, Dependency};
-use crate::analysis::{self};
-use crate::repl::datastore::{ClarityDatastore, Datastore};
-use crate::repl::Settings;
 use clarity::consts::{CHAIN_ID_MAINNET, CHAIN_ID_TESTNET};
 use clarity::types::StacksEpochId;
-use clarity::vm::analysis::ContractAnalysis;
+use clarity::vm::analysis::{AnalysisDatabase, ContractAnalysis};
 use clarity::vm::ast::{build_ast_with_diagnostics, ContractAST};
 #[cfg(not(target_arch = "wasm32"))]
 use clarity::vm::clarity_wasm::{call_function, initialize_contract};
 use clarity::vm::contexts::{CallStack, ContractContext, Environment, GlobalContext, LocalContext};
 use clarity::vm::contracts::Contract;
 use clarity::vm::costs::{ExecutionCost, LimitedCostTracker};
-use clarity::vm::database::{ClarityDatabase, StoreType};
+use clarity::vm::database::{ClarityBackingStore, ClarityDatabase, StoreType};
 use clarity::vm::diagnostic::{Diagnostic, Level};
+use clarity::vm::events::*;
 use clarity::vm::representations::SymbolicExpressionType::{Atom, List};
 use clarity::vm::representations::{Span, SymbolicExpression};
 use clarity::vm::types::{
     PrincipalData, QualifiedContractIdentifier, StandardPrincipalData, Value,
 };
-use clarity::vm::{analysis::AnalysisDatabase, database::ClarityBackingStore};
-use clarity::vm::{eval, eval_all, EvaluationResult, SnippetEvaluationResult};
-use clarity::vm::{events::*, ClarityVersion};
-use clarity::vm::{ContractEvaluationResult, EvalHook};
-use clarity::vm::{CostSynthesis, ExecutionResult, ParsedContract};
+use clarity::vm::{
+    eval, eval_all, ClarityVersion, ContractEvaluationResult, CostSynthesis, EvalHook,
+    EvaluationResult, ExecutionResult, ParsedContract, SnippetEvaluationResult,
+};
 
 use super::datastore::StacksConstants;
 use super::remote_data::HttpClient;
 use super::settings::{ApiUrl, RemoteNetworkInfo};
 use super::{ClarityContract, DEFAULT_EPOCH};
+use crate::analysis::annotation::{Annotation, AnnotationKind};
+use crate::analysis::ast_dependency_detector::{ASTDependencyDetector, Dependency};
+use crate::analysis::{self};
+use crate::repl::datastore::{ClarityDatastore, Datastore};
+use crate::repl::Settings;
 
 #[derive(Debug, Clone)]
 pub enum ContractCallError {
@@ -1234,14 +1235,15 @@ fn to_contract_call_error(error: String) -> ContractCallError {
 }
 #[cfg(test)]
 mod tests {
+    use clarity::types::chainstate::StacksAddress;
+    use clarity::types::Address;
+    use clarity::vm::types::TupleData;
+    use clarity::vm::{self, ClarityVersion};
+
     use super::*;
     use crate::analysis::Settings as AnalysisSettings;
     use crate::repl::settings::RemoteDataSettings;
     use crate::test_fixtures::clarity_contract::ClarityContractBuilder;
-    use clarity::{
-        types::{chainstate::StacksAddress, Address},
-        vm::{self, types::TupleData, ClarityVersion},
-    };
 
     #[track_caller]
     fn get_interpreter(settings: Option<Settings>) -> ClarityInterpreter {

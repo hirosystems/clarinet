@@ -1,11 +1,11 @@
-use chainhook_sdk::chainhooks::types::{ChainhookSpecificationNetworkMap, ChainhookStore};
-use chainhook_sdk::types::{BitcoinNetwork, StacksNetwork};
-use clarinet_files::FileLocation;
+use std::fs;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::PathBuf;
 
-use std::fs;
+use chainhook_sdk::chainhooks::types::{ChainhookSpecificationNetworkMap, ChainhookStore};
+use chainhook_sdk::types::{BitcoinNetwork, StacksNetwork};
+use clarinet_files::FileLocation;
 
 pub fn parse_chainhook_full_specification(
     path: &PathBuf,

@@ -1,17 +1,11 @@
 use std::path::PathBuf;
 
-use clarity::{
-    types::{
-        chainstate::{BlockHeaderHash, StacksBlockId},
-        StacksEpochId,
-    },
-    util::hash::hex_bytes,
-    vm::{EvaluationResult, Value},
-};
-use clarity_repl::repl::{
-    settings::{ApiUrl, RemoteDataSettings},
-    Session, SessionSettings,
-};
+use clarity::types::chainstate::{BlockHeaderHash, StacksBlockId};
+use clarity::types::StacksEpochId;
+use clarity::util::hash::hex_bytes;
+use clarity::vm::{EvaluationResult, Value};
+use clarity_repl::repl::settings::{ApiUrl, RemoteDataSettings};
+use clarity_repl::repl::{Session, SessionSettings};
 
 #[track_caller]
 fn eval_snippet(session: &mut Session, snippet: &str) -> Value {

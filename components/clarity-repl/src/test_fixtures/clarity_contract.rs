@@ -1,4 +1,5 @@
-use clarity::{types::StacksEpochId, vm::ClarityVersion};
+use clarity::types::StacksEpochId;
+use clarity::vm::ClarityVersion;
 
 use crate::repl::{
     ClarityCodeSource, ClarityContract, ContractDeployer, DEFAULT_CLARITY_VERSION, DEFAULT_EPOCH,

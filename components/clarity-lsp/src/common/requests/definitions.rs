@@ -1,7 +1,5 @@
 use std::collections::HashMap;
 
-use super::helpers::span_to_range;
-
 use clarity_repl::analysis::ast_visitor::{traverse, ASTVisitor, TypedVar};
 use clarity_repl::clarity::functions::define::DefineFunctions;
 use clarity_repl::clarity::vm::types::{
@@ -10,6 +8,7 @@ use clarity_repl::clarity::vm::types::{
 use clarity_repl::clarity::{ClarityName, SymbolicExpression};
 use lsp_types::Range;
 
+use super::helpers::span_to_range;
 #[cfg(target_arch = "wasm32")]
 #[allow(unused_imports)]
 use crate::utils::log;
@@ -658,10 +657,8 @@ mod definitions_visitor_tests {
     use std::collections::HashMap;
 
     use clarity_repl::clarity::ast::build_ast_with_rules;
-    use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
-    use clarity_repl::clarity::vm::types::StandardPrincipalData;
-    use clarity_repl::clarity::StacksEpochId;
-    use clarity_repl::clarity::{ClarityVersion, SymbolicExpression};
+    use clarity_repl::clarity::vm::types::{QualifiedContractIdentifier, StandardPrincipalData};
+    use clarity_repl::clarity::{ClarityVersion, StacksEpochId, SymbolicExpression};
     use lsp_types::{Position, Range};
 
     use super::{DefinitionLocation, Definitions};

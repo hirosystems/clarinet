@@ -1,9 +1,8 @@
 use std::collections::HashMap;
 
-use clarity_repl::{
-    analysis::ast_visitor::{traverse, ASTVisitor},
-    clarity::{representations::Span, ClarityName, SymbolicExpression, SymbolicExpressionType},
-};
+use clarity_repl::analysis::ast_visitor::{traverse, ASTVisitor};
+use clarity_repl::clarity::representations::Span;
+use clarity_repl::clarity::{ClarityName, SymbolicExpression, SymbolicExpressionType};
 use lsp_types::{DocumentSymbol, SymbolKind};
 use serde::{Deserialize, Serialize};
 
@@ -483,16 +482,13 @@ impl<'a> ASTVisitor<'a> for ASTSymbols {
 #[cfg(test)]
 mod tests {
     use clarity_repl::clarity::ast::{build_ast_with_rules, ASTRules};
-    use clarity_repl::clarity::StacksEpochId;
-    use clarity_repl::clarity::{
-        representations::Span, vm::types::QualifiedContractIdentifier, ClarityVersion,
-        SymbolicExpression,
-    };
+    use clarity_repl::clarity::representations::Span;
+    use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
+    use clarity_repl::clarity::{ClarityVersion, StacksEpochId, SymbolicExpression};
     use lsp_types::{DocumentSymbol, SymbolKind};
 
-    use crate::common::requests::document_symbols::{build_symbol, ClaritySymbolKind};
-
     use super::ASTSymbols;
+    use crate::common::requests::document_symbols::{build_symbol, ClaritySymbolKind};
 
     // use crate::common::ast_to_symbols::{build_symbol, ASTSymbols, ClaritySymbolKind};
 

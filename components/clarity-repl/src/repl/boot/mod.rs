@@ -56,16 +56,13 @@ pub static SBTC_TOKEN_MAINNET_ADDRESS: LazyLock<QualifiedContractIdentifier> =
         QualifiedContractIdentifier::parse(&format!("{SBTC_MAINNET_ADDRESS}.sbtc-token")).unwrap()
     });
 
-use std::{collections::BTreeMap, sync::LazyLock};
+use std::collections::BTreeMap;
+use std::sync::LazyLock;
 
-use clarity::{
-    types::StacksEpochId,
-    vm::{
-        ast::ContractAST,
-        types::{PrincipalData, QualifiedContractIdentifier, StandardPrincipalData},
-        ClarityVersion,
-    },
-};
+use clarity::types::StacksEpochId;
+use clarity::vm::ast::ContractAST;
+use clarity::vm::types::{PrincipalData, QualifiedContractIdentifier, StandardPrincipalData};
+use clarity::vm::ClarityVersion;
 
 use crate::repl::{
     ClarityCodeSource, ClarityContract, ClarityInterpreter, ContractDeployer, Settings,

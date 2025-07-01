@@ -1,13 +1,12 @@
-use crate::repl::settings::ApiUrl;
-use clarity::types::{
-    chainstate::{
-        BlockHeaderHash, BurnchainHeaderHash, ConsensusHash, SortitionId, StacksBlockId, VRFSeed,
-    },
-    StacksEpochId,
+use clarity::types::chainstate::{
+    BlockHeaderHash, BurnchainHeaderHash, ConsensusHash, SortitionId, StacksBlockId, VRFSeed,
 };
+use clarity::types::StacksEpochId;
 use clarity::vm::errors::InterpreterResult;
-use serde::de::Error as SerdeError;
-use serde::{de::DeserializeOwned, Deserialize, Deserializer};
+use serde::de::{DeserializeOwned, Error as SerdeError};
+use serde::{Deserialize, Deserializer};
+
+use crate::repl::settings::ApiUrl;
 
 pub mod fs;
 mod http_request;

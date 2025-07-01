@@ -3,9 +3,8 @@ use std::io::Cursor;
 use clarity::codec::StacksMessageCodec;
 use clarity::util::hash::{bytes_to_hex, hex_bytes, to_hex};
 use clarity::vm::types::Value;
-use stacks_codec::codec::{StacksTransaction, TransactionPayload};
-
 use reqwest::blocking::Client;
+use stacks_codec::codec::{StacksTransaction, TransactionPayload};
 
 #[derive(Clone, Debug)]
 pub enum RpcError {

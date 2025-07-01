@@ -1,9 +1,9 @@
 use clarity_repl::clarity::docs::FunctionAPI;
 use lsp_types::{ParameterInformation, ParameterLabel, Position, SignatureInformation};
 
+use super::api_ref::API_REF;
+use super::helpers::get_function_at_position;
 use crate::state::ActiveContractData;
-
-use super::{api_ref::API_REF, helpers::get_function_at_position};
 
 pub fn get_signatures(
     contract: &ActiveContractData,
@@ -82,12 +82,13 @@ pub fn get_signatures(
 #[cfg(test)]
 mod definitions_visitor_tests {
     use clarity_repl::clarity::functions::NativeFunctions;
-    use clarity_repl::clarity::{ClarityVersion::Clarity2, StacksEpochId::Epoch21};
-    use lsp_types::{ParameterInformation, ParameterLabel::Simple, Position, SignatureInformation};
-
-    use crate::state::ActiveContractData;
+    use clarity_repl::clarity::ClarityVersion::Clarity2;
+    use clarity_repl::clarity::StacksEpochId::Epoch21;
+    use lsp_types::ParameterLabel::Simple;
+    use lsp_types::{ParameterInformation, Position, SignatureInformation};
 
     use super::get_signatures;
+    use crate::state::ActiveContractData;
 
     fn get_source_signature(
         source: String,

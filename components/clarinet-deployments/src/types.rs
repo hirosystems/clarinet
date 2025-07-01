@@ -1,8 +1,7 @@
-use std::collections::BTreeMap;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
-use clarinet_files::StacksNetwork;
-use clarinet_files::{FileAccessor, FileLocation};
+use clarinet_files::{FileAccessor, FileLocation, StacksNetwork};
+use clarity_repl::analysis::ast_dependency_detector::DependencySet;
 use clarity_repl::clarity::util::hash::{hex_bytes, to_hex};
 use clarity_repl::clarity::vm::analysis::ContractAnalysis;
 use clarity_repl::clarity::vm::ast::ContractAST;
@@ -10,8 +9,6 @@ use clarity_repl::clarity::vm::diagnostic::Diagnostic;
 use clarity_repl::clarity::vm::types::{
     PrincipalData, QualifiedContractIdentifier, StandardPrincipalData,
 };
-
-use clarity_repl::analysis::ast_dependency_detector::DependencySet;
 use clarity_repl::clarity::{ClarityName, ClarityVersion, ContractName, StacksEpochId, Value};
 use clarity_repl::repl::{Session, DEFAULT_CLARITY_VERSION};
 use serde::{Deserialize, Serialize};
@@ -526,9 +523,11 @@ pub struct RequirementPublishSpecification {
 }
 
 pub mod source_serde {
-    use base64::{engine::general_purpose::STANDARD as b64, Engine as _};
-    use serde::{Deserialize, Deserializer, Serializer};
     use std::str::from_utf8;
+
+    use base64::engine::general_purpose::STANDARD as b64;
+    use base64::Engine as _;
+    use serde::{Deserialize, Deserializer, Serializer};
 
     pub fn serialize<S>(x: &str, s: S) -> Result<S::Ok, S::Error>
     where
@@ -598,9 +597,11 @@ pub mod qualified_contract_identifier_serde {
 }
 
 pub mod remap_principals_serde {
-    use clarity_repl::clarity::vm::types::{PrincipalData, StandardPrincipalData};
-    use serde::{ser::SerializeMap, Deserializer, Serializer};
     use std::collections::{BTreeMap, HashMap};
+
+    use clarity_repl::clarity::vm::types::{PrincipalData, StandardPrincipalData};
+    use serde::ser::SerializeMap;
+    use serde::{Deserializer, Serializer};
 
     pub fn serialize<S>(
         target: &BTreeMap<StandardPrincipalData, StandardPrincipalData>,
@@ -875,11 +876,14 @@ pub struct DeploymentSpecification {
 }
 
 pub mod contracts_serde {
-    use base64::{engine::general_purpose::STANDARD as b64, Engine as _};
+    use std::collections::{BTreeMap, HashMap};
+
+    use base64::engine::general_purpose::STANDARD as b64;
+    use base64::Engine as _;
     use clarinet_files::FileLocation;
     use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
-    use serde::{ser::SerializeSeq, Deserializer, Serializer};
-    use std::collections::{BTreeMap, HashMap};
+    use serde::ser::SerializeSeq;
+    use serde::{Deserializer, Serializer};
 
     use super::source_serde;
 

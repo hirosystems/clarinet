@@ -1,3 +1,10 @@
+use std::collections::HashMap;
+use std::fs::{self, File};
+use std::io::Write;
+use std::path::{Path, PathBuf};
+use std::sync::mpsc::{Receiver, Sender};
+use std::time::Duration;
+
 use bollard::container::{
     Config, CreateContainerOptions, KillContainerOptions, ListContainersOptions,
     PruneContainersOptions, WaitContainerOptions,
@@ -11,8 +18,9 @@ use bollard::service::Ipam;
 use bollard::Docker;
 use chainhook_sdk::bitcoin::hex::DisplayHex;
 use chainhook_sdk::utils::Context;
-use clarinet_files::{DevnetConfig, StacksNetwork};
-use clarinet_files::{DevnetConfigFile, NetworkManifest, ProjectManifest};
+use clarinet_files::{
+    DevnetConfig, DevnetConfigFile, NetworkManifest, ProjectManifest, StacksNetwork,
+};
 use clarity::types::chainstate::StacksPrivateKey;
 use clarity::types::PrivateKey;
 use futures::stream::TryStreamExt;
@@ -20,12 +28,6 @@ use hiro_system_kit::{slog, slog_term, Drain};
 use indoc::formatdoc;
 use reqwest::RequestBuilder;
 use serde_json::Value as JsonValue;
-use std::collections::HashMap;
-use std::fs::{self, File};
-use std::io::Write;
-use std::path::{Path, PathBuf};
-use std::sync::mpsc::{Receiver, Sender};
-use std::time::Duration;
 
 use crate::event::{send_status_update, DevnetEvent, Status};
 
@@ -2906,10 +2908,11 @@ events_keys = ["*"]
         devnet_event_tx: &Sender<DevnetEvent>,
         no_snapshot: bool,
     ) -> Result<(), String> {
+        use std::str::FromStr;
+
         use bitcoincore_rpc::bitcoin::Address;
         use reqwest::Client as HttpClient;
         use serde_json::json;
-        use std::str::FromStr;
 
         let (devnet_config, accounts) = match &self.network_config {
             Some(ref network_config) => match network_config.devnet {

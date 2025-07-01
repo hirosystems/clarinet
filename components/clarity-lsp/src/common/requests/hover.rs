@@ -1,7 +1,8 @@
 use clarity_repl::clarity::SymbolicExpression;
 use lsp_types::Position;
 
-use super::{api_ref::API_REF, helpers::get_expression_name_at_position};
+use super::api_ref::API_REF;
+use super::helpers::get_expression_name_at_position;
 
 pub fn get_expression_documentation(
     position: &Position,

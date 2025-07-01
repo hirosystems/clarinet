@@ -1,11 +1,10 @@
-use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::process;
 
 use clarinet_deployments::get_default_deployment_path;
 use clarinet_deployments::types::DeploymentSpecification;
-use clarinet_files::StacksNetwork;
-use clarinet_files::{NetworkManifest, ProjectManifest};
+use clarinet_files::{NetworkManifest, ProjectManifest, StacksNetwork};
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ConfigurationPackage {

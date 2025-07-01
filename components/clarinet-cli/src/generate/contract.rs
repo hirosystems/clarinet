@@ -1,9 +1,13 @@
-use super::changes::{Changes, FileCreation, FileDeletion, TOMLEdition};
+use std::collections::HashMap;
+use std::path::PathBuf;
+use std::str::FromStr;
+
 use clarinet_files::FileLocation;
 use clarity_repl::repl::{
     ClarityCodeSource, ClarityContract, ContractDeployer, DEFAULT_CLARITY_VERSION, DEFAULT_EPOCH,
 };
-use std::{collections::HashMap, path::PathBuf, str::FromStr};
+
+use super::changes::{Changes, FileCreation, FileDeletion, TOMLEdition};
 
 pub struct GetChangesForRmContract {
     manifest_location: FileLocation,

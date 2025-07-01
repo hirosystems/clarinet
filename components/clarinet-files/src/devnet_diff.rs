@@ -1,6 +1,6 @@
-pub use crate::DevnetConfig;
-
 use std::collections::HashMap;
+
+pub use crate::DevnetConfig;
 
 /// Config which fields to check for differences
 pub struct DevnetDiffConfig {

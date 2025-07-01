@@ -12,35 +12,32 @@ pub mod onchain;
 pub mod requirements;
 pub mod types;
 
-use self::types::{
-    DeploymentSpecification, EmulatedContractPublishSpecification, GenesisSpecification,
-    TransactionPlanSpecification, TransactionsBatchSpecification, WalletSpecification,
-};
-use clarinet_files::StacksNetwork;
-use clarinet_files::{FileAccessor, FileLocation};
-use clarinet_files::{NetworkManifest, ProjectManifest};
+use clarinet_files::{FileAccessor, FileLocation, NetworkManifest, ProjectManifest, StacksNetwork};
 use clarity_repl::analysis::ast_dependency_detector::{ASTDependencyDetector, DependencySet};
 use clarity_repl::clarity::vm::ast::ContractAST;
 use clarity_repl::clarity::vm::diagnostic::Diagnostic;
-use clarity_repl::clarity::vm::types::PrincipalData;
-use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
-use clarity_repl::clarity::vm::ContractName;
-use clarity_repl::clarity::vm::EvaluationResult;
-use clarity_repl::clarity::vm::ExecutionResult;
-use clarity_repl::clarity::vm::SymbolicExpression;
+use clarity_repl::clarity::vm::types::{PrincipalData, QualifiedContractIdentifier};
+use clarity_repl::clarity::vm::{
+    ContractName, EvaluationResult, ExecutionResult, SymbolicExpression,
+};
 use clarity_repl::clarity::StacksEpochId;
 use clarity_repl::repl::boot::{
     BOOT_CONTRACTS_DATA, SBTC_DEPOSIT_MAINNET_ADDRESS, SBTC_MAINNET_ADDRESS,
     SBTC_TESTNET_ADDRESS_PRINCIPAL, SBTC_TOKEN_MAINNET_ADDRESS,
 };
-use clarity_repl::repl::Session;
-use clarity_repl::repl::SessionSettings;
-use clarity_repl::repl::{ClarityCodeSource, ClarityContract, ContractDeployer};
-use clarity_repl::repl::{DEFAULT_CLARITY_VERSION, DEFAULT_EPOCH};
-use types::TransactionSpecification;
-use types::{ContractPublishSpecification, EpochSpec};
-use types::{DeploymentGenerationArtifacts, StxTransferSpecification};
-use types::{EmulatedContractCallSpecification, RequirementPublishSpecification};
+use clarity_repl::repl::{
+    ClarityCodeSource, ClarityContract, ContractDeployer, Session, SessionSettings,
+    DEFAULT_CLARITY_VERSION, DEFAULT_EPOCH,
+};
+use types::{
+    ContractPublishSpecification, DeploymentGenerationArtifacts, EmulatedContractCallSpecification,
+    EpochSpec, RequirementPublishSpecification, StxTransferSpecification, TransactionSpecification,
+};
+
+use self::types::{
+    DeploymentSpecification, EmulatedContractPublishSpecification, GenesisSpecification,
+    TransactionPlanSpecification, TransactionsBatchSpecification, WalletSpecification,
+};
 
 pub type ExecutionResultMap =
     BTreeMap<QualifiedContractIdentifier, Result<ExecutionResult, Vec<Diagnostic>>>;
@@ -980,8 +977,10 @@ pub fn load_deployment(
 
 #[cfg(test)]
 mod tests {
-    use clarity::vm::{types::TupleData, ClarityName, ClarityVersion, Value};
-    use clarity_repl::repl::{clarity_values::to_raw_value, SessionSettings};
+    use clarity::vm::types::TupleData;
+    use clarity::vm::{ClarityName, ClarityVersion, Value};
+    use clarity_repl::repl::clarity_values::to_raw_value;
+    use clarity_repl::repl::SessionSettings;
 
     use super::*;
 

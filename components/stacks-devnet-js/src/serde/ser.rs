@@ -2,12 +2,12 @@
 //! Serialize a Rust data structure into a `JsValue`
 //!
 
-use super::errors::Error;
-use super::errors::ErrorKind;
-use super::errors::Result as LibResult;
+use std::marker::PhantomData;
+
 use neon::prelude::*;
 use serde::ser::{self, Serialize};
-use std::marker::PhantomData;
+
+use super::errors::{Error, ErrorKind, Result as LibResult};
 
 fn as_num<T: num::cast::NumCast, OutT: num::cast::NumCast>(n: T) -> LibResult<OutT> {
     match num::cast::<T, OutT>(n) {

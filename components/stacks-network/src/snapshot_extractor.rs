@@ -1,9 +1,11 @@
-use crate::DevnetEvent;
-use flate2::read::GzDecoder;
 use std::fs;
 use std::path::Path;
 use std::sync::mpsc::Sender;
+
+use flate2::read::GzDecoder;
 use tar::Archive;
+
+use crate::DevnetEvent;
 
 /// Extract embedded devnet snapshot to the specified directory
 pub fn extract_embedded_snapshot(

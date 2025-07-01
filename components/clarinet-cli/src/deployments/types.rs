@@ -1,5 +1,6 @@
-use clarinet_deployments::types::{DeploymentSpecification, TransactionSpecification};
 use std::fmt::{Display, Formatter, Result};
+
+use clarinet_deployments::types::{DeploymentSpecification, TransactionSpecification};
 
 pub struct DeploymentSynthesis {
     pub blocks_count: u64,
