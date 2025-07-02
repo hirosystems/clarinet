@@ -1227,6 +1227,7 @@ username = "{bitcoin_node_username}"
 password = "{bitcoin_node_password}"
 rpc_port = {orchestrator_ingestion_port}
 peer_port = {bitcoin_node_p2p_port}
+
 "#,
             bitcoin_node_username = devnet_config.bitcoin_node_username,
             bitcoin_node_password = devnet_config.bitcoin_node_password,
@@ -1240,6 +1241,7 @@ peer_port = {bitcoin_node_p2p_port}
             [[burnchain.epochs]]
             epoch_name = "1.0"
             start_height = 0
+
         "#
         ));
 
