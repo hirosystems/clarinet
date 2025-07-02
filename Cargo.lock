@@ -539,7 +539,7 @@ checksum = "613afe47fcd5fac7ccf1db93babcb082c5994d996f20b8b159f2ad1658eb5724"
 [[package]]
 name = "chainhook-sdk"
 version = "0.12.12"
-source = "git+https://github.com/hirosystems/chainhook.git?branch=chore%2Fupgrade-clarinet#beb911cd77e332cc59886baf87e0dcf570348114"
+source = "git+https://github.com/hirosystems/chainhook.git?branch=develop#cd7719706bf50ef3bb6edfec5a0649b6cf5f2c40"
 dependencies = [
  "base58",
  "base64 0.21.7",
@@ -567,7 +567,7 @@ dependencies = [
 [[package]]
 name = "chainhook-types"
 version = "1.3.7"
-source = "git+https://github.com/hirosystems/chainhook.git?branch=chore%2Fupgrade-clarinet#beb911cd77e332cc59886baf87e0dcf570348114"
+source = "git+https://github.com/hirosystems/chainhook.git?branch=develop#cd7719706bf50ef3bb6edfec5a0649b6cf5f2c40"
 dependencies = [
  "hex",
  "schemars",
@@ -896,7 +896,7 @@ version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fde0e0ec90c9dfb3b4b1a0891a7dcd0e2bffde2f7efed5fe7c9bb00e5bfb915e"
 dependencies = [
- "windows-sys 0.48.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
