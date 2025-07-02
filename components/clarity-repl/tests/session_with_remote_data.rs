@@ -28,7 +28,7 @@ fn init_session(initial_heigth: u32) -> Session {
     Session::new(settings)
 }
 
-// the counter contract is delpoyed on testnet at height #41613
+// the counter contract is deployed on testnet at height #41613
 // the initial count value is 0 and is incremented by 1 at #56232
 const COUNTER_ADDR: &str = "STJCAB2T9TR2EJM7YS4DM2CGBBVTF7BV237Y8KNV.counter";
 

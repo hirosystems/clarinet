@@ -246,7 +246,7 @@ mod tests {
     #[test_case(r#"(list (list u1)"# ; "incomplete input missing closing parenthesis")]
     #[test_case(r#"{ a: { b: 1 }"# ; "incomplete input missing closing curly brace")]
     #[test_case(r#"(concat u")""# ; "incomplete input with closing parenthesis in string")]
-    #[test_case(r#"{ a: { b: "}" }"# ; "incomplete input with closing curly brace in strng")]
+    #[test_case(r#"{ a: { b: "}" }"# ; "incomplete input with closing curly brace in string")]
     #[test_case(r#"{foo: "\"""# ; "incomplete input with escaped quote in string")]
     fn test_incomplete_input(input: &str) {
         let r = complete_input(input).unwrap();
