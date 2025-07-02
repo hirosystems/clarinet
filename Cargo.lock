@@ -539,7 +539,7 @@ checksum = "613afe47fcd5fac7ccf1db93babcb082c5994d996f20b8b159f2ad1658eb5724"
 [[package]]
 name = "chainhook-sdk"
 version = "0.12.12"
-source = "git+https://github.com/hirosystems/chainhook.git?branch=chore%2Fupgrade-clarinet#e3e3b37fb426de0e78b5affb2fadb503ebdefdfa"
+source = "git+https://github.com/hirosystems/chainhook.git?branch=chore%2Fupgrade-clarinet#beb911cd77e332cc59886baf87e0dcf570348114"
 dependencies = [
  "base58",
  "base64 0.21.7",
@@ -567,14 +567,14 @@ dependencies = [
 [[package]]
 name = "chainhook-types"
 version = "1.3.7"
-source = "git+https://github.com/hirosystems/chainhook.git?branch=chore%2Fupgrade-clarinet#e3e3b37fb426de0e78b5affb2fadb503ebdefdfa"
+source = "git+https://github.com/hirosystems/chainhook.git?branch=chore%2Fupgrade-clarinet#beb911cd77e332cc59886baf87e0dcf570348114"
 dependencies = [
  "hex",
  "schemars",
  "serde",
  "serde_derive",
  "serde_json",
- "strum 0.23.0",
+ "strum 0.27.1",
 ]
 
 [[package]]
@@ -707,7 +707,9 @@ dependencies = [
  "clarity",
  "clarity-repl",
  "colored",
+ "indoc",
  "libsecp256k1",
+ "pretty_assertions",
  "rand",
  "reqwest",
  "serde",
@@ -716,6 +718,8 @@ dependencies = [
  "serde_yaml",
  "stacks-codec",
  "stacks-rpc-client",
+ "strum 0.27.1",
+ "toml 0.5.11",
 ]
 
 [[package]]
@@ -892,7 +896,7 @@ version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fde0e0ec90c9dfb3b4b1a0891a7dcd0e2bffde2f7efed5fe7c9bb00e5bfb915e"
 dependencies = [
- "windows-sys 0.59.0",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]
@@ -4700,6 +4704,7 @@ dependencies = [
  "hiro-system-kit",
  "indoc",
  "libc",
+ "pretty_assertions",
  "rand",
  "ratatui",
  "reqwest",
@@ -4712,6 +4717,7 @@ dependencies = [
  "stackslib",
  "tar",
  "tokio",
+ "toml 0.5.11",
  "tracing",
  "tracing-appender",
  "tracing-subscriber",
@@ -4792,15 +4798,6 @@ checksum = "7da8b5736845d9f2fcb837ea5d9e2628564b3b043a70948a3f0b778838c5fb4f"
 
 [[package]]
 name = "strum"
-version = "0.23.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cae14b91c7d11c9a851d3fbc80a963198998c2a64eec840477fa92d8ce9b70bb"
-dependencies = [
- "strum_macros 0.23.1",
-]
-
-[[package]]
-name = "strum"
 version = "0.26.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8fec0f0aef304996cf250b31b5a10dee7980c85da9d759361292b8bca5a18f06"
@@ -4809,16 +4806,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "strum_macros"
-version = "0.23.1"
+name = "strum"
+version = "0.27.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5bb0dc7ee9c15cea6199cde9a127fa16a4c5819af85395457ad72d68edc85a38"
+checksum = "f64def088c51c9510a8579e3c5d67c65349dcf755e5479ad3d010aa6454e2c32"
 dependencies = [
- "heck 0.3.3",
- "proc-macro2",
- "quote",
- "rustversion",
- "syn 1.0.107",
+ "strum_macros 0.27.1",
 ]
 
 [[package]]
@@ -4826,6 +4819,19 @@ name = "strum_macros"
 version = "0.26.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4c6bee85a5a24955dc440386795aa378cd9cf82acd5f764469152d2270e581be"
+dependencies = [
+ "heck 0.5.0",
+ "proc-macro2",
+ "quote",
+ "rustversion",
+ "syn 2.0.96",
+]
+
+[[package]]
+name = "strum_macros"
+version = "0.27.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c77a8c5abcaf0f9ce05d62342b7d298c346515365c36b673df4ebe3ced01fde8"
 dependencies = [
  "heck 0.5.0",
  "proc-macro2",

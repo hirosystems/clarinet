@@ -18,6 +18,7 @@ use bollard::service::Ipam;
 use bollard::Docker;
 use chainhook_sdk::bitcoin::hex::DisplayHex;
 use chainhook_sdk::utils::Context;
+use clarinet_deployments::types::BurnchainEpochConfig;
 use clarinet_files::{
     DevnetConfig, DevnetConfigFile, NetworkManifest, ProjectManifest, StacksNetwork,
 };
@@ -1234,58 +1235,18 @@ peer_port = {bitcoin_node_p2p_port}
             miner_wallet_name = devnet_config.miner_wallet_name,
         ));
 
-        stacks_conf.push_str(&format!(
+        stacks_conf.push_str(&formatdoc!(
             r#"
-[[burnchain.epochs]]
-epoch_name = "1.0"
-start_height = 0
-
-[[burnchain.epochs]]
-epoch_name = "2.0"
-start_height = {epoch_2_0}
-
-[[burnchain.epochs]]
-epoch_name = "2.05"
-start_height = {epoch_2_05}
-
-[[burnchain.epochs]]
-epoch_name = "2.1"
-start_height = {epoch_2_1}
-
-[[burnchain.epochs]]
-epoch_name = "2.2"
-start_height = {epoch_2_2}
-
-[[burnchain.epochs]]
-epoch_name = "2.3"
-start_height = {epoch_2_3}
-
-[[burnchain.epochs]]
-epoch_name = "2.4"
-start_height = {epoch_2_4}
-
-[[burnchain.epochs]]
-epoch_name = "2.5"
-start_height = {epoch_2_5}
-
-[[burnchain.epochs]]
-epoch_name = "3.0"
-start_height = {epoch_3_0}
-
-[[burnchain.epochs]]
-epoch_name = "3.1"
-start_height = {epoch_3_1}
-"#,
-            epoch_2_0 = devnet_config.epoch_2_0,
-            epoch_2_05 = devnet_config.epoch_2_05,
-            epoch_2_1 = devnet_config.epoch_2_1,
-            epoch_2_2 = devnet_config.epoch_2_2,
-            epoch_2_3 = devnet_config.epoch_2_3,
-            epoch_2_4 = devnet_config.epoch_2_4,
-            epoch_2_5 = devnet_config.epoch_2_5,
-            epoch_3_0 = devnet_config.epoch_3_0,
-            epoch_3_1 = devnet_config.epoch_3_1,
+            [[burnchain.epochs]]
+            epoch_name = "1.0"
+            start_height = 0
+        "#
         ));
+
+        let epoch_config = BurnchainEpochConfig::from(devnet_config);
+        let epoch_config_toml = toml::to_string(&epoch_config)
+            .map_err(|e| format!("unable to serialize stacks epoch config: {e:?}"))?;
+        stacks_conf.push_str(&epoch_config_toml);
 
         let mut stacks_conf_path = PathBuf::from(&devnet_config.working_dir);
         stacks_conf_path.push("conf/Stacks.toml");

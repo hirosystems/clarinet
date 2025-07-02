@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, HashMap};
 
-use clarinet_files::{FileAccessor, FileLocation, StacksNetwork};
+use clarinet_files::{DevnetConfig, FileAccessor, FileLocation, StacksNetwork};
 use clarity_repl::analysis::ast_dependency_detector::DependencySet;
 use clarity_repl::clarity::util::hash::{hex_bytes, to_hex};
 use clarity_repl::clarity::vm::analysis::ContractAnalysis;
@@ -13,8 +13,9 @@ use clarity_repl::clarity::{ClarityName, ClarityVersion, ContractName, StacksEpo
 use clarity_repl::repl::{Session, DEFAULT_CLARITY_VERSION};
 use serde::{Deserialize, Serialize};
 use serde_yaml;
+use strum::{EnumIter, IntoEnumIterator};
 
-#[derive(Serialize, Deserialize, PartialEq, Debug, Clone, Copy, Eq, PartialOrd, Ord)]
+#[derive(Serialize, Deserialize, PartialEq, Debug, Clone, Copy, Eq, PartialOrd, Ord, EnumIter)]
 pub enum EpochSpec {
     #[serde(rename = "2.0")]
     Epoch2_0,
@@ -65,6 +66,50 @@ impl From<EpochSpec> for StacksEpochId {
             EpochSpec::Epoch2_5 => StacksEpochId::Epoch25,
             EpochSpec::Epoch3_0 => StacksEpochId::Epoch30,
             EpochSpec::Epoch3_1 => StacksEpochId::Epoch31,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct EpochConfig {
+    epoch_name: EpochSpec,
+    start_height: u64,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct EpochsConfig {
+    epochs: Vec<EpochConfig>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct BurnchainEpochConfig {
+    burnchain: EpochsConfig,
+}
+
+impl From<&DevnetConfig> for BurnchainEpochConfig {
+    fn from(config: &DevnetConfig) -> Self {
+        let epochs: Vec<EpochConfig> = EpochSpec::iter()
+            .map(|epoch| {
+                let start_height = match epoch {
+                    EpochSpec::Epoch2_0 => config.epoch_2_0,
+                    EpochSpec::Epoch2_05 => config.epoch_2_05,
+                    EpochSpec::Epoch2_1 => config.epoch_2_1,
+                    EpochSpec::Epoch2_2 => config.epoch_2_2,
+                    EpochSpec::Epoch2_3 => config.epoch_2_3,
+                    EpochSpec::Epoch2_4 => config.epoch_2_4,
+                    EpochSpec::Epoch2_5 => config.epoch_2_5,
+                    EpochSpec::Epoch3_0 => config.epoch_3_0,
+                    EpochSpec::Epoch3_1 => config.epoch_3_1,
+                };
+                EpochConfig {
+                    epoch_name: epoch,
+                    start_height,
+                }
+            })
+            .collect();
+
+        Self {
+            burnchain: EpochsConfig { epochs },
         }
     }
 }
@@ -1446,5 +1491,74 @@ impl TransactionPlanSpecification {
         }
 
         TransactionPlanSpecificationFile { batches }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use indoc::indoc;
+    use pretty_assertions::assert_eq;
+
+    use super::*;
+
+    #[test]
+    fn test_epoch_config() {
+        let devnet_config = DevnetConfig {
+            epoch_2_0: 1,
+            epoch_2_05: 2,
+            epoch_2_1: 3,
+            epoch_2_2: 4,
+            epoch_2_3: 5,
+            epoch_2_4: 6,
+            epoch_2_5: 7,
+            epoch_3_0: 8,
+            epoch_3_1: 9,
+            ..Default::default()
+        };
+
+        let epoch_config = BurnchainEpochConfig::from(&devnet_config);
+        let epoch_config_toml = toml::to_string(&epoch_config).unwrap();
+
+        assert_eq!(
+            epoch_config_toml,
+            indoc! { r#"
+                [[burnchain.epochs]]
+                epoch_name = "2.0"
+                start_height = 1
+
+                [[burnchain.epochs]]
+                epoch_name = "2.05"
+                start_height = 2
+
+                [[burnchain.epochs]]
+                epoch_name = "2.1"
+                start_height = 3
+
+                [[burnchain.epochs]]
+                epoch_name = "2.2"
+                start_height = 4
+
+                [[burnchain.epochs]]
+                epoch_name = "2.3"
+                start_height = 5
+
+                [[burnchain.epochs]]
+                epoch_name = "2.4"
+                start_height = 6
+
+                [[burnchain.epochs]]
+                epoch_name = "2.5"
+                start_height = 7
+
+                [[burnchain.epochs]]
+                epoch_name = "3.0"
+                start_height = 8
+
+                [[burnchain.epochs]]
+                epoch_name = "3.1"
+                start_height = 9
+                "#
+            }
+        );
     }
 }
