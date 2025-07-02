@@ -12,6 +12,7 @@ clarity = { workspace = true, features = ["wasm", "developer-mode", "devtools"] 
 [dev-dependencies]
 pretty_assertions = { workspace = true }
 divan = "0.1"
+indoc = { workspace = true }
 
 [[bench]]
 name = "formatter"
