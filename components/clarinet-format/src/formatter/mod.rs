@@ -557,7 +557,7 @@ impl<'a> Aggregator<'a> {
         let space = format!("{previous_indentation}{indentation}");
 
         let mut iter = exprs.get(1..).unwrap_or_default().iter().peekable();
-        let mut prev_end_line = 0;
+        let mut prev_end_line = None;
 
         while let Some(expr) = iter.next() {
             let trailing = get_trailing_comment(expr, &mut iter);
@@ -576,7 +576,7 @@ impl<'a> Aggregator<'a> {
                 acc.push_str(&self.display_pse(comment, previous_indentation));
             }
 
-            prev_end_line = expr.span().end_line;
+            prev_end_line = Some(expr.span().end_line);
         }
         acc.push_str(&format!("\n{previous_indentation})"));
         acc
@@ -596,7 +596,7 @@ impl<'a> Aggregator<'a> {
         let break_up =
             without_comments_len(&exprs[1..]) > BOOLEAN_BREAK_LIMIT || differing_lines(exprs);
         let mut iter = exprs.get(1..).unwrap_or_default().iter().peekable();
-        let mut prev_end_line = 0;
+        let mut prev_end_line = None;
 
         if break_up {
             while let Some(expr) = iter.next() {
@@ -615,7 +615,7 @@ impl<'a> Aggregator<'a> {
                     acc.push_str(&self.display_pse(comment, previous_indentation));
                 }
 
-                prev_end_line = expr.span().end_line;
+                prev_end_line = Some(expr.span().end_line);
             }
         } else {
             while let Some(expr) = iter.next() {
@@ -648,7 +648,7 @@ impl<'a> Aggregator<'a> {
         let mut acc = format!("({func_type} ");
         let mut iter = exprs[1..].iter().peekable();
         let mut index = 0;
-        let mut prev_end_line = 0;
+        let mut prev_end_line = None;
 
         while let Some(expr) = iter.next() {
             let trailing = get_trailing_comment(expr, &mut iter);
@@ -667,7 +667,7 @@ impl<'a> Aggregator<'a> {
             }
 
             index += 1;
-            prev_end_line = expr.span().end_line;
+            prev_end_line = Some(expr.span().end_line);
         }
         acc.push('\n');
         acc.push_str(previous_indentation);
@@ -705,7 +705,7 @@ impl<'a> Aggregator<'a> {
             }
         }
         // start the let body
-        let mut prev_end_line = 0;
+        let mut prev_end_line = None;
         for e in exprs.get(2..).unwrap_or_default() {
             // Add extra newlines based on original blank lines (limit to 1 consecutive blank lines)
             push_blank_lines(&mut acc, prev_end_line, e.span().start_line);
@@ -716,7 +716,7 @@ impl<'a> Aggregator<'a> {
                 self.format_source_exprs(slice::from_ref(e), &space)
             ));
 
-            prev_end_line = e.span().end_line;
+            prev_end_line = Some(e.span().end_line);
         }
         acc.push_str(&format!("\n{previous_indentation})"));
         acc
@@ -1369,12 +1369,14 @@ fn chars_since_last_newline(acc: &str) -> usize {
 }
 
 // Helper to insert at most one blank line if there are blank lines between two expressions
-fn push_blank_lines(acc: &mut String, prev_end_line: u32, curr_start_line: u32) {
-    if prev_end_line > 0 && curr_start_line > 0 && curr_start_line > prev_end_line {
-        let blank_lines = curr_start_line.saturating_sub(prev_end_line + 1);
-        let extra_newlines = std::cmp::min(blank_lines, 1);
-        for _ in 0..extra_newlines {
-            acc.push('\n');
+fn push_blank_lines(acc: &mut String, prev_end_line: Option<u32>, curr_start_line: u32) {
+    if let Some(prev_end) = prev_end_line {
+        if curr_start_line > prev_end {
+            let blank_lines = curr_start_line.saturating_sub(prev_end + 1);
+            let extra_newlines = std::cmp::min(blank_lines, 1);
+            for _ in 0..extra_newlines {
+                acc.push('\n');
+            }
         }
     }
 }
