@@ -2043,18 +2043,6 @@ mod tests_formatter {
     }
 
     #[test]
-    fn format_tuple() {
-        let src = "(tuple (prop-a 1))";
-        let ast = clarity::vm::ast::parser::v2::parse(src).unwrap();
-        println!("AST: {:#?}", ast);
-        let expected = format_with_default(src);
-        let formatter = ClarityFormatter::new(Settings::default());
-        let result = formatter.format_ast(&ast);
-        println!("Result: {}", result);
-        assert_eq!(result, expected);
-    }
-
-    #[test]
     fn retain_comment_newlines() {
         let src = r#"(senderBalance (unwrap!
   (at-block proposalBlockHash

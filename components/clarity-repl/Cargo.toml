@@ -68,7 +68,6 @@ test-case = "*"
 divan = "0.1"
 mockito = { version = "1.6", default-features = false }
 tempfile = "3.19"
-indoc = { workspace = true }
 
 [lib]
 name = "clarity_repl"
