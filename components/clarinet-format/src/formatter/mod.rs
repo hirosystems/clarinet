@@ -1495,14 +1495,17 @@ mod tests_formatter {
     }
     #[test]
     fn test_preserve_newlines_inner_function() {
-        let src = r#"(define-public (increment)
-  (begin
-    (try! (stx-transfer? (var-get cost) tx-sender (var-get contract-owner)))
+        let src = indoc!(
+            r#"
+            (define-public (increment)
+              (begin
+                (try! (stx-transfer? (var-get cost) tx-sender (var-get contract-owner)))
 
-    (ok (var-set count (+ (var-get count) u1)))
-  )
-)
-"#;
+                (ok (var-set count (+ (var-get count) u1)))
+              )
+            )
+            "#
+        );
         let result = format_with_default(&String::from(src));
         assert_eq!(result, src);
     }
