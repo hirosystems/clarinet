@@ -31,8 +31,6 @@ serde_derive = "1.0"
 serde_json = { version = "1.0.47", features = ["unbounded_depth"] }
 sha2 = "0.10"
 
-clarinet-format = { path = "../clarinet-format" }
-
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 clarity = { workspace = true, default-features = false, features = ["developer-mode", "devtools", "log"] }
 clar2wasm = { git = "https://github.com/stacks-network/clarity-wasm.git", branch = "main" }

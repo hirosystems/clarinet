@@ -433,22 +433,39 @@ describe("prints logs", () => {
     const consoleSpy = vi.spyOn(console, "log");
     const res = simnet.callPublicFn("counter", "increment", [], address1);
     expect(res.result).toStrictEqual(Cl.ok(Cl.bool(true)));
+
     expect(consoleSpy).toHaveBeenCalledWith('"call increment" (counter:26)');
     expect(consoleSpy).toHaveBeenCalledWith('"call inner-increment" (counter:15)');
     consoleSpy.mockRestore();
   });
 
-  // it("can log events in failing function calls", () => {
-  //   const consoleSpy = vi.spyOn(console, "log");
-  //   const res = simnet.callPublicFn("counter", "increment", [], address1);
-  //   expect(res.result).toStrictEqual(Cl.ok(Cl.bool(true)));
-  //   expect(consoleSpy).toHaveBeenCalledTimes(3);
-  //   expect(consoleSpy).toHaveBeenCalledWith('"call increment" (counter:30)');
-  //   expect(consoleSpy).toHaveBeenCalledWith('"call inner-increment" (counter:18)');
-  //   expect(consoleSpy).toHaveBeenCalledWith("u1 (counter:19)");
+  it("can log events in failing function calls", () => {
+    const consoleSpy = vi.spyOn(console, "log");
+    const deploy = simnet.deployContract(
+      "test-contract",
+      '(define-public (always-fail) (begin (print "hello") (err u1)))',
+      { clarityVersion: 2 },
+      deployerAddr,
+    );
+    expect(deploy.result).toStrictEqual(Cl.bool(true));
+    const { result } = simnet.callPublicFn("test-contract", "always-fail", [], address1);
+    expect(result).toStrictEqual(Cl.error(Cl.uint(1)));
 
-  //   consoleSpy.mockRestore();
-  // });
+    expect(consoleSpy).toHaveBeenCalledTimes(1);
+    expect(consoleSpy).toHaveBeenCalledWith('"hello" (test-contract:1)');
+    consoleSpy.mockRestore();
+  });
+
+  it("pretty print logs", () => {
+    const consoleSpy = vi.spyOn(console, "log");
+
+    const { result } = simnet.execute("(print { prop-a: 1, prop-b: 0x01 })");
+    expect(result.type).toBe("tuple");
+
+    expect(consoleSpy).toHaveBeenCalledTimes(1);
+    expect(consoleSpy).toHaveBeenCalledWith("{ prop-a: 1, prop-b: 0x01 } (contract-4:1)");
+    consoleSpy.mockRestore();
+  });
 });
 
 describe("the simnet can execute commands", () => {
