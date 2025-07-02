@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { Cl } from "@stacks/transactions";
-import { describe, expect, it, beforeEach, afterEach } from "vitest";
+import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 
 // test the built package and not the source code
 // makes it simpler to handle wasm build
@@ -428,6 +428,29 @@ describe("simnet can transfer stx", () => {
   });
 });
 
+describe("prints logs", () => {
+  it("can log events in successful function calls", () => {
+    const consoleSpy = vi.spyOn(console, "log");
+    const res = simnet.callPublicFn("counter", "increment", [], address1);
+    expect(res.result).toStrictEqual(Cl.ok(Cl.bool(true)));
+    expect(consoleSpy).toHaveBeenCalledWith('"call increment" (counter:26)');
+    expect(consoleSpy).toHaveBeenCalledWith('"call inner-increment" (counter:15)');
+    consoleSpy.mockRestore();
+  });
+
+  // it("can log events in failing function calls", () => {
+  //   const consoleSpy = vi.spyOn(console, "log");
+  //   const res = simnet.callPublicFn("counter", "increment", [], address1);
+  //   expect(res.result).toStrictEqual(Cl.ok(Cl.bool(true)));
+  //   expect(consoleSpy).toHaveBeenCalledTimes(3);
+  //   expect(consoleSpy).toHaveBeenCalledWith('"call increment" (counter:30)');
+  //   expect(consoleSpy).toHaveBeenCalledWith('"call inner-increment" (counter:18)');
+  //   expect(consoleSpy).toHaveBeenCalledWith("u1 (counter:19)");
+
+  //   consoleSpy.mockRestore();
+  // });
+});
+
 describe("the simnet can execute commands", () => {
   it("can mint_stx", () => {
     const result = simnet.executeCommand(
@@ -456,13 +479,13 @@ describe("the simnet can execute commands", () => {
   });
 });
 
-// describe("custom manifest path", () => {
-//   it("initSimnet handles absolute path", async () => {
-//     const manifestPath = path.join(process.cwd(), "tests/fixtures/Clarinet.toml");
-//     const simnet = await initSimnet(manifestPath);
-//     expect(simnet.blockHeight).toBe(1);
-//   });
-// });
+describe("custom manifest path", () => {
+  it("initSimnet handles absolute path", async () => {
+    const manifestPath = path.join(process.cwd(), "tests/fixtures/Clarinet.toml");
+    const simnet = await initSimnet(manifestPath);
+    expect(simnet.blockHeight).toBe(1);
+  });
+});
 
 describe("the sdk handles multiple manifests project", () => {
   it("handle invalid project", async () => {

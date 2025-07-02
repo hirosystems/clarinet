@@ -25,6 +25,7 @@ use super::boot::{
     BOOT_CODE_MAINNET, BOOT_CODE_TESTNET, BOOT_MAINNET_PRINCIPAL, BOOT_TESTNET_PRINCIPAL,
 };
 use super::diagnostic::output_diagnostic;
+use super::hooks::logger::LoggerHook;
 use super::interpreter::ContractCallError;
 use super::{
     ClarityCodeSource, ClarityContract, ClarityInterpreter, ContractDeployer, SessionSettings,
@@ -53,6 +54,7 @@ pub struct Session {
     keywords_reference: HashMap<String, String>,
 
     coverage_hook: Option<CoverageHook>,
+    logger_hook: Option<LoggerHook>,
 }
 
 impl Session {
@@ -80,11 +82,16 @@ impl Session {
             keywords_reference: clarity_keywords(),
 
             coverage_hook: None,
+            logger_hook: None,
         }
     }
 
     pub fn enable_coverage(&mut self) {
         self.coverage_hook = Some(CoverageHook::new());
+    }
+
+    pub fn enable_logger_hook(&mut self) {
+        self.logger_hook = Some(LoggerHook::new());
     }
 
     pub fn set_test_name(&mut self, name: String) {
@@ -395,13 +402,13 @@ impl Session {
 
     #[cfg(not(target_arch = "wasm32"))]
     pub fn trace(&mut self, output: &mut Vec<String>, cmd: &str) {
-        use super::tracer::Tracer;
+        use super::hooks::tracer::TracerHook;
 
         let Some((_, snippet)) = cmd.split_once(' ') else {
             return output.push("Usage: ::trace <expr>".red().to_string());
         };
 
-        let mut tracer = Tracer::new(snippet.to_string());
+        let mut tracer = TracerHook::new(snippet.to_string());
 
         match self.eval_with_hooks(snippet.to_string(), Some(vec![&mut tracer]), false) {
             Ok(_) => (),
@@ -494,6 +501,9 @@ impl Session {
         if let Some(ref mut coverage_hook) = self.coverage_hook {
             hooks.push(coverage_hook);
         }
+        if let Some(ref mut logger_hook) = self.logger_hook {
+            hooks.push(logger_hook);
+        }
 
         if contract.clarity_version > ClarityVersion::default_for_epoch(contract.epoch) {
             let diagnostic = Diagnostic {
@@ -544,6 +554,9 @@ impl Session {
         let mut hooks: Vec<&mut dyn EvalHook> = vec![];
         if let Some(ref mut coverage_hook) = self.coverage_hook {
             hooks.push(coverage_hook);
+        }
+        if let Some(ref mut logger_hook) = self.logger_hook {
+            hooks.push(logger_hook);
         }
 
         let current_epoch = self.interpreter.datastore.get_current_epoch();
@@ -605,21 +618,20 @@ impl Session {
         if let Some(ref mut coverage_hook) = self.coverage_hook {
             hooks.push(coverage_hook);
         }
+        if let Some(ref mut logger_hook) = self.logger_hook {
+            hooks.push(logger_hook);
+        }
 
         let result = self
             .interpreter
             .run(&contract, None, cost_track, Some(hooks));
 
-        match result {
-            Ok(result) => {
-                if let EvaluationResult::Contract(contract_result) = &result.result {
-                    self.contracts
-                        .insert(contract_identifier, contract_result.contract.clone());
-                };
-                Ok(result)
+        result.inspect(|result| {
+            if let EvaluationResult::Contract(contract_result) = &result.result {
+                self.contracts
+                    .insert(contract_identifier, contract_result.contract.clone());
             }
-            Err(res) => Err(res),
-        }
+        })
     }
 
     /// Evaluate a Clarity snippet in order to use it as Clarity function arguments
@@ -1956,5 +1968,73 @@ mod tests {
                 session.get_tx_sender()
             )
         );
+    }
+}
+#[cfg(test)]
+mod logger_hook_tests {
+    use clarity::vm::types::TupleData;
+    use indoc::indoc;
+
+    use super::*;
+    use crate::repl::DEFAULT_EPOCH;
+    use crate::test_fixtures::clarity_contract::ClarityContractBuilder;
+
+    #[test]
+    fn can_retrieve_print_values() {
+        let settings = SessionSettings::default();
+        let mut session = Session::new(settings);
+        session.start().expect("session could not start");
+        session.update_epoch(DEFAULT_EPOCH);
+
+        session.enable_logger_hook();
+
+        let snippet = indoc! {
+            r#"(define-public (print-and-return (input (response (string-ascii 16) uint)))
+                (begin
+                    (try! (print input))
+                    (match input
+                        x (begin (print x) true)
+                        y false
+                    )
+                    input
+                )
+            )"#
+        };
+
+        fn call_contract(session: &mut Session, arg: Value) {
+            let arg = SymbolicExpression::atom_value(arg);
+            let _ = session.call_contract_fn(
+                "contract",
+                "print-and-return",
+                &[arg],
+                &session.get_tx_sender(),
+                false,
+                false,
+            );
+        }
+
+        let contract = ClarityContractBuilder::new()
+            .code_source(snippet.to_owned())
+            .build();
+        let _ = session.deploy_contract(&contract, false, None);
+
+        // call with a string
+        let arg = Value::okay(Value::string_ascii_from_bytes("hello".into()).unwrap()).unwrap();
+        call_contract(&mut session, arg);
+
+        // call with a tuple
+        let arg = Value::okay(Value::Tuple(
+            TupleData::from_data(vec![
+                ("prop-a".into(), Value::UInt(0)),
+                ("prop-b".into(), Value::Bool(true)),
+            ])
+            .unwrap(),
+        ))
+        .unwrap();
+        call_contract(&mut session, arg);
+
+        // call with an error
+        let arg = Value::error(Value::UInt(404)).unwrap();
+        call_contract(&mut session, arg);
     }
 }
