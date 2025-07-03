@@ -1,5 +1,6 @@
 use std::collections::{BTreeMap, HashMap};
 use std::fmt;
+use std::fmt::Write as _;
 use std::num::ParseIntError;
 
 use clarity::codec::StacksMessageCodec;
@@ -997,12 +998,12 @@ impl Session {
                 };
                 let mut s = String::with_capacity(2 * tx_bytes.len());
                 for byte in tx_bytes {
-                    s = format!("{s}{byte:02x}");
+                    write!(s, "{byte:02x}").unwrap();
                 }
                 s.green().to_string()
             }
             Err(diagnostics) => {
-                let lines: Vec<String> = snippet.split('\n').map(|s| s.to_string()).collect();
+                let lines: Vec<String> = snippet.split('\n').map(String::from).collect();
                 let mut output: Vec<String> = diagnostics
                     .iter()
                     .flat_map(|d| output_diagnostic(d, "encode", &lines))
