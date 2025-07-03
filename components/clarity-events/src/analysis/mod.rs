@@ -474,7 +474,7 @@ impl<'a, 'b> EventCollector<'a, 'b> {
     pub fn add_method(&mut self, method: ClarityName) {
         let mut events = vec![];
         events.append(&mut self.last_entries);
-        self.event_map.insert(Some(method.clone()), events);
+        self.event_map.insert(Some(method), events);
     }
 
     pub fn add_event(&mut self, event: StacksTransactionEvent) {

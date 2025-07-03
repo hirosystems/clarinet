@@ -19,7 +19,7 @@ impl ClarityContract {
         .join("\n");
 
         Self {
-            code_source: ClarityCodeSource::ContractInMemory(snippet.to_string()),
+            code_source: ClarityCodeSource::ContractInMemory(snippet),
             name: "contract".into(),
             deployer: ContractDeployer::DefaultDeployer,
             clarity_version: DEFAULT_CLARITY_VERSION,

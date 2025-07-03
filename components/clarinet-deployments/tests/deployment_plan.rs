@@ -9,7 +9,7 @@ fn get_test_txs() -> (TransactionSpecification, TransactionSpecification) {
     let contract_id =
         QualifiedContractIdentifier::parse("ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.test")
             .unwrap();
-    let tx_sender = contract_id.issuer.clone();
+    let tx_sender = contract_id.issuer;
 
     let contract_publish_tx =
         TransactionSpecification::EmulatedContractPublish(EmulatedContractPublishSpecification {
@@ -26,7 +26,7 @@ fn get_test_txs() -> (TransactionSpecification, TransactionSpecification) {
                 "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.test",
             )
             .unwrap(),
-            emulated_sender: tx_sender.clone(),
+            emulated_sender: tx_sender,
             method: ClarityName::try_from("test".to_string()).unwrap(),
             parameters: vec![],
         });
@@ -72,7 +72,7 @@ fn test_extract_no_contract_publish_txs() {
         new_plan,
         build_test_deployement_plan(vec![TransactionsBatchSpecification {
             id: 0,
-            transactions: vec![contract_publish_tx.clone()],
+            transactions: vec![contract_publish_tx],
             epoch: Some(EpochSpec::Epoch2_4),
         },])
     );
@@ -81,7 +81,7 @@ fn test_extract_no_contract_publish_txs() {
         custom_txs,
         vec![TransactionsBatchSpecification {
             id: 1,
-            transactions: vec![contract_call_txs.clone()],
+            transactions: vec![contract_call_txs],
             epoch: Some(EpochSpec::Epoch2_4),
         }]
     );
@@ -94,12 +94,12 @@ fn test_merge_batches() {
     let plan = build_test_deployement_plan(vec![
         TransactionsBatchSpecification {
             id: 0,
-            transactions: vec![contract_publish_tx.clone()],
+            transactions: vec![contract_publish_tx],
             epoch: Some(EpochSpec::Epoch2_4),
         },
         TransactionsBatchSpecification {
             id: 1,
-            transactions: vec![contract_call_txs.clone()],
+            transactions: vec![contract_call_txs],
             epoch: Some(EpochSpec::Epoch2_4),
         },
     ]);
