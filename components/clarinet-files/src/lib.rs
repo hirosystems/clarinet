@@ -148,9 +148,10 @@ impl FileLocation {
                 path.extend(&path_to_append);
             }
             FileLocation::Url { url } => {
+                let url_string = url.to_string();
                 let mut paths_segments = url
                     .path_segments_mut()
-                    .map_err(|_| "unable to mutate url")?;
+                    .map_err(|_| format!("unable to mutate url: {url_string}"))?;
                 for component in path_to_append.components() {
                     let segment = component
                         .as_os_str()
