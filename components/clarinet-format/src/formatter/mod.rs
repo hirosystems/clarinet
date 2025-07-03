@@ -1253,7 +1253,7 @@ impl<'a> Aggregator<'a> {
                 // in the original source code
                 let on_different_line_in_source =
                     // i - 1 index is fine here because we're withing !first_on_line
-                    list[i - 1].span().start_line != expr.span().start_line;
+                    is_comment(expr) || list[i - 1].span().start_line != expr.span().start_line;
 
                 // Add line break if expression was on different lines in source
                 // or if the line would be too long
