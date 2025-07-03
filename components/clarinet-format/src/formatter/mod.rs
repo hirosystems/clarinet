@@ -201,9 +201,11 @@ impl<'a> Aggregator<'a> {
                 continue;
             }
 
-            if prev_end_line > 0 {
+            if prev_end_line > 0
+                && expr.span().start_line > 0
+                && expr.span().start_line > prev_end_line
+            {
                 let blank_lines = expr.span().start_line - prev_end_line - 1;
-                // Add extra newlines based on original blank lines (limit to 1 consecutive blank lines)
                 let extra_newlines = std::cmp::min(blank_lines, 1);
                 for _ in 0..extra_newlines {
                     result.push('\n');
@@ -555,8 +557,13 @@ impl<'a> Aggregator<'a> {
         let space = format!("{previous_indentation}{indentation}");
 
         let mut iter = exprs.get(1..).unwrap_or_default().iter().peekable();
+        let mut prev_end_line = None;
+
         while let Some(expr) = iter.next() {
             let trailing = get_trailing_comment(expr, &mut iter);
+
+            // Add extra newlines based on original blank lines (limit to 1 consecutive blank lines)
+            push_blank_lines(&mut acc, prev_end_line, expr.span().start_line);
 
             // begin body
             acc.push_str(&format!(
@@ -568,6 +575,8 @@ impl<'a> Aggregator<'a> {
                 acc.push(' ');
                 acc.push_str(&self.display_pse(comment, previous_indentation));
             }
+
+            prev_end_line = Some(expr.span().end_line);
         }
         acc.push_str(&format!("\n{previous_indentation})"));
         acc
@@ -587,9 +596,15 @@ impl<'a> Aggregator<'a> {
         let break_up =
             without_comments_len(&exprs[1..]) > BOOLEAN_BREAK_LIMIT || differing_lines(exprs);
         let mut iter = exprs.get(1..).unwrap_or_default().iter().peekable();
+        let mut prev_end_line = None;
+
         if break_up {
             while let Some(expr) = iter.next() {
                 let trailing = get_trailing_comment(expr, &mut iter);
+
+                // Add extra newlines based on original blank lines (limit to 1 consecutive blank lines)
+                push_blank_lines(&mut acc, prev_end_line, expr.span().start_line);
+
                 acc.push_str(&format!(
                     "\n{}{}",
                     space,
@@ -599,6 +614,8 @@ impl<'a> Aggregator<'a> {
                     acc.push(' ');
                     acc.push_str(&self.display_pse(comment, previous_indentation));
                 }
+
+                prev_end_line = Some(expr.span().end_line);
             }
         } else {
             while let Some(expr) = iter.next() {
@@ -631,9 +648,14 @@ impl<'a> Aggregator<'a> {
         let mut acc = format!("({func_type} ");
         let mut iter = exprs[1..].iter().peekable();
         let mut index = 0;
+        let mut prev_end_line = None;
 
         while let Some(expr) = iter.next() {
             let trailing = get_trailing_comment(expr, &mut iter);
+
+            // Add extra newlines based on original blank lines (limit to 1 consecutive blank lines)
+            push_blank_lines(&mut acc, prev_end_line, expr.span().start_line);
+
             if index > 0 {
                 acc.push('\n');
                 acc.push_str(&space);
@@ -643,7 +665,9 @@ impl<'a> Aggregator<'a> {
                 acc.push(' ');
                 acc.push_str(&self.display_pse(comment, previous_indentation));
             }
+
             index += 1;
+            prev_end_line = Some(expr.span().end_line);
         }
         acc.push('\n');
         acc.push_str(previous_indentation);
@@ -681,12 +705,18 @@ impl<'a> Aggregator<'a> {
             }
         }
         // start the let body
+        let mut prev_end_line = None;
         for e in exprs.get(2..).unwrap_or_default() {
+            // Add extra newlines based on original blank lines (limit to 1 consecutive blank lines)
+            push_blank_lines(&mut acc, prev_end_line, e.span().start_line);
+
             acc.push_str(&format!(
                 "\n{}{}",
                 space,
                 self.format_source_exprs(slice::from_ref(e), &space)
-            ))
+            ));
+
+            prev_end_line = Some(e.span().end_line);
         }
         acc.push_str(&format!("\n{previous_indentation})"));
         acc
@@ -798,7 +828,10 @@ impl<'a> Aggregator<'a> {
             let start_line = item.span().start_line;
             acc.push_str(&value.to_string());
             if let Some(comment) = trailing {
-                let count = comment.span().start_column - item.span().end_column - 1;
+                let count = comment
+                    .span()
+                    .start_column
+                    .saturating_sub(item.span().end_column + 1);
                 let spaces = " ".repeat(count as usize);
                 acc.push_str(&spaces);
                 acc.push_str(&self.display_pse(comment, previous_indentation));
@@ -853,7 +886,10 @@ impl<'a> Aggregator<'a> {
             acc.push_str(&value.to_string());
 
             if let Some(comment) = trailing {
-                let count = comment.span().start_column - item.span().end_column - 1;
+                let count = comment
+                    .span()
+                    .start_column
+                    .saturating_sub(item.span().end_column + 1);
                 let spaces = " ".repeat(count as usize);
                 acc.push_str(&spaces);
                 acc.push_str(&self.display_pse(comment, previous_indentation));
@@ -1332,10 +1368,25 @@ fn chars_since_last_newline(acc: &str) -> usize {
     }
 }
 
+// Helper to insert at most one blank line if there are blank lines between two expressions
+fn push_blank_lines(acc: &mut String, prev_end_line: Option<u32>, curr_start_line: u32) {
+    if let Some(prev_end) = prev_end_line {
+        if curr_start_line > prev_end {
+            let blank_lines = curr_start_line.saturating_sub(prev_end + 1);
+            let extra_newlines = std::cmp::min(blank_lines, 1);
+            for _ in 0..extra_newlines {
+                acc.push('\n');
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests_formatter {
     #[allow(unused_imports)]
     use std::assert_eq;
+
+    use indoc::indoc;
 
     use super::{ClarityFormatter, Settings};
     use crate::formatter::Indentation;
@@ -1389,11 +1440,14 @@ mod tests_formatter {
 
     #[test]
     fn intact_comment_spacing() {
-        let src = r#";; (define-read-only (has-access)
-;;   (begin
-;;     (ok true)
-;;   )
-;; )"#;
+        let src = indoc!(
+            r#"
+          ;; (define-read-only (has-access)
+          ;;   (begin
+          ;;     (ok true)
+          ;;   )
+          ;; )"#
+        );
         let result = format_with_default(&String::from(src));
         assert_eq!(src, result);
 
@@ -1405,13 +1459,16 @@ mod tests_formatter {
     fn test_multi_function() {
         let src = "(define-public (my-func) (ok true))\n(define-public (my-func2) (ok true))";
         let result = format_with_default(&String::from(src));
-        let expected = r#"(define-public (my-func)
-  (ok true)
-)
-(define-public (my-func2)
-  (ok true)
-)
-"#;
+        let expected = indoc!(
+            r#"
+            (define-public (my-func)
+              (ok true)
+            )
+            (define-public (my-func2)
+              (ok true)
+            )
+            "#
+        );
         assert_eq!(expected, result);
     }
     #[test]
@@ -1437,6 +1494,22 @@ mod tests_formatter {
             result,
             "(define-public (my-func\n    (amount uint)\n    (sender principal)\n  )\n  (ok true)\n)\n"
         );
+    }
+    #[test]
+    fn test_preserve_newlines_inner_function() {
+        let src = indoc!(
+            r#"
+            (define-public (increment)
+              (begin
+                (try! (stx-transfer? (var-get cost) tx-sender (var-get contract-owner)))
+
+                (ok (var-set count (+ (var-get count) u1)))
+              )
+            )
+            "#
+        );
+        let result = format_with_default(&String::from(src));
+        assert_eq!(result, src);
     }
     #[test]
     fn test_pre_comments_included() {
@@ -1465,22 +1538,28 @@ mod tests_formatter {
 
     #[test]
     fn test_booleans_with_comments() {
-        let src = r#"(or
-  true
-  ;; pre comment
-  (is-eq 1 2) ;; comment
-  (is-eq 1 1) ;; b
-)"#;
+        let src = indoc!(
+            r#"
+            (or
+              true
+              ;; pre comment
+              (is-eq 1 2) ;; comment
+              (is-eq 1 1) ;; b
+            )"#
+        );
         let result = format_with_default(&String::from(src));
         assert_eq!(src, result);
 
-        let src = r#"(asserts!
-  (or
-    (is-eq merkle-root txid) ;; true, if the transaction is the only transaction
-    (try! (verify-merkle-proof reversed-txid (reverse-buff32 merkle-root) proof))
-  )
-  (err ERR-INVALID-MERKLE-PROOF)
-)"#;
+        let src = indoc!(
+            r#"
+            (asserts!
+              (or
+                (is-eq merkle-root txid) ;; true, if the transaction is the only transaction
+                (try! (verify-merkle-proof reversed-txid (reverse-buff32 merkle-root) proof))
+              )
+              (err ERR-INVALID-MERKLE-PROOF)
+            )"#
+        );
         let result = format_with_default(&String::from(src));
         assert_eq!(src, result);
     }
@@ -1489,13 +1568,16 @@ mod tests_formatter {
     fn long_line_unwrapping() {
         let src = "(try! (unwrap! (complete-deposit-wrapper (get txid deposit) (get vout-index deposit) (get amount deposit) (get recipient deposit) (get burn-hash deposit) (get burn-height deposit) (get sweep-txid deposit)) (err (+ ERR_DEPOSIT_INDEX_PREFIX (+ u10 index)))))";
         let result = format_with_default(&String::from(src));
-        let expected = r#"(try! (unwrap!
-  (complete-deposit-wrapper (get txid deposit) (get vout-index deposit)
-    (get amount deposit) (get recipient deposit) (get burn-hash deposit)
-    (get burn-height deposit) (get sweep-txid deposit)
-  )
-  (err (+ ERR_DEPOSIT_INDEX_PREFIX (+ u10 index)))
-))"#;
+        let expected = indoc!(
+            r#"
+            (try! (unwrap!
+              (complete-deposit-wrapper (get txid deposit) (get vout-index deposit)
+                (get amount deposit) (get recipient deposit) (get burn-hash deposit)
+                (get burn-height deposit) (get sweep-txid deposit)
+              )
+              (err (+ ERR_DEPOSIT_INDEX_PREFIX (+ u10 index)))
+            ))"#
+        );
         assert_eq!(expected, result);
 
         // non-max-length sanity case
@@ -1511,14 +1593,17 @@ mod tests_formatter {
         assert_eq!(result, "(define-map a\n  uint\n  { n1: (buff 20) }\n)\n");
         let src = "(define-map something { name: (buff 48), a: uint } uint)\n";
         let result = format_with_default(&String::from(src));
-        let expected = r#"(define-map something
-  {
-    name: (buff 48),
-    a: uint,
-  }
-  uint
-)
-"#;
+        let expected = indoc!(
+            r#"
+            (define-map something
+              {
+                name: (buff 48),
+                a: uint,
+              }
+              uint
+            )
+            "#
+        );
         assert_eq!(result, expected);
     }
 
@@ -1526,20 +1611,26 @@ mod tests_formatter {
     fn test_let() {
         let src = "(let ((a 1) (b 2)) (+ a b))";
         let result = format_with_default(&String::from(src));
-        let expected = r#"(let (
-    (a 1)
-    (b 2)
-  )
-  (+ a b)
-)"#;
+        let expected = indoc!(
+            r#"
+            (let (
+                (a 1)
+                (b 2)
+              )
+              (+ a b)
+            )"#
+        );
         assert_eq!(expected, result);
     }
     #[test]
     fn test_single_let() {
-        let src = r#"(let ((current-count (var-get count)))
-  (asserts! (> current-count u0) ERR_COUNT_MUST_BE_POSITIVE)
-  (ok (var-set count (- current-count u1)))
-)"#;
+        let src = indoc!(
+            r#"
+            (let ((current-count (var-get count)))
+              (asserts! (> current-count u0) ERR_COUNT_MUST_BE_POSITIVE)
+              (ok (var-set count (- current-count u1)))
+            )"#
+        );
         let result = format_with_default(&String::from(src));
         assert_eq!(src, result);
     }
@@ -1549,10 +1640,13 @@ mod tests_formatter {
         let src = "(match opt value (ok (handle-new-value value)) (ok 1))";
         let result = format_with_default(&String::from(src));
         // "(match opt\n
-        let expected = r#"(match opt
-  value (ok (handle-new-value value))
-  (ok 1)
-)"#;
+        let expected = indoc!(
+            r#"
+            (match opt
+              value (ok (handle-new-value value))
+              (ok 1)
+            )"#
+        );
         assert_eq!(result, expected);
     }
 
@@ -1560,33 +1654,45 @@ mod tests_formatter {
     fn test_response_match() {
         let src = "(match x value (ok (+ to-add value)) err-value (err err-value))";
         let result = format_with_default(&String::from(src));
-        let expected = r#"(match x
-  value (ok (+ to-add value))
-  err-value (err err-value)
-)"#;
+        let expected = indoc!(
+            r#"
+            (match x
+              value (ok (+ to-add value))
+              err-value (err err-value)
+            )"#
+        );
         assert_eq!(result, expected);
     }
 
     #[test]
     fn test_comment_spacing() {
-        let src = r#";;comment
-;;    comment
-;;;comment"#;
+        let src = indoc!(
+            r#"
+            ;;comment
+            ;;    comment
+            ;;;comment"#
+        );
         let result = format_with_default(&String::from(src));
-        let expected = r#";; comment
-;;    comment
-;;; comment"#;
+        let expected = indoc!(
+            r#"
+            ;; comment
+            ;;    comment
+            ;;; comment"#
+        );
         assert_eq!(expected, result);
     }
     #[test]
     fn test_commented_match() {
-        let src = r#"(match x
-  ;; comment
-  value
-  ;; comment
-  (ok (+ to-add value))
-  (ok true)
-)"#;
+        let src = indoc!(
+            r#"
+            (match x
+              ;; comment
+              value
+              ;; comment
+              (ok (+ to-add value))
+              (ok true)
+            )"#
+        );
         let result = format_with_default(&String::from(src));
         assert_eq!(src, result);
     }
@@ -1604,59 +1710,77 @@ mod tests_formatter {
     fn map_in_map() {
         let src = "(ok { a: b, ctx: { a: b, c: d }})";
         let result = format_with_default(src);
-        let expected = r#"(ok {
-  a: b,
-  ctx: {
-    a: b,
-    c: d,
-  },
-})"#;
+        let expected = indoc!(
+            r#"
+            (ok {
+              a: b,
+              ctx: {
+                a: b,
+                c: d,
+              },
+            })"#
+        );
         assert_eq!(expected, result);
-        let src = r#"(ok {
-  varslice: (unwrap! (slice? txbuff slice-start target-index) (err ERR-OUT-OF-BOUNDS)),
-  ctx: {
-    txbuff: tx,
-    index: (+ u1 ptr),
-  },
-})"#;
+        let src = indoc!(
+            r#"
+            (ok {
+              varslice: (unwrap! (slice? txbuff slice-start target-index) (err ERR-OUT-OF-BOUNDS)),
+              ctx: {
+                txbuff: tx,
+                index: (+ u1 ptr),
+              },
+            })"#
+        );
         let result = format_with_default(src);
         assert_eq!(src, result);
     }
 
     #[test]
     fn old_tuple() {
-        let src = r#"(tuple
-  (a uint)
-  (b uint) ;; comment
-  (c bool)
-)"#;
+        let src = indoc!(
+            r#"
+            (tuple
+              (a uint)
+              (b uint) ;; comment
+              (c bool)
+            )"#
+        );
         let result = format_with_default(src);
-        let expected = r#"{
-  a: uint,
-  b: uint, ;; comment
-  c: bool,
-}"#;
+        let expected = indoc!(
+            r#"
+            {
+              a: uint,
+              b: uint, ;; comment
+              c: bool,
+            }"#
+        );
         assert_eq!(result, expected);
     }
 
     #[test]
     fn top_level_exprs() {
-        let src = r#"(let ((x (+ u1 u1)))
-  (map-insert ns x true)
-)
-(define-public (get-value)
-  (ok (map-get? ns u2))
-)
-"#;
+        let src = indoc!(
+            r#"
+            (let ((x (+ u1 u1)))
+              (map-insert ns x true)
+            )
+            (define-public (get-value)
+              (ok (map-get? ns u2))
+            )
+            "#
+        );
         let result = format_with_default(src);
         assert_eq!(result, src);
 
-        let src = r#"(print {
-  notification: "format-me",
-  payload: { message: "Hello, World!" },
-})
-(var-set test-var 1)
-(var-set test-var 2)"#;
+        let src = indoc!(
+            r#"
+            (print {
+              notification: "format-me",
+              payload: { message: "Hello, World!" },
+            })
+            (var-set test-var 1)
+            (var-set test-var 2)"#
+        );
         let result = format_with_default(src);
         assert_eq!(result, src);
     }
@@ -1664,26 +1788,32 @@ mod tests_formatter {
     fn test_indentation_levels() {
         let src = "(begin (let ((a 1) (b 2)) (ok true)))";
         let result = format_with_default(&String::from(src));
-        let expected = r#"(begin
-  (let (
-      (a 1)
-      (b 2)
-    )
-    (ok true)
-  )
-)"#;
+        let expected = indoc!(
+            r#"
+            (begin
+              (let (
+                  (a 1)
+                  (b 2)
+                )
+                (ok true)
+              )
+            )"#
+        );
         assert_eq!(result, expected);
     }
     #[test]
     fn test_let_comments() {
-        let src = r#"(begin
-  (let (
-      (a 1) ;; something
-      (b 2) ;; comment
-    )
-    (ok true)
-  )
-)"#;
+        let src = indoc!(
+            r#"
+            (begin
+              (let (
+                  (a 1) ;; something
+                  (b 2) ;; comment
+                )
+                (ok true)
+              )
+            )"#
+        );
         let result = format_with_default(&String::from(src));
         assert_eq!(src, result);
     }
@@ -1697,11 +1827,14 @@ mod tests_formatter {
 
     #[test]
     fn test_key_value_sugar_comment_midrecord() {
-        let src = r#"{
-  name: (buff 48),
-  ;;; comment
-  owner: send-to, ;; trailing
-}"#;
+        let src = indoc!(
+            r#"
+            {
+              name: (buff 48),
+              ;;; comment
+              owner: send-to, ;; trailing
+            }"#
+        );
         let result = format_with_default(&String::from(src));
         assert_eq!(src, result);
     }
@@ -1780,16 +1913,19 @@ mod tests_formatter {
     }
     #[test]
     fn test_detailed_traits() {
-        let src = r#"(define-public (parse-and-verify-vaa
-    (core-contract <core-trait>)
-    (vaa-bytes (buff 8192))
-  )
-  (begin
-    (try! (check-active-wormhole-core-contract core-contract))
-    (contract-call? core-contract parse-and-verify-vaa vaa-bytes)
-  )
-)
-"#;
+        let src = indoc!(
+            r#"
+            (define-public (parse-and-verify-vaa
+                (core-contract <core-trait>)
+                (vaa-bytes (buff 8192))
+              )
+              (begin
+                (try! (check-active-wormhole-core-contract core-contract))
+                (contract-call? core-contract parse-and-verify-vaa vaa-bytes)
+              )
+            )
+            "#
+        );
         let result = format_with_default(&String::from(src));
         assert_eq!(src, result);
     }
@@ -1802,10 +1938,13 @@ mod tests_formatter {
 
     #[test]
     fn too_many_newlines() {
-        let src = r#"(ok (at-block
-  (unwrap! (get-stacks-block-info? id-header-hash block) ERR_BLOCK_NOT_FOUND)
-  (var-get count)
-))"#;
+        let src = indoc!(
+            r#"
+            (ok (at-block
+              (unwrap! (get-stacks-block-info? id-header-hash block) ERR_BLOCK_NOT_FOUND)
+              (var-get count)
+            ))"#
+        );
         let result = format_with_default(&String::from(src));
         assert_eq!(src, result);
     }
@@ -1823,81 +1962,96 @@ mod tests_formatter {
     fn closing_if_parens() {
         let src = "(something (if (true) (list) (list 1 2 3)))";
         let result = format_with_default(src);
-        let expected = r#"(something (if (true)
-  (list)
-  (list 1 2 3)
-))"#;
+        let expected = indoc!(
+            r#"
+            (something (if (true)
+              (list)
+              (list 1 2 3)
+            ))"#
+        );
         assert_eq!(expected, result);
     }
     #[test]
     fn ok_map() {
         let src = "(ok { a: b, c: d })";
         let result = format_with_default(src);
-        let expected = r#"(ok {
-  a: b,
-  c: d,
-})"#;
+        let expected = indoc!(
+            r#"
+            (ok {
+              a: b,
+              c: d,
+            })"#
+        );
         assert_eq!(expected, result);
     }
 
     #[test]
     fn if_let_if() {
-        let src = r#"(if (true)
-  (let ((a (if (true)
-      (list)
-      (list)
-    )))
-    (list)
-  )
-  (list)
-)"#;
+        let src = indoc!(
+            r#"
+            (if (true)
+              (let ((a (if (true)
+                  (list)
+                  (list)
+                )))
+                (list)
+              )
+              (list)
+            )"#
+        );
         let result = format_with_default(src);
         assert_eq!(src, result);
     }
 
     #[test]
     fn weird_nesting() {
-        let src = r#"(merge name-props {
-  something: u1,
-  ;; comment
-  renewal-height:
-    ;; If still within lifetime, extend from current renewal height; otherwise, use new renewal height
-    (if (< burn-block-height
-        (unwrap-panic (get-renewal-height (unwrap-panic (get-id-from-bns name namespace))))
-      )
-      (+
-        (unwrap-panic (get-renewal-height (unwrap-panic (get-id-from-bns name namespace))))
-        lifetime
-      )
-      new-renewal-height
-    ),
-})"#;
+        let src = indoc!(
+            r#"
+            (merge name-props {
+              something: u1,
+              ;; comment
+              renewal-height:
+                ;; If still within lifetime, extend from current renewal height; otherwise, use new renewal height
+                (if (< burn-block-height
+                    (unwrap-panic (get-renewal-height (unwrap-panic (get-id-from-bns name namespace))))
+                  )
+                  (+
+                    (unwrap-panic (get-renewal-height (unwrap-panic (get-id-from-bns name namespace))))
+                    lifetime
+                  )
+                  new-renewal-height
+                ),
+            })"#
+        );
         let result = format_with_default(src);
         assert_eq!(src, result);
     }
 
     #[test]
     fn weird_nesting_single_value() {
-        let src = r#"(begin
-  (map-set name-properties {
-    name: name,
-    namespace: namespace,
-  }
-    (merge name-props {
-      renewal-height:
-        ;; If still within lifetime, extend from current renewal height; otherwise, use new renewal height
-        (if (< burn-block-height
-            (unwrap-panic (get-renewal-height (unwrap-panic (get-id-from-bns name namespace))))
-          )
-          (+
-            (unwrap-panic (get-renewal-height (unwrap-panic (get-id-from-bns name namespace))))
-            lifetime
-          )
-          new-renewal-height
-        ),
-    })
-  )
-)"#;
+        let src = indoc!(
+            r#"
+            (begin
+              (map-set name-properties {
+                name: name,
+                namespace: namespace,
+              }
+                (merge name-props {
+                  renewal-height:
+                    ;; If still within lifetime, extend from current renewal height; otherwise, use new renewal height
+                    (if (< burn-block-height
+                        (unwrap-panic (get-renewal-height (unwrap-panic (get-id-from-bns name namespace))))
+                      )
+                      (+
+                        (unwrap-panic (get-renewal-height (unwrap-panic (get-id-from-bns name namespace))))
+                        lifetime
+                      )
+                      new-renewal-height
+                    ),
+                })
+              )
+            )"#
+        );
         let result = format_with_default(src);
         assert_eq!(src, result);
     }
@@ -1922,102 +2076,131 @@ mod tests_formatter {
 
     #[test]
     fn inner_list_with_maps() {
-        let src = r#"(list
-  u1
-  {
-    extension: .ccd001-direct-execute,
-    enabled: true,
-  }
-  ;; {extension: .ccd008-city-activation, enabled: true}
-  {
-    extension: .ccd009-auth-v2-adapter,
-    enabled: true,
-  }
-)"#;
+        let src = indoc!(
+            r#"
+            (list
+              u1
+              {
+                extension: .ccd001-direct-execute,
+                enabled: true,
+              }
+              ;; {extension: .ccd008-city-activation, enabled: true}
+              {
+                extension: .ccd009-auth-v2-adapter,
+                enabled: true,
+              }
+            )"#
+        );
         let result = format_with_default(src);
         assert_eq!(src, result);
     }
 
     #[test]
     fn valid_comment_breaking() {
-        let src = r#"(var-set voteStart block-height) ;; vote tracking
-(define-data-var yesVotes uint u0)
-"#;
+        let src = indoc!(
+            r#"
+            (var-set voteStart block-height) ;; vote tracking
+            (define-data-var yesVotes uint u0)
+            "#
+        );
         let result = format_with_default(src);
         assert_eq!(src, result);
     }
     #[test]
     fn significant_newline_preserving_inner() {
-        let src = r#";; comment
+        let src = indoc!(
+            r#"
+            ;; comment
 
-;; another
-;; more
+            ;; another
+            ;; more
 
 
-;; after 2 spaces, now it's 1"#;
+            ;; after 2 spaces, now it's 1"#
+        );
         let result = format_with_default(src);
-        let expected = r#";; comment
+        let expected = indoc!(
+            r#"
+            ;; comment
 
-;; another
-;; more
+            ;; another
+            ;; more
 
-;; after 2 spaces, now it's 1"#;
+            ;; after 2 spaces, now it's 1"#
+        );
         assert_eq!(expected, result);
     }
     #[test]
     fn significant_newline_preserving() {
-        let src = r#";; comment
+        let src = indoc!(
+            r#"
+            ;; comment
 
-;; another
-;; more
+            ;; another
+            ;; more
 
 
-;; after 2 spaces, now it's 1"#;
+            ;; after 2 spaces, now it's 1"#
+        );
         let result = format_with_default(src);
-        let expected = r#";; comment
+        let expected = indoc!(
+            r#"
+            ;; comment
 
-;; another
-;; more
+            ;; another
+            ;; more
 
-;; after 2 spaces, now it's 1"#;
+            ;; after 2 spaces, now it's 1"#
+        );
         assert_eq!(expected, result);
     }
     #[test]
     fn define_trait_test() {
-        let src = r#"(define-trait token-trait (
-  (transfer?
-    (principal principal uint) ;; principal
-    ;; pre comment
-    (response uint uint)       ;; comment
-  )
-  (get-balance
-    (principal)
-    (response uint uint)
-  )
-))
-"#;
+        let src = indoc!(
+            r#"
+            (define-trait token-trait (
+              (transfer?
+                (principal principal uint) ;; principal
+                ;; pre comment
+                (response uint uint)       ;; comment
+              )
+              (get-balance
+                (principal)
+                (response uint uint)
+              )
+            ))
+            "#
+        );
         let result = format_with_default(src);
         assert_eq!(src, result);
     }
     #[test]
     fn unwrap_wrapped_lines() {
-        let src = r#"(new-available-ids (if (is-eq no-to-treasury u0)
-  (var-get available-ids)
-  (unwrap-panic (as-max-len? (concat (var-get available-ids) ids-to-treasury) u10000))
-))"#;
+        let src = indoc!(
+            r#"
+            (new-available-ids (if (is-eq no-to-treasury u0)
+              (var-get available-ids)
+              (unwrap-panic (as-max-len? (concat (var-get available-ids) ids-to-treasury) u10000))
+            ))"#
+        );
         let result = format_with_default(src);
         assert_eq!(src, result);
     }
 
     #[test]
     fn wrapped_list() {
-        let src = r#"{ buckets: (list p-func-b1 p-func-b2 p-func-b3 p-func-b4 p-func-b5 p-func-b6 p-func-b7 p-func-b8 p-func-b9 p-func-b10 p-func-b11 p-func-b12 p-func-b13 p-func-b14 p-func-b15 p-func-b16), something: u1 }"#;
-        let expected = r#"{
-  buckets: (list p-func-b1 p-func-b2 p-func-b3 p-func-b4 p-func-b5 p-func-b6 p-func-b7
-    p-func-b8 p-func-b9 p-func-b10 p-func-b11 p-func-b12 p-func-b13 p-func-b14
-    p-func-b15 p-func-b16),
-  something: u1,
-}"#;
+        let src = indoc!(
+            r#"{ buckets: (list p-func-b1 p-func-b2 p-func-b3 p-func-b4 p-func-b5 p-func-b6 p-func-b7 p-func-b8 p-func-b9 p-func-b10 p-func-b11 p-func-b12 p-func-b13 p-func-b14 p-func-b15 p-func-b16), something: u1 }"#
+        );
+        let expected = indoc!(
+            r#"
+            {
+              buckets: (list p-func-b1 p-func-b2 p-func-b3 p-func-b4 p-func-b5 p-func-b6 p-func-b7
+                p-func-b8 p-func-b9 p-func-b10 p-func-b11 p-func-b12 p-func-b13 p-func-b14
+                p-func-b15 p-func-b16),
+              something: u1,
+            }"#
+        );
         let result = format_with_default(src);
         assert_eq!(expected, result);
     }
@@ -2044,13 +2227,16 @@ mod tests_formatter {
 
     #[test]
     fn retain_comment_newlines() {
-        let src = r#"(senderBalance (unwrap!
-  (at-block proposalBlockHash
-    ;; /g/.aibtc-faktory/dao_contract_token
-    (contract-call? .aibtc-faktory get-balance contract-caller)
-  )
-  ERR_FETCHING_TOKEN_DATA
-))"#;
+        let src = indoc!(
+            r#"
+            (senderBalance (unwrap!
+              (at-block proposalBlockHash
+                ;; /g/.aibtc-faktory/dao_contract_token
+                (contract-call? .aibtc-faktory get-balance contract-caller)
+              )
+              ERR_FETCHING_TOKEN_DATA
+            ))"#
+        );
         let result = format_with_default(src);
         assert_eq!(src, result);
     }
