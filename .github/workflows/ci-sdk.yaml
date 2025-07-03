@@ -20,6 +20,8 @@ jobs:
   build_wasm:
     name: Build and test Wasm packages
     runs-on: ubuntu-latest
+    env:
+      RUSTFLAGS: "-Dwarnings"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
