@@ -1,4 +1,4 @@
-;; max_line_length: 80, indentation: 2
+;; max_line_length: 80, indentation: 4
 ;; The .pox-4 contract
 ;; Error codes
 (define-constant ERR_STACKING_UNREACHABLE 255)
