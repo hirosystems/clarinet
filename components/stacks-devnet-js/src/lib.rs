@@ -201,6 +201,7 @@ impl StacksDevnet {
                             stacks_network::Context::empty(),
                             termination_tx,
                             None,
+                            false,
                         ));
 
                         let (devnet_events_rx, chains_coordinator_command_tx) = match res {
