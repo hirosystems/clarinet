@@ -51,6 +51,9 @@ jobs:
             ${{ runner.os }}-${{ github.job }}-${{ env.RUST_VERSION }}-
             ${{ runner.os }}-${{ github.job }}-
 
+      - name: Run clippy
+        run: cargo clippy --package clarinet-sdk-wasm --target wasm32-unknown-unknown
+
       - name: Install wasm-pack if not available
         run: |
           if ! command -v wasm-pack &> /dev/null; then
