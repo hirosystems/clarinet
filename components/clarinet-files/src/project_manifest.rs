@@ -463,6 +463,10 @@ mod tests {
         let result = get_epoch_and_clarity_version(Some("3.0"), None);
         assert_eq!(result, Ok((Epoch30, Clarity3)));
 
+        // epoch 3.1, no version
+        let result = get_epoch_and_clarity_version(Some("3.1"), None);
+        assert_eq!(result, Ok((Epoch31, Clarity3)));
+
         // no epoch
         // no epoch, version 1
         let result = get_epoch_and_clarity_version(None, Some("1"));
