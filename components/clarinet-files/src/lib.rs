@@ -284,9 +284,10 @@ impl FileLocation {
                 path.pop();
             }
             FileLocation::Url { url } => {
+                let url_string = url.to_string();
                 let mut segments = url
                     .path_segments_mut()
-                    .map_err(|_| "unable to mutate url".to_string())?;
+                    .map_err(|_| format!("unable to mutate url: {url_string}"))?;
                 segments.pop();
             }
         }
