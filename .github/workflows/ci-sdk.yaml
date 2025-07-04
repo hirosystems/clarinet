@@ -20,6 +20,8 @@ jobs:
   build_wasm:
     name: Build and test Wasm packages
     runs-on: ubuntu-latest
+    env:
+      RUSTFLAGS: "-Dwarnings"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -50,6 +52,9 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-${{ github.job }}-${{ env.RUST_VERSION }}-
             ${{ runner.os }}-${{ github.job }}-
+
+      - name: Run clippy
+        run: cargo clippy --package clarinet-sdk-wasm --target wasm32-unknown-unknown
 
       - name: Install wasm-pack if not available
         run: |
