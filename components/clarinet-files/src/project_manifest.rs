@@ -16,8 +16,6 @@ use crate::FileAccessor;
 
 pub const INVALID_CLARITY_VERSION: &str =
     "clarity_version field invalid (value supported: 1, 2, 3)";
-const INVALID_EPOCH: &str =
-    "epoch field invalid (value supported: 2.0, 2.05, 2.1, 2.2, 2.3, 2.4, 3.0)";
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct ClarityContractMetadata {
@@ -101,7 +99,13 @@ where
             None => None,
             Some(JsonValue::String(epoch)) => Some(epoch.as_str()),
             Some(JsonValue::Number(epoch)) => Some(epoch.as_str()),
-            _ => return Err(serde::de::Error::custom(INVALID_EPOCH)),
+            Some(value) => {
+                return Err(serde::de::Error::invalid_type(
+                    serde::de::Unexpected::Other(&format!("{value}")),
+                    // we try to parse the epoch as a string or number, but it's recommended to use a string
+                    &"epoch must be a string in json config",
+                ));
+            }
         };
 
         let parsed_clarity_version = match contract_settings.get("clarity_version") {
@@ -320,10 +324,14 @@ impl ProjectManifest {
                     };
 
                     let parsed_epoch = match contract_settings.get("epoch") {
+                        None => None,
                         Some(TomlValue::String(epoch)) => Some(epoch.clone()),
                         Some(TomlValue::Float(epoch)) => Some(epoch.to_string()),
-                        None => None,
-                        _ => return Err(INVALID_EPOCH.into()),
+                        Some(value) => {
+                            return Err(format!(
+                                "epoch must be a string in toml config (got {value})"
+                            ));
+                        }
                     };
 
                     let parsed_clarity_version = match contract_settings.get("clarity_version") {
@@ -390,7 +398,10 @@ fn get_epoch_and_clarity_version(
             "2.5" => StacksEpochId::Epoch25,
             "3" | "3.0" => StacksEpochId::Epoch30,
             "3.1" => StacksEpochId::Epoch31,
-            _ => return Err(INVALID_EPOCH.into()),
+            _ => return Err(
+                "epoch field invalid (value supported: 2.0, 2.05, 2.1, 2.2, 2.3, 2.4, 3.0, 3.1)"
+                    .into(),
+            ),
         },
     };
 
