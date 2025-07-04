@@ -79,6 +79,9 @@ impl DevnetDiffConfig {
                 name: "epoch_3_0".to_string(),
                 extractor: make_extractor(|config| config.epoch_3_0),
             },
+            // With the default snapshot, the devnet starts at epoch 3.0
+            // So users can set custom higher epoch heights
+
             // Stacking orders
             SignificantField {
                 name: "pox_stacking_orders".to_string(),
