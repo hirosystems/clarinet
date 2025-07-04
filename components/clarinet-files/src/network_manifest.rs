@@ -15,19 +15,24 @@ use super::{FileAccessor, FileLocation};
 
 pub const DEFAULT_DERIVATION_PATH: &str = "m/44'/5757'/0'/0/0";
 
-pub const DEFAULT_STACKS_NODE_IMAGE: &str = "quay.io/hirosystems/stacks-node:devnet-3.1";
-pub const DEFAULT_STACKS_SIGNER_IMAGE: &str = "quay.io/hirosystems/stacks-signer:devnet-3.1";
-pub const DEFAULT_STACKS_API_IMAGE: &str = "hirosystems/stacks-blockchain-api:master";
+pub const DEFAULT_STACKS_NODE_IMAGE: &str = "blockstack/stacks-blockchain:3.1.0.0.13-alpine";
+pub const DEFAULT_STACKS_SIGNER_IMAGE: &str = "blockstack/stacks-signer:3.1.0.0.13.0-alpine";
+pub const DEFAULT_STACKS_API_IMAGE: &str = "hirosystems/stacks-blockchain-api:latest";
 
-pub const DEFAULT_BITCOIN_NODE_IMAGE: &str = "quay.io/hirosystems/bitcoind:26.0";
+pub const DEFAULT_POSTGRES_IMAGE: &str = "postgres:alpine";
+
+pub const DEFAULT_BITCOIN_NODE_IMAGE: &str = "lncm/bitcoind:v27.2";
 pub const DEFAULT_BITCOIN_EXPLORER_IMAGE: &str = "quay.io/hirosystems/bitcoin-explorer:devnet";
+
 // This is the latest Explorer image before the "hybrid version" with SSR
 pub const DEFAULT_STACKS_EXPLORER_IMAGE: &str = "hirosystems/explorer:1.276.1";
-pub const DEFAULT_POSTGRES_IMAGE: &str = "postgres:alpine";
+
 pub const DEFAULT_SUBNET_NODE_IMAGE: &str = "hirosystems/stacks-subnets:0.8.1";
+
 pub const DEFAULT_SUBNET_API_IMAGE: &str = "hirosystems/stacks-blockchain-api:master";
 pub const DEFAULT_SUBNET_CONTRACT_ID: &str =
     "ST173JK7NZBA4BS05ZRATQH1K89YJMTGEH1Z5J52E.subnet-v3-0-1";
+
 pub const DEFAULT_STACKS_MINER_MNEMONIC: &str = "fragile loan twenty basic net assault jazz absorb diet talk art shock innocent float punch travel gadget embrace caught blossom hockey surround initial reduce";
 pub const DEFAULT_FAUCET_MNEMONIC: &str = "shadow private easily thought say logic fault paddle word top book during ignore notable orange flight clock image wealth health outside kitten belt reform";
 pub const DEFAULT_STACKER_MNEMONIC: &str = "empty lens any direct brother then drop fury rule pole win claim scissors list rescue horn rent inform relief jump sword weekend half legend";
@@ -366,7 +371,7 @@ pub struct DevnetConfig {
     pub epoch_3_0: u64,
     pub epoch_3_1: u64,
     pub use_docker_gateway_routing: bool,
-    pub docker_platform: String,
+    pub docker_platform: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -1100,9 +1105,7 @@ impl NetworkManifest {
                 use_docker_gateway_routing: devnet_config
                     .use_docker_gateway_routing
                     .unwrap_or(false),
-                docker_platform: devnet_config
-                    .docker_platform
-                    .unwrap_or(DEFAULT_DOCKER_PLATFORM.to_string()),
+                docker_platform: devnet_config.docker_platform,
             };
             Some(config)
         } else {
@@ -1233,7 +1236,7 @@ impl Default for DevnetConfig {
             epoch_3_0: DEFAULT_EPOCH_3_0,
             epoch_3_1: DEFAULT_EPOCH_3_1,
             use_docker_gateway_routing: false,
-            docker_platform: DEFAULT_DOCKER_PLATFORM.to_string(),
+            docker_platform: None,
         }
     }
 }
