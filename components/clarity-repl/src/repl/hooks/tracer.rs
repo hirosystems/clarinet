@@ -8,19 +8,18 @@ use clarity::vm::{
 };
 
 use crate::repl::interpreter::Txid;
-use crate::repl::tracer::SymbolicExpressionType::List;
 
-pub struct Tracer {
+pub struct TracerHook {
     stack: Vec<u64>,
     pending_call_string: Vec<String>,
     pending_args: Vec<Vec<u64>>,
     nb_of_emitted_events: usize,
 }
 
-impl Tracer {
-    pub fn new(snippet: String) -> Tracer {
+impl TracerHook {
+    pub fn new(snippet: String) -> Self {
         println!("{}  {}", snippet, black!("<console>"));
-        Tracer {
+        Self {
             stack: vec![u64::MAX],
             pending_call_string: Vec::new(),
             pending_args: Vec::new(),
@@ -29,14 +28,14 @@ impl Tracer {
     }
 }
 
-impl EvalHook for Tracer {
+impl EvalHook for TracerHook {
     fn will_begin_eval(
         &mut self,
         env: &mut Environment,
         context: &LocalContext,
         expr: &SymbolicExpression,
     ) {
-        let List(list) = &expr.expr else {
+        let SymbolicExpressionType::List(list) = &expr.expr else {
             return;
         };
         if let Some((function_name, args)) = list.split_first() {
