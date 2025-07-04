@@ -21,6 +21,7 @@ use chainhook_sdk::utils::Context;
 use clarinet_deployments::types::BurnchainEpochConfig;
 use clarinet_files::{
     DevnetConfig, DevnetConfigFile, NetworkManifest, ProjectManifest, StacksNetwork,
+    DEFAULT_DOCKER_PLATFORM,
 };
 use clarity::types::chainstate::StacksPrivateKey;
 use clarity::types::PrivateKey;
@@ -31,6 +32,8 @@ use reqwest::RequestBuilder;
 use serde_json::Value as JsonValue;
 
 use crate::event::{send_status_update, DevnetEvent, Status};
+
+const DOCKER_ERR_MSG: &str = "unable to get docker client";
 
 #[derive(Debug)]
 pub struct DevnetOrchestrator {
@@ -175,6 +178,13 @@ impl DevnetOrchestrator {
         })
     }
 
+    fn get_devnet_config(&self) -> Result<&DevnetConfig, String> {
+        self.network_config
+            .as_ref()
+            .and_then(|config| config.devnet.as_ref())
+            .ok_or_else(|| "unable to get devnet configuration".to_string())
+    }
+
     pub fn prepare_network_k8s_coordinator(
         &mut self,
         namespace: &str,
@@ -198,16 +208,11 @@ impl DevnetOrchestrator {
     }
 
     pub async fn prepare_local_network(&mut self) -> Result<ServicesMapHosts, String> {
-        let (docker, devnet_config) = match (&self.docker_client, &self.network_config) {
-            (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
-                Some(ref devnet_config) => (docker, devnet_config),
-                _ => return Err("unable to get devnet config".to_string()),
-            },
-            _ => return Err("unable to get devnet config".to_string()),
-        };
+        let docker = self.docker_client.as_ref().ok_or(DOCKER_ERR_MSG)?;
+        let devnet_config = self.get_devnet_config()?;
 
-        // First, let's make sure that we pruned staled resources correctly
-        // self.clean_previous_session().await?;
+        // prune any staled resources from previous sessions
+        self.clean_previous_session().await?;
 
         let mut labels = HashMap::new();
         labels.insert("project", self.network_name.as_str());
@@ -292,13 +297,7 @@ impl DevnetOrchestrator {
         ctx: &Context,
         no_snapshot: bool,
     ) -> Result<(), String> {
-        let (_docker, devnet_config) = match (&self.docker_client, &self.network_config) {
-            (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
-                Some(ref devnet_config) => (docker, devnet_config),
-                _ => return Err("unable to get devnet config".to_string()),
-            },
-            _ => return Err("unable to get devnet config".to_string()),
-        };
+        let devnet_config = self.get_devnet_config()?;
 
         let mut boot_index = 1;
 
@@ -780,15 +779,16 @@ impl DevnetOrchestrator {
         boot_index: u32,
         no_snapshot: bool,
     ) -> Result<Config<String>, String> {
-        let devnet_config = match &self.network_config {
-            Some(ref network_config) => match network_config.devnet {
-                Some(ref devnet_config) => devnet_config,
-                _ => return Err("unable to get devnet configuration".into()),
-            },
-            _ => return Err("unable to get Docker client".into()),
-        };
+        let devnet_config = self.get_devnet_config()?;
 
         let mut port_bindings = HashMap::new();
+        port_bindings.insert(
+            format!("{}/tcp", devnet_config.bitcoin_node_rpc_port),
+            Some(vec![PortBinding {
+                host_ip: Some(String::from("0.0.0.0")),
+                host_port: Some(format!("{}/tcp", devnet_config.bitcoin_node_rpc_port)),
+            }]),
+        );
         port_bindings.insert(
             format!("{}/tcp", devnet_config.bitcoin_node_p2p_port),
             Some(vec![PortBinding {
@@ -796,11 +796,20 @@ impl DevnetOrchestrator {
                 host_port: Some(format!("{}/tcp", devnet_config.bitcoin_node_p2p_port)),
             }]),
         );
+        // ZMQ block notifications
         port_bindings.insert(
-            format!("{}/tcp", devnet_config.bitcoin_node_rpc_port),
+            format!("{}/tcp", 28332),
             Some(vec![PortBinding {
                 host_ip: Some(String::from("0.0.0.0")),
-                host_port: Some(format!("{}/tcp", devnet_config.bitcoin_node_rpc_port)),
+                host_port: Some(format!("{}/tcp", 28332)),
+            }]),
+        );
+        // ZMQ transaction notifications
+        port_bindings.insert(
+            format!("{}/tcp", 28333),
+            Some(vec![PortBinding {
+                host_ip: Some(String::from("0.0.0.0")),
+                host_port: Some(format!("{}/tcp", 28333)),
             }]),
         );
 
@@ -874,7 +883,7 @@ rpcport={bitcoin_node_rpc_port}
 
         if devnet_config.bind_containers_volumes {
             binds.push(format!(
-                "{}/data/{}/bitcoin:/root/.bitcoin",
+                "{}/data/{}/bitcoin:/home/bitcoin/.bitcoin",
                 devnet_config.working_dir, boot_index
             ));
         }
@@ -883,14 +892,15 @@ rpcport={bitcoin_node_rpc_port}
             "/usr/local/bin/bitcoind".into(),
             "-conf=/etc/bitcoin/bitcoin.conf".into(),
             "-nodebuglogfile".into(),
-            "-pid=/run/bitcoind.pid".into(),
-            "-datadir=/root/.bitcoin".into(),
+            "-pid=/home/bitcoin/.bitcoin/bitcoind.pid".into(),
+            "-datadir=/home/bitcoin/.bitcoin".into(),
         ];
         if !no_snapshot {
             cmd_args.push("-reindex".into());
         }
         let config = Config {
             labels: Some(labels),
+            user: Some("1000".to_string()), // Run as user 10000
             image: Some(devnet_config.bitcoin_node_image_url.clone()),
             domainname: Some(self.network_name.to_string()),
             tty: None,
@@ -917,19 +927,14 @@ rpcport={bitcoin_node_rpc_port}
         ctx: &Context,
         no_snapshot: bool,
     ) -> Result<(), String> {
-        let (docker, devnet_config) = match (&self.docker_client, &self.network_config) {
-            (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
-                Some(ref devnet_config) => (docker, devnet_config),
-                _ => return Err("unable to get devnet configuration".into()),
-            },
-            _ => return Err("unable to get Docker client".into()),
-        };
+        let docker = self.docker_client.as_ref().ok_or(DOCKER_ERR_MSG)?;
+        let devnet_config = self.get_devnet_config()?;
 
         let _info = docker
             .create_image(
                 Some(CreateImageOptions {
                     from_image: devnet_config.bitcoin_node_image_url.clone(),
-                    platform: devnet_config.docker_platform.clone(),
+                    platform: devnet_config.docker_platform.clone().unwrap_or_default(),
                     ..Default::default()
                 }),
                 None,
@@ -938,13 +943,13 @@ rpcport={bitcoin_node_rpc_port}
             .try_collect::<Vec<_>>()
             .await
             .map_err(|e| formatted_docker_error("unable to create bitcoind image", e))?;
-
-        let config = self.prepare_bitcoin_node_config(1, no_snapshot)?;
         let container_name = format!("bitcoin-node.{}", self.network_name);
         let options = CreateContainerOptions {
             name: container_name.as_str(),
-            platform: Some(&devnet_config.docker_platform),
+            platform: devnet_config.docker_platform.as_deref(),
         };
+
+        let config = self.prepare_bitcoin_node_config(1, no_snapshot)?;
 
         let container = match docker
             .create_container::<&str, String>(Some(options.clone()), config.clone())
@@ -1064,13 +1069,11 @@ rpcport={bitcoin_node_rpc_port}
     }
 
     pub fn prepare_stacks_node_config(&self, boot_index: u32) -> Result<Config<String>, String> {
-        let (network_config, devnet_config) = match &self.network_config {
-            Some(ref network_config) => match network_config.devnet {
-                Some(ref devnet_config) => (network_config, devnet_config),
-                _ => return Err("unable to get devnet configuration".into()),
-            },
-            _ => return Err("unable to get Docker client".into()),
-        };
+        let network_config = self
+            .network_config
+            .as_ref()
+            .ok_or("unable to get network configuration")?;
+        let devnet_config = self.get_devnet_config()?;
 
         let mut port_bindings = HashMap::new();
         port_bindings.insert(
@@ -1325,19 +1328,14 @@ peer_port = {bitcoin_node_p2p_port}
         boot_index: u32,
         ctx: &Context,
     ) -> Result<(), String> {
-        let (docker, devnet_config) = match (&self.docker_client, &self.network_config) {
-            (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
-                Some(ref devnet_config) => (docker, devnet_config),
-                _ => return Err("unable to get devnet configuration".into()),
-            },
-            _ => return Err("unable to get Docker client".into()),
-        };
+        let docker = self.docker_client.as_ref().ok_or(DOCKER_ERR_MSG)?;
+        let devnet_config = self.get_devnet_config()?;
 
         let _info = docker
             .create_image(
                 Some(CreateImageOptions {
                     from_image: devnet_config.stacks_node_image_url.clone(),
-                    platform: devnet_config.docker_platform.clone(),
+                    platform: devnet_config.docker_platform.clone().unwrap_or_default(),
                     ..Default::default()
                 }),
                 None,
@@ -1346,13 +1344,12 @@ peer_port = {bitcoin_node_p2p_port}
             .try_collect::<Vec<_>>()
             .await
             .map_err(|e| format!("unable to create image: {e}"))?;
-
-        let config = self.prepare_stacks_node_config(boot_index)?;
-
         let options = CreateContainerOptions {
             name: format!("stacks-node.{}", self.network_name),
-            platform: Some(devnet_config.docker_platform.to_string()),
+            platform: devnet_config.docker_platform.clone(),
         };
+
+        let config = self.prepare_stacks_node_config(boot_index)?;
 
         let container = docker
             .create_container::<String, String>(Some(options), config)
@@ -1407,13 +1404,7 @@ peer_port = {bitcoin_node_p2p_port}
         signer_id: u32,
         signer_key: &StacksPrivateKey,
     ) -> Result<Config<String>, String> {
-        let devnet_config = match &self.network_config {
-            Some(ref network_config) => match network_config.devnet {
-                Some(ref devnet_config) => devnet_config,
-                _ => return Err("unable to initialize bitcoin node".to_string()),
-            },
-            _ => return Err("unable to initialize bitcoin node".to_string()),
-        };
+        let devnet_config = self.get_devnet_config()?;
 
         let signer_conf = format!(
             r#"
@@ -1497,19 +1488,14 @@ db_path = "stacks-signer-{signer_id}.sqlite"
         signer_id: u32,
         signer_key: &StacksPrivateKey,
     ) -> Result<(), String> {
-        let (docker, devnet_config) = match (&self.docker_client, &self.network_config) {
-            (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
-                Some(ref devnet_config) => (docker, devnet_config),
-                _ => return Err("unable to get devnet configuration".into()),
-            },
-            _ => return Err("unable to get Docker client".into()),
-        };
+        let docker = self.docker_client.as_ref().ok_or(DOCKER_ERR_MSG)?;
+        let devnet_config = self.get_devnet_config()?;
 
         let _info = docker
             .create_image(
                 Some(CreateImageOptions {
                     from_image: devnet_config.stacks_signer_image_url.clone(),
-                    platform: devnet_config.docker_platform.clone(),
+                    platform: devnet_config.docker_platform.clone().unwrap_or_default(),
                     ..Default::default()
                 }),
                 None,
@@ -1518,13 +1504,12 @@ db_path = "stacks-signer-{signer_id}.sqlite"
             .try_collect::<Vec<_>>()
             .await
             .map_err(|e| format!("unable to create image: {e}"))?;
-
-        let config = self.prepare_stacks_signer_config(boot_index, signer_id, signer_key)?;
-
         let options = CreateContainerOptions {
             name: format!("stacks-signer-{signer_id}.{}", self.network_name),
-            platform: Some(devnet_config.docker_platform.to_string()),
+            platform: devnet_config.docker_platform.clone(),
         };
+
+        let config = self.prepare_stacks_signer_config(boot_index, signer_id, signer_key)?;
 
         let container = docker
             .create_container::<String, String>(Some(options), config)
@@ -1754,19 +1739,18 @@ events_keys = ["*"]
         boot_index: u32,
         ctx: &Context,
     ) -> Result<(), String> {
-        let (docker, devnet_config) = match (&self.docker_client, &self.network_config) {
-            (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
-                Some(ref devnet_config) => (docker, devnet_config),
-                _ => return Err("unable to get devnet configuration".into()),
-            },
-            _ => return Err("unable to get Docker client".into()),
-        };
+        let docker = self.docker_client.as_ref().ok_or(DOCKER_ERR_MSG)?;
+        let devnet_config = self.get_devnet_config()?;
 
+        let platform = devnet_config
+            .docker_platform
+            .clone()
+            .unwrap_or(DEFAULT_DOCKER_PLATFORM.to_string());
         let _info = docker
             .create_image(
                 Some(CreateImageOptions {
                     from_image: devnet_config.subnet_node_image_url.clone(),
-                    platform: devnet_config.docker_platform.clone(),
+                    platform: platform.clone(),
                     ..Default::default()
                 }),
                 None,
@@ -1775,13 +1759,12 @@ events_keys = ["*"]
             .try_collect::<Vec<_>>()
             .await
             .map_err(|e| format!("unable to create image: {e}"))?;
-
-        let config = self.prepare_subnet_node_config(boot_index)?;
-
         let options = CreateContainerOptions {
             name: format!("subnet-node.{}", self.network_name),
-            platform: Some(devnet_config.docker_platform.to_string()),
+            platform: Some(platform),
         };
+
+        let config = self.prepare_subnet_node_config(boot_index)?;
 
         let container = docker
             .create_container::<String, String>(Some(options), config)
@@ -1814,19 +1797,17 @@ events_keys = ["*"]
     }
 
     pub async fn prepare_stacks_api_container(&mut self, ctx: &Context) -> Result<(), String> {
-        let (docker, _, devnet_config) = match (&self.docker_client, &self.network_config) {
-            (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
-                Some(ref devnet_config) => (docker, network_config, devnet_config),
-                _ => return Err("unable to get devnet configuration".into()),
-            },
-            _ => return Err("unable to get Docker client".into()),
-        };
+        let docker = self
+            .docker_client
+            .as_ref()
+            .ok_or_else(|| "unable to get Docker client".to_string())?;
+        let devnet_config = self.get_devnet_config()?;
 
         let _info = docker
             .create_image(
                 Some(CreateImageOptions {
                     from_image: devnet_config.stacks_api_image_url.clone(),
-                    platform: devnet_config.docker_platform.clone(),
+                    platform: devnet_config.docker_platform.clone().unwrap_or_default(),
                     ..Default::default()
                 }),
                 None,
@@ -1835,6 +1816,10 @@ events_keys = ["*"]
             .try_collect::<Vec<_>>()
             .await
             .map_err(|e| format!("unable to create image: {e}"))?;
+        let options = CreateContainerOptions {
+            name: format!("stacks-api.{}", self.network_name),
+            platform: devnet_config.docker_platform.clone(),
+        };
 
         let mut port_bindings = HashMap::new();
         port_bindings.insert(
@@ -1899,11 +1884,6 @@ events_keys = ["*"]
                 ..Default::default()
             }),
             ..Default::default()
-        };
-
-        let options = CreateContainerOptions {
-            name: format!("stacks-api.{}", self.network_name),
-            platform: Some(devnet_config.docker_platform.to_string()),
         };
 
         let container = docker
@@ -2026,11 +2006,15 @@ events_keys = ["*"]
             _ => return Err("unable to get Docker client".into()),
         };
 
+        let platform = devnet_config
+            .docker_platform
+            .clone()
+            .unwrap_or(DEFAULT_DOCKER_PLATFORM.to_string());
         let _info = docker
             .create_image(
                 Some(CreateImageOptions {
                     from_image: devnet_config.subnet_api_image_url.clone(),
-                    platform: devnet_config.docker_platform.clone(),
+                    platform: platform.clone(),
                     ..Default::default()
                 }),
                 None,
@@ -2039,6 +2023,10 @@ events_keys = ["*"]
             .try_collect::<Vec<_>>()
             .await
             .map_err(|e| format!("unable to create image: {e}"))?;
+        let options = CreateContainerOptions {
+            name: format!("subnet-api.{}", self.network_name),
+            platform: Some(platform),
+        };
 
         let mut port_bindings = HashMap::new();
         port_bindings.insert(
@@ -2103,11 +2091,6 @@ events_keys = ["*"]
                 ..Default::default()
             }),
             ..Default::default()
-        };
-
-        let options = CreateContainerOptions {
-            name: format!("subnet-api.{}", self.network_name),
-            platform: Some(devnet_config.docker_platform.to_string()),
         };
 
         let container = docker
@@ -2242,13 +2225,8 @@ events_keys = ["*"]
 
     pub async fn boot_subnet_api_container(&self) -> Result<(), String> {
         // Before booting the subnet-api, we need to create an additional DB in the postgres container.
-        let (docker, _, devnet_config) = match (&self.docker_client, &self.network_config) {
-            (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
-                Some(ref devnet_config) => (docker, network_config, devnet_config),
-                _ => return Err("unable to get devnet configuration".into()),
-            },
-            _ => return Err("unable to get Docker client".into()),
-        };
+        let docker = self.docker_client.as_ref().ok_or(DOCKER_ERR_MSG)?;
+        let devnet_config = self.get_devnet_config()?;
 
         let postgres_container = match &self.postgres_container_id {
             Some(container) => container.clone(),
@@ -2299,19 +2277,14 @@ events_keys = ["*"]
     }
 
     pub async fn prepare_postgres_container(&mut self, ctx: &Context) -> Result<(), String> {
-        let (docker, _, devnet_config) = match (&self.docker_client, &self.network_config) {
-            (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
-                Some(ref devnet_config) => (docker, network_config, devnet_config),
-                _ => return Err("unable to get devnet configuration".into()),
-            },
-            _ => return Err("unable to get Docker client".into()),
-        };
+        let docker = self.docker_client.as_ref().ok_or(DOCKER_ERR_MSG)?;
+        let devnet_config = self.get_devnet_config()?;
 
         let _info = docker
             .create_image(
                 Some(CreateImageOptions {
                     from_image: devnet_config.postgres_image_url.clone(),
-                    platform: devnet_config.docker_platform.clone(),
+                    platform: devnet_config.docker_platform.clone().unwrap_or_default(),
                     ..Default::default()
                 }),
                 None,
@@ -2320,6 +2293,10 @@ events_keys = ["*"]
             .try_collect::<Vec<_>>()
             .await
             .map_err(|e| format!("unable to create image: {e}"))?;
+        let options = CreateContainerOptions {
+            name: format!("postgres.{}", self.network_name),
+            platform: devnet_config.docker_platform.clone(),
+        };
 
         let mut port_bindings = HashMap::new();
         port_bindings.insert(
@@ -2355,11 +2332,6 @@ events_keys = ["*"]
             ..Default::default()
         };
 
-        let options = CreateContainerOptions {
-            name: format!("postgres.{}", self.network_name),
-            platform: Some(devnet_config.docker_platform.to_string()),
-        };
-
         let container = docker
             .create_container::<String, String>(Some(options), config)
             .await
@@ -2391,19 +2363,18 @@ events_keys = ["*"]
     }
 
     pub async fn prepare_stacks_explorer_container(&mut self, ctx: &Context) -> Result<(), String> {
-        let (docker, _, devnet_config) = match (&self.docker_client, &self.network_config) {
-            (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
-                Some(ref devnet_config) => (docker, network_config, devnet_config),
-                _ => return Err("unable to get devnet configuration".into()),
-            },
-            _ => return Err("unable to get Docker client".into()),
-        };
+        let docker = self.docker_client.as_ref().ok_or(DOCKER_ERR_MSG)?;
+        let devnet_config = self.get_devnet_config()?;
 
+        let platform = devnet_config
+            .docker_platform
+            .clone()
+            .unwrap_or(DEFAULT_DOCKER_PLATFORM.to_string());
         let _info = docker
             .create_image(
                 Some(CreateImageOptions {
                     from_image: devnet_config.stacks_explorer_image_url.clone(),
-                    platform: devnet_config.docker_platform.clone(),
+                    platform: platform.clone(),
                     ..Default::default()
                 }),
                 None,
@@ -2412,6 +2383,11 @@ events_keys = ["*"]
             .try_collect::<Vec<_>>()
             .await
             .map_err(|e| format!("unable to create image: {e}"))?;
+        let options = CreateContainerOptions {
+            name: format!("stacks-explorer.{}", self.network_name),
+            platform: Some(platform),
+        };
+
         let explorer_guest_port = 3000;
         let mut port_bindings = HashMap::new();
         port_bindings.insert(
@@ -2463,11 +2439,6 @@ events_keys = ["*"]
             ..Default::default()
         };
 
-        let options = CreateContainerOptions {
-            name: format!("stacks-explorer.{}", self.network_name),
-            platform: Some(devnet_config.docker_platform.to_string()),
-        };
-
         let container = docker
             .create_container::<String, String>(Some(options), config)
             .await
@@ -2504,19 +2475,18 @@ events_keys = ["*"]
         &mut self,
         ctx: &Context,
     ) -> Result<(), String> {
-        let (docker, _, devnet_config) = match (&self.docker_client, &self.network_config) {
-            (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
-                Some(ref devnet_config) => (docker, network_config, devnet_config),
-                _ => return Err("unable to get devnet configuration".into()),
-            },
-            _ => return Err("unable to get Docker client".into()),
-        };
+        let docker = self.docker_client.as_ref().ok_or(DOCKER_ERR_MSG)?;
+        let devnet_config = self.get_devnet_config()?;
 
+        let platform = devnet_config
+            .docker_platform
+            .clone()
+            .unwrap_or(DEFAULT_DOCKER_PLATFORM.to_string());
         let _info = docker
             .create_image(
                 Some(CreateImageOptions {
                     from_image: devnet_config.bitcoin_explorer_image_url.clone(),
-                    platform: devnet_config.docker_platform.clone(),
+                    platform: platform.clone(),
                     ..Default::default()
                 }),
                 None,
@@ -2525,6 +2495,10 @@ events_keys = ["*"]
             .try_collect::<Vec<_>>()
             .await
             .map_err(|e| format!("unable to create image: {e}"))?;
+        let options = CreateContainerOptions {
+            name: format!("bitcoin-explorer.{}", self.network_name),
+            platform: Some(platform),
+        };
 
         let mut port_bindings = HashMap::new();
         port_bindings.insert(
@@ -2580,11 +2554,6 @@ events_keys = ["*"]
                 ..Default::default()
             }),
             ..Default::default()
-        };
-
-        let options = CreateContainerOptions {
-            name: format!("bitcoin-explorer.{}", self.network_name),
-            platform: Some(devnet_config.docker_platform.to_string()),
         };
 
         let container = docker
@@ -2710,10 +2679,6 @@ events_keys = ["*"]
             return Err("unable to get Docker client".into());
         };
 
-        // TODO(lgalabru): should we spawn
-        // docker run -d -p 5000:5000 --name registry registry:2.7
-        // ?
-
         // Prune
         let mut filters = HashMap::new();
         filters.insert(
@@ -2727,30 +2692,28 @@ events_keys = ["*"]
             .prune_containers(Some(PruneContainersOptions { filters }))
             .await;
 
-        let bitcoin_node_config = self.prepare_bitcoin_node_config(boot_index, no_snapshot)?;
-
         let platform = self
             .network_config
             .as_ref()
             .and_then(|c| c.devnet.as_ref())
-            .map(|c| c.docker_platform.to_string());
+            .and_then(|c| c.docker_platform.clone());
 
         let options = CreateContainerOptions {
             name: format!("bitcoin-node.{}", self.network_name),
             platform: platform.clone(),
         };
+        let bitcoin_node_config = self.prepare_bitcoin_node_config(boot_index, no_snapshot)?;
         let bitcoin_node_c_id = docker
             .create_container::<String, String>(Some(options), bitcoin_node_config)
             .await
             .map_err(|e| format!("unable to create container: {e}"))?
             .id;
 
-        let stacks_node_config = self.prepare_stacks_node_config(boot_index)?;
-
         let options = CreateContainerOptions {
             name: format!("stacks-node.{}", self.network_name),
             platform,
         };
+        let stacks_node_config = self.prepare_stacks_node_config(boot_index)?;
         let stacks_node_c_id = docker
             .create_container::<String, String>(Some(options), stacks_node_config)
             .await
@@ -2874,13 +2837,12 @@ events_keys = ["*"]
         use reqwest::Client as HttpClient;
         use serde_json::json;
 
-        let (devnet_config, accounts) = match &self.network_config {
-            Some(ref network_config) => match network_config.devnet {
-                Some(ref devnet_config) => (devnet_config, &network_config.accounts),
-                _ => return Err("unable to initialize bitcoin node".to_string()),
-            },
-            _ => return Err("unable to initialize bitcoin node".to_string()),
-        };
+        let devnet_config = self.get_devnet_config()?;
+        let accounts = self
+            .network_config
+            .as_ref()
+            .map(|config| &config.accounts)
+            .ok_or_else(|| "unable to initialize bitcoin node".to_string())?;
 
         let miner_address = Address::from_str(&devnet_config.miner_btc_address)
             .map_err(|e| format!("unable to create miner address: {e:?}"))?;
