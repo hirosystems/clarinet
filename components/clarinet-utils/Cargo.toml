@@ -6,8 +6,10 @@ license = "MIT"
 edition = "2021"
 
 [dependencies]
-bip32 =  { version = "0.5.3", features = ["mnemonic"] }
+bip39 = "2.2.0"
+bip32 = "0.5.3"
 libsecp256k1 = "0.7.0"
+rand.workspace = true
 
 [lib]
 name = "clarinet_utils"
