@@ -33,6 +33,8 @@ use serde_json::Value as JsonValue;
 
 use crate::event::{send_status_update, DevnetEvent, Status};
 
+const BITCOIND_DATA_DIR: &str = "/home/bitcoin/.bitcoin";
+
 const DOCKER_ERR_MSG: &str = "unable to get docker client";
 
 #[derive(Debug)]
@@ -889,12 +891,12 @@ rpcport={bitcoin_node_rpc_port}
             env.push("STACKS_BITCOIN_AUTOMINING_DISABLED=1".to_string());
         }
 
-        let mut binds = vec![format!("{}/conf:/etc/bitcoin", devnet_config.working_dir)];
+        let working_dir = &devnet_config.working_dir;
+        let mut binds = vec![format!("{working_dir}/conf:/etc/bitcoin")];
 
         if devnet_config.bind_containers_volumes {
             binds.push(format!(
-                "{}/data/{}/bitcoin:/home/bitcoin/.bitcoin",
-                devnet_config.working_dir, boot_index
+                "{working_dir}/data/{boot_index}/bitcoin:{BITCOIND_DATA_DIR}"
             ));
         }
 
@@ -902,8 +904,8 @@ rpcport={bitcoin_node_rpc_port}
             "/usr/local/bin/bitcoind".into(),
             "-conf=/etc/bitcoin/bitcoin.conf".into(),
             "-nodebuglogfile".into(),
-            "-pid=/home/bitcoin/.bitcoin/bitcoind.pid".into(),
-            "-datadir=/home/bitcoin/.bitcoin".into(),
+            format!("-pid={BITCOIND_DATA_DIR}/bitcoind.pid"),
+            format!("-datadir={BITCOIND_DATA_DIR}"),
         ];
         if !no_snapshot {
             cmd_args.push("-reindex".into());
@@ -1047,7 +1049,7 @@ rpcport={bitcoin_node_rpc_port}
         let bitcoin_snapshot = global_snapshot_dir.join("bitcoin").join("regtest");
         // XXX This shouldn't be needed
         let exec_config = bollard::exec::CreateExecOptions {
-            cmd: Some(vec!["mkdir", "-p", "/root/.bitcoin"]),
+            cmd: Some(vec!["mkdir", "-p", BITCOIND_DATA_DIR]),
             attach_stdout: Some(false),
             attach_stderr: Some(false),
             ..Default::default()
@@ -1068,7 +1070,7 @@ rpcport={bitcoin_node_rpc_port}
             copy_snapshot_to_container(
                 &container,
                 &bitcoin_snapshot,
-                "/root/.bitcoin/",
+                BITCOIND_DATA_DIR,
                 devnet_event_tx,
                 "Bitcoin",
             )
