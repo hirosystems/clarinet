@@ -9,7 +9,6 @@ exclude = ["index.node"]
 crate-type = ["cdylib"]
 
 [dependencies]
-bip39 = { version = "1.0.1", default-features = false }
 serde = "1"
 error-chain = "0.12"
 clarinet-files = { path = "../clarinet-files" }
