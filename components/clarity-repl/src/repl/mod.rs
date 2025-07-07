@@ -32,6 +32,7 @@ pub struct ClarityContract {
     pub name: String,
     pub deployer: ContractDeployer,
     pub clarity_version: ClarityVersion,
+    #[serde(serialize_with = "serialize_epoch")]
     pub epoch: StacksEpochId,
 }
 
@@ -40,62 +41,20 @@ impl Serialize for ClarityContract {
     where
         S: Serializer,
     {
-        let mut map = serializer.serialize_map(Some(1))?;
-        match self.code_source {
-            ClarityCodeSource::ContractOnDisk(ref path) => {
-                map.serialize_entry("path", &format!("{}", path.display()))?;
-            }
-            _ => unreachable!(),
-        }
-        match self.deployer {
-            ContractDeployer::LabeledDeployer(ref label) => {
-                map.serialize_entry("deployer", &label)?;
-            }
-            ContractDeployer::DefaultDeployer => {}
-            _ => unreachable!(),
-        }
-        match self.clarity_version {
-            ClarityVersion::Clarity1 => {
-                map.serialize_entry("clarity_version", &1)?;
-            }
-            ClarityVersion::Clarity2 => {
-                map.serialize_entry("clarity_version", &2)?;
-            }
-            ClarityVersion::Clarity3 => {
-                map.serialize_entry("clarity_version", &3)?;
-            }
-        }
+        let mut map = serializer.serialize_map(Some(4))?;
+        map.serialize_entry("path", &self.expect_contract_path_as_str())?;
+        map.serialize_entry("clarity_version", &self.clarity_version)?;
         match self.epoch {
-            StacksEpochId::Epoch10 => {
-                map.serialize_entry("epoch", &1.0)?;
-            }
-            StacksEpochId::Epoch20 => {
-                map.serialize_entry("epoch", &2.0)?;
-            }
-            StacksEpochId::Epoch2_05 => {
-                map.serialize_entry("epoch", &2.05)?;
-            }
-            StacksEpochId::Epoch21 => {
-                map.serialize_entry("epoch", &2.1)?;
-            }
-            StacksEpochId::Epoch22 => {
-                map.serialize_entry("epoch", &2.2)?;
-            }
-            StacksEpochId::Epoch23 => {
-                map.serialize_entry("epoch", &2.3)?;
-            }
-            StacksEpochId::Epoch24 => {
-                map.serialize_entry("epoch", &2.4)?;
-            }
-            StacksEpochId::Epoch25 => {
-                map.serialize_entry("epoch", &2.5)?;
-            }
-            StacksEpochId::Epoch30 => {
-                map.serialize_entry("epoch", &3.0)?;
-            }
-            StacksEpochId::Epoch31 => {
-                map.serialize_entry("epoch", &3.1)?;
-            }
+            StacksEpochId::Epoch10 => map.serialize_entry("epoch", &1.0)?,
+            StacksEpochId::Epoch20 => map.serialize_entry("epoch", &2.0)?,
+            StacksEpochId::Epoch2_05 => map.serialize_entry("epoch", &2.05)?,
+            StacksEpochId::Epoch21 => map.serialize_entry("epoch", &2.1)?,
+            StacksEpochId::Epoch22 => map.serialize_entry("epoch", &2.2)?,
+            StacksEpochId::Epoch23 => map.serialize_entry("epoch", &2.3)?,
+            StacksEpochId::Epoch24 => map.serialize_entry("epoch", &2.4)?,
+            StacksEpochId::Epoch25 => map.serialize_entry("epoch", &2.5)?,
+            StacksEpochId::Epoch30 => map.serialize_entry("epoch", &3.0)?,
+            StacksEpochId::Epoch31 => map.serialize_entry("epoch", &"latest")?,
         }
         map.end()
     }
