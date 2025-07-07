@@ -467,6 +467,7 @@ impl SDK {
         if self.options.track_coverage {
             session.enable_coverage();
         }
+        session.enable_logger_hook();
         let executed_contracts = update_session_with_deployment_plan(
             &mut session,
             &deployment,

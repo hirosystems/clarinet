@@ -811,14 +811,14 @@ impl DevnetOrchestrator {
             format!("{}/tcp", devnet_config.bitcoin_node_p2p_port),
             Some(vec![PortBinding {
                 host_ip: Some(String::from("0.0.0.0")),
-                host_port: Some(format!("{}/tcp", devnet_config.bitcoin_node_p2p_port)),
+                host_port: Some(format!("{}", devnet_config.bitcoin_node_p2p_port)),
             }]),
         );
         port_bindings.insert(
             format!("{}/tcp", devnet_config.bitcoin_node_rpc_port),
             Some(vec![PortBinding {
                 host_ip: Some(String::from("0.0.0.0")),
-                host_port: Some(format!("{}/tcp", devnet_config.bitcoin_node_rpc_port)),
+                host_port: Some(format!("{}", devnet_config.bitcoin_node_rpc_port)),
             }]),
         );
 
@@ -996,16 +996,13 @@ rpcport={bitcoin_node_rpc_port}
             panic!("unable to get Docker client");
         };
         let res = docker.list_containers(options).await;
-        let containers = match res {
-            Ok(containers) => containers,
-            Err(e) => {
-                let err = formatdoc!("
-                    unable to communicate with Docker: {e}
-                    visit https://docs.hiro.so/clarinet/troubleshooting#i-am-unable-to-start-devnet-though-my-docker-is-running to resolve this issue.
-                ");
-                return Err(err);
-            }
-        };
+        let containers = res.map_err(|e|
+            formatdoc!("
+                unable to communicate with Docker: {e}
+                visit https://docs.hiro.so/clarinet/troubleshooting#i-am-unable-to-start-devnet-though-my-docker-is-running to resolve this issue.
+            ")
+        )?;
+
         let options = KillContainerOptions { signal: "SIGKILL" };
 
         for container in containers.iter() {
@@ -1092,14 +1089,14 @@ rpcport={bitcoin_node_rpc_port}
             format!("{}/tcp", devnet_config.stacks_node_p2p_port),
             Some(vec![PortBinding {
                 host_ip: Some(String::from("0.0.0.0")),
-                host_port: Some(format!("{}/tcp", devnet_config.stacks_node_p2p_port)),
+                host_port: Some(format!("{}", devnet_config.stacks_node_p2p_port)),
             }]),
         );
         port_bindings.insert(
             format!("{}/tcp", devnet_config.stacks_node_rpc_port),
             Some(vec![PortBinding {
                 host_ip: Some(String::from("0.0.0.0")),
-                host_port: Some(format!("{}/tcp", devnet_config.stacks_node_rpc_port)),
+                host_port: Some(format!("{}", devnet_config.stacks_node_rpc_port)),
             }]),
         );
 
@@ -1576,14 +1573,14 @@ db_path = "stacks-signer-{signer_id}.sqlite"
             format!("{}/tcp", devnet_config.subnet_node_p2p_port),
             Some(vec![PortBinding {
                 host_ip: Some(String::from("0.0.0.0")),
-                host_port: Some(format!("{}/tcp", devnet_config.subnet_node_p2p_port)),
+                host_port: Some(format!("{}", devnet_config.subnet_node_p2p_port)),
             }]),
         );
         port_bindings.insert(
             format!("{}/tcp", devnet_config.subnet_node_rpc_port),
             Some(vec![PortBinding {
                 host_ip: Some(String::from("0.0.0.0")),
-                host_port: Some(format!("{}/tcp", devnet_config.subnet_node_rpc_port)),
+                host_port: Some(format!("{}", devnet_config.subnet_node_rpc_port)),
             }]),
         );
         port_bindings.insert(
@@ -1832,7 +1829,7 @@ events_keys = ["*"]
             format!("{}/tcp", devnet_config.stacks_api_port),
             Some(vec![PortBinding {
                 host_ip: Some(String::from("0.0.0.0")),
-                host_port: Some(format!("{}/tcp", devnet_config.stacks_api_port)),
+                host_port: Some(format!("{}", devnet_config.stacks_api_port)),
             }]),
         );
 
@@ -2037,7 +2034,7 @@ events_keys = ["*"]
             format!("{}/tcp", devnet_config.subnet_api_port),
             Some(vec![PortBinding {
                 host_ip: Some(String::from("0.0.0.0")),
-                host_port: Some(format!("{}/tcp", devnet_config.subnet_api_port)),
+                host_port: Some(format!("{}", devnet_config.subnet_api_port)),
             }]),
         );
 
@@ -2306,7 +2303,7 @@ events_keys = ["*"]
             "5432/tcp".to_string(),
             Some(vec![PortBinding {
                 host_ip: Some(String::from("0.0.0.0")),
-                host_port: Some(format!("{}/tcp", devnet_config.postgres_port)),
+                host_port: Some(format!("{}", devnet_config.postgres_port)),
             }]),
         );
 
@@ -2392,7 +2389,7 @@ events_keys = ["*"]
             format!("{explorer_guest_port}/tcp"),
             Some(vec![PortBinding {
                 host_ip: Some(String::from("0.0.0.0")),
-                host_port: Some(format!("{}/tcp", devnet_config.stacks_explorer_port)),
+                host_port: Some(format!("{}", devnet_config.stacks_explorer_port)),
             }]),
         );
 
@@ -2499,7 +2496,7 @@ events_keys = ["*"]
             format!("{}/tcp", devnet_config.bitcoin_explorer_port),
             Some(vec![PortBinding {
                 host_ip: Some(String::from("0.0.0.0")),
-                host_port: Some(format!("{}/tcp", devnet_config.bitcoin_explorer_port)),
+                host_port: Some(format!("{}", devnet_config.bitcoin_explorer_port)),
             }]),
         );
 

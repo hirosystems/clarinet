@@ -1,5 +1,6 @@
 use std::collections::{BTreeMap, HashMap};
 use std::fmt;
+use std::fmt::Write as _;
 use std::num::ParseIntError;
 
 use clarity::codec::StacksMessageCodec;
@@ -25,6 +26,7 @@ use super::boot::{
     BOOT_CODE_MAINNET, BOOT_CODE_TESTNET, BOOT_MAINNET_PRINCIPAL, BOOT_TESTNET_PRINCIPAL,
 };
 use super::diagnostic::output_diagnostic;
+use super::hooks::logger::LoggerHook;
 use super::interpreter::ContractCallError;
 use super::{
     ClarityCodeSource, ClarityContract, ClarityInterpreter, ContractDeployer, SessionSettings,
@@ -53,6 +55,7 @@ pub struct Session {
     keywords_reference: HashMap<String, String>,
 
     coverage_hook: Option<CoverageHook>,
+    logger_hook: Option<LoggerHook>,
 }
 
 impl Session {
@@ -80,11 +83,16 @@ impl Session {
             keywords_reference: clarity_keywords(),
 
             coverage_hook: None,
+            logger_hook: None,
         }
     }
 
     pub fn enable_coverage(&mut self) {
         self.coverage_hook = Some(CoverageHook::new());
+    }
+
+    pub fn enable_logger_hook(&mut self) {
+        self.logger_hook = Some(LoggerHook::new());
     }
 
     pub fn set_test_name(&mut self, name: String) {
@@ -395,13 +403,13 @@ impl Session {
 
     #[cfg(not(target_arch = "wasm32"))]
     pub fn trace(&mut self, output: &mut Vec<String>, cmd: &str) {
-        use super::tracer::Tracer;
+        use super::hooks::tracer::TracerHook;
 
         let Some((_, snippet)) = cmd.split_once(' ') else {
             return output.push("Usage: ::trace <expr>".red().to_string());
         };
 
-        let mut tracer = Tracer::new(snippet.to_string());
+        let mut tracer = TracerHook::new(snippet.to_string());
 
         match self.eval_with_hooks(snippet.to_string(), Some(vec![&mut tracer]), false) {
             Ok(_) => (),
@@ -494,6 +502,9 @@ impl Session {
         if let Some(ref mut coverage_hook) = self.coverage_hook {
             hooks.push(coverage_hook);
         }
+        if let Some(ref mut logger_hook) = self.logger_hook {
+            hooks.push(logger_hook);
+        }
 
         if contract.clarity_version > ClarityVersion::default_for_epoch(contract.epoch) {
             let diagnostic = Diagnostic {
@@ -544,6 +555,9 @@ impl Session {
         let mut hooks: Vec<&mut dyn EvalHook> = vec![];
         if let Some(ref mut coverage_hook) = self.coverage_hook {
             hooks.push(coverage_hook);
+        }
+        if let Some(ref mut logger_hook) = self.logger_hook {
+            hooks.push(logger_hook);
         }
 
         let current_epoch = self.interpreter.datastore.get_current_epoch();
@@ -605,21 +619,20 @@ impl Session {
         if let Some(ref mut coverage_hook) = self.coverage_hook {
             hooks.push(coverage_hook);
         }
+        if let Some(ref mut logger_hook) = self.logger_hook {
+            hooks.push(logger_hook);
+        }
 
         let result = self
             .interpreter
             .run(&contract, None, cost_track, Some(hooks));
 
-        match result {
-            Ok(result) => {
-                if let EvaluationResult::Contract(contract_result) = &result.result {
-                    self.contracts
-                        .insert(contract_identifier, contract_result.contract.clone());
-                };
-                Ok(result)
+        result.inspect(|result| {
+            if let EvaluationResult::Contract(contract_result) = &result.result {
+                self.contracts
+                    .insert(contract_identifier, contract_result.contract.clone());
             }
-            Err(res) => Err(res),
-        }
+        })
     }
 
     /// Evaluate a Clarity snippet in order to use it as Clarity function arguments
@@ -997,12 +1010,12 @@ impl Session {
                 };
                 let mut s = String::with_capacity(2 * tx_bytes.len());
                 for byte in tx_bytes {
-                    s = format!("{s}{byte:02x}");
+                    write!(s, "{byte:02x}").unwrap();
                 }
                 s.green().to_string()
             }
             Err(diagnostics) => {
-                let lines: Vec<String> = snippet.split('\n').map(|s| s.to_string()).collect();
+                let lines: Vec<String> = snippet.split('\n').map(String::from).collect();
                 let mut output: Vec<String> = diagnostics
                     .iter()
                     .flat_map(|d| output_diagnostic(d, "encode", &lines))

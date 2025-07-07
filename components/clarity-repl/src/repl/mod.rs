@@ -2,11 +2,11 @@ pub mod boot;
 pub mod clarity_values;
 pub mod datastore;
 pub mod diagnostic;
+pub mod hooks;
 pub mod interpreter;
 pub mod remote_data;
 pub mod session;
 pub mod settings;
-pub mod tracer;
 
 #[cfg(any(not(target_arch = "wasm32"), feature = "dap"))]
 pub mod debug;

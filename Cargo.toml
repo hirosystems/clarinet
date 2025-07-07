@@ -30,20 +30,22 @@ colored = { version = "3" }
 crossterm = { version = "0.28" }
 pretty_assertions = "1.4"
 ratatui = { version = "0.29.0", default-features = false, features = ["crossterm"] }
-reqwest = { version = "0.12", default-features = false, features = [
+reqwest = { version = "0.12.22", default-features = false, features = [
     "json",
     "rustls-tls",
 ] }
 strum = { version = "0.27.1" }
 toml = { version = "0.5.6", features = ["preserve_order"] }
+tokio = { version = "1.46.1", features = ["full"] }
+tokio-util = { version = "0.7.15", features = ["codec"] }
 wasm-bindgen = { version = "=0.2.100" }
 wasm-bindgen-futures = { version = "=0.4.50" }
 web-sys = { version = "=0.3.77" }
 indoc = "2.0.3"
 
 [patch.crates-io]
-chainhook-sdk = { git = "https://github.com/hirosystems/chainhook.git", branch = "chore/upgrade-clarinet" }
-chainhook-types = { git = "https://github.com/hirosystems/chainhook.git", branch = "chore/upgrade-clarinet" }
+chainhook-sdk = { git = "https://github.com/hirosystems/chainhook.git", branch = "develop" }
+chainhook-types = { git = "https://github.com/hirosystems/chainhook.git", branch = "develop" }
 stacks-codec = { path = "./components/stacks-codec" }
 hiro-system-kit = { path = "./components/hiro-system-kit" }
 
@@ -51,3 +53,4 @@ hiro-system-kit = { path = "./components/hiro-system-kit" }
 # clarity = { path = "../stacks-core/clarity" }
 # stacks-common = { path = "../stacks-core/stacks-common" }
 # stackslib = { path = "../stacks-core/stackslib" }
+# pox-locking = { path = "../stacks-core/pox-locking" }

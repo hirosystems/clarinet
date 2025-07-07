@@ -23,7 +23,7 @@ ratatui = { workspace = true }
 chrono = "0.4.31"
 futures = "0.3.12"
 base58 = "0.2.0"
-tokio = { version = "1.35.1", features = ["full"] }
+tokio = { workspace = true}
 dirs = { version = "6.0.0" }
 clap = { version = "4.4.8", features = ["derive"] }
 serde_yaml = "0.8.23"

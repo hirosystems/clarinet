@@ -20,8 +20,7 @@ colored = { workspace = true }
 toml = { workspace = true }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1.0.79", features = ["preserve_order"] }
-serde_derive = "1"
-tokio = { version = "1.35.1", features = ["full"] }
+tokio = { workspace = true }
 crossterm = { workspace = true }
 ratatui = { workspace = true }
 similar = "2.1.0"

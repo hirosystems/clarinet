@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { Cl } from "@stacks/transactions";
-import { describe, expect, it, beforeEach, afterEach } from "vitest";
+import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 
 // test the built package and not the source code
 // makes it simpler to handle wasm build
@@ -357,7 +357,7 @@ describe("simnet can get contracts info and deploy contracts", () => {
     expect(getWithShortAddr).toBeDefined();
   });
 
-  it("can get commets in ast", () => {
+  it("can get comments in ast", () => {
     const counterAst = simnet.getContractAST(`${deployerAddr}.counter`);
 
     expect(counterAst).toBeDefined();
@@ -425,6 +425,46 @@ describe("simnet can transfer stx", () => {
     const stxAddress2 = stxBalances?.get(address2);
     expect(stxAddress1).toBe(99999999999000n);
     expect(stxAddress2).toBe(100000000001000n);
+  });
+});
+
+describe("prints logs", () => {
+  it("can log events in successful function calls", () => {
+    const consoleSpy = vi.spyOn(console, "log");
+    const res = simnet.callPublicFn("counter", "increment", [], address1);
+    expect(res.result).toStrictEqual(Cl.ok(Cl.bool(true)));
+
+    expect(consoleSpy).toHaveBeenCalledWith('"call increment" (counter:26)');
+    expect(consoleSpy).toHaveBeenCalledWith('"call inner-increment" (counter:15)');
+    consoleSpy.mockRestore();
+  });
+
+  it("can log events in failing function calls", () => {
+    const consoleSpy = vi.spyOn(console, "log");
+    const deploy = simnet.deployContract(
+      "test-contract",
+      '(define-public (always-fail) (begin (print "hello") (err u1)))',
+      { clarityVersion: 2 },
+      deployerAddr,
+    );
+    expect(deploy.result).toStrictEqual(Cl.bool(true));
+    const { result } = simnet.callPublicFn("test-contract", "always-fail", [], address1);
+    expect(result).toStrictEqual(Cl.error(Cl.uint(1)));
+
+    expect(consoleSpy).toHaveBeenCalledTimes(1);
+    expect(consoleSpy).toHaveBeenCalledWith('"hello" (test-contract:1)');
+    consoleSpy.mockRestore();
+  });
+
+  it("pretty print logs", () => {
+    const consoleSpy = vi.spyOn(console, "log");
+
+    const { result } = simnet.execute("(print { prop-a: 1, prop-b: 0x01 })");
+    expect(result.type).toBe("tuple");
+
+    expect(consoleSpy).toHaveBeenCalledTimes(1);
+    expect(consoleSpy).toHaveBeenCalledWith("{ prop-a: 1, prop-b: 0x01 } (contract-4:1)");
+    consoleSpy.mockRestore();
   });
 });
 
