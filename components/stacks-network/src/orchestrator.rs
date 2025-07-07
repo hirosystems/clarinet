@@ -2374,6 +2374,7 @@ events_keys = ["*"]
         let docker = self.docker_client.as_ref().ok_or(DOCKER_ERR_MSG)?;
         let devnet_config = self.get_devnet_config()?;
 
+        // default platform to linux/amd64 since the image is built for that
         let platform = devnet_config
             .docker_platform
             .clone()
@@ -2486,6 +2487,7 @@ events_keys = ["*"]
         let docker = self.docker_client.as_ref().ok_or(DOCKER_ERR_MSG)?;
         let devnet_config = self.get_devnet_config()?;
 
+        // default platform to linux/amd64 since the image is built for that
         let platform = devnet_config
             .docker_platform
             .clone()
