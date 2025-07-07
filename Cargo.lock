@@ -324,6 +324,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "bip39"
+version = "2.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "43d193de1f7487df1914d3a568b772458861d33f9c54249612cc2893d6915054"
+dependencies = [
+ "bitcoin_hashes 0.13.0",
+ "serde",
+ "unicode-normalization",
+]
+
+[[package]]
 name = "bitcoin"
 version = "0.31.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -781,7 +792,9 @@ name = "clarinet-utils"
 version = "1.0.0"
 dependencies = [
  "bip32",
+ "bip39 2.2.0",
  "libsecp256k1",
+ "rand",
 ]
 
 [[package]]
@@ -4697,7 +4710,7 @@ dependencies = [
 name = "stacks-devnet-js"
 version = "3.2.0"
 dependencies = [
- "bip39",
+ "bip39 1.2.0",
  "clarinet-deployments",
  "clarinet-files",
  "clarinet-utils",
@@ -5453,6 +5466,15 @@ name = "unicode-ident"
 version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "84a22b9f218b40614adcb3f4ff08b703773ad44fa9423e4e0d346d5db86e4ebc"
+
+[[package]]
+name = "unicode-normalization"
+version = "0.1.24"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5033c97c4262335cded6d6fc3e5c18ab755e1a3dc96376350f3d8e9f009ad956"
+dependencies = [
+ "tinyvec",
+]
 
 [[package]]
 name = "unicode-segmentation"

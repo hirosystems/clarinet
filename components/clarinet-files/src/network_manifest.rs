@@ -490,7 +490,7 @@ impl NetworkManifest {
 
                     let mnemonic = match account_settings.get("mnemonic") {
                         Some(Value::String(phrase)) => match mnemonic_from_phrase(phrase) {
-                            Ok(result) => result.phrase().to_string(),
+                            Ok(result) => result.to_string(),
                             Err(e) => {
                                 return Err(format!(
                                         "mnemonic (located in ./settings/{:?}.toml) for deploying address is invalid: {}",
@@ -498,7 +498,7 @@ impl NetworkManifest {
                                     ));
                             }
                         },
-                        _ => random_mnemonic().phrase().to_string(),
+                        _ => random_mnemonic().to_string(),
                     };
 
                     let derivation = match account_settings.get("derivation") {

@@ -399,7 +399,7 @@ impl StacksDevnet {
                 .downcast_or_throw::<JsString, _>(&mut cx)?
                 .value(&mut cx);
 
-            let mnemonic = mnemonic_from_phrase(&phrase).unwrap().phrase().to_string();
+            let mnemonic = mnemonic_from_phrase(&phrase).unwrap().to_string();
 
             let balance = match account_settings
                 .get(&mut cx, "balance")?
