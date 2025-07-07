@@ -772,9 +772,9 @@ pub async fn create_global_snapshot(
 ) {
     // First, remove the existing global snapshot if it exists
     if let Err(e) = remove_global_snapshot(devnet_event_tx).await {
-        let _ = devnet_event_tx.send(DevnetEvent::warning(
-            format!("Failed to remove existing global snapshot: {e}. Continuing with new snapshot creation.")
-        ));
+        let _ = devnet_event_tx.send(DevnetEvent::warning(format!(
+            "Failed to remove existing global snapshot: {e}. Continuing with new snapshot creation."
+        )));
     }
 
     let devnet_config = &devnet_event_observer_config.devnet_config;

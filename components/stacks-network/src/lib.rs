@@ -32,6 +32,7 @@ pub use orchestrator::DevnetOrchestrator;
 use orchestrator::ServicesMapHosts;
 
 use self::chains_coordinator::DevnetEventObserverConfig;
+
 #[allow(dead_code)]
 #[derive(Debug)]
 pub enum ChainsCoordinatorCommand {
