@@ -28,7 +28,7 @@ dirs = { version = "6.0.0" }
 clap = { version = "4.4.8", features = ["derive"] }
 serde_yaml = "0.8.23"
 toml = { workspace = true }
-rand = "0.8.5"
+rand = { workspace = true }
 flate2 = "1.1.1"
 tar = "0.4.44"
 indoc = { workspace = true }
