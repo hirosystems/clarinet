@@ -43,7 +43,7 @@ use crate::deployments::{
     write_deployment,
 };
 use crate::devnet::package::{self as Package, ConfigurationPackage};
-use crate::devnet::start::{start, StartConfig};
+use crate::devnet::start::start;
 use crate::generate::changes::{Changes, TOMLEdition};
 use crate::generate::{self};
 use crate::lsp::run_lsp;
@@ -461,6 +461,9 @@ struct DevnetStart {
     /// Save container logs locally
     #[clap(long = "save-container-logs")]
     pub save_container_logs: bool,
+    /// Create a new global snapshot when reaching epoch 3.0
+    #[clap(long = "create-new-snapshot")]
+    pub create_new_snapshot: bool,
     /// If specified, use this deployment file
     #[clap(long = "deployment-plan-path", short = 'p')]
     pub deployment_plan_path: Option<String>,
@@ -2055,14 +2058,14 @@ fn devnet_start(cmd: DevnetStart, clarinetrc: ClarinetRC) {
         prompt_user_to_continue();
         display_devnet_incompatibilities_continue()
     }
-    match start(StartConfig {
-        devnet: orchestrator,
+    match start(
+        orchestrator,
         deployment,
-        log_tx: None,
-        display_dashboard: !cmd.no_dashboard,
-        no_snapshot: cmd.no_snapshot,
-        save_container_logs: cmd.save_container_logs,
-    }) {
+        None,
+        !cmd.no_dashboard,
+        cmd.no_snapshot,
+        cmd.create_new_snapshot,
+    ) {
         Err(e) => {
             eprintln!("{}", format_err!(e));
             process::exit(1);

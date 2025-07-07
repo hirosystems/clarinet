@@ -179,6 +179,7 @@ pub async fn start_chains_coordinator(
     mining_command_tx: Sender<BitcoinMiningCommand>,
     mining_command_rx: Receiver<BitcoinMiningCommand>,
     using_snapshot: bool,
+    create_new_snapshot: bool,
     ctx: Context,
 ) -> Result<(), String> {
     let mut should_deploy_protocol = true; // Will change when `stacks-network` components becomes compatible with Testnet / Mainnet setups
@@ -406,15 +407,17 @@ pub async fn start_chains_coordinator(
                         let comment =
                             format!("mining blocks (chain_tip = #{bitcoin_block_height})");
 
-                        // Check if we've reached the target height for database export (142)
-                        // If we've reached epoch 3.0, create the global snapshot
-                        if bitcoin_block_height == config.devnet_config.epoch_3_0 {
-                            let _ = create_global_snapshot(
-                                &config,
-                                &devnet_event_tx,
-                                mining_command_tx.clone(),
-                            )
-                            .await;
+                        if create_new_snapshot {
+                            // Check if we've reached the target height for database export (142)
+                            // If we've reached epoch 3.0, create the global snapshot
+                            if bitcoin_block_height == config.devnet_config.epoch_3_0 {
+                                let _ = create_global_snapshot(
+                                    &config,
+                                    &devnet_event_tx,
+                                    mining_command_tx.clone(),
+                                )
+                                .await;
+                            }
                         }
                         // Stacking orders can't be published until devnet is ready
                         if !stacks_signers_keys.is_empty()
@@ -736,11 +739,44 @@ fn should_publish_stacking_orders(
     true
 }
 
+pub async fn remove_global_snapshot(devnet_event_tx: &Sender<DevnetEvent>) -> Result<(), String> {
+    let global_snapshot_dir = get_global_snapshot_dir();
+
+    // Check if the global snapshot directory exists
+    if !global_snapshot_dir.exists() {
+        let _ = devnet_event_tx.send(DevnetEvent::info(
+            "No existing global snapshot found to remove".to_string(),
+        ));
+        return Ok(());
+    }
+
+    let _ = devnet_event_tx.send(DevnetEvent::info(
+        "Removing existing global snapshot...".to_string(),
+    ));
+
+    // Remove the entire global snapshot directory
+    fs::remove_dir_all(&global_snapshot_dir)
+        .map_err(|e| format!("unable to remove global snapshot directory: {e:?}"))?;
+
+    let _ = devnet_event_tx.send(DevnetEvent::success(
+        "Existing global snapshot removed successfully".to_string(),
+    ));
+
+    Ok(())
+}
+
 pub async fn create_global_snapshot(
     devnet_event_observer_config: &DevnetEventObserverConfig,
     devnet_event_tx: &Sender<DevnetEvent>,
     mining_command_tx: Sender<BitcoinMiningCommand>,
 ) {
+    // First, remove the existing global snapshot if it exists
+    if let Err(e) = remove_global_snapshot(devnet_event_tx).await {
+        let _ = devnet_event_tx.send(DevnetEvent::warning(
+            format!("Failed to remove existing global snapshot: {e}. Continuing with new snapshot creation.")
+        ));
+    }
+
     let devnet_config = &devnet_event_observer_config.devnet_config;
     let global_snapshot_dir = get_global_snapshot_dir();
     let project_snapshot_dir = get_project_snapshot_dir(devnet_config);

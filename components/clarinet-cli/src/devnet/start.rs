@@ -13,17 +13,13 @@ use stacks_network::{
     DevnetOrchestrator, LogData,
 };
 
-pub struct StartConfig {
-    pub devnet: DevnetOrchestrator,
-    pub deployment: DeploymentSpecification,
-    pub log_tx: Option<Sender<LogData>>,
-    pub display_dashboard: bool,
-    pub no_snapshot: bool,
-    pub save_container_logs: bool,
-}
-
 pub fn start(
-    config: StartConfig,
+    devnet: DevnetOrchestrator,
+    deployment: DeploymentSpecification,
+    log_tx: Option<Sender<LogData>>,
+    display_dashboard: bool,
+    no_snapshot: bool,
+    create_new_snapshot: bool,
 ) -> Result<
     (
         Option<mpsc::Receiver<DevnetEvent>>,
@@ -33,7 +29,7 @@ pub fn start(
     String,
 > {
     let hooks = match load_chainhooks(
-        &config.devnet.manifest.location,
+        &devnet.manifest.location,
         &(BitcoinNetwork::Regtest, StacksNetwork::Devnet),
     ) {
         Ok(hooks) => hooks,
@@ -43,8 +39,7 @@ pub fn start(
         }
     };
 
-    let working_dir = config
-        .devnet
+    let working_dir = devnet
         .network_config
         .as_ref()
         .and_then(|c| c.devnet.as_ref())
@@ -74,16 +69,17 @@ pub fn start(
 
     let (orchestrator_terminated_tx, orchestrator_terminated_rx) = channel();
     let res = hiro_system_kit::nestable_block_on(do_run_local_devnet(
-        config.devnet,
-        config.deployment,
+        devnet,
+        deployment,
         &mut Some(hooks),
-        config.log_tx,
-        config.display_dashboard,
-        config.no_snapshot,
+        log_tx,
+        display_dashboard,
+        no_snapshot,
+        create_new_snapshot,
         ctx,
         orchestrator_terminated_tx,
         Some(orchestrator_terminated_rx),
-        config.save_container_logs,
+        false,
     ));
     println!(
         "{} logs and chainstate available at location {}",
