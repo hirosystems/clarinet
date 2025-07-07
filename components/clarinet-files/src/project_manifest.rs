@@ -5,7 +5,7 @@ use std::str::FromStr;
 use clarity::types::StacksEpochId;
 use clarity::vm::ClarityVersion;
 use clarity_repl::repl;
-use clarity_repl::repl::{ClarityCodeSource, ClarityContract, ContractDeployer};
+use clarity_repl::repl::{ClarityCodeSource, ClarityContract, ContractDeployer, DEFAULT_EPOCH};
 use serde::ser::SerializeMap;
 use serde::{Deserializer, Serialize, Serializer};
 use serde_json::Value as JsonValue;
@@ -383,12 +383,13 @@ fn get_epoch_and_clarity_version(
     settings_epoch: Option<&str>,
     settings_clarity_version: Option<&str>,
 ) -> Result<(StacksEpochId, ClarityVersion), String> {
-    // if neither epoch or version are specified in clarinet.toml use: epoch 2.05 and clarity 1
+    // if neither epoch or version are specified in clarinet.toml use: epoch DEFAULT_EPOCH and clarity 3
     // if epoch is specified but not version: use the default version for that epoch
 
     let epoch = match settings_epoch {
-        None => StacksEpochId::Epoch2_05,
+        None => DEFAULT_EPOCH,
         Some(epoch) => match epoch {
+            "latest" => DEFAULT_EPOCH,
             "2" | "2.0" => StacksEpochId::Epoch20,
             "2.05" => StacksEpochId::Epoch2_05,
             "2.1" => StacksEpochId::Epoch21,
@@ -399,7 +400,7 @@ fn get_epoch_and_clarity_version(
             "3" | "3.0" => StacksEpochId::Epoch30,
             "3.1" => StacksEpochId::Epoch31,
             _ => return Err(
-                "epoch field invalid (value supported: 2.0, 2.05, 2.1, 2.2, 2.3, 2.4, 3.0, 3.1)"
+                "epoch field invalid (value supported: latest, 2.0, 2.05, 2.1, 2.2, 2.3, 2.4, 3.0, 3.1)"
                     .into(),
             ),
         },
@@ -407,7 +408,7 @@ fn get_epoch_and_clarity_version(
 
     let clarity_version = match settings_clarity_version {
         None => match settings_epoch {
-            None => ClarityVersion::Clarity1,
+            None => ClarityVersion::Clarity3,
             Some(_) => ClarityVersion::default_for_epoch(epoch),
         },
         Some(version) => ClarityVersion::from_str(&format!("clarity{version}"))
@@ -456,7 +457,11 @@ mod tests {
 
         // no epoch, no version
         let result = get_epoch_and_clarity_version(None, None);
-        assert_eq!(result, Ok((Epoch2_05, Clarity1)));
+        assert_eq!(result, Ok((Epoch31, Clarity3)));
+
+        // epoch "latest", no version
+        let result = get_epoch_and_clarity_version(Some("latest"), None);
+        assert_eq!(result, Ok((Epoch31, Clarity3)));
 
         // epoch 2.0, no version
         let result = get_epoch_and_clarity_version(Some("2.0"), None);
@@ -478,29 +483,32 @@ mod tests {
         let result = get_epoch_and_clarity_version(Some("3.1"), None);
         assert_eq!(result, Ok((Epoch31, Clarity3)));
 
-        // no epoch
         // no epoch, version 1
         let result = get_epoch_and_clarity_version(None, Some("1"));
-        assert_eq!(result, Ok((Epoch2_05, Clarity1)));
+        assert_eq!(result, Ok((Epoch31, Clarity1)));
 
-        // no epoch, version 2 -> error, must specify epoch
+        // no epoch, version 2
         let result = get_epoch_and_clarity_version(None, Some("2"));
-        assert_eq!(result, Err("Clarity 2 can not be used with 2.05".into()));
+        assert_eq!(result, Ok((Epoch31, Clarity2)));
+
+        // no epoch, version 3
+        let result = get_epoch_and_clarity_version(None, Some("3"));
+        assert_eq!(result, Ok((Epoch31, Clarity3)));
 
         // epoch and clarity version
-        // no epoch 2.05, version 1
+        // epoch 2.05, version 1
         let result = get_epoch_and_clarity_version(Some("2.05"), Some("1"));
         assert_eq!(result, Ok((Epoch2_05, Clarity1)));
 
-        // no epoch 2.05, version 2 -> error
+        // epoch 2.05, version 2 -> error
         let result = get_epoch_and_clarity_version(Some("2.05"), Some("2"));
         assert_eq!(result, Err("Clarity 2 can not be used with 2.05".into()));
 
-        // no epoch 2.05, version 1
+        // epoch 2.1, version 1
         let result = get_epoch_and_clarity_version(Some("2.1"), Some("1"));
         assert_eq!(result, Ok((Epoch21, Clarity1)));
 
-        // no epoch 2.05, version 2 -> error
+        // epoch 2.1, version 2
         let result = get_epoch_and_clarity_version(Some("2.1"), Some("2"));
         assert_eq!(result, Ok((Epoch21, Clarity2)));
     }

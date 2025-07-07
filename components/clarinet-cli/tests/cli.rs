@@ -125,6 +125,14 @@ fn test_contract_new() {
     let expected = format!(";; title: {contract_name}");
     assert_eq!(contract_str.lines().next().unwrap_or(""), expected);
 
+    // Verify that the TOML contains "latest" as the epoch value
+    let manifest_str = fs::read_to_string(project_path.join("Clarinet.toml"))
+        .expect("Failed to read Clarinet.toml");
+    assert!(
+        manifest_str.contains("epoch = 'latest'"),
+        "TOML should contain epoch = 'latest'"
+    );
+
     let expected_files = [
         "contracts/test_contract.clar",
         "tests/test_contract.test.ts",
@@ -157,6 +165,57 @@ fn test_requirement_add() {
         .flatten()
         .any(|c| c.contract_id == requirement_name);
     assert!(found, "Requirement not found in manifest");
+}
+
+#[test]
+fn test_default_epoch_handling() {
+    // Explicit epoch = 3.1 should serialize as 3.1
+    let project_name = "test_default_epoch_3_1";
+    let temp_dir = create_new_project(project_name);
+    let project_path = temp_dir.path().join(project_name);
+
+    // Create a contract with explicit epoch = 3.1
+    let contract_name = "test_contract_default_epoch_3_1";
+    let output = Command::new(env!("CARGO_BIN_EXE_clarinet"))
+        .args(["contract", "new", contract_name])
+        .current_dir(&project_path)
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "clarinet contract new failed");
+
+    // Read the generated Clarinet.toml
+    let clarinet_toml_path = project_path.join("Clarinet.toml");
+    let toml_content = std::fs::read_to_string(&clarinet_toml_path).unwrap();
+
+    // epoch should be 'latest' by default
+    assert!(
+        toml_content.contains("epoch = 'latest'"),
+        "New contracts should default to 'latest', but found: {}",
+        toml_content
+            .lines()
+            .find(|line| line.contains("epoch"))
+            .unwrap_or("no epoch line")
+    );
+
+    // Test 2: edit the TOML to set epoch = 3.1 and fix clarity_version to be an integer
+    let updated_toml = toml_content
+        .replace("epoch = 'latest'", "epoch = 3.1")
+        .replace("clarity_version = 'Clarity3'", "clarity_version = 3");
+    std::fs::write(&clarinet_toml_path, updated_toml).unwrap();
+
+    // Load the manifest and verify the epoch is correctly parsed as 3.1
+    let manifest = parse_manifest(&project_path);
+    let contract = manifest
+        .contracts
+        .get(contract_name)
+        .expect("Contract not found in manifest");
+
+    use clarity_repl::clarity::StacksEpochId;
+    assert_eq!(
+        contract.epoch,
+        StacksEpochId::Epoch31,
+        "Explicit epoch = 3.1 should be parsed as StacksEpochId::Epoch31"
+    );
 }
 
 #[test]
