@@ -406,16 +406,6 @@ pub async fn start_chains_coordinator(
                         let comment =
                             format!("mining blocks (chain_tip = #{bitcoin_block_height})");
 
-                        // Check if we've reached the target height for database export (142)
-                        // If we've reached epoch 3.0, create the global snapshot
-                        if bitcoin_block_height == config.devnet_config.epoch_3_0 {
-                            let _ = create_global_snapshot(
-                                &config,
-                                &devnet_event_tx,
-                                mining_command_tx.clone(),
-                            )
-                            .await;
-                        }
                         // Stacking orders can't be published until devnet is ready
                         if !stacks_signers_keys.is_empty()
                             && bitcoin_block_height >= DEFAULT_FIRST_BURN_HEADER_HEIGHT + 10
@@ -734,105 +724,6 @@ fn should_publish_stacking_orders(
     }
 
     true
-}
-
-pub async fn create_global_snapshot(
-    devnet_event_observer_config: &DevnetEventObserverConfig,
-    devnet_event_tx: &Sender<DevnetEvent>,
-    mining_command_tx: Sender<BitcoinMiningCommand>,
-) {
-    let devnet_config = &devnet_event_observer_config.devnet_config;
-    let global_snapshot_dir = get_global_snapshot_dir();
-    let project_snapshot_dir = get_project_snapshot_dir(devnet_config);
-
-    // Project snapshot marker
-    let project_marker = project_snapshot_dir.join("epoch_3_ready");
-    if !project_marker.exists() {
-        match std::fs::File::create(&project_marker) {
-            Ok(_) => {
-                let _ = devnet_event_tx.send(DevnetEvent::success(
-                    "Project snapshot data prepared up to epoch 3.0. Future project starts will be faster.".to_string(),
-                ));
-            }
-            Err(e) => {
-                let _ = devnet_event_tx.send(DevnetEvent::warning(format!(
-                    "Failed to create project snapshot marker file: {e}"
-                )));
-            }
-        }
-    }
-
-    let global_marker = global_snapshot_dir.join("epoch_3_ready");
-    if !global_marker.exists() {
-        // Copy project snapshot to global snapshot as a template
-        if project_snapshot_dir != global_snapshot_dir {
-            // Copy bitcoin data
-            let project_bitcoin_snapshot = project_snapshot_dir.join("bitcoin");
-            let global_bitcoin_snapshot = global_snapshot_dir.join("bitcoin");
-            if project_bitcoin_snapshot.exists() {
-                let _ = copy_directory(&project_bitcoin_snapshot, &global_bitcoin_snapshot, None)
-                    .inspect_err(|e| {
-                        let _ = devnet_event_tx.send(DevnetEvent::warning(format!(
-                            "Failed to copy bitcoin snapshot: {e}"
-                        )));
-                    });
-            }
-
-            // Copy stacks data
-            let project_stacks_snapshot = project_snapshot_dir.join("stacks");
-            let global_stacks_snapshot = global_snapshot_dir.join("stacks");
-            if project_stacks_snapshot.exists() {
-                let _ = copy_directory(
-                    &project_stacks_snapshot,
-                    &global_stacks_snapshot,
-                    Some(EXCLUDED_STACKS_SNAPSHOT_FILES),
-                )
-                .inspect_err(|e| {
-                    let _ = devnet_event_tx.send(DevnetEvent::warning(format!(
-                        "Failed to copy stacks snapshot: {e}"
-                    )));
-                });
-            }
-
-            match std::fs::File::create(&global_marker) {
-                Ok(_) => {
-                    let _ = devnet_event_tx.send(DevnetEvent::success(
-                        "Global template snapshot data prepared. Future project initializations will be faster.".to_string()
-                    ));
-                }
-                Err(e) => {
-                    let _ = devnet_event_tx.send(DevnetEvent::warning(format!(
-                        "Failed to create global snapshot marker file: {e}"
-                    )));
-                }
-            }
-        }
-    }
-    let _ = devnet_event_tx.send(DevnetEvent::info(
-        "Reached block height 142, preparing to export Stacks API events...".to_string(),
-    ));
-
-    // To properly export, we need to:
-    // 1. Stop mining to prevent further blocks
-    let _ = mining_command_tx.send(BitcoinMiningCommand::Pause);
-    // 2. Wait a moment for pausing to complete
-    std::thread::sleep(Duration::from_secs(3));
-
-    // Export the events
-    match export_stacks_api_events(devnet_event_observer_config, devnet_event_tx).await {
-        Ok(_) => {
-            let _ = devnet_event_tx.send(DevnetEvent::success(
-                "Stacks API events exported successfully".to_string(),
-            ));
-        }
-        Err(e) => {
-            let _ = devnet_event_tx.send(DevnetEvent::warning(format!(
-                "Failed to export Stacks API events: {e}. Continuing without export."
-            )));
-        }
-    }
-    // 3. Resume mining after presumed export completion
-    let _ = mining_command_tx.send(BitcoinMiningCommand::Start);
 }
 
 pub async fn publish_stacking_orders(
