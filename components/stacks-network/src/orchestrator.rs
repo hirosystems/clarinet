@@ -3455,56 +3455,49 @@ events_keys = ["*"]
             let log_path_clone = log_path.clone();
 
             // Spawn a background thread to stream logs
-            std::thread::spawn(move || {
+            tokio::task::spawn(async move {
                 // Create a dedicated runtime for the Docker client to ensure stable connections
-                let rt = tokio::runtime::Builder::new_current_thread()
-                    .enable_all()
-                    .build()
-                    .unwrap();
-                rt.block_on(async {
-                    let logs_options = LogsOptions::<String> {
-                        stdout: true,
-                        stderr: true,
-                        follow: true,
-                        ..Default::default()
-                    };
+                let mut file = match File::create(&log_path_clone) {
+                    Ok(file) => file,
+                    Err(e) => {
+                        eprintln!("Failed to create log file: {e}");
+                        return;
+                    }
+                };
+                let logs_options = LogsOptions::<String> {
+                    stdout: true,
+                    stderr: true,
+                    follow: true,
+                    ..Default::default()
+                };
 
-                    let mut file = match File::create(&log_path_clone) {
-                        Ok(file) => file,
-                        Err(e) => {
-                            eprintln!("Failed to create log file: {e}");
-                            return;
-                        }
-                    };
-
-                    match docker
-                        .logs(&container_id, Some(logs_options))
-                        .try_for_each(|log| {
-                            match log {
-                                bollard::container::LogOutput::StdOut { message }
-                                | bollard::container::LogOutput::StdErr { message } => {
-                                    if let Ok(log_line) = String::from_utf8(message.to_vec()) {
-                                        let _ = writeln!(file, "{log_line}");
-                                        let _ = file.flush(); // Ensure logs are written immediately
-                                    }
-                                }
-                                bollard::container::LogOutput::StdIn { .. }
-                                | bollard::container::LogOutput::Console { .. } => {
-                                    // Skip these types as they're not relevant for logs
+                match docker
+                    .logs(&container_id, Some(logs_options))
+                    .try_for_each(|log| {
+                        match log {
+                            bollard::container::LogOutput::StdOut { message }
+                            | bollard::container::LogOutput::StdErr { message } => {
+                                if let Ok(log_line) = String::from_utf8(message.to_vec()) {
+                                    let _ = writeln!(file, "{log_line}");
+                                    let _ = file.flush(); // Ensure logs are written immediately
                                 }
                             }
-                            futures::future::ok(())
-                        })
-                        .await
-                    {
-                        Ok(_) => {
-                            eprintln!("Container logs stream ended for {container_id}");
+                            bollard::container::LogOutput::StdIn { .. }
+                            | bollard::container::LogOutput::Console { .. } => {
+                                // Skip these types as they're not relevant for logs
+                            }
                         }
-                        Err(e) => {
-                            eprintln!("Error streaming container logs: {e}");
-                        }
+                        futures::future::ok(())
+                    })
+                    .await
+                {
+                    Ok(_) => {
+                        eprintln!("Container logs stream ended for {container_id}");
                     }
-                });
+                    Err(e) => {
+                        eprintln!("Error streaming container logs: {e}");
+                    }
+                }
             });
 
             ctx.try_log(|logger| {
