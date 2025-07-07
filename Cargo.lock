@@ -700,7 +700,7 @@ name = "clarinet-deployments"
 version = "3.2.0"
 dependencies = [
  "base58",
- "base64 0.21.7",
+ "base64 0.22.1",
  "bitcoin",
  "bitcoincore-rpc",
  "bitcoincore-rpc-json",
