@@ -3455,6 +3455,8 @@ events_keys = ["*"]
             let log_path_clone = log_path.clone();
 
             // Spawn a background thread to stream logs
+            // TODO: use tokio::spawn instead
+            // https://github.com/hirosystems/clarinet/issues/1905
             std::thread::spawn(move || {
                 // Create a dedicated runtime for the Docker client to ensure stable connections
                 let rt = tokio::runtime::Builder::new_current_thread()
