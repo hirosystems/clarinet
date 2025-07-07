@@ -745,7 +745,7 @@ impl SDK {
         let test_name = self.current_test_name.clone();
         let SDKOptions { track_costs, .. } = self.options;
 
-        if let Err(_) = PrincipalData::parse_standard_principal(sender) {
+        if PrincipalData::parse_standard_principal(sender).is_err() {
             return Err(format!("Invalid sender address '{sender}'."));
         }
 
@@ -848,11 +848,11 @@ impl SDK {
         args: &TransferSTXArgs,
         advance_chain_tip: bool,
     ) -> Result<TransactionRes, String> {
-        if let Err(_) = PrincipalData::parse_standard_principal(&args.sender) {
+        if PrincipalData::parse_standard_principal(&args.sender).is_err() {
             return Err(format!("Invalid sender address '{}'.", args.sender));
         }
 
-        if let Err(_) = PrincipalData::parse_standard_principal(&args.recipient) {
+        if PrincipalData::parse_standard_principal(&args.recipient).is_err() {
             return Err(format!("Invalid recipient address '{}'.", args.recipient));
         }
 
@@ -883,7 +883,7 @@ impl SDK {
         args: &DeployContractArgs,
         advance_chain_tip: bool,
     ) -> Result<TransactionRes, String> {
-        if let Err(_) = PrincipalData::parse_standard_principal(&args.sender) {
+        if PrincipalData::parse_standard_principal(&args.sender).is_err() {
             return Err(format!("Invalid sender address '{}'.", args.sender));
         }
 
@@ -1065,9 +1065,9 @@ impl SDK {
     pub fn set_local_accounts(&mut self, addresses: Vec<String>) {
         let principals = addresses
             .into_iter()
-            .map(|a| {
+            .filter_map(|a| {
                 // Validate each address before converting
-                if let Err(_) = PrincipalData::parse_standard_principal(&a) {
+                if PrincipalData::parse_standard_principal(&a).is_err() {
                     log!(
                         "Warning: Invalid address '{}' in setLocalAccounts, skipping",
                         a
@@ -1078,7 +1078,6 @@ impl SDK {
                     StacksAddress::from_string(&a).unwrap(),
                 ))
             })
-            .filter_map(|p| p)
             .collect();
         let session = self.get_session_mut();
         session
@@ -1089,7 +1088,7 @@ impl SDK {
 
     #[wasm_bindgen(js_name=mintSTX)]
     pub fn mint_stx(&mut self, recipient: String, amount: u64) -> Result<String, String> {
-        if let Err(_) = PrincipalData::parse_standard_principal(&recipient) {
+        if PrincipalData::parse_standard_principal(&recipient).is_err() {
             return Err(format!("Invalid recipient address '{recipient}'."));
         }
 
