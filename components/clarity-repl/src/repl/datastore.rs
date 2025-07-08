@@ -1436,7 +1436,8 @@ mod tests {
         let current_tip = *clarity_datastore.current_chain_tip.borrow();
         assert_ne!(current_tip, initial_tip);
 
-        let clarity_datastore = cache;
+        #[allow(clippy::redundant_clone)]
+        let clarity_datastore = cache.clone();
         let current_tip = *clarity_datastore.current_chain_tip.borrow();
         assert_eq!(current_tip, initial_tip);
     }
