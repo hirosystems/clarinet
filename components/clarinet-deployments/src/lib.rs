@@ -26,8 +26,7 @@ use clarity_repl::repl::boot::{
     SBTC_TESTNET_ADDRESS_PRINCIPAL, SBTC_TOKEN_MAINNET_ADDRESS,
 };
 use clarity_repl::repl::{
-    ClarityCodeSource, ClarityContract, ContractDeployer, Session, SessionSettings,
-    DEFAULT_CLARITY_VERSION, DEFAULT_EPOCH,
+    ClarityCodeSource, ClarityContract, ContractDeployer, Session, SessionSettings, DEFAULT_EPOCH,
 };
 use types::{
     ContractPublishSpecification, DeploymentGenerationArtifacts, EmulatedContractCallSpecification,
@@ -409,21 +408,6 @@ pub async fn generate_default_deployment(
 
     let mut queue = VecDeque::new();
 
-    if let Some(ref devnet) = network_manifest.devnet {
-        if devnet.enable_subnet_node {
-            let contract_id = match QualifiedContractIdentifier::parse(&devnet.subnet_contract_id) {
-                Ok(contract_id) => contract_id,
-                Err(_e) => {
-                    return Err(format!(
-                        "malformatted subnet_contract_id: {}",
-                        devnet.subnet_contract_id
-                    ))
-                }
-            };
-            queue.push_front((contract_id, Some(DEFAULT_CLARITY_VERSION)));
-        }
-    }
-
     let mut contract_epochs = HashMap::new();
 
     // Build the ASTs / DependencySet for requirements - step required for Simnet/Devnet/Testnet/Mainnet
@@ -504,20 +488,6 @@ pub async fn generate_default_deployment(
                         let mut remap_principals = BTreeMap::new();
                         remap_principals
                             .insert(contract_id.issuer.clone(), default_deployer_address.clone());
-                        match network_manifest.devnet {
-                            Some(ref devnet)
-                                if devnet.subnet_contract_id == contract_id.to_string() =>
-                            {
-                                remap_principals.insert(
-                                    contract_id.issuer.clone(),
-                                    PrincipalData::parse_standard_principal(
-                                        &devnet.subnet_leader_stx_address,
-                                    )
-                                    .unwrap(),
-                                );
-                            }
-                            _ => {}
-                        }
 
                         let data = RequirementPublishSpecification {
                             contract_id: contract_id.clone(),
