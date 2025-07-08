@@ -741,7 +741,9 @@ pub fn apply_on_chain_deployment(
                 EpochSpec::Epoch2_4 => network_manifest.devnet.as_ref().unwrap().epoch_2_4,
                 EpochSpec::Epoch2_5 => network_manifest.devnet.as_ref().unwrap().epoch_2_5,
                 EpochSpec::Epoch3_0 => network_manifest.devnet.as_ref().unwrap().epoch_3_0,
-                EpochSpec::Epoch3_1 => network_manifest.devnet.as_ref().unwrap().epoch_3_1,
+                EpochSpec::Epoch3_1 | EpochSpec::Latest => {
+                    network_manifest.devnet.as_ref().unwrap().epoch_3_1
+                }
             };
             let mut epoch_transition_successful =
                 current_bitcoin_block_height > after_bitcoin_block;
