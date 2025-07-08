@@ -43,7 +43,7 @@ use crate::deployments::{
     write_deployment,
 };
 use crate::devnet::package::{self as Package, ConfigurationPackage};
-use crate::devnet::start::start;
+use crate::devnet::start::{start, StartConfig};
 use crate::generate::changes::{Changes, TOMLEdition};
 use crate::generate::{self};
 use crate::lsp::run_lsp;
@@ -2058,14 +2058,16 @@ fn devnet_start(cmd: DevnetStart, clarinetrc: ClarinetRC) {
         prompt_user_to_continue();
         display_devnet_incompatibilities_continue()
     }
-    match start(
-        orchestrator,
+    let config = StartConfig {
+        devnet: orchestrator,
         deployment,
-        None,
-        !cmd.no_dashboard,
-        cmd.no_snapshot,
-        cmd.create_new_snapshot,
-    ) {
+        log_tx: None,
+        display_dashboard: !cmd.no_dashboard,
+        no_snapshot: cmd.no_snapshot,
+        save_container_logs: cmd.save_container_logs,
+        create_new_snapshot: cmd.create_new_snapshot,
+    };
+    match start(config) {
         Err(e) => {
             eprintln!("{}", format_err!(e));
             process::exit(1);
