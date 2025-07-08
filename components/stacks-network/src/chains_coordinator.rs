@@ -407,17 +407,17 @@ pub async fn start_chains_coordinator(
                         let comment =
                             format!("mining blocks (chain_tip = #{bitcoin_block_height})");
 
-                        if create_new_snapshot {
-                            // Check if we've reached the target height for database export (142)
-                            // If we've reached epoch 3.0, create the global snapshot
-                            if bitcoin_block_height == config.devnet_config.epoch_3_0 {
-                                let _ = create_global_snapshot(
-                                    &config,
-                                    &devnet_event_tx,
-                                    mining_command_tx.clone(),
-                                )
-                                .await;
-                            }
+                        // Check if we've reached the target height for database export (142)
+                        // If we've reached epoch 3.0, create the global snapshot
+                        if create_new_snapshot
+                            && bitcoin_block_height == config.devnet_config.epoch_3_0
+                        {
+                            let _ = create_global_snapshot(
+                                &config,
+                                &devnet_event_tx,
+                                mining_command_tx.clone(),
+                            )
+                            .await;
                         }
                         // Stacking orders can't be published until devnet is ready
                         if !stacks_signers_keys.is_empty()
@@ -739,7 +739,7 @@ fn should_publish_stacking_orders(
     true
 }
 
-pub async fn remove_global_snapshot(devnet_event_tx: &Sender<DevnetEvent>) -> Result<(), String> {
+async fn remove_global_snapshot(devnet_event_tx: &Sender<DevnetEvent>) -> Result<(), String> {
     let global_snapshot_dir = get_global_snapshot_dir();
 
     // Check if the global snapshot directory exists
