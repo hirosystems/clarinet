@@ -21,7 +21,7 @@ pub const DEFAULT_STACKS_API_IMAGE: &str = "hirosystems/stacks-blockchain-api:la
 
 pub const DEFAULT_POSTGRES_IMAGE: &str = "postgres:alpine";
 
-pub const DEFAULT_BITCOIN_NODE_IMAGE: &str = "lncm/bitcoind:v26.1";
+pub const DEFAULT_BITCOIN_NODE_IMAGE: &str = "lncm/bitcoind:v27.2";
 pub const DEFAULT_BITCOIN_EXPLORER_IMAGE: &str = "quay.io/hirosystems/bitcoin-explorer:devnet";
 
 // This is the latest Explorer image before the "hybrid version" with SSR
