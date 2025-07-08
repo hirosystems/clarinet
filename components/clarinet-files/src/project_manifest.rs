@@ -387,7 +387,7 @@ fn get_epoch_and_clarity_version(
     // if epoch is specified but not version: use the default version for that epoch
 
     let epoch = match settings_epoch {
-        None => DEFAULT_EPOCH,
+        None => StacksEpochId::Epoch2_05,
         Some(epoch) => match epoch {
             "latest" => DEFAULT_EPOCH,
             "2" | "2.0" => StacksEpochId::Epoch20,
@@ -408,7 +408,7 @@ fn get_epoch_and_clarity_version(
 
     let clarity_version = match settings_clarity_version {
         None => match settings_epoch {
-            None => ClarityVersion::Clarity3,
+            None => ClarityVersion::Clarity1,
             Some(_) => ClarityVersion::default_for_epoch(epoch),
         },
         Some(version) => ClarityVersion::from_str(&format!("clarity{version}"))
