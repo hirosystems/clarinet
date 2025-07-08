@@ -75,8 +75,6 @@ balance = 100_000_000_000_000
 [devnet]
 disable_stacks_explorer = false
 disable_stacks_api = false
-# disable_postgres = false
-# disable_subnet_api = false
 # disable_bitcoin_explorer = true
 # working_dir = "tmp/devnet"
 # stacks_node_events_observers = ["host.docker.internal:8002"]
@@ -106,17 +104,6 @@ disable_stacks_api = false
 # stacks_explorer_image_url = "hirosystems/explorer:latest"
 # bitcoin_explorer_image_url = "quay.io/hirosystems/bitcoin-explorer:devnet"
 # postgres_image_url = "postgres:14"
-# enable_subnet_node = true
-# subnet_node_image_url = "hirosystems/stacks-subnets:0.5.0"
-# subnet_leader_mnemonic = "twice kind fence tip hidden tilt action fragile skin nothing glory cousin green tomorrow spring wrist shed math olympic multiply hip blue scout claw"
-# subnet_leader_derivation_path = "m/44'/5757'/0'/0/0"
-# subnet_contract_id = "ST13F481SBR0R7Z6NMMH8YV2FJJYXA5JPA0AD3HP9.subnet-v1-2"
-# subnet_node_rpc_port = 30443
-# subnet_node_p2p_port = 30444
-# subnet_events_ingestion_port = 30445
-# subnet_node_events_observers = ["host.docker.internal:8002"]
-# subnet_api_image_url = "hirosystems/stacks-blockchain-api:7.1.0-subnets.1"
-# subnet_api_postgres_database = "subnet_api"
 
 # For testing in epoch 2.1 / using Clarity2
 # epoch_2_0 = 100
