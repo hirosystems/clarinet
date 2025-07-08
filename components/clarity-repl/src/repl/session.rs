@@ -1894,7 +1894,7 @@ mod tests {
 
         let contract = ClarityContractBuilder::new()
             .name("contract-2-5")
-            .code_source(snippet.clone())
+            .code_source(snippet)
             .clarity_version(ClarityVersion::Clarity2)
             .epoch(StacksEpochId::Epoch25)
             .build();

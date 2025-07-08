@@ -234,7 +234,7 @@ mod tests {
     #[test]
     fn test_with_differences() {
         let default_config = DevnetConfig::default();
-        let mut user_config = default_config.clone();
+        let mut user_config = default_config;
         user_config.epoch_3_0 = 150; // Different from default
         user_config.pox_stacking_orders = vec![];
 
@@ -255,7 +255,7 @@ mod tests {
         let differ = DevnetDiffConfig::with_fields(custom_fields);
 
         let default_config = DevnetConfig::default();
-        let mut user_config = default_config.clone();
+        let mut user_config = default_config;
         user_config.epoch_3_0 = 145;
 
         let different_fields = differ.is_compatible(&user_config);

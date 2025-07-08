@@ -1145,8 +1145,8 @@ mod tests {
             .mint_stx_balance(PrincipalData::Standard(sender_principal.clone()), 1000000);
 
         let stx_transfer_spec = StxTransferSpecification {
-            expected_sender: sender_principal.clone(),
-            recipient: PrincipalData::Standard(receiver_principal).clone(),
+            expected_sender: sender_principal,
+            recipient: PrincipalData::Standard(receiver_principal),
             mstx_amount: 1000,
             cost: 0,
             anchor_block_only: true,

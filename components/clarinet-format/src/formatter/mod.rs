@@ -177,7 +177,7 @@ impl<'a> Aggregator<'a> {
             cache_ref.get(&key).cloned()
         };
         if let Some(result) = cached_result {
-            return result.clone();
+            return result;
         }
         // Track the end line of the previous expression
         let mut prev_end_line = 0;
@@ -1076,7 +1076,7 @@ impl<'a> Aggregator<'a> {
             cache_ref.get(&key).cloned()
         };
         if let Some(result) = cached_result {
-            return result.clone();
+            return result;
         }
         let result = match pse.pre_expr {
             PreSymbolicExpressionType::Atom(ref value) => t(value.as_str()).to_string(),

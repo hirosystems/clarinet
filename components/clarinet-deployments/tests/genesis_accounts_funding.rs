@@ -111,7 +111,7 @@ fn can_fund_initial_sbtc_balance() {
     let batch = TransactionsBatchSpecification {
         id: 0,
         epoch: Some(EpochSpec::Epoch3_0),
-        transactions: contract_requirements_txs.clone(),
+        transactions: contract_requirements_txs,
     };
 
     let genesis = GenesisSpecification {
