@@ -18,6 +18,7 @@
 
 ##### Bug Fixes
 
+- Add sender and recipient validation messages (#1896) (a69340bc)
 - 12 word mnemonics (#1906) (54296abf)
 - Devnet port binding (#1900) (a0a52b88)
 - Preserve inner expr newlines (#1790) (#1886) (7a4379f2)
