@@ -90,10 +90,12 @@ pub fn setup_session_with_deployment(
 }
 
 pub fn initiate_session_from_manifest(manifest: &ProjectManifest) -> Session {
+    let mut repl_settings = manifest.repl_settings.clone();
+    repl_settings.remote_data.enabled = false;
     let settings = SessionSettings {
-        repl_settings: manifest.repl_settings.clone(),
-        disk_cache_enabled: true,
-        cache_location: Some(manifest.project.cache_location.to_path_buf()),
+        repl_settings,
+        include_boot_contracts: manifest.project.boot_contracts.clone(),
+        override_boot_contracts_source: manifest.project.override_boot_contracts_source.clone(),
         ..Default::default()
     };
     Session::new(settings)
@@ -179,7 +181,13 @@ pub fn update_session_with_deployment_plan(
 
     let mut boot_contracts = BTreeMap::new();
     if !session.settings.repl_settings.remote_data.enabled {
-        let boot_contracts_data = BOOT_CONTRACTS_DATA.clone();
+        let boot_contracts_data = if session.settings.override_boot_contracts_source.is_empty() {
+            BOOT_CONTRACTS_DATA.clone()
+        } else {
+            clarity_repl::repl::boot::get_boot_contracts_data_with_overrides(
+                &session.settings.override_boot_contracts_source,
+            )
+        };
 
         for (contract_id, (contract, ast)) in boot_contracts_data {
             let result = session.interpreter.run(&contract, Some(&ast), false, None);
@@ -389,6 +397,8 @@ pub async fn generate_default_deployment(
     repl_settings.remote_data.enabled = false;
     let settings = SessionSettings {
         repl_settings,
+        include_boot_contracts: manifest.project.boot_contracts.clone(),
+        override_boot_contracts_source: manifest.project.override_boot_contracts_source.clone(),
         ..Default::default()
     };
     let session = Session::new(settings.clone());
@@ -399,7 +409,13 @@ pub async fn generate_default_deployment(
     let mut boot_contracts_ids = BTreeSet::new();
 
     if !simnet_remote_data {
-        let boot_contracts_data = BOOT_CONTRACTS_DATA.clone();
+        let boot_contracts_data = if settings.override_boot_contracts_source.is_empty() {
+            BOOT_CONTRACTS_DATA.clone()
+        } else {
+            clarity_repl::repl::boot::get_boot_contracts_data_with_overrides(
+                &settings.override_boot_contracts_source,
+            )
+        };
         let mut boot_contracts_asts = BTreeMap::new();
         for (id, (contract, ast)) in boot_contracts_data {
             boot_contracts_ids.insert(id.clone());
