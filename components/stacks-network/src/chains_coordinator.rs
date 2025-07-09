@@ -29,7 +29,6 @@ use clarinet_files::{
     self, AccountConfig, DevnetConfig, NetworkManifest, PoxStackingOrder, ProjectManifest,
     StacksNetwork, DEFAULT_FIRST_BURN_HEADER_HEIGHT,
 };
-use clarity::address::AddressHashMode;
 use clarity::types::PublicKey;
 use clarity::util::hash::{hex_bytes, Hash160};
 use clarity::vm::types::{BuffData, PrincipalData, SequenceData, TupleData};
@@ -37,6 +36,7 @@ use clarity::vm::{ClarityName, Value as ClarityValue};
 use hiro_system_kit;
 use hiro_system_kit::{slog, yellow};
 use serde_json::json;
+use stacks_common::address::AddressHashMode;
 use stacks_rpc_client::rpc_client::PoxInfo;
 use stacks_rpc_client::StacksRpc;
 use stackslib::chainstate::stacks::address::PoxAddress;

@@ -5,9 +5,6 @@ use std::sync::mpsc::{Receiver, Sender};
 use bitcoincore_rpc::{Auth, Client};
 use clarinet_files::{AccountConfig, NetworkManifest, StacksNetwork};
 use clarinet_utils::get_bip32_keys_from_mnemonic;
-use clarity_repl::clarity::address::{
-    AddressHashMode, C32_ADDRESS_VERSION_MAINNET_SINGLESIG, C32_ADDRESS_VERSION_TESTNET_SINGLESIG,
-};
 use clarity_repl::clarity::chainstate::StacksAddress;
 use clarity_repl::clarity::codec::StacksMessageCodec;
 use clarity_repl::clarity::util::secp256k1::{
@@ -31,6 +28,9 @@ use stacks_codec::codec::{
     TransactionContractCall, TransactionPayload, TransactionPostConditionMode,
     TransactionPublicKeyEncoding, TransactionSmartContract, TransactionSpendingCondition,
     TransactionVersion,
+};
+use stacks_common::address::{
+    AddressHashMode, C32_ADDRESS_VERSION_MAINNET_SINGLESIG, C32_ADDRESS_VERSION_TESTNET_SINGLESIG,
 };
 use stacks_rpc_client::StacksRpc;
 

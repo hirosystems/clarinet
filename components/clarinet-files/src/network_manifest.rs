@@ -2,7 +2,6 @@ use std::collections::BTreeMap;
 use std::sync::LazyLock;
 
 use clarinet_utils::{get_bip32_keys_from_mnemonic, mnemonic_from_phrase, random_mnemonic};
-use clarity::address::AddressHashMode;
 use clarity::types::chainstate::{StacksAddress, StacksPrivateKey};
 use clarity::util::hash::bytes_to_hex;
 use clarity::util::secp256k1::Secp256k1PublicKey;
@@ -1277,14 +1276,14 @@ pub fn compute_addresses(
 
     let pub_key = Secp256k1PublicKey::from_slice(&public_key.serialize_compressed()).unwrap();
     let version = if matches!(networks.1, StacksNetwork::Mainnet) {
-        clarity::address::C32_ADDRESS_VERSION_MAINNET_SINGLESIG
+        stacks_common::address::C32_ADDRESS_VERSION_MAINNET_SINGLESIG
     } else {
-        clarity::address::C32_ADDRESS_VERSION_TESTNET_SINGLESIG
+        stacks_common::address::C32_ADDRESS_VERSION_TESTNET_SINGLESIG
     };
 
     let stx_address = StacksAddress::from_public_keys(
         version,
-        &AddressHashMode::SerializeP2PKH,
+        &stacks_common::address::AddressHashMode::SerializeP2PKH,
         1,
         &vec![pub_key],
     )

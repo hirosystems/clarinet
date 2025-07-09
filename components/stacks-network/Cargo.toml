@@ -33,7 +33,8 @@ flate2 = "1.1.1"
 tar = "0.4.44"
 indoc = { workspace = true }
 
-clarity = { workspace = true }
+clarity = { workspace = true, default-features = false }
+stacks-common = { workspace = true, default-features = false }
 stackslib = { git = "https://github.com/stacks-network/stacks-core.git", branch="feat/clarity-wasm-develop", package = "stackslib" }
 chainhook-sdk = { version = "0.12" }
 chainhook-types = { version = "1.3.7" }
