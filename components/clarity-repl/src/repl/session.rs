@@ -137,6 +137,24 @@ impl Session {
                 .include_boot_contracts
                 .contains(&name.to_string())
             {
+                // Check if there's a custom override for this boot contract
+                let contract_source = if let Some(custom_path) =
+                    self.settings.override_boot_contracts_source.get(*name)
+                {
+                    match crate::repl::boot::load_custom_boot_contract(custom_path) {
+                        Ok(source) => source,
+                        Err(e) => {
+                            eprintln!(
+                                "Warning: Failed to load custom boot contract {}: {}",
+                                name, e
+                            );
+                            code.to_string()
+                        }
+                    }
+                } else {
+                    code.to_string()
+                };
+
                 let (epoch, clarity_version) = if (*name).eq("pox-4") {
                     (StacksEpochId::Epoch25, ClarityVersion::Clarity2)
                 } else if (*name).eq("pox-3") {
@@ -150,7 +168,7 @@ impl Session {
                 };
 
                 let contract = ClarityContract {
-                    code_source: ClarityCodeSource::ContractInMemory(code.to_string()),
+                    code_source: ClarityCodeSource::ContractInMemory(contract_source),
                     name: name.to_string(),
                     deployer: deployer.clone(),
                     clarity_version,

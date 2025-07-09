@@ -33,6 +33,7 @@ pub struct ProjectConfigFile {
     telemetry: Option<bool>,
     requirements: Option<TomlValue>,
     boot_contracts: Option<Vec<String>>,
+    override_boot_contracts_source: Option<BTreeMap<String, String>>,
 
     // The fields below have been moved into repl above, but are kept here for
     // backwards compatibility.
@@ -143,6 +144,8 @@ pub struct ProjectConfig {
     pub cache_location: FileLocation,
     #[serde(skip_deserializing)]
     pub boot_contracts: Vec<String>,
+    #[serde(skip_deserializing)]
+    pub override_boot_contracts_source: BTreeMap<String, String>,
 }
 
 fn cache_location_deserializer<'de, D>(des: D) -> Result<FileLocation, D::Error>
@@ -257,6 +260,14 @@ impl ProjectManifest {
             }
         };
 
+        // Parse override boot contracts source configuration
+        let mut override_boot_contracts_source = BTreeMap::new();
+        if let Some(overrides) = project_manifest_file.project.override_boot_contracts_source {
+            for (contract_name, contract_path) in overrides.iter() {
+                override_boot_contracts_source.insert(contract_name.clone(), contract_path.clone());
+            }
+        }
+
         let project = ProjectConfig {
             name: project_name,
             requirements: None,
@@ -279,6 +290,7 @@ impl ProjectManifest {
                 "cost-voting".to_string(),
                 "bns".to_string(),
             ],
+            override_boot_contracts_source: override_boot_contracts_source.clone(),
         };
 
         let mut config = ProjectManifest {
@@ -303,6 +315,7 @@ impl ProjectManifest {
                 }
             }
         };
+
         if let Some(TomlValue::Table(contracts)) = project_manifest_file.contracts {
             for (contract_name, contract_settings) in contracts.iter() {
                 if let TomlValue::Table(contract_settings) = contract_settings {
@@ -523,5 +536,32 @@ mod tests {
             Some(&latest_clarity_version.to_string().replace("Clarity ", "")),
         );
         assert_eq!(result, Ok((latest_epoch, latest_clarity_version)));
+    }
+
+    #[test]
+    fn test_override_boot_contracts_source_parsing() {
+        let manifest_toml = toml! {
+            [project]
+            name = "test-project"
+            telemetry = false
+            [project.override_boot_contracts_source]
+            "pox-4" = "./custom-boot-contracts/pox-4.clar"
+            "costs" = "./custom-boot-contracts/costs.clar"
+        };
+        let manifest_file: ProjectManifestFile = manifest_toml.clone().try_into().unwrap();
+        let location = FileLocation::from_path("/tmp/clarinet.toml".into());
+
+        let manifest =
+            ProjectManifest::from_project_manifest_file(manifest_file, &location, false).unwrap();
+
+        assert_eq!(manifest.project.override_boot_contracts_source.len(), 2);
+        assert_eq!(
+            manifest.project.override_boot_contracts_source.get("pox-4"),
+            Some(&"./custom-boot-contracts/pox-4.clar".to_string())
+        );
+        assert_eq!(
+            manifest.project.override_boot_contracts_source.get("costs"),
+            Some(&"./custom-boot-contracts/costs.clar".to_string())
+        );
     }
 }

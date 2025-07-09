@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::convert::TryInto;
 use std::fmt;
 use std::path::PathBuf;
@@ -53,6 +54,7 @@ pub struct SessionSettings {
     pub repl_settings: Settings,
     pub cache_location: Option<PathBuf>,
     pub epoch_id: Option<StacksEpochId>,
+    pub override_boot_contracts_source: BTreeMap<String, String>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
