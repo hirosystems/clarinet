@@ -852,7 +852,7 @@ impl SDK {
             return Err(format!("Invalid sender address '{}'.", args.sender));
         }
 
-        if PrincipalData::parse_standard_principal(&args.recipient).is_err() {
+        if PrincipalData::parse(&args.recipient).is_err() {
             return Err(format!("Invalid recipient address '{}'.", args.recipient));
         }
 
@@ -1088,7 +1088,7 @@ impl SDK {
 
     #[wasm_bindgen(js_name=mintSTX)]
     pub fn mint_stx(&mut self, recipient: String, amount: u64) -> Result<String, String> {
-        if PrincipalData::parse_standard_principal(&recipient).is_err() {
+        if PrincipalData::parse(&recipient).is_err() {
             return Err(format!("Invalid recipient address '{recipient}'."));
         }
 

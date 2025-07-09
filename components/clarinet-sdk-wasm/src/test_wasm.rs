@@ -111,19 +111,17 @@ async fn it_handles_invalid_sender_address() {
 }
 
 #[wasm_bindgen_test]
-async fn it_handles_invalid_recipient_address() {
+async fn it_handles_contract_recipient_address() {
     let mut sdk = init_sdk().await;
 
-    // Test with invalid recipient address
     let result = sdk.transfer_stx(&crate::core::TransferSTXArgs::new(
         1000,
-        "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.invalid-contract".into(), // Invalid: contract address
+        "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.basic-contract".into(), // valid: contract address
         "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM".into(),
     ));
 
-    assert!(result.is_err());
-    let error_msg = result.unwrap_err();
-    assert!(error_msg.contains("Invalid recipient address"));
+    // contract addresses are valid recipients
+    assert!(result.is_ok());
 }
 
 #[wasm_bindgen_test]
@@ -149,7 +147,6 @@ async fn it_handles_contract_address_as_sender() {
     let mut sdk = init_sdk().await;
     let _ = deploy_basic_contract(&mut sdk);
 
-    // Test error with contract address as sender
     let contract_address = "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.test";
     let result = sdk.call_public_fn(&CallFnArgs::new(
         "basic-contract".into(),
@@ -168,16 +165,13 @@ async fn it_handles_contract_address_as_sender() {
 async fn it_handles_contract_address_as_recipient() {
     let mut sdk = init_sdk().await;
 
-    // Test with contract address as recipient
     let contract_address = "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.test";
     let result = sdk.transfer_stx(&crate::core::TransferSTXArgs::new(
         1000,
-        contract_address.into(), // Invalid: contract address instead of recipient address
+        contract_address.into(), // Valid: contract address instead of recipient address
         "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM".into(),
     ));
 
-    assert!(result.is_err());
-    let error_msg = result.unwrap_err();
-    assert!(error_msg.contains("Invalid recipient address"));
-    assert!(error_msg.contains("ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.test"));
+    // we support contract addresses as recipients
+    assert!(result.is_ok());
 }
