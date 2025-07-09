@@ -461,6 +461,9 @@ struct DevnetStart {
     /// Save container logs locally
     #[clap(long = "save-container-logs")]
     pub save_container_logs: bool,
+    /// Create a new global snapshot when reaching epoch 3.0
+    #[clap(long = "create-new-snapshot")]
+    pub create_new_snapshot: bool,
     /// If specified, use this deployment file
     #[clap(long = "deployment-plan-path", short = 'p')]
     pub deployment_plan_path: Option<String>,
@@ -2055,14 +2058,16 @@ fn devnet_start(cmd: DevnetStart, clarinetrc: ClarinetRC) {
         prompt_user_to_continue();
         display_devnet_incompatibilities_continue()
     }
-    match start(StartConfig {
+    let config = StartConfig {
         devnet: orchestrator,
         deployment,
         log_tx: None,
         display_dashboard: !cmd.no_dashboard,
         no_snapshot: cmd.no_snapshot,
         save_container_logs: cmd.save_container_logs,
-    }) {
+        create_new_snapshot: cmd.create_new_snapshot,
+    };
+    match start(config) {
         Err(e) => {
             eprintln!("{}", format_err!(e));
             process::exit(1);

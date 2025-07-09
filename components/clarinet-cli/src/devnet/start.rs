@@ -20,6 +20,7 @@ pub struct StartConfig {
     pub display_dashboard: bool,
     pub no_snapshot: bool,
     pub save_container_logs: bool,
+    pub create_new_snapshot: bool,
 }
 
 pub fn start(
@@ -80,6 +81,7 @@ pub fn start(
         config.log_tx,
         config.display_dashboard,
         config.no_snapshot,
+        config.create_new_snapshot,
         ctx,
         orchestrator_terminated_tx,
         Some(orchestrator_terminated_rx),
