@@ -1,3 +1,37 @@
+# [3.3.0](https://github.com/hirosystems/clarinet/compare/v3.2.0...v3.3.0) (2025-07-09)
+
+##### New Features
+
+- Add --create-global-snapshot flag (#1904) (d730cc1c)
+- Use official stacks node image with multi platform support (#1899) (4836ca2f)
+- Add --save-container-logs flag (#1882) (a90772fb)
+- Add a logger hook (#1574) (694b0c7f)
+
+##### Chores
+
+- Fix some typos in comment (#1765) (1b1c191b)
+- Add `cargo fmt-stacks` alias to clean up and sort imports (#1880) (56284555)
+
+##### Continuous Integration
+
+- Run clippy for wasm target (#1895) (646ae694)
+
+##### Bug Fixes
+
+- Add sender and recipient validation messages (#1896) (a69340bc)
+- 12 word mnemonics (#1906) (54296abf)
+- Devnet port binding (#1900) (a0a52b88)
+- Preserve inner expr newlines (#1790) (#1886) (7a4379f2)
+
+##### Performance Improvements
+
+- Fix `O(n^2)` string generation (#1898) (dfb4651f)
+
+##### Refactors
+
+- Epoch 3.1 improvements (#1894) (ede0243e)
+- Safe epoch spec serialization (#1889) (087334f5)
+
 # [3.2.0](https://github.com/hirosystems/clarinet/compare/v3.1.0...v3.2.0) (2025-06-30)
 
 ##### New Features
