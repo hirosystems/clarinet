@@ -5,10 +5,11 @@ use std::str::FromStr;
 use clarity::types::StacksEpochId;
 use clarity::vm::ClarityVersion;
 use clarity_repl::repl;
-use clarity_repl::repl::{ClarityCodeSource, ClarityContract, ContractDeployer};
+use clarity_repl::repl::{ClarityCodeSource, ClarityContract, ContractDeployer, DEFAULT_EPOCH};
 use serde::ser::SerializeMap;
 use serde::{Deserializer, Serialize, Serializer};
 use serde_json::Value as JsonValue;
+use toml::map::Map as TomlMap;
 use toml::Value as TomlValue;
 
 use super::FileLocation;
@@ -47,7 +48,7 @@ pub struct ProjectManifestFile {
     repl: Option<repl::SettingsFile>,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct ProjectManifest {
     pub project: ProjectConfig,
     #[serde(serialize_with = "toml::ser::tables_last")]
@@ -383,12 +384,11 @@ fn get_epoch_and_clarity_version(
     settings_epoch: Option<&str>,
     settings_clarity_version: Option<&str>,
 ) -> Result<(StacksEpochId, ClarityVersion), String> {
-    // if neither epoch or version are specified in clarinet.toml use: epoch 2.05 and clarity 1
-    // if epoch is specified but not version: use the default version for that epoch
-
+    // if neither epoch or version are specified in clarinet.toml use: epoch 2.05 and clarity 1 for backwards compat
     let epoch = match settings_epoch {
         None => StacksEpochId::Epoch2_05,
         Some(epoch) => match epoch {
+            "latest" => DEFAULT_EPOCH,
             "2" | "2.0" => StacksEpochId::Epoch20,
             "2.05" => StacksEpochId::Epoch2_05,
             "2.1" => StacksEpochId::Epoch21,
@@ -399,7 +399,7 @@ fn get_epoch_and_clarity_version(
             "3" | "3.0" => StacksEpochId::Epoch30,
             "3.1" => StacksEpochId::Epoch31,
             _ => return Err(
-                "epoch field invalid (value supported: 2.0, 2.05, 2.1, 2.2, 2.3, 2.4, 3.0, 3.1)"
+                "epoch field invalid (value supported: latest, 2.0, 2.05, 2.1, 2.2, 2.3, 2.4, 3.0, 3.1)"
                     .into(),
             ),
         },
@@ -419,6 +419,68 @@ fn get_epoch_and_clarity_version(
     }
 
     Ok((epoch, clarity_version))
+}
+
+impl Serialize for ProjectManifest {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let mut state = serializer.serialize_struct("ProjectManifest", 4)?;
+        state.serialize_field("project", &self.project)?;
+        // Custom contracts serialization
+        use std::collections::BTreeMap;
+
+        use clarity::types::StacksEpochId;
+        let mut contracts_map = BTreeMap::new();
+        for (name, contract) in &self.contracts {
+            let mut contract_map = TomlMap::new();
+            contract_map.insert(
+                "path".to_string(),
+                toml::Value::String(contract.expect_contract_path_as_str().to_string()),
+            );
+            contract_map.insert(
+                "clarity_version".to_string(),
+                toml::Value::Integer(match contract.clarity_version {
+                    ClarityVersion::Clarity1 => 1,
+                    ClarityVersion::Clarity2 => 2,
+                    ClarityVersion::Clarity3 => 3,
+                }),
+            );
+
+            contract_map.insert(
+                "epoch".to_string(),
+                toml::Value::String(if contract.epoch == StacksEpochId::latest() {
+                    "latest".to_string()
+                } else {
+                    match contract.epoch {
+                        StacksEpochId::Epoch10 => "1.0".to_string(),
+                        StacksEpochId::Epoch20 => "2.0".to_string(),
+                        StacksEpochId::Epoch2_05 => "2.05".to_string(),
+                        StacksEpochId::Epoch21 => "2.1".to_string(),
+                        StacksEpochId::Epoch22 => "2.2".to_string(),
+                        StacksEpochId::Epoch23 => "2.3".to_string(),
+                        StacksEpochId::Epoch24 => "2.4".to_string(),
+                        StacksEpochId::Epoch25 => "2.5".to_string(),
+                        StacksEpochId::Epoch30 => "3.0".to_string(),
+                        StacksEpochId::Epoch31 => "3.1".to_string(),
+                    }
+                }),
+            );
+            contract_map.insert(
+                "deployer".to_string(),
+                toml::Value::String(match &contract.deployer {
+                    ContractDeployer::LabeledDeployer(s) => s.clone(),
+                    _ => "__default__".to_string(),
+                }),
+            );
+            contracts_map.insert(name, toml::Value::Table(contract_map));
+        }
+        state.serialize_field("contracts", &contracts_map)?;
+        state.serialize_field("repl", &self.repl_settings)?;
+        state.end()
+    }
 }
 
 #[cfg(test)]
@@ -476,6 +538,12 @@ mod tests {
 
         // epoch 3.1, no version
         let result = get_epoch_and_clarity_version(Some("3.1"), None);
+        assert_eq!(result, Ok((Epoch31, Clarity3)));
+
+        let result = get_epoch_and_clarity_version(Some("3.1"), None);
+        assert_eq!(result, Ok((Epoch31, Clarity3)));
+
+        let result = get_epoch_and_clarity_version(Some("latest"), None);
         assert_eq!(result, Ok((Epoch31, Clarity3)));
 
         // no epoch
