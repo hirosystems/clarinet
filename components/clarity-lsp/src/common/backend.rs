@@ -6,7 +6,8 @@ use clarity_repl::repl::ContractDeployer;
 use lsp_types::{
     CompletionItem, CompletionParams, DocumentFormattingParams, DocumentRangeFormattingParams,
     DocumentSymbol, DocumentSymbolParams, GotoDefinitionParams, Hover, HoverParams,
-    InitializeParams, InitializeResult, Location, SignatureHelp, SignatureHelpParams, TextEdit,
+    InitializeParams, InitializeResult, Location, ServerInfo, SignatureHelp, SignatureHelpParams,
+    TextEdit,
 };
 use serde::{Deserialize, Serialize};
 
@@ -568,7 +569,10 @@ pub fn process_mutating_request(
                 .try_write(|es| es.settings = initialization_options.clone())
                 .map(|_| {
                     LspRequestResponse::Initialize(Box::new(InitializeResult {
-                        server_info: None,
+                        server_info: Some(ServerInfo {
+                            name: "clarinet lsp".to_owned(),
+                            version: Some(String::from(env!("CARGO_PKG_VERSION"))),
+                        }),
                         capabilities: get_capabilities(&initialization_options),
                     }))
                 })
