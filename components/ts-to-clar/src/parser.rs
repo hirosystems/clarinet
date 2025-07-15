@@ -9,7 +9,7 @@
 
 use std::marker::PhantomData;
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use oxc_allocator::{Allocator, CloneIn};
 use oxc_ast::ast::{
     self, Expression, Function, ObjectPropertyKind, Program, PropertyKey, Statement,
@@ -18,7 +18,7 @@ use oxc_ast::ast::{
 use oxc_parser::Parser;
 use oxc_semantic::SemanticBuilder;
 use oxc_span::SourceType;
-use oxc_traverse::{Traverse, traverse_mut};
+use oxc_traverse::{traverse_mut, Traverse};
 
 use clarity::vm::types::TypeSignature;
 
@@ -345,25 +345,25 @@ pub fn get_ir<'a>(allocator: &'a Allocator, file_name: &str, source: &'a str) ->
 mod test {
     use crate::{
         clarity_std::STD_PKG_NAME,
-        parser::{IR, IRConstant, IRDataMap, IRDataVar, get_ir},
+        parser::{get_ir, IRConstant, IRDataMap, IRDataVar, IR},
         types::{get_ascii_type, get_utf8_type},
     };
 
     use clarity::vm::{
-        ClarityName,
         types::{
             TupleTypeSignature,
             TypeSignature::{self, *},
         },
+        ClarityName,
     };
     use indoc::{formatdoc, indoc};
     use oxc_allocator::{Allocator, Box, FromIn};
     use oxc_ast::{
-        AstBuilder,
         ast::{
             BinaryOperator, Expression, NumberBase, ObjectPropertyKind, PropertyKey, PropertyKind,
             Statement,
         },
+        AstBuilder,
     };
     use oxc_span::{Atom, Span};
 
@@ -575,6 +575,20 @@ mod test {
             name: "isActive".to_string(),
             r#type: BoolType,
             expr: expr_bool(&allocator, true),
+        };
+        assert_data_var_eq(ir, &expected);
+    }
+
+    #[test]
+    fn test_data_var_principal_ir() {
+        let src =
+            "const owner = new DataVar<Principal>(\"ST3AM1A56AK2C1XAFJ4115ZSV26EB49BVQ10MGCS0\");";
+        let allocator = Allocator::default();
+        let ir = &get_tmp_ir(&allocator, src).data_vars[0];
+        let expected = IRDataVar {
+            name: "owner".to_string(),
+            r#type: PrincipalType,
+            expr: expr_string(&allocator, "ST3AM1A56AK2C1XAFJ4115ZSV26EB49BVQ10MGCS0"),
         };
         assert_data_var_eq(ir, &expected);
     }

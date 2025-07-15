@@ -23,6 +23,9 @@ fn type_signature_to_pse(
         ClarityTypeSignature::UIntType => PreSymbolicExpression::atom(ClarityName::from("uint")),
         ClarityTypeSignature::IntType => PreSymbolicExpression::atom(ClarityName::from("int")),
         ClarityTypeSignature::BoolType => PreSymbolicExpression::atom(ClarityName::from("bool")),
+        ClarityTypeSignature::PrincipalType => {
+            PreSymbolicExpression::atom(ClarityName::from("principal"))
+        }
         ClarityTypeSignature::SequenceType(seq_subtype) => match seq_subtype {
             SequenceSubtype::StringType(string_subtype) => match string_subtype {
                 StringSubtype::ASCII(len) => PreSymbolicExpression::list(vec![
