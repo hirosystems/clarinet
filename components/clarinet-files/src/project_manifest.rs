@@ -34,6 +34,8 @@ pub struct ProjectConfigFile {
     requirements: Option<TomlValue>,
     boot_contracts: Option<Vec<String>>,
     override_boot_contracts_source: Option<BTreeMap<String, String>>,
+    #[serde(rename = "simnet_override_boot_contracts_source")]
+    simnet_override_boot_contracts_source: Option<BTreeMap<String, String>>,
 
     // The fields below have been moved into repl above, but are kept here for
     // backwards compatibility.
@@ -146,6 +148,8 @@ pub struct ProjectConfig {
     pub boot_contracts: Vec<String>,
     #[serde(skip_deserializing)]
     pub override_boot_contracts_source: BTreeMap<String, String>,
+    #[serde(skip_deserializing)]
+    pub simnet_override_boot_contracts_source: BTreeMap<String, String>,
 }
 
 fn cache_location_deserializer<'de, D>(des: D) -> Result<FileLocation, D::Error>
@@ -268,6 +272,39 @@ impl ProjectManifest {
             }
         }
 
+        // Parse simnet-specific override boot contracts source configuration
+        let mut simnet_override_boot_contracts_source = BTreeMap::new();
+        if let Some(overrides) = project_manifest_file
+            .project
+            .simnet_override_boot_contracts_source
+        {
+            for (contract_name, contract_path) in overrides.iter() {
+                simnet_override_boot_contracts_source
+                    .insert(contract_name.clone(), contract_path.clone());
+            }
+        }
+
+        // Merge user-specified boot_contracts with the default list
+        let mut boot_contracts = vec![
+            "costs".to_string(),
+            "pox".to_string(),
+            "pox-2".to_string(),
+            "pox-3".to_string(),
+            "pox-4".to_string(),
+            "lockup".to_string(),
+            "costs-2".to_string(),
+            "costs-3".to_string(),
+            "cost-voting".to_string(),
+            "bns".to_string(),
+        ];
+        if let Some(user_boot_contracts) = &project_manifest_file.project.boot_contracts {
+            for contract in user_boot_contracts {
+                if !boot_contracts.contains(contract) {
+                    boot_contracts.push(contract.clone());
+                }
+            }
+        }
+
         let project = ProjectConfig {
             name: project_name,
             requirements: None,
@@ -278,19 +315,9 @@ impl ProjectManifest {
             authors: project_manifest_file.project.authors.unwrap_or_default(),
             telemetry: project_manifest_file.project.telemetry.unwrap_or(false),
             cache_location,
-            boot_contracts: vec![
-                "costs".to_string(),
-                "pox".to_string(),
-                "pox-2".to_string(),
-                "pox-3".to_string(),
-                "pox-4".to_string(),
-                "lockup".to_string(),
-                "costs-2".to_string(),
-                "costs-3".to_string(),
-                "cost-voting".to_string(),
-                "bns".to_string(),
-            ],
+            boot_contracts,
             override_boot_contracts_source: override_boot_contracts_source.clone(),
+            simnet_override_boot_contracts_source: simnet_override_boot_contracts_source.clone(),
         };
 
         let mut config = ProjectManifest {
