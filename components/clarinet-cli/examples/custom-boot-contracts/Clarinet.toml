@@ -7,9 +7,4 @@ telemetry = false
 # Override boot contracts with custom implementations
 [project.override_boot_contracts_source]
 pox-4 = "./custom-boot-contracts/pox-4.clar"
-costs = "./custom-boot-contracts/costs.clar"
-
-[contracts.example-contract]
-path = "contracts/example-contract.clar"
-clarity_version = 2
-epoch = "2.4"
+pox-5 = "./custom-boot-contracts/pox-5.clar"
