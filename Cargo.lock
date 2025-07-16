@@ -353,9 +353,6 @@ name = "bitflags"
 version = "2.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1b8e56985ec62d17e9c1001dc89c88ecd7dc08e47eba5ec7c29c7b5eeecde967"
-dependencies = [
- "serde",
-]
 
 [[package]]
 name = "block-buffer"
@@ -626,6 +623,7 @@ dependencies = [
  "tokio",
  "toml 0.5.11",
  "tower-lsp-server",
+ "ts-to-clar",
  "winapi 0.3.9",
 ]
 
@@ -871,7 +869,6 @@ dependencies = [
  "itoa",
  "rustversion",
  "ryu",
- "serde",
  "static_assertions",
 ]
 
@@ -1862,20 +1859,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5444c27eef6923071f7ebcc33e3444508466a76f7a2b93da00ed6e19f30c1ddb"
 dependencies = [
  "windows-sys 0.48.0",
-]
-
-[[package]]
-name = "hstr"
-version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "71399f53a92ef72ee336a4b30201c6e944827e14e0af23204c291aad9c24cc85"
-dependencies = [
- "hashbrown 0.14.5",
- "new_debug_unreachable",
- "once_cell",
- "phf",
- "rustc-hash",
- "triomphe",
 ]
 
 [[package]]
@@ -3040,9 +3023,7 @@ dependencies = [
  "bumpalo",
  "hashbrown 0.15.4",
  "oxc_data_structures",
- "oxc_estree",
  "rustc-hash",
- "serde",
 ]
 
 [[package]]
@@ -3137,20 +3118,12 @@ name = "oxc_estree"
 version = "0.75.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b4f30ee2c1758598f22bb6578c8cda33557a74ce7a53bdebac9b75a0aed909b5"
-dependencies = [
- "itoa",
- "oxc_data_structures",
- "ryu-js",
-]
 
 [[package]]
 name = "oxc_index"
 version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2fa07b0cfa997730afed43705766ef27792873fdf5215b1391949fec678d2392"
-dependencies = [
- "serde",
-]
 
 [[package]]
 name = "oxc_parser"
@@ -3224,7 +3197,6 @@ dependencies = [
  "oxc_allocator",
  "oxc_ast_macros",
  "oxc_estree",
- "serde",
 ]
 
 [[package]]
@@ -3245,7 +3217,6 @@ dependencies = [
  "phf",
  "rustc-hash",
  "ryu-js",
- "serde",
  "unicode-id-start",
 ]
 
@@ -4771,18 +4742,6 @@ name = "subtle"
 version = "2.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
-
-[[package]]
-name = "swc_atoms"
-version = "5.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9d7077ba879f95406459bc0c81f3141c529b34580bc64d7ab7bd15e7118a0391"
-dependencies = [
- "hstr",
- "once_cell",
- "rustc-hash",
- "serde",
-]
 
 [[package]]
 name = "syn"
