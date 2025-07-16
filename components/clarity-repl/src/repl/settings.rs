@@ -55,6 +55,7 @@ pub struct SessionSettings {
     pub cache_location: Option<PathBuf>,
     pub epoch_id: Option<StacksEpochId>,
     pub override_boot_contracts_source: BTreeMap<String, String>,
+    pub simnet_override_boot_contracts_source: BTreeMap<String, String>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]

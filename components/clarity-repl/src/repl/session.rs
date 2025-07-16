@@ -131,6 +131,7 @@ impl Session {
         let tx_sender = self.interpreter.get_tx_sender();
         let deployer = ContractDeployer::Address(tx_sender.to_address());
 
+        // Deploy standard boot contracts (with possible overrides)
         for (name, code) in boot_code.iter() {
             if self
                 .settings
@@ -144,10 +145,7 @@ impl Session {
                     match crate::repl::boot::load_custom_boot_contract(custom_path) {
                         Ok(source) => source,
                         Err(e) => {
-                            eprintln!(
-                                "Warning: Failed to load custom boot contract {}: {}",
-                                name, e
-                            );
+                            eprintln!("Warning: Failed to load custom boot contract {name}: {e}");
                             code.to_string()
                         }
                     }
@@ -178,6 +176,35 @@ impl Session {
                 // Result ignored, boot contracts are trusted to be valid
                 let _ = self.deploy_contract(&contract, false, None);
             }
+        }
+
+        // Clone override_boot_contracts_source to avoid borrow checker issues
+        let custom_boot_contracts = self.settings.override_boot_contracts_source.clone();
+        for (name, custom_path) in custom_boot_contracts {
+            if boot_code.iter().any(|(std_name, _)| std_name == &name) {
+                continue; // Already handled above
+            }
+            // Only deploy if included in the boot contracts list
+            if !self.settings.include_boot_contracts.contains(&name) {
+                continue;
+            }
+            let contract_source = match crate::repl::boot::load_custom_boot_contract(&custom_path) {
+                Ok(source) => source,
+                Err(e) => {
+                    eprintln!("Warning: Failed to load custom boot contract {name}: {e}");
+                    continue;
+                }
+            };
+            // Use a default epoch/version for new custom boot contracts
+            let (epoch, clarity_version) = (StacksEpochId::Epoch25, ClarityVersion::Clarity2);
+            let contract = ClarityContract {
+                code_source: ClarityCodeSource::ContractInMemory(contract_source),
+                name: name.to_string(),
+                deployer: deployer.clone(),
+                clarity_version,
+                epoch,
+            };
+            let _ = self.deploy_contract(&contract, false, None);
         }
     }
 

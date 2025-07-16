@@ -92,9 +92,21 @@ pub fn setup_session_with_deployment(
 pub fn initiate_session_from_manifest(manifest: &ProjectManifest) -> Session {
     let mut repl_settings = manifest.repl_settings.clone();
     repl_settings.remote_data.enabled = false;
+
+    // For session initialization, we assume simnet context (used for console, tests, etc.)
+    // Custom boot contracts are allowed in this context
+    let mut include_boot_contracts = manifest.project.boot_contracts.clone();
+
+    // Add contracts from override_boot_contracts_source to include_boot_contracts
+    for contract_name in manifest.project.override_boot_contracts_source.keys() {
+        if !include_boot_contracts.contains(contract_name) {
+            include_boot_contracts.push(contract_name.clone());
+        }
+    }
+
     let settings = SessionSettings {
         repl_settings,
-        include_boot_contracts: manifest.project.boot_contracts.clone(),
+        include_boot_contracts,
         override_boot_contracts_source: manifest.project.override_boot_contracts_source.clone(),
         ..Default::default()
     };
@@ -181,17 +193,32 @@ pub fn update_session_with_deployment_plan(
 
     let mut boot_contracts = BTreeMap::new();
     if !session.settings.repl_settings.remote_data.enabled {
+        // Only use custom boot contracts for simnet deployments
         let boot_contracts_data = if session.settings.override_boot_contracts_source.is_empty() {
             BOOT_CONTRACTS_DATA.clone()
         } else {
-            clarity_repl::repl::boot::get_boot_contracts_data_with_overrides(
-                &session.settings.override_boot_contracts_source,
-            )
+            // Check if this is a simnet deployment by looking at the genesis field
+            let is_simnet = deployment.genesis.is_some();
+            if is_simnet {
+                clarity_repl::repl::boot::get_boot_contracts_data_with_overrides(
+                    &session.settings.override_boot_contracts_source,
+                )
+            } else {
+                // For non-simnet deployments, ignore custom boot contracts
+                BOOT_CONTRACTS_DATA.clone()
+            }
         };
 
         for (contract_id, (contract, ast)) in boot_contracts_data {
-            let result = session.interpreter.run(&contract, Some(&ast), false, None);
-            boot_contracts.insert(contract_id, result);
+            // Only load boot contracts that are in the include_boot_contracts list
+            if session
+                .settings
+                .include_boot_contracts
+                .contains(&contract.name)
+            {
+                let result = session.interpreter.run(&contract, Some(&ast), false, None);
+                boot_contracts.insert(contract_id, result);
+            }
         }
     }
 
@@ -395,10 +422,21 @@ pub async fn generate_default_deployment(
 
     let mut repl_settings = manifest.repl_settings.clone();
     repl_settings.remote_data.enabled = false;
+
+    // Only use custom boot contracts for simnet
+    let override_boot_contracts_source = if matches!(network, StacksNetwork::Simnet) {
+        manifest.project.override_boot_contracts_source.clone()
+    } else {
+        if !manifest.project.override_boot_contracts_source.is_empty() {
+            eprintln!("Warning: Custom boot contracts are only supported on simnet. Ignoring override_boot_contracts_source configuration for {network:?} network.");
+        }
+        BTreeMap::new()
+    };
+
     let settings = SessionSettings {
         repl_settings,
         include_boot_contracts: manifest.project.boot_contracts.clone(),
-        override_boot_contracts_source: manifest.project.override_boot_contracts_source.clone(),
+        override_boot_contracts_source,
         ..Default::default()
     };
     let session = Session::new(settings.clone());
@@ -422,6 +460,76 @@ pub async fn generate_default_deployment(
             boot_contracts_asts.insert(id, (contract.clarity_version, ast));
         }
         requirements_data.append(&mut boot_contracts_asts);
+    }
+
+    // Handle additional boot contracts specified in manifest.project.boot_contracts
+    if matches!(network, StacksNetwork::Simnet) && !simnet_remote_data {
+        let base_location = manifest.location.get_parent_location()?;
+        for contract_name in &manifest.project.boot_contracts {
+            // Skip if this is already a standard boot contract
+            if boot_contracts_ids
+                .iter()
+                .any(|id| id.name.to_string() == *contract_name)
+            {
+                continue;
+            }
+
+            // Load the additional boot contract source
+            let mut contract_location = base_location.clone();
+            contract_location
+                .append_path(&format!("custom-boot-contracts/{contract_name}.clar"))?;
+
+            let source = match file_accessor {
+                None => contract_location.read_content_as_utf8()?,
+                Some(file_accessor) => {
+                    let sources = file_accessor
+                        .read_files(vec![contract_location.to_string()])
+                        .await?;
+                    sources
+                        .get(&contract_location.to_string())
+                        .ok_or(format!(
+                            "Unable to read additional boot contract: {contract_name}",
+                        ))?
+                        .clone()
+                }
+            };
+
+            // Create contract ID for the additional boot contract
+            let contract_id = QualifiedContractIdentifier::new(
+                default_deployer_address.clone(),
+                ContractName::try_from(contract_name.clone())
+                    .map_err(|_| format!("Invalid contract name: {contract_name}"))?,
+            );
+
+            // Add to requirements data for AST building
+            let session = Session::new(settings.clone());
+            let contract = ClarityContract {
+                code_source: ClarityCodeSource::ContractInMemory(source.clone()),
+                deployer: ContractDeployer::Address(default_deployer_address.to_address()),
+                name: contract_name.clone(),
+                clarity_version: DEFAULT_CLARITY_VERSION,
+                epoch: DEFAULT_EPOCH,
+            };
+
+            let (ast, _, _) = session.interpreter.build_ast(&contract);
+            requirements_data.insert(contract_id.clone(), (DEFAULT_CLARITY_VERSION, ast));
+
+            // Add as emulated contract publish transaction
+            let data = EmulatedContractPublishSpecification {
+                contract_name: ContractName::try_from(contract_name.clone())
+                    .map_err(|_| format!("Invalid contract name: {contract_name}"))?,
+                emulated_sender: default_deployer_address.clone(),
+                source: source.clone(),
+                location: contract_location.clone(),
+                clarity_version: DEFAULT_CLARITY_VERSION,
+            };
+
+            let tx = TransactionSpecification::EmulatedContractPublish(data);
+            add_transaction_to_epoch(&mut transactions, tx, &DEFAULT_EPOCH.into());
+
+            // Add to contracts map
+            contracts_map.insert(contract_id, (source, contract_location));
+        }
     }
 
     let mut queue = VecDeque::new();
@@ -890,9 +998,19 @@ pub async fn generate_default_deployment(
         bitcoin_node,
         network: network.clone(),
         genesis: if matches!(network, StacksNetwork::Simnet) {
+            // Include both standard boot contracts and custom boot contracts from override_boot_contracts_source
+            let mut genesis_contracts = manifest.project.boot_contracts.clone();
+
+            // Add contracts from override_boot_contracts_source to genesis contracts
+            for contract_name in manifest.project.override_boot_contracts_source.keys() {
+                if !genesis_contracts.contains(contract_name) {
+                    genesis_contracts.push(contract_name.clone());
+                }
+            }
+
             Some(GenesisSpecification {
                 wallets,
-                contracts: manifest.project.boot_contracts.clone(),
+                contracts: genesis_contracts,
             })
         } else {
             None
