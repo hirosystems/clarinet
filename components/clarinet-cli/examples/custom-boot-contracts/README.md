@@ -16,8 +16,7 @@ name = "my-project"
 # ... other project settings
 
 [project.override_boot_contracts_source]
-pox-4 = "./custom-boot-contracts/pox-4.clar"
-pox-5 = "./custom-boot-contracts/pox-5.clar"
+pox-4 = "./custom-boot-contracts/pox-5.clar"
 ```
 
 ## Supported Boot Contract Overrides
@@ -49,8 +48,7 @@ You can override any of the following boot contracts:
 
 In this example:
 
-1. **Custom PoX-4 Contract** (`custom-boot-contracts/pox-4.clar`): Overrides the default PoX-4 contract with custom logic
-3. **Example Contract** (`contracts/example-contract.clar`): Demonstrates how to interact with the custom boot contracts
+- **Custom PoX-5 Contract** (`custom-boot-contracts/pox-5.clar`): Overrides the default PoX-4 contract with custom logic
 
 ## Testing
 
@@ -64,11 +62,8 @@ clarinet console
 In the console, you can test the custom boot contracts:
 
 ```clarity
-;; Test the custom pox-4 contract
+;; Test the custom pox-5 contract
 (contract-call? 'SP000000000000000000002Q6VF78.pox-4 get-pox-info)
-
-;; Deploy and test the example contract
-(contract-call? 'ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5.example-contract test-custom-pox-info)
 ```
 
 ## Use Cases
