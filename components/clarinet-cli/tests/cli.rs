@@ -158,3 +158,133 @@ fn test_requirement_add() {
         .any(|c| c.contract_id == requirement_name);
     assert!(found, "Requirement not found in manifest");
 }
+
+#[test]
+fn test_formatter_check() {
+    let project_name = "test_formatter_check";
+    let temp_dir = create_new_project(project_name);
+    let project_path = temp_dir.path().join(project_name);
+
+    // Create a contract with unformatted code
+    let contract_name = "test_contract";
+    let output = Command::new(env!("CARGO_BIN_EXE_clarinet"))
+        .args(["contract", "new", contract_name])
+        .current_dir(&project_path)
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "clarinet contract new failed");
+
+    let contract_path = project_path
+        .join("contracts")
+        .join(format!("{contract_name}.clar"));
+
+    // Write unformatted code to the contract file
+    let unformatted_code = indoc::indoc! {"
+        ;; title: test_contract
+        ;; description: A test contract for formatter check
+
+        (define-public (test-function (amount uint))
+        (ok amount))
+
+        (define-private (another-function)
+        (begin
+        (ok true)
+        (ok false)))
+    "};
+    fs::write(&contract_path, unformatted_code).expect("Failed to write unformatted code");
+
+    // Test that --check flag detects unformatted files
+    let check_output = Command::new(env!("CARGO_BIN_EXE_clarinet"))
+        .args(["format", "--check"])
+        .current_dir(&project_path)
+        .output()
+        .unwrap();
+
+    // Should fail because files need formatting
+    assert!(
+        !check_output.status.success(),
+        "Check should fail for unformatted files"
+    );
+
+    let stderr = String::from_utf8_lossy(&check_output.stderr);
+    assert!(stderr.contains("✗"), "Should show error symbol");
+    assert!(
+        stderr.contains("file needs formatting"),
+        "Should indicate file needs formatting"
+    );
+    assert!(
+        stderr.contains("test_contract.clar"),
+        "Should list the unformatted file"
+    );
+
+    // Format the file in-place
+    let format_output = Command::new(env!("CARGO_BIN_EXE_clarinet"))
+        .args(["format", "--in-place"])
+        .current_dir(&project_path)
+        .output()
+        .unwrap();
+    assert!(
+        format_output.status.success(),
+        "Format in-place should succeed"
+    );
+
+    // Test that --check flag now passes
+    let check_output_after = Command::new(env!("CARGO_BIN_EXE_clarinet"))
+        .args(["format", "--check"])
+        .current_dir(&project_path)
+        .output()
+        .unwrap();
+
+    // Should succeed because files are now formatted
+    assert!(
+        check_output_after.status.success(),
+        "Check should pass for formatted files"
+    );
+
+    let stdout = String::from_utf8_lossy(&check_output_after.stdout);
+    assert!(stdout.contains("✔"), "Should show success symbol");
+    assert!(
+        stdout.contains("All files are properly formatted"),
+        "Should indicate all files are formatted"
+    );
+
+    // Test --check with a specific file
+    let check_specific_output = Command::new(env!("CARGO_BIN_EXE_clarinet"))
+        .args([
+            "format",
+            "--check",
+            "--file",
+            "contracts/test_contract.clar",
+        ])
+        .current_dir(&project_path)
+        .output()
+        .unwrap();
+
+    assert!(
+        check_specific_output.status.success(),
+        "Check specific file should pass"
+    );
+
+    let stdout_specific = String::from_utf8_lossy(&check_specific_output.stdout);
+    assert!(
+        stdout_specific.contains("✔"),
+        "Should show success symbol for specific file"
+    );
+    assert!(
+        stdout_specific.contains("All files are properly formatted"),
+        "Should indicate file is formatted"
+    );
+
+    // Test --check with non-existent file
+    let check_nonexistent_output = Command::new(env!("CARGO_BIN_EXE_clarinet"))
+        .args(["format", "--check", "--file", "contracts/nonexistent.clar"])
+        .current_dir(&project_path)
+        .output()
+        .unwrap();
+
+    // Should fail because file doesn't exist
+    assert!(
+        !check_nonexistent_output.status.success(),
+        "Check should fail for non-existent file"
+    );
+}

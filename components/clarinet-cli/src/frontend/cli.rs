@@ -126,6 +126,9 @@ struct Formatter {
     #[clap(long = "stdin", conflicts_with_all = ["in_place", "file"])]
     /// Read from stdin (and output to stdout)
     pub stdin: bool,
+    #[clap(long = "check", conflicts_with_all = ["in_place", "dry_run", "stdin"])]
+    /// Check if files are properly formatted without modifying them
+    pub check: bool,
 }
 
 impl Formatter {
@@ -1305,10 +1308,21 @@ pub fn main() {
             }
             let formatter = ClarityFormatter::new(settings);
 
+            let mut all_files_formatted = true;
+            let mut unformatted_files = Vec::new();
+
             for source in sources {
                 let input = source.get_input();
                 let output = formatter.format(&input);
-                if cmd.in_place {
+
+                if cmd.check {
+                    if let Some(file_path) = source.file_path() {
+                        if input != output {
+                            all_files_formatted = false;
+                            unformatted_files.push(file_path.to_string());
+                        }
+                    }
+                } else if cmd.in_place {
                     let file_path = source
                         .file_path()
                         .expect("No file path for in-place formatting");
@@ -1316,7 +1330,30 @@ pub fn main() {
                 } else if cmd.dry_run || source.is_stdin() {
                     println!("{output}");
                 } else {
-                    eprintln!("required flags: in-place or dry-run");
+                    eprintln!("required flags: in-place, dry-run, or check");
+                    std::process::exit(1);
+                }
+            }
+
+            if cmd.check {
+                if all_files_formatted {
+                    println!("{} All files are properly formatted", green!("✔"));
+                    std::process::exit(0);
+                } else {
+                    eprintln!(
+                        "{} {} {} formatting",
+                        red!("✗"),
+                        unformatted_files.len(),
+                        if unformatted_files.len() == 1 {
+                            "file needs"
+                        } else {
+                            "files need"
+                        }
+                    );
+                    for file in unformatted_files {
+                        eprintln!("  {file}");
+                    }
+                    std::process::exit(1);
                 }
             }
         }
