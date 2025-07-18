@@ -12,7 +12,7 @@ describe("Ensure that tokens can be minted and burnt", () => {
       "cbtc-token",
       "mint",
       [Cl.uint(1000), Cl.standardPrincipal(authority)],
-      authority
+      authority,
     );
 
     expect(result).toBeOk(Cl.bool(true));
@@ -23,7 +23,7 @@ describe("Ensure that tokens can be minted and burnt", () => {
       "cbtc-token",
       "mint",
       [Cl.uint(1000), Cl.standardPrincipal(authority)],
-      address2
+      address2,
     );
 
     expect(result).toBeErr(Cl.uint(0));
@@ -34,13 +34,13 @@ describe("Ensure that tokens can be minted and burnt", () => {
       "cbtc-token",
       "mint",
       [Cl.uint(1000), Cl.standardPrincipal(authority)],
-      authority
+      authority,
     );
     simnet.callPublicFn(
       "cbtc-token",
       "mint",
       [Cl.uint(1000), Cl.standardPrincipal(address2)],
-      authority
+      authority,
     );
     const block = simnet.mineBlock([
       tx.callPublicFn("cbtc-token", "burn", [Cl.uint(1000)], authority),
