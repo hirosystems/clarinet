@@ -32,7 +32,6 @@ pub fn start_ui(
     chains_coordinator_commands_tx: crossbeam_channel::Sender<ChainsCoordinatorCommand>,
     orchestrator_terminated_rx: Receiver<bool>,
     devnet_path: &str,
-    subnet_enabled: bool,
     automining_enabled: bool,
     ctx: &Context,
 ) -> Result<(), String> {
@@ -42,7 +41,6 @@ pub fn start_ui(
         chains_coordinator_commands_tx,
         orchestrator_terminated_rx,
         devnet_path,
-        subnet_enabled,
         automining_enabled,
         ctx,
     );
@@ -58,7 +56,6 @@ pub fn do_start_ui(
     chains_coordinator_commands_tx: crossbeam_channel::Sender<ChainsCoordinatorCommand>,
     orchestrator_terminated_rx: Receiver<bool>,
     devnet_path: &str,
-    subnet_enabled: bool,
     automining_enabled: bool,
     ctx: &Context,
 ) -> Result<(), String> {
@@ -96,7 +93,7 @@ pub fn do_start_ui(
         }
     });
 
-    let mut app = App::new("Clarinet", devnet_path, subnet_enabled);
+    let mut app = App::new("Clarinet", devnet_path);
 
     terminal
         .clear()
