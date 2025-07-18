@@ -314,6 +314,7 @@ impl DevnetOrchestrator {
 
         let bitcoin_explorer_port = devnet_config.bitcoin_explorer_port;
         let stacks_explorer_port = devnet_config.stacks_explorer_port;
+        let stacks_api_port = devnet_config.stacks_api_port;
 
         send_status_update(
             &event_tx,
@@ -432,6 +433,13 @@ impl DevnetOrchestrator {
         };
         // Start stacks-api
         if !disable_stacks_api {
+            send_status_update(
+                &event_tx,
+                &self.logger,
+                "stacks-api",
+                Status::Yellow,
+                "preparing container",
+            );
             let _ = event_tx.send(DevnetEvent::info("Starting stacks-api".to_string()));
             match self.prepare_stacks_api_container(ctx).await {
                 Ok(_) => {}
@@ -441,6 +449,14 @@ impl DevnetOrchestrator {
                     return Err(message);
                 }
             };
+
+            send_status_update(
+                &event_tx,
+                &self.logger,
+                "stacks-api",
+                Status::Green,
+                &format!("http://localhost:{stacks_api_port}/doc"),
+            );
 
             match self.boot_stacks_api_container(ctx).await {
                 Ok(_) => {}
