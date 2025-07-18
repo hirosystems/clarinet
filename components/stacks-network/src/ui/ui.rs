@@ -28,9 +28,8 @@ pub fn draw(f: &mut Frame, app: &mut App) {
 
     let nb_of_services = 5;
     let nb_of_signers = 2;
-    let nb_of_subnet_services = if app.subnet_enabled { 2 } else { 0 };
 
-    let service_len = nb_of_services + nb_of_signers + nb_of_subnet_services + 2;
+    let service_len = nb_of_services + nb_of_signers + 2;
 
     let top_right_components = Layout::default()
         .direction(Direction::Vertical)

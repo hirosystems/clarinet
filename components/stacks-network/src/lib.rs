@@ -242,7 +242,6 @@ async fn do_run_devnet(
                 "orchestrator_terminated_rx should be provided when display_dashboard set to true",
             ),
             &devnet_path,
-            devnet_config.enable_subnet_node,
             !devnet_config.bitcoin_controller_automining_disabled,
             &config.ctx,
         )?;
