@@ -4,7 +4,7 @@ This example demonstrates how to use override boot contracts in Clarinet with cu
 
 ## Overview
 
-Clarinet embeds a copy of the boot contracts (like `pox-4`, `costs`, etc.) that are used by default. For Stacks core developers, it's useful to be able to load custom code instead of the embedded versions, or add new boot contracts entirely.
+Clarinet embeds a copy of the boot contracts (like `pox-4`, `costs`, etc.) that are used by default. For Stacks core developers, it's useful to be able to load custom code instead of the embedded versions. **Note: Only existing boot contracts can be overridden - new boot contracts cannot be added.**
 
 ## Configuration
 
@@ -40,15 +40,16 @@ You can override any of the following boot contracts:
 
 1. When Clarinet loads boot contracts, it first checks if there are any overrides specified in the `Clarinet.toml`
 2. If an override is found for a specific boot contract, it loads the custom source from the specified file path
-3. If it's not overriding an existing contract, it will additionally load it alongside other boot contracts
-3. The custom source is used instead of the embedded version
-4. If the custom file cannot be loaded, a warning is printed and the embedded version is used as fallback
+3. **Only existing boot contracts can be overridden** - if a non-standard boot contract name is specified, a warning is printed and it is skipped
+4. The custom source is used instead of the embedded version
+5. If the custom file cannot be loaded, a warning is printed and the embedded version is used as fallback
 
 ## Example Usage
 
 In this example:
 
-- **Custom PoX-5 Contract** (`custom-boot-contracts/pox-5.clar`): Overrides the default PoX-4 contract with custom logic
+- **Custom PoX-4 Contract** (`custom-boot-contracts/pox-4.clar`): Overrides the default PoX-4 contract with custom logic
+- **Note**: The `pox-5` contract in the example configuration will be skipped with a warning since it's not a standard boot contract
 
 ## Testing
 
