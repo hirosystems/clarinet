@@ -1820,15 +1820,7 @@ fn execute_changes(changes: Vec<Changes>) -> bool {
     }
 
     if let Some(project_manifest) = shared_config {
-        let toml_value = match toml::Value::try_from(&project_manifest) {
-            Ok(value) => value,
-            Err(e) => {
-                eprintln!("{} failed encoding config file ({})", red!("error:"), e);
-                return false;
-            }
-        };
-
-        let pretty_toml = match toml::ser::to_string_pretty(&toml_value) {
+        let pretty_toml = match toml::ser::to_string_pretty(&project_manifest) {
             Ok(value) => value,
             Err(e) => {
                 eprintln!("{} failed formatting config file ({})", red!("error:"), e);
