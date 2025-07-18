@@ -207,7 +207,7 @@ pub fn load_custom_boot_contract(path: &str) -> Result<String, String> {
     fs::read_to_string(path).map_err(|e| format!("Failed to read boot contract file {path}: {e}"))
 }
 
-/// Get boot contracts data with optional overrides and additions
+/// Get boot contracts data with optional overrides (only existing boot contracts can be overridden)
 pub fn get_boot_contracts_data_with_overrides(
     overrides: &BTreeMap<String, String>,
 ) -> BTreeMap<QualifiedContractIdentifier, (ClarityContract, ContractAST)> {
@@ -220,37 +220,36 @@ pub fn get_boot_contracts_data_with_overrides(
     );
 
     for (contract_name, file_path) in overrides {
+        // Only allow overriding existing boot contracts
+        if !BOOT_CONTRACTS_NAMES.contains(&contract_name.as_str()) {
+            eprintln!("Warning: Skipping custom boot contract '{contract_name}' - only existing boot contracts can be overridden. Valid boot contracts are: {BOOT_CONTRACTS_NAMES:?}");
+            continue;
+        }
+
         // Load custom source
         let custom_source = match load_custom_boot_contract(file_path) {
             Ok(source) => source,
-            Err(_) => {
+            Err(e) => {
+                eprintln!("Warning: Failed to load custom boot contract {contract_name}: {e}");
                 continue;
             }
         };
 
-        // Check if this is a standard boot contract or a new one
-        let is_standard_boot_contract = BOOT_CONTRACTS_NAMES.contains(&contract_name.as_str());
-
-        // Determine epoch and clarity version for the contract
-        let (epoch, clarity_version) = if is_standard_boot_contract {
-            // Use standard epoch/version mapping for known boot contracts
-            match contract_name.as_str() {
-                "pox-4" | "signers" | "signers-voting" => {
-                    (StacksEpochId::Epoch25, ClarityVersion::Clarity2)
-                }
-                "pox-3" => (StacksEpochId::Epoch24, ClarityVersion::Clarity2),
-                "pox-2" | "costs-3" => (StacksEpochId::Epoch21, ClarityVersion::Clarity2),
-                "costs-2" => (StacksEpochId::Epoch2_05, ClarityVersion::Clarity1),
-                "genesis" | "lockup" | "bns" | "cost-voting" | "costs" | "pox" => {
-                    (StacksEpochId::Epoch20, ClarityVersion::Clarity1)
-                }
-                _ => {
-                    continue;
-                }
+        // Use standard epoch/version mapping for known boot contracts
+        let (epoch, clarity_version) = match contract_name.as_str() {
+            "pox-4" | "signers" | "signers-voting" => {
+                (StacksEpochId::Epoch25, ClarityVersion::Clarity2)
             }
-        } else {
-            // For new boot contracts, use a reasonable default
-            (StacksEpochId::Epoch25, ClarityVersion::Clarity2)
+            "pox-3" => (StacksEpochId::Epoch24, ClarityVersion::Clarity2),
+            "pox-2" | "costs-3" => (StacksEpochId::Epoch21, ClarityVersion::Clarity2),
+            "costs-2" => (StacksEpochId::Epoch2_05, ClarityVersion::Clarity1),
+            "genesis" | "lockup" | "bns" | "cost-voting" | "costs" | "pox" => {
+                (StacksEpochId::Epoch20, ClarityVersion::Clarity1)
+            }
+            _ => {
+                eprintln!("Warning: Unknown boot contract '{contract_name}' - skipping");
+                continue;
+            }
         };
 
         // Create contracts for both testnet and mainnet
@@ -266,7 +265,7 @@ pub fn get_boot_contracts_data_with_overrides(
             let (ast, _, _) = interpreter.build_ast(&boot_contract);
             let contract_id = boot_contract.expect_resolved_contract_identifier(None);
 
-            // Insert the contract (this will replace if it's a standard boot contract, or add if it's new)
+            // Insert the contract (this will replace the existing boot contract)
             result.insert(contract_id, (boot_contract, ast));
         }
     }
