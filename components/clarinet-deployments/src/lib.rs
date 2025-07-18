@@ -515,7 +515,7 @@ pub async fn generate_default_deployment(
                 deployer: ContractDeployer::Address(default_deployer_address.to_address()),
                 name: contract_name.clone(),
                 clarity_version: DEFAULT_CLARITY_VERSION,
-                epoch: DEFAULT_EPOCH,
+                epoch: clarity_repl::repl::Epoch::Specific(DEFAULT_EPOCH),
             };
 
             let (ast, _, _) = session.interpreter.build_ast(&contract);
