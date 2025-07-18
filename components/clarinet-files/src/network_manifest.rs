@@ -29,7 +29,6 @@ pub const DEFAULT_STACKS_EXPLORER_IMAGE: &str = "hirosystems/explorer:1.276.1";
 pub const DEFAULT_STACKS_MINER_MNEMONIC: &str = "fragile loan twenty basic net assault jazz absorb diet talk art shock innocent float punch travel gadget embrace caught blossom hockey surround initial reduce";
 pub const DEFAULT_FAUCET_MNEMONIC: &str = "shadow private easily thought say logic fault paddle word top book during ignore notable orange flight clock image wealth health outside kitten belt reform";
 pub const DEFAULT_STACKER_MNEMONIC: &str = "empty lens any direct brother then drop fury rule pole win claim scissors list rescue horn rent inform relief jump sword weekend half legend";
-pub const DEFAULT_SUBNET_MNEMONIC: &str = "twice kind fence tip hidden tilt action fragile skin nothing glory cousin green tomorrow spring wrist shed math olympic multiply hip blue scout claw";
 #[cfg(unix)]
 pub const DEFAULT_DOCKER_SOCKET: &str = "unix:///var/run/docker.sock";
 #[cfg(windows)]
