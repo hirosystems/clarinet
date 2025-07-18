@@ -1351,7 +1351,7 @@ pub fn main() {
                         }
                     );
                     for file in unformatted_files {
-                        eprintln!("  {}", file);
+                        eprintln!("  {file}");
                     }
                     std::process::exit(1);
                 }
