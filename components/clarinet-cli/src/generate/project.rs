@@ -422,7 +422,6 @@ btc_address = "mvZtbibDAAA3WLpY7zXXFqRa3T4XSknBX7"
   "dependencies": {{
     "@hirosystems/clarinet-sdk": "^3.0.2",
     "@stacks/transactions": "^7.0.6",
-    "@types/node": "^22.15.18",
     "chokidar-cli": "^3.0.0",
     "vitest": "^3.1.3",
     "vitest-environment-clarinet": "^2.3.0"
