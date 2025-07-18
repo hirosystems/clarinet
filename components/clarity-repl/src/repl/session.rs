@@ -235,7 +235,7 @@ impl Session {
                 name: name.to_string(),
                 deployer: deployer.clone(),
                 clarity_version,
-                epoch,
+                epoch: Epoch::Specific(epoch),
             };
             let _ = self.deploy_contract(&contract, false, None);
         }

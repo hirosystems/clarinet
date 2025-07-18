@@ -67,6 +67,8 @@ test-case = "*"
 divan = "0.1"
 mockito = { workspace = true }
 tempfile = "3.19"
+clarinet-files = { path = "../clarinet-files" }
+clarinet-deployments = { path = "../clarinet-deployments" }
 
 [lib]
 name = "clarity_repl"
