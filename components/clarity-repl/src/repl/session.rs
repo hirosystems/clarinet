@@ -178,16 +178,25 @@ impl Session {
             }
         }
 
-        // Clone override_boot_contracts_source to avoid borrow checker issues
+        // Only allow overriding existing boot contracts, not adding new ones
         let custom_boot_contracts = self.settings.override_boot_contracts_source.clone();
         for (name, custom_path) in custom_boot_contracts {
+            // Skip if this is already a standard boot contract (handled above)
             if boot_code.iter().any(|(std_name, _)| std_name == &name) {
-                continue; // Already handled above
+                continue;
             }
+
+            // Check if this is a valid boot contract name
+            if !crate::repl::boot::BOOT_CONTRACTS_NAMES.contains(&name.as_str()) {
+                eprintln!("Warning: Skipping custom boot contract '{name}' - only existing boot contracts can be overridden. Valid boot contracts are: {:?}", crate::repl::boot::BOOT_CONTRACTS_NAMES);
+                continue;
+            }
+
             // Only deploy if included in the boot contracts list
             if !self.settings.include_boot_contracts.contains(&name) {
                 continue;
             }
+
             let contract_source = match crate::repl::boot::load_custom_boot_contract(&custom_path) {
                 Ok(source) => source,
                 Err(e) => {
@@ -195,8 +204,24 @@ impl Session {
                     continue;
                 }
             };
-            // Use a default epoch/version for new custom boot contracts
-            let (epoch, clarity_version) = (StacksEpochId::Epoch25, ClarityVersion::Clarity2);
+
+            // Use appropriate epoch/version for the boot contract being overridden
+            let (epoch, clarity_version) = match name.as_str() {
+                "pox-4" | "signers" | "signers-voting" => {
+                    (StacksEpochId::Epoch25, ClarityVersion::Clarity2)
+                }
+                "pox-3" => (StacksEpochId::Epoch24, ClarityVersion::Clarity2),
+                "pox-2" | "costs-3" => (StacksEpochId::Epoch21, ClarityVersion::Clarity2),
+                "costs-2" => (StacksEpochId::Epoch2_05, ClarityVersion::Clarity1),
+                "genesis" | "lockup" | "bns" | "cost-voting" | "costs" | "pox" => {
+                    (StacksEpochId::Epoch20, ClarityVersion::Clarity1)
+                }
+                _ => {
+                    eprintln!("Warning: Unknown boot contract '{name}' - skipping");
+                    continue;
+                }
+            };
+
             let contract = ClarityContract {
                 code_source: ClarityCodeSource::ContractInMemory(contract_source),
                 name: name.to_string(),

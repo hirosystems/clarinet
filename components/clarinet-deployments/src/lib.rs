@@ -26,7 +26,8 @@ use clarity_repl::repl::boot::{
     SBTC_TESTNET_ADDRESS_PRINCIPAL, SBTC_TOKEN_MAINNET_ADDRESS,
 };
 use clarity_repl::repl::{
-    ClarityCodeSource, ClarityContract, ContractDeployer, Session, SessionSettings, DEFAULT_EPOCH,
+    ClarityCodeSource, ClarityContract, ContractDeployer, Session, SessionSettings,
+    DEFAULT_CLARITY_VERSION, DEFAULT_EPOCH,
 };
 use types::{
     ContractPublishSpecification, DeploymentGenerationArtifacts, EmulatedContractCallSpecification,
@@ -462,7 +463,7 @@ pub async fn generate_default_deployment(
         requirements_data.append(&mut boot_contracts_asts);
     }
 
-    // Handle additional boot contracts specified in manifest.project.boot_contracts
+    // Only allow overriding existing boot contracts, not adding new ones
     if matches!(network, StacksNetwork::Simnet) && !simnet_remote_data {
         let base_location = manifest.location.get_parent_location()?;
         for contract_name in &manifest.project.boot_contracts {
@@ -471,6 +472,12 @@ pub async fn generate_default_deployment(
                 .iter()
                 .any(|id| id.name.to_string() == *contract_name)
             {
+                continue;
+            }
+
+            // Check if this is a valid boot contract name
+            if !clarity_repl::repl::boot::BOOT_CONTRACTS_NAMES.contains(&contract_name.as_str()) {
+                eprintln!("Warning: Skipping custom boot contract '{contract_name}' - only existing boot contracts can be overridden. Valid boot contracts are: {:?}", clarity_repl::repl::boot::BOOT_CONTRACTS_NAMES);
                 continue;
             }
 

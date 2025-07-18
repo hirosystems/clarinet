@@ -7,4 +7,3 @@ telemetry = false
 # Override boot contracts with custom implementations
 [project.override_boot_contracts_source]
 pox-4 = "./custom-boot-contracts/pox-4.clar"
-pox-5 = "./custom-boot-contracts/pox-5.clar"
