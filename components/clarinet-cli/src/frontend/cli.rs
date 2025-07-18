@@ -1341,13 +1341,13 @@ pub fn main() {
                     std::process::exit(0);
                 } else {
                     eprintln!(
-                        "{} {} {} need formatting",
+                        "{} {} {} formatting",
                         red!("✗"),
                         unformatted_files.len(),
                         if unformatted_files.len() == 1 {
-                            "file"
+                            "file needs"
                         } else {
-                            "files"
+                            "files need"
                         }
                     );
                     for file in unformatted_files {
