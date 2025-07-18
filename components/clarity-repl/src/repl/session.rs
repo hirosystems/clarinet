@@ -138,12 +138,28 @@ impl Session {
         let tx_sender = self.interpreter.get_tx_sender();
         let deployer = ContractDeployer::Address(tx_sender.to_address());
 
+        // Deploy standard boot contracts (with possible overrides)
         for (name, code) in boot_code.iter() {
             if self
                 .settings
                 .include_boot_contracts
                 .contains(&name.to_string())
             {
+                // Check if there's a custom override for this boot contract
+                let contract_source = if let Some(custom_path) =
+                    self.settings.override_boot_contracts_source.get(*name)
+                {
+                    match crate::repl::boot::load_custom_boot_contract(custom_path) {
+                        Ok(source) => source,
+                        Err(e) => {
+                            eprintln!("Warning: Failed to load custom boot contract {name}: {e}");
+                            code.to_string()
+                        }
+                    }
+                } else {
+                    code.to_string()
+                };
+
                 let (epoch, clarity_version) = if (*name).eq("pox-4") {
                     (StacksEpochId::Epoch25, ClarityVersion::Clarity2)
                 } else if (*name).eq("pox-3") {
@@ -157,7 +173,7 @@ impl Session {
                 };
 
                 let contract = ClarityContract {
-                    code_source: ClarityCodeSource::ContractInMemory(code.to_string()),
+                    code_source: ClarityCodeSource::ContractInMemory(contract_source),
                     name: name.to_string(),
                     deployer: deployer.clone(),
                     clarity_version,
@@ -167,6 +183,60 @@ impl Session {
                 // Result ignored, boot contracts are trusted to be valid
                 let _ = self.deploy_contract(&contract, false, None);
             }
+        }
+
+        // Only allow overriding existing boot contracts, not adding new ones
+        let custom_boot_contracts = self.settings.override_boot_contracts_source.clone();
+        for (name, custom_path) in custom_boot_contracts {
+            // Skip if this is already a standard boot contract (handled above)
+            if boot_code.iter().any(|(std_name, _)| std_name == &name) {
+                continue;
+            }
+
+            // Check if this is a valid boot contract name
+            if !crate::repl::boot::BOOT_CONTRACTS_NAMES.contains(&name.as_str()) {
+                eprintln!("Warning: Skipping custom boot contract '{name}' - only existing boot contracts can be overridden. Valid boot contracts are: {:?}", crate::repl::boot::BOOT_CONTRACTS_NAMES);
+                continue;
+            }
+
+            // Only deploy if included in the boot contracts list
+            if !self.settings.include_boot_contracts.contains(&name) {
+                continue;
+            }
+
+            let contract_source = match crate::repl::boot::load_custom_boot_contract(&custom_path) {
+                Ok(source) => source,
+                Err(e) => {
+                    eprintln!("Warning: Failed to load custom boot contract {name}: {e}");
+                    continue;
+                }
+            };
+
+            // Use appropriate epoch/version for the boot contract being overridden
+            let (epoch, clarity_version) = match name.as_str() {
+                "pox-4" | "signers" | "signers-voting" => {
+                    (StacksEpochId::Epoch25, ClarityVersion::Clarity2)
+                }
+                "pox-3" => (StacksEpochId::Epoch24, ClarityVersion::Clarity2),
+                "pox-2" | "costs-3" => (StacksEpochId::Epoch21, ClarityVersion::Clarity2),
+                "costs-2" => (StacksEpochId::Epoch2_05, ClarityVersion::Clarity1),
+                "genesis" | "lockup" | "bns" | "cost-voting" | "costs" | "pox" => {
+                    (StacksEpochId::Epoch20, ClarityVersion::Clarity1)
+                }
+                _ => {
+                    eprintln!("Warning: Unknown boot contract '{name}' - skipping");
+                    continue;
+                }
+            };
+
+            let contract = ClarityContract {
+                code_source: ClarityCodeSource::ContractInMemory(contract_source),
+                name: name.to_string(),
+                deployer: deployer.clone(),
+                clarity_version,
+                epoch,
+            };
+            let _ = self.deploy_contract(&contract, false, None);
         }
     }
 

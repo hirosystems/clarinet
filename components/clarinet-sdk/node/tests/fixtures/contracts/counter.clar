@@ -10,6 +10,10 @@
   (ok { count: (var-get count) })
 )
 
+(define-read-only (get-count-at-block (height uint))
+  (ok (var-get count))
+)
+
 (define-private (inner-increment)
   (begin
     (print "call inner-increment")
