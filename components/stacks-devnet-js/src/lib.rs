@@ -198,6 +198,7 @@ impl StacksDevnet {
                             Some(log_tx),
                             false,
                             false,
+                            false,
                             stacks_network::Context::empty(),
                             termination_tx,
                             None,

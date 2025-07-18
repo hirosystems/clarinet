@@ -32,6 +32,7 @@ pub use orchestrator::DevnetOrchestrator;
 use orchestrator::ServicesMapHosts;
 
 use self::chains_coordinator::DevnetEventObserverConfig;
+
 #[allow(dead_code)]
 #[derive(Debug)]
 pub enum ChainsCoordinatorCommand {
@@ -52,6 +53,7 @@ pub struct DevnetRunConfig {
     pub log_tx: Option<Sender<LogData>>,
     pub display_dashboard: bool,
     pub no_snapshot: bool,
+    pub create_new_snapshot: bool,
     pub ctx: Context,
     pub orchestrator_terminated_tx: Sender<bool>,
     pub orchestrator_terminated_rx: Option<Receiver<bool>>,
@@ -182,6 +184,7 @@ async fn do_run_devnet(
                 moved_mining_command_tx,
                 mining_command_rx,
                 !config.no_snapshot,
+                config.create_new_snapshot,
                 ctx_moved,
             );
             let rt = hiro_system_kit::create_basic_runtime();
@@ -239,7 +242,6 @@ async fn do_run_devnet(
                 "orchestrator_terminated_rx should be provided when display_dashboard set to true",
             ),
             &devnet_path,
-            devnet_config.enable_subnet_node,
             !devnet_config.bitcoin_controller_automining_disabled,
             &config.ctx,
         )?;
@@ -337,6 +339,7 @@ pub async fn do_run_chain_coordinator(
         log_tx,
         display_dashboard: false,
         no_snapshot,
+        create_new_snapshot: false,
         ctx,
         orchestrator_terminated_tx,
         orchestrator_terminated_rx: None,
@@ -355,6 +358,7 @@ pub async fn do_run_local_devnet(
     log_tx: Option<Sender<LogData>>,
     display_dashboard: bool,
     no_snapshot: bool,
+    create_new_snapshot: bool,
     ctx: Context,
     orchestrator_terminated_tx: Sender<bool>,
     orchestrator_terminated_rx: Option<Receiver<bool>>,
@@ -374,6 +378,7 @@ pub async fn do_run_local_devnet(
         log_tx,
         display_dashboard,
         no_snapshot,
+        create_new_snapshot,
         ctx,
         orchestrator_terminated_tx,
         orchestrator_terminated_rx,

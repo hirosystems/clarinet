@@ -179,6 +179,7 @@ pub async fn start_chains_coordinator(
     mining_command_tx: Sender<BitcoinMiningCommand>,
     mining_command_rx: Receiver<BitcoinMiningCommand>,
     using_snapshot: bool,
+    create_new_snapshot: bool,
     ctx: Context,
 ) -> Result<(), String> {
     let mut should_deploy_protocol = true; // Will change when `stacks-network` components becomes compatible with Testnet / Mainnet setups
@@ -338,13 +339,11 @@ pub async fn start_chains_coordinator(
     // Loop over events being received from Bitcoin and Stacks,
     // and orchestrate the 2 chains + protocol.
     let mut deployment_commands_tx = Some(deployment_commands_tx);
-    let mut subnet_initialized = false;
 
     let mut sel = crossbeam_channel::Select::new();
     let chains_coordinator_commands_oper = sel.recv(&chains_coordinator_commands_rx);
     let observer_event_oper = sel.recv(&observer_event_rx);
 
-    let enable_subnet_node = config.devnet_config.enable_subnet_node;
     let stacks_signers_keys = config.devnet_config.stacks_signers_keys.clone();
 
     loop {
@@ -408,7 +407,9 @@ pub async fn start_chains_coordinator(
 
                         // Check if we've reached the target height for database export (142)
                         // If we've reached epoch 3.0, create the global snapshot
-                        if bitcoin_block_height == config.devnet_config.epoch_3_0 {
+                        if create_new_snapshot
+                            && bitcoin_block_height == config.devnet_config.epoch_3_0
+                        {
                             let _ = create_global_snapshot(
                                 &config,
                                 &devnet_event_tx,
@@ -459,7 +460,6 @@ pub async fn start_chains_coordinator(
 
                 send_status_update(
                     &devnet_event_tx,
-                    enable_subnet_node,
                     &None,
                     "bitcoin-node",
                     Status::Green,
@@ -544,7 +544,6 @@ pub async fn start_chains_coordinator(
                 // would require either cloning the block, or passing ownership.
                 send_status_update(
                     &devnet_event_tx,
-                    enable_subnet_node,
                     &None,
                     "stacks-node",
                     Status::Green,
@@ -621,23 +620,6 @@ pub async fn start_chains_coordinator(
             }
             ObserverEvent::StacksChainMempoolEvent(mempool_event) => match mempool_event {
                 StacksChainMempoolEvent::TransactionsAdmitted(transactions) => {
-                    // Temporary UI patch
-                    if config.devnet_config.enable_subnet_node && !subnet_initialized {
-                        for tx in transactions.iter() {
-                            if tx.tx_description.contains("::commit-block") {
-                                send_status_update(
-                                    &devnet_event_tx,
-                                    enable_subnet_node,
-                                    &None,
-                                    "subnet-node",
-                                    Status::Green,
-                                    "⚡️",
-                                );
-                                subnet_initialized = true;
-                                break;
-                            }
-                        }
-                    }
                     for tx in transactions.into_iter() {
                         let _ = devnet_event_tx.send(DevnetEvent::MempoolAdmission(tx));
                     }
@@ -736,11 +718,44 @@ fn should_publish_stacking_orders(
     true
 }
 
+async fn remove_global_snapshot(devnet_event_tx: &Sender<DevnetEvent>) -> Result<(), String> {
+    let global_snapshot_dir = get_global_snapshot_dir();
+
+    // Check if the global snapshot directory exists
+    if !global_snapshot_dir.exists() {
+        let _ = devnet_event_tx.send(DevnetEvent::info(
+            "No existing global snapshot found to remove".to_string(),
+        ));
+        return Ok(());
+    }
+
+    let _ = devnet_event_tx.send(DevnetEvent::info(
+        "Removing existing global snapshot...".to_string(),
+    ));
+
+    // Remove the entire global snapshot directory
+    fs::remove_dir_all(&global_snapshot_dir)
+        .map_err(|e| format!("unable to remove global snapshot directory: {e:?}"))?;
+
+    let _ = devnet_event_tx.send(DevnetEvent::success(
+        "Existing global snapshot removed successfully".to_string(),
+    ));
+
+    Ok(())
+}
+
 pub async fn create_global_snapshot(
     devnet_event_observer_config: &DevnetEventObserverConfig,
     devnet_event_tx: &Sender<DevnetEvent>,
     mining_command_tx: Sender<BitcoinMiningCommand>,
 ) {
+    // First, remove the existing global snapshot if it exists
+    if let Err(e) = remove_global_snapshot(devnet_event_tx).await {
+        let _ = devnet_event_tx.send(DevnetEvent::warning(format!(
+            "Failed to remove existing global snapshot: {e}. Continuing with new snapshot creation."
+        )));
+    }
+
     let devnet_config = &devnet_event_observer_config.devnet_config;
     let global_snapshot_dir = get_global_snapshot_dir();
     let project_snapshot_dir = get_project_snapshot_dir(devnet_config);
@@ -1472,8 +1487,6 @@ mod test_rpc_client {
             bitcoin_node_host: "localhost".to_string(),
             bitcoin_explorer_host: "localhost".to_string(),
             stacks_explorer_host: "localhost".to_string(),
-            subnet_node_host: "localhost".to_string(),
-            subnet_api_host: "localhost".to_string(),
             postgres_host: "localhost".to_string(),
         };
         let accounts = vec![deployer];

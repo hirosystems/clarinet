@@ -6,7 +6,6 @@ use clarity::address::AddressHashMode;
 use clarity::types::chainstate::{StacksAddress, StacksPrivateKey};
 use clarity::util::hash::bytes_to_hex;
 use clarity::util::secp256k1::Secp256k1PublicKey;
-use clarity::vm::types::QualifiedContractIdentifier;
 use libsecp256k1::PublicKey;
 use serde::Serialize;
 use toml::value::Value;
@@ -27,16 +26,9 @@ pub const DEFAULT_BITCOIN_EXPLORER_IMAGE: &str = "quay.io/hirosystems/bitcoin-ex
 // This is the latest Explorer image before the "hybrid version" with SSR
 pub const DEFAULT_STACKS_EXPLORER_IMAGE: &str = "hirosystems/explorer:1.276.1";
 
-pub const DEFAULT_SUBNET_NODE_IMAGE: &str = "hirosystems/stacks-subnets:0.8.1";
-
-pub const DEFAULT_SUBNET_API_IMAGE: &str = "hirosystems/stacks-blockchain-api:master";
-pub const DEFAULT_SUBNET_CONTRACT_ID: &str =
-    "ST173JK7NZBA4BS05ZRATQH1K89YJMTGEH1Z5J52E.subnet-v3-0-1";
-
 pub const DEFAULT_STACKS_MINER_MNEMONIC: &str = "fragile loan twenty basic net assault jazz absorb diet talk art shock innocent float punch travel gadget embrace caught blossom hockey surround initial reduce";
 pub const DEFAULT_FAUCET_MNEMONIC: &str = "shadow private easily thought say logic fault paddle word top book during ignore notable orange flight clock image wealth health outside kitten belt reform";
 pub const DEFAULT_STACKER_MNEMONIC: &str = "empty lens any direct brother then drop fury rule pole win claim scissors list rescue horn rent inform relief jump sword weekend half legend";
-pub const DEFAULT_SUBNET_MNEMONIC: &str = "twice kind fence tip hidden tilt action fragile skin nothing glory cousin green tomorrow spring wrist shed math olympic multiply hip blue scout claw";
 #[cfg(unix)]
 pub const DEFAULT_DOCKER_SOCKET: &str = "unix:///var/run/docker.sock";
 #[cfg(windows)]
@@ -134,7 +126,6 @@ pub struct DevnetConfigFile {
     pub stacks_signers_env_vars: Option<Vec<String>>,
     pub stacks_api_env_vars: Option<Vec<String>>,
     pub stacks_explorer_env_vars: Option<Vec<String>>,
-    pub subnet_node_env_vars: Option<Vec<String>>,
     pub stacks_api_port: Option<u16>,
     pub stacks_api_events_port: Option<u16>,
     pub bitcoin_explorer_port: Option<u16>,
@@ -157,7 +148,6 @@ pub struct DevnetConfigFile {
     pub postgres_username: Option<String>,
     pub postgres_password: Option<String>,
     pub stacks_api_postgres_database: Option<String>,
-    pub subnet_api_postgres_database: Option<String>,
     pub pox_stacking_orders: Option<Vec<PoxStackingOrder>>,
     pub execute_script: Option<Vec<ExecuteScript>>,
     pub bitcoin_node_image_url: Option<String>,
@@ -172,20 +162,6 @@ pub struct DevnetConfigFile {
     pub disable_stacks_api: Option<bool>,
     pub disable_postgres: Option<bool>,
     pub bind_containers_volumes: Option<bool>,
-    pub enable_subnet_node: Option<bool>,
-    pub subnet_node_image_url: Option<String>,
-    pub subnet_leader_mnemonic: Option<String>,
-    pub subnet_leader_derivation_path: Option<String>,
-    pub subnet_node_p2p_port: Option<u16>,
-    pub subnet_node_rpc_port: Option<u16>,
-    pub subnet_events_ingestion_port: Option<u16>,
-    pub subnet_node_events_observers: Option<Vec<String>>,
-    pub subnet_contract_id: Option<String>,
-    pub subnet_api_image_url: Option<String>,
-    pub subnet_api_port: Option<u16>,
-    pub subnet_api_events_port: Option<u16>,
-    pub subnet_api_env_vars: Option<Vec<String>>,
-    pub disable_subnet_api: Option<bool>,
     pub docker_host: Option<String>,
     pub components_host: Option<String>,
     pub epoch_2_0: Option<u64>,
@@ -325,7 +301,6 @@ pub struct DevnetConfig {
     pub postgres_username: String,
     pub postgres_password: String,
     pub stacks_api_postgres_database: String,
-    pub subnet_api_postgres_database: String,
     pub pox_stacking_orders: Vec<PoxStackingOrder>,
     pub execute_script: Vec<ExecuteScript>,
     pub bitcoin_node_image_url: String,
@@ -340,25 +315,6 @@ pub struct DevnetConfig {
     pub disable_stacks_api: bool,
     pub disable_postgres: bool,
     pub bind_containers_volumes: bool,
-    pub enable_subnet_node: bool,
-    pub subnet_node_image_url: String,
-    pub subnet_leader_stx_address: String,
-    pub subnet_leader_secret_key_hex: String,
-    pub subnet_leader_btc_address: String,
-    pub subnet_leader_mnemonic: String,
-    pub subnet_leader_derivation_path: String,
-    pub subnet_node_p2p_port: u16,
-    pub subnet_node_rpc_port: u16,
-    pub subnet_events_ingestion_port: u16,
-    pub subnet_node_events_observers: Vec<String>,
-    pub subnet_contract_id: String,
-    pub remapped_subnet_contract_id: String,
-    pub subnet_node_env_vars: Vec<String>,
-    pub subnet_api_image_url: String,
-    pub subnet_api_port: u16,
-    pub subnet_api_events_port: u16,
-    pub subnet_api_env_vars: Vec<String>,
-    pub disable_subnet_api: bool,
     pub docker_host: String,
     pub components_host: String,
     pub epoch_2_0: u64,
@@ -627,10 +583,6 @@ impl NetworkManifest {
                     devnet_config.stacks_api_postgres_database = Some(val.clone());
                 }
 
-                if let Some(ref val) = devnet_override.subnet_api_postgres_database {
-                    devnet_config.subnet_api_postgres_database = Some(val.clone());
-                }
-
                 if let Some(ref val) = devnet_override.pox_stacking_orders {
                     devnet_config.pox_stacking_orders = Some(val.clone());
                 }
@@ -681,42 +633,6 @@ impl NetworkManifest {
 
                 if let Some(val) = devnet_override.bitcoin_controller_automining_disabled {
                     devnet_config.bitcoin_controller_automining_disabled = Some(val);
-                }
-
-                if let Some(val) = devnet_override.enable_subnet_node {
-                    devnet_config.enable_subnet_node = Some(val);
-                }
-
-                if let Some(val) = devnet_override.subnet_node_p2p_port {
-                    devnet_config.subnet_node_p2p_port = Some(val);
-                }
-
-                if let Some(val) = devnet_override.subnet_node_rpc_port {
-                    devnet_config.subnet_node_rpc_port = Some(val);
-                }
-
-                if let Some(val) = devnet_override.subnet_events_ingestion_port {
-                    devnet_config.subnet_events_ingestion_port = Some(val);
-                }
-
-                if let Some(ref val) = devnet_override.subnet_node_events_observers {
-                    devnet_config.subnet_node_events_observers = Some(val.clone());
-                }
-
-                if let Some(ref val) = devnet_override.subnet_node_image_url {
-                    devnet_config.subnet_node_image_url = Some(val.clone());
-                }
-
-                if let Some(ref val) = devnet_override.subnet_leader_derivation_path {
-                    devnet_config.subnet_leader_derivation_path = Some(val.clone());
-                }
-
-                if let Some(ref val) = devnet_override.subnet_leader_mnemonic {
-                    devnet_config.subnet_leader_mnemonic = Some(val.clone());
-                }
-
-                if let Some(ref val) = devnet_override.subnet_leader_mnemonic {
-                    devnet_config.subnet_leader_mnemonic = Some(val.clone());
                 }
 
                 if let Some(ref val) = devnet_override.epoch_2_0 {
@@ -805,43 +721,10 @@ impl NetworkManifest {
             let (faucet_stx_address, faucet_btc_address, faucet_secret_key_hex) =
                 compute_addresses(&faucet_mnemonic, &faucet_derivation_path, networks);
 
-            let subnet_leader_mnemonic = devnet_config
-                .subnet_leader_mnemonic
-                .take()
-                .unwrap_or(DEFAULT_SUBNET_MNEMONIC.to_string());
-            let subnet_leader_derivation_path = devnet_config
-                .subnet_leader_derivation_path
-                .take()
-                .unwrap_or(DEFAULT_DERIVATION_PATH.to_string());
-            let (
-                subnet_leader_stx_address,
-                subnet_leader_btc_address,
-                subnet_leader_secret_key_hex,
-            ) = compute_addresses(
-                &subnet_leader_mnemonic,
-                &subnet_leader_derivation_path,
-                networks,
-            );
-
-            let enable_subnet_node = devnet_config.enable_subnet_node.unwrap_or(false);
-            let subnet_events_ingestion_port =
-                devnet_config.subnet_events_ingestion_port.unwrap_or(30445);
-
             let stacks_node_events_observers = devnet_config
                 .stacks_node_events_observers
                 .take()
                 .unwrap_or_default();
-
-            let subnet_contract_id = devnet_config
-                .subnet_contract_id
-                .unwrap_or(DEFAULT_SUBNET_CONTRACT_ID.to_string());
-            let contract_id = QualifiedContractIdentifier::parse(&subnet_contract_id)
-                .expect("subnet contract_id invalid");
-            let default_deployer = accounts
-                .get("deployer")
-                .expect("default deployer account unavailable");
-            let remapped_subnet_contract_id =
-                format!("{}.{}", default_deployer.stx_address, contract_id.name);
 
             // validate that epoch 3.0 is started in a reward phase
             let epoch_3_0 = devnet_config.epoch_3_0.unwrap_or(DEFAULT_EPOCH_3_0);
@@ -995,10 +878,6 @@ impl NetworkManifest {
                     .stacks_api_postgres_database
                     .take()
                     .unwrap_or("stacks_api".to_string()),
-                subnet_api_postgres_database: devnet_config
-                    .subnet_api_postgres_database
-                    .take()
-                    .unwrap_or("subnet_api".to_string()),
                 execute_script: devnet_config.execute_script.take().unwrap_or_default(),
                 bitcoin_node_image_url: devnet_config
                     .bitcoin_node_image_url
@@ -1034,34 +913,6 @@ impl NetworkManifest {
                 disable_postgres: devnet_config.disable_postgres.unwrap_or(false),
                 disable_stacks_explorer: devnet_config.disable_stacks_explorer.unwrap_or(false),
                 bind_containers_volumes: devnet_config.bind_containers_volumes.unwrap_or(true),
-                enable_subnet_node,
-                subnet_node_image_url: devnet_config
-                    .subnet_node_image_url
-                    .take()
-                    .unwrap_or(DEFAULT_SUBNET_NODE_IMAGE.to_string()),
-                subnet_leader_btc_address,
-                subnet_leader_stx_address,
-                subnet_leader_mnemonic,
-                subnet_leader_secret_key_hex,
-                subnet_leader_derivation_path,
-                subnet_node_p2p_port: devnet_config.subnet_node_p2p_port.unwrap_or(30444),
-                subnet_node_rpc_port: devnet_config.subnet_node_rpc_port.unwrap_or(30443),
-                subnet_events_ingestion_port,
-                subnet_node_events_observers: devnet_config
-                    .subnet_node_events_observers
-                    .take()
-                    .unwrap_or_default(),
-                subnet_contract_id,
-                remapped_subnet_contract_id,
-                subnet_api_image_url: devnet_config
-                    .subnet_api_image_url
-                    .take()
-                    .unwrap_or(DEFAULT_SUBNET_API_IMAGE.to_string()),
-                subnet_api_port: devnet_config.subnet_api_port.unwrap_or(13999),
-                subnet_api_events_port: devnet_config.stacks_api_events_port.unwrap_or(13700),
-                disable_subnet_api: devnet_config
-                    .disable_subnet_api
-                    .unwrap_or(!enable_subnet_node),
                 docker_host: devnet_config
                     .docker_host
                     .unwrap_or(DEFAULT_DOCKER_SOCKET.into()),
@@ -1097,11 +948,6 @@ impl NetworkManifest {
                     .stacks_explorer_env_vars
                     .take()
                     .unwrap_or_default(),
-                subnet_node_env_vars: devnet_config
-                    .subnet_node_env_vars
-                    .take()
-                    .unwrap_or_default(),
-                subnet_api_env_vars: devnet_config.subnet_api_env_vars.take().unwrap_or_default(),
                 use_docker_gateway_routing: devnet_config
                     .use_docker_gateway_routing
                     .unwrap_or(false),
@@ -1134,9 +980,6 @@ impl Default for DevnetConfig {
 
         let (faucet_stx_address, faucet_btc_address, faucet_secret_key_hex) =
             compute_addresses(DEFAULT_FAUCET_MNEMONIC, DEFAULT_DERIVATION_PATH, &networks);
-
-        let (subnet_leader_stx_address, subnet_leader_btc_address, subnet_leader_secret_key_hex) =
-            compute_addresses(DEFAULT_SUBNET_MNEMONIC, DEFAULT_DERIVATION_PATH, &networks);
 
         Self {
             name: "devnet".to_string(),
@@ -1184,7 +1027,6 @@ impl Default for DevnetConfig {
             postgres_username: "postgres".to_string(),
             postgres_password: "postgres".to_string(),
             stacks_api_postgres_database: "stacks_api".to_string(),
-            subnet_api_postgres_database: "subnet_api".to_string(),
             pox_stacking_orders: get_default_stacking_orders(),
             execute_script: vec![],
             bitcoin_node_image_url: DEFAULT_BITCOIN_NODE_IMAGE.to_string(),
@@ -1199,31 +1041,6 @@ impl Default for DevnetConfig {
             disable_stacks_api: false,
             disable_postgres: false,
             bind_containers_volumes: true,
-            enable_subnet_node: false,
-            subnet_node_image_url: DEFAULT_SUBNET_NODE_IMAGE.to_string(),
-            subnet_leader_stx_address,
-            subnet_leader_secret_key_hex,
-            subnet_leader_btc_address,
-            subnet_leader_mnemonic: DEFAULT_SUBNET_MNEMONIC.to_string(),
-            subnet_leader_derivation_path: DEFAULT_DERIVATION_PATH.to_string(),
-            subnet_node_p2p_port: 30444,
-            subnet_node_rpc_port: 30443,
-            subnet_events_ingestion_port: 30445,
-            subnet_node_events_observers: vec![],
-            subnet_contract_id: DEFAULT_SUBNET_CONTRACT_ID.to_string(),
-            remapped_subnet_contract_id: format!(
-                "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.{}",
-                DEFAULT_SUBNET_CONTRACT_ID
-                    .split('.')
-                    .nth(1)
-                    .unwrap_or("subnet-v3-0-1")
-            ),
-            subnet_node_env_vars: vec![],
-            subnet_api_image_url: DEFAULT_SUBNET_API_IMAGE.to_string(),
-            subnet_api_port: 13999,
-            subnet_api_events_port: 13700,
-            subnet_api_env_vars: vec![],
-            disable_subnet_api: true, // disabled by default since subnet is disabled
             docker_host: DEFAULT_DOCKER_SOCKET.to_string(),
             components_host: "127.0.0.1".to_string(),
             epoch_2_0: DEFAULT_EPOCH_2_0,

@@ -91,3 +91,87 @@ async fn it_can_call_remote_data() {
     let expected = format!("0x{}", ClarityValue::UInt(0).serialize_to_hex().unwrap());
     assert_eq!(tx.unwrap().result, expected);
 }
+
+#[wasm_bindgen_test]
+async fn it_handles_invalid_sender_address() {
+    let mut sdk = init_sdk().await;
+    let _ = deploy_basic_contract(&mut sdk);
+
+    // Test with invalid sender address (full contract address instead of just sender)
+    let result = sdk.call_public_fn(&CallFnArgs::new(
+        "basic-contract".into(),
+        "two".into(),
+        vec![],
+        "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.basic-contract".into(), // Invalid: full contract address
+    ));
+
+    assert!(result.is_err());
+    let error_msg = result.unwrap_err();
+    assert!(error_msg.contains("Invalid sender address"));
+}
+
+#[wasm_bindgen_test]
+async fn it_handles_contract_recipient_address() {
+    let mut sdk = init_sdk().await;
+
+    let result = sdk.transfer_stx(&crate::core::TransferSTXArgs::new(
+        1000,
+        "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.basic-contract".into(), // valid: contract address
+        "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM".into(),
+    ));
+
+    // contract addresses are valid recipients
+    assert!(result.is_ok());
+}
+
+#[wasm_bindgen_test]
+async fn it_handles_invalid_deployer_address() {
+    let mut sdk = init_sdk().await;
+
+    // Test with invalid deployer address
+    let contract = DeployContractArgs::new(
+        "basic-contract".into(),
+        "(define-private (two) (+ u1 u1))".into(),
+        ContractOptions::new(None),
+        "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.invalid-contract".into(), // Invalid: contract address
+    );
+
+    let result = sdk.deploy_contract(&contract);
+    assert!(result.is_err());
+    let error_msg = result.unwrap_err();
+    assert!(error_msg.contains("Invalid sender address"));
+}
+
+#[wasm_bindgen_test]
+async fn it_handles_contract_address_as_sender() {
+    let mut sdk = init_sdk().await;
+    let _ = deploy_basic_contract(&mut sdk);
+
+    let contract_address = "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.test";
+    let result = sdk.call_public_fn(&CallFnArgs::new(
+        "basic-contract".into(),
+        "two".into(),
+        vec![],
+        contract_address.into(), // Invalid: contract address instead of sender address
+    ));
+
+    assert!(result.is_err());
+    let error_msg = result.unwrap_err();
+    assert!(error_msg.contains("Invalid sender address"));
+    assert!(error_msg.contains("ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.test"));
+}
+
+#[wasm_bindgen_test]
+async fn it_handles_contract_address_as_recipient() {
+    let mut sdk = init_sdk().await;
+
+    let contract_address = "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.test";
+    let result = sdk.transfer_stx(&crate::core::TransferSTXArgs::new(
+        1000,
+        contract_address.into(), // Valid: contract address instead of recipient address
+        "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM".into(),
+    ));
+
+    // we support contract addresses as recipients
+    assert!(result.is_ok());
+}
