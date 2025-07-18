@@ -300,7 +300,12 @@ impl ProjectManifest {
         if let Some(user_boot_contracts) = &project_manifest_file.project.boot_contracts {
             for contract in user_boot_contracts {
                 if !boot_contracts.contains(contract) {
-                    boot_contracts.push(contract.clone());
+                    // Check if this is a valid boot contract name
+                    if clarity_repl::repl::boot::BOOT_CONTRACTS_NAMES.contains(&contract.as_str()) {
+                        boot_contracts.push(contract.clone());
+                    } else {
+                        eprintln!("Warning: Skipping custom boot contract '{contract}' - only existing boot contracts can be overridden. Valid boot contracts are: {:?}", clarity_repl::repl::boot::BOOT_CONTRACTS_NAMES);
+                    }
                 }
             }
         }
