@@ -19,7 +19,7 @@
     "publish:sdk": "npm publish -w components/clarinet-sdk/node -w components/clarinet-sdk/browser --tag beta"
   },
   "devDependencies": {
-    "@types/node": "^22.12.0",
+    "@types/node": "^24.0.14",
     "@types/prompts": "^2.4.5",
     "@types/yargs": "^17.0.24",
     "prettier": "^3.3.3",
