@@ -165,9 +165,9 @@ describe("simnet can call contracts function", () => {
       total: {
         writeLength: 44,
         writeCount: 3,
-        readLength: 1466,
+        readLength: 1545,
         readCount: 8,
-        runtime: 15630,
+        runtime: 15709,
       },
       limit: {
         writeLength: 15000000,
@@ -327,11 +327,12 @@ describe("simnet can read contracts data vars and maps", () => {
 describe("simnet can get contracts info and deploy contracts", () => {
   it("can get contract interfaces", () => {
     const contractInterfaces = simnet.getContractsInterfaces();
+    console.log("contractInterfaces", contractInterfaces);
     expect(contractInterfaces).toHaveLength(nbOfBootContracts + 4);
 
     const counterInterface = contractInterfaces.get(`${deployerAddr}.counter`);
     expect(counterInterface).not.toBeNull();
-    expect(counterInterface?.functions).toHaveLength(7);
+    expect(counterInterface?.functions).toHaveLength(8);
     expect(counterInterface?.variables).toHaveLength(2);
     expect(counterInterface?.maps).toHaveLength(1);
   });
@@ -351,7 +352,7 @@ describe("simnet can get contracts info and deploy contracts", () => {
     const counterAst = simnet.getContractAST(`${deployerAddr}.counter`);
 
     expect(counterAst).toBeDefined();
-    expect(counterAst.expressions).toHaveLength(11);
+    expect(counterAst.expressions).toHaveLength(12);
 
     const getWithShortAddr = simnet.getContractAST("counter");
     expect(getWithShortAddr).toBeDefined();
@@ -361,7 +362,7 @@ describe("simnet can get contracts info and deploy contracts", () => {
     const counterAst = simnet.getContractAST(`${deployerAddr}.counter`);
 
     expect(counterAst).toBeDefined();
-    expect(counterAst.expressions).toHaveLength(11);
+    expect(counterAst.expressions).toHaveLength(12);
 
     // @ts-ignore
     expect(counterAst.expressions[0].pre_comments[0][0]).toBe("counter contract");
@@ -434,8 +435,8 @@ describe("prints logs", () => {
     const res = simnet.callPublicFn("counter", "increment", [], address1);
     expect(res.result).toStrictEqual(Cl.ok(Cl.bool(true)));
 
-    expect(consoleSpy).toHaveBeenCalledWith('"call increment" (counter:26)');
-    expect(consoleSpy).toHaveBeenCalledWith('"call inner-increment" (counter:15)');
+    expect(consoleSpy).toHaveBeenCalledWith('"call increment" (counter:30)');
+    expect(consoleSpy).toHaveBeenCalledWith('"call inner-increment" (counter:19)');
     consoleSpy.mockRestore();
   });
 
