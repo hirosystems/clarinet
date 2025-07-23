@@ -18,7 +18,7 @@ use clarity_repl::clarity::vm::ast::ContractAST;
 use clarity_repl::clarity::vm::diagnostic::Diagnostic;
 use clarity_repl::clarity::vm::types::{PrincipalData, QualifiedContractIdentifier};
 use clarity_repl::clarity::vm::{
-    ContractName, EvaluationResult, ExecutionResult, SymbolicExpression,
+    ClarityVersion, ContractName, EvaluationResult, ExecutionResult, SymbolicExpression,
 };
 use clarity_repl::clarity::StacksEpochId;
 use clarity_repl::repl::boot::{
@@ -463,6 +463,88 @@ pub async fn generate_default_deployment(
         requirements_data.append(&mut boot_contracts_asts);
     }
 
+    // Validate custom boot contracts from override_boot_contracts_source
+    if !settings.override_boot_contracts_source.is_empty() && !simnet_remote_data {
+        let mut session = Session::new(settings.clone());
+        for (contract_name, file_path) in &settings.override_boot_contracts_source {
+            // Only validate existing boot contracts that are being overridden
+            if !clarity_repl::repl::boot::BOOT_CONTRACTS_NAMES.contains(&contract_name.as_str()) {
+                continue;
+            }
+
+            // Load and validate the custom boot contract
+            let custom_source = match clarity_repl::repl::boot::load_custom_boot_contract(file_path)
+            {
+                Ok(source) => source,
+                Err(e) => {
+                    return Err(format!(
+                        "Failed to load custom boot contract '{contract_name}' from '{file_path}': {e}"
+                    ));
+                }
+            };
+
+            // Use standard epoch/version mapping for known boot contracts
+            let (epoch, clarity_version) = match contract_name.as_str() {
+                "pox-4" | "signers" | "signers-voting" => {
+                    (StacksEpochId::Epoch25, ClarityVersion::Clarity2)
+                }
+                "pox-3" => (StacksEpochId::Epoch24, ClarityVersion::Clarity2),
+                "pox-2" | "costs-3" => (StacksEpochId::Epoch21, ClarityVersion::Clarity2),
+                "costs-2" => (StacksEpochId::Epoch2_05, ClarityVersion::Clarity1),
+                "genesis" | "lockup" | "bns" | "cost-voting" | "costs" | "pox" => {
+                    (StacksEpochId::Epoch20, ClarityVersion::Clarity1)
+                }
+                _ => {
+                    return Err(format!(
+                        "Unknown boot contract '{contract_name}' - cannot validate"
+                    ));
+                }
+            };
+
+            // Set the session to the correct epoch for validation
+            session.update_epoch(epoch);
+
+            // Create a temporary contract for validation
+            let temp_contract = ClarityContract {
+                code_source: ClarityCodeSource::ContractInMemory(custom_source),
+                deployer: ContractDeployer::Address(default_deployer_address.to_address()),
+                name: contract_name.clone(),
+                clarity_version,
+                epoch,
+            };
+
+            let (_, diagnostics, ast_success) = session.interpreter.build_ast(&temp_contract);
+
+            // Try to deploy the contract to catch any runtime errors that build_ast might miss
+            let deploy_result = session.deploy_contract(&temp_contract, false, None);
+            match deploy_result {
+                Ok(_) => {
+                    // Deployment succeeded, continue with AST validation
+                }
+                Err(deploy_errors) => {
+                    let error_messages: Vec<String> =
+                        deploy_errors.iter().map(|d| d.message.clone()).collect();
+                    return Err(format!(
+                        "Custom boot contract '{}' is invalid:\n{}",
+                        contract_name,
+                        error_messages.join("\n")
+                    ));
+                }
+            }
+
+            // Validate the custom boot contract
+            if !ast_success {
+                let error_messages: Vec<String> =
+                    diagnostics.iter().map(|d| d.message.clone()).collect();
+                return Err(format!(
+                    "Custom boot contract '{}' is invalid:\n{}",
+                    contract_name,
+                    error_messages.join("\n")
+                ));
+            }
+        }
+    }
+
     // Only allow overriding existing boot contracts, not adding new ones
     if matches!(network, StacksNetwork::Simnet) && !simnet_remote_data {
         let base_location = manifest.location.get_parent_location()?;
@@ -509,7 +591,7 @@ pub async fn generate_default_deployment(
             );
 
             // Add to requirements data for AST building
-            let session = Session::new(settings.clone());
+            let mut session = Session::new(settings.clone());
             let contract = ClarityContract {
                 code_source: ClarityCodeSource::ContractInMemory(source.clone()),
                 deployer: ContractDeployer::Address(default_deployer_address.to_address()),
@@ -518,7 +600,38 @@ pub async fn generate_default_deployment(
                 epoch: clarity_repl::repl::Epoch::Specific(DEFAULT_EPOCH),
             };
 
-            let (ast, _, _) = session.interpreter.build_ast(&contract);
+            let (ast, diagnostics, ast_success) = session.interpreter.build_ast(&contract);
+
+            // Try to deploy the contract to catch any runtime errors that build_ast might miss
+            let deploy_result = session.deploy_contract(&contract, false, None);
+            match deploy_result {
+                Ok(_) => {
+                    // Deployment succeeded, continue with AST validation
+                }
+                Err(deploy_errors) => {
+                    let error_messages: Vec<String> =
+                        deploy_errors.iter().map(|d| d.message.clone()).collect();
+                    return Err(format!(
+                        "Custom boot contract '{}' from '{}' is invalid:\n{}",
+                        contract_name,
+                        contract_location,
+                        error_messages.join("\n")
+                    ));
+                }
+            }
+
+            // Validate the custom boot contract
+            if !ast_success {
+                let error_messages: Vec<String> =
+                    diagnostics.iter().map(|d| d.message.clone()).collect();
+                return Err(format!(
+                    "Custom boot contract '{}' from '{}' is invalid:\n{}",
+                    contract_name,
+                    contract_location,
+                    error_messages.join("\n")
+                ));
+            }
+
             requirements_data.insert(contract_id.clone(), (DEFAULT_CLARITY_VERSION, ast));
 
             // Add as emulated contract publish transaction
