@@ -1522,7 +1522,7 @@ mod tests {
             name: "should_error".to_string(),
             deployer: ContractDeployer::Address("ST000000000000000000002AMW42H".into()),
             clarity_version: ClarityVersion::Clarity2,
-            epoch: StacksEpochId::Epoch2_05,
+            epoch: Epoch::Specific(StacksEpochId::Epoch2_05),
         };
 
         let result = session.deploy_contract(&contract, false, None);
@@ -1607,7 +1607,7 @@ mod tests {
             name: "contract".to_string(),
             deployer: ContractDeployer::Address("ST000000000000000000002AMW42H".into()),
             clarity_version: ClarityVersion::Clarity2,
-            epoch: StacksEpochId::Epoch25,
+            epoch: Epoch::Specific(StacksEpochId::Epoch25),
         };
 
         let _ = session.deploy_contract(&contract, false, None);
