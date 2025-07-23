@@ -65,7 +65,7 @@ use clarity::vm::types::{PrincipalData, QualifiedContractIdentifier, StandardPri
 use clarity::vm::ClarityVersion;
 
 use crate::repl::{
-    ClarityCodeSource, ClarityContract, ClarityInterpreter, ContractDeployer, Settings,
+    ClarityCodeSource, ClarityContract, ClarityInterpreter, ContractDeployer, Epoch, Settings,
 };
 
 fn make_testnet_cost_voting() -> String {
@@ -188,7 +188,7 @@ pub static BOOT_CONTRACTS_DATA: LazyLock<
                 code_source: ClarityCodeSource::ContractInMemory(code.to_string()),
                 deployer: ContractDeployer::Address(deployer.to_address()),
                 name: name.to_string(),
-                epoch,
+                epoch: Epoch::Specific(epoch),
                 clarity_version,
             };
             let (ast, _, _) = interpreter.build_ast(&boot_contract);

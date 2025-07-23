@@ -1166,7 +1166,7 @@ pub fn main() {
                 deployer: ContractDeployer::Transient,
                 name: "transient".to_string(),
                 clarity_version: ClarityVersion::default_for_epoch(epoch),
-                epoch,
+                epoch: clarity_repl::repl::Epoch::Specific(epoch),
             };
             let (ast, mut diagnostics, mut success) = session.interpreter.build_ast(&contract);
             let (annotations, mut annotation_diagnostics) = session
@@ -1178,7 +1178,7 @@ pub fn main() {
                 contract_id,
                 ast.expressions,
                 LimitedCostTracker::new_free(),
-                contract.epoch,
+                contract.epoch.resolve(),
                 contract.clarity_version,
             );
             let mut analysis_db = AnalysisDatabase::new(&mut session.interpreter.clarity_datastore);

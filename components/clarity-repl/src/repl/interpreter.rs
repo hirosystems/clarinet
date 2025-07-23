@@ -291,7 +291,7 @@ impl ClarityInterpreter {
             source_code,
             &mut (),
             contract.clarity_version,
-            contract.epoch,
+            contract.epoch.resolve(),
         )
     }
 
@@ -350,7 +350,7 @@ impl ClarityInterpreter {
             &mut analysis_db,
             false,
             LimitedCostTracker::new_free(),
-            contract.epoch,
+            contract.epoch.resolve(),
             contract.clarity_version,
             true,
         )
@@ -471,7 +471,7 @@ impl ClarityInterpreter {
 
         let tx_sender: PrincipalData = self.tx_sender.clone().into();
 
-        let mut global_context = self.get_global_context(contract.epoch, cost_track)?;
+        let mut global_context = self.get_global_context(contract.epoch.resolve(), cost_track)?;
 
         if let Some(in_hooks) = eval_hooks {
             let mut hooks: Vec<&mut dyn EvalHook> = Vec::new();
@@ -676,7 +676,7 @@ impl ClarityInterpreter {
         let show_timings = self.repl_settings.show_timings;
         let tx_sender = PrincipalData::from(self.tx_sender.clone());
 
-        let mut global_context = self.get_global_context(contract.epoch, cost_track)?;
+        let mut global_context = self.get_global_context(contract.epoch.resolve(), cost_track)?;
 
         if let Some(in_hooks) = eval_hooks {
             let mut hooks: Vec<&mut dyn EvalHook> = Vec::new();

@@ -259,7 +259,7 @@ fn handle_emulated_contract_publish(
         deployer: ContractDeployer::Address(tx.emulated_sender.to_string()),
         name: tx.contract_name.to_string(),
         clarity_version: tx.clarity_version,
-        epoch,
+        epoch: clarity_repl::repl::Epoch::Specific(epoch),
     };
 
     let result = session.deploy_contract(&contract, false, contract_ast);
@@ -532,7 +532,7 @@ pub async fn generate_default_deployment(
                         name: contract_id.name.to_string(),
                         deployer: ContractDeployer::ContractIdentifier(contract_id.clone()),
                         clarity_version,
-                        epoch,
+                        epoch: clarity_repl::repl::Epoch::Specific(epoch),
                     };
                     let (ast, _, _) = session.interpreter.build_ast(&contract);
                     (clarity_version, ast)
@@ -717,8 +717,8 @@ pub async fn generate_default_deployment(
         let contract_id = QualifiedContractIdentifier::new(sender.clone(), contract_name.clone());
 
         let epoch = match forced_min_epoch {
-            Some(min_epoch) => std::cmp::max(min_epoch, contract_config.epoch),
-            None => contract_config.epoch,
+            Some(min_epoch) => std::cmp::max(min_epoch, contract_config.epoch.resolve()),
+            None => contract_config.epoch.resolve(),
         };
 
         contracts_sources.insert(
@@ -728,7 +728,7 @@ pub async fn generate_default_deployment(
                 deployer: ContractDeployer::Address(sender.to_address()),
                 name: contract_name.to_string(),
                 clarity_version: contract_config.clarity_version,
-                epoch,
+                epoch: clarity_repl::repl::Epoch::Specific(epoch),
             },
         );
 
@@ -770,7 +770,7 @@ pub async fn generate_default_deployment(
         contract_asts.insert(contract_id.clone(), ast.clone());
         contract_data.insert(contract_id.clone(), (contract.clarity_version, ast));
         contract_diags.insert(contract_id.clone(), diags);
-        contract_epochs.insert(contract_id, contract.epoch);
+        contract_epochs.insert(contract_id, contract.epoch.resolve());
         asts_success = asts_success && ast_success;
     }
 

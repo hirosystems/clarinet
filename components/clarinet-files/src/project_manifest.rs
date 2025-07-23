@@ -5,7 +5,7 @@ use std::str::FromStr;
 use clarity::types::StacksEpochId;
 use clarity::vm::ClarityVersion;
 use clarity_repl::repl;
-use clarity_repl::repl::{ClarityCodeSource, ClarityContract, ContractDeployer};
+use clarity_repl::repl::{ClarityCodeSource, ClarityContract, ContractDeployer, DEFAULT_EPOCH};
 use serde::ser::SerializeMap;
 use serde::{Deserializer, Serialize, Serializer};
 use serde_json::Value as JsonValue;
@@ -123,7 +123,7 @@ where
             name: contract_name.clone(),
             deployer,
             clarity_version,
-            epoch,
+            epoch: clarity_repl::repl::Epoch::Specific(epoch),
         };
 
         map.insert(contract_name, cc);
@@ -354,7 +354,7 @@ impl ProjectManifest {
                             deployer: deployer.clone(),
                             code_source,
                             clarity_version,
-                            epoch,
+                            epoch: clarity_repl::repl::Epoch::Specific(epoch),
                         },
                     );
 
@@ -387,7 +387,8 @@ fn get_epoch_and_clarity_version(
     // if epoch is specified but not version: use the default version for that epoch
 
     let epoch = match settings_epoch {
-        None => StacksEpochId::Epoch2_05,
+        None => StacksEpochId::Epoch2_05, // Keep the existing default unchanged
+        Some("latest") => DEFAULT_EPOCH,
         Some(epoch) => match epoch {
             "2" | "2.0" => StacksEpochId::Epoch20,
             "2.05" => StacksEpochId::Epoch2_05,
@@ -399,7 +400,7 @@ fn get_epoch_and_clarity_version(
             "3" | "3.0" => StacksEpochId::Epoch30,
             "3.1" => StacksEpochId::Epoch31,
             _ => return Err(
-                "epoch field invalid (value supported: 2.0, 2.05, 2.1, 2.2, 2.3, 2.4, 3.0, 3.1)"
+                "epoch field invalid (value supported: 2.0, 2.05, 2.1, 2.2, 2.3, 2.4, 3.0, 3.1, latest)"
                     .into(),
             ),
         },

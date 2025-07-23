@@ -29,7 +29,8 @@ use super::diagnostic::output_diagnostic;
 use super::hooks::logger::LoggerHook;
 use super::interpreter::ContractCallError;
 use super::{
-    ClarityCodeSource, ClarityContract, ClarityInterpreter, ContractDeployer, SessionSettings,
+    ClarityCodeSource, ClarityContract, ClarityInterpreter, ContractDeployer, Epoch,
+    SessionSettings,
 };
 use crate::analysis::coverage::CoverageHook;
 use crate::repl::clarity_values::value_to_string;
@@ -161,7 +162,7 @@ impl Session {
                     name: name.to_string(),
                     deployer: deployer.clone(),
                     clarity_version,
-                    epoch,
+                    epoch: Epoch::Specific(epoch),
                 };
 
                 // Result ignored, boot contracts are trusted to be valid
@@ -485,7 +486,7 @@ impl Session {
         ast: Option<&ContractAST>,
     ) -> Result<ExecutionResult, Vec<Diagnostic>> {
         let current_epoch = self.interpreter.datastore.get_current_epoch();
-        if contract.epoch != current_epoch {
+        if contract.epoch.resolve() != current_epoch {
             let diagnostic = Diagnostic {
                 level: Level::Error,
                 message: format!(
@@ -506,7 +507,7 @@ impl Session {
             hooks.push(logger_hook);
         }
 
-        if contract.clarity_version > ClarityVersion::default_for_epoch(contract.epoch) {
+        if contract.clarity_version > ClarityVersion::default_for_epoch(contract.epoch.resolve()) {
             let diagnostic = Diagnostic {
                 level: Level::Error,
                 message: format!(
@@ -610,7 +611,7 @@ impl Session {
             name: format!("contract-{}", self.contracts.len()),
             deployer: ContractDeployer::DefaultDeployer,
             clarity_version: ClarityVersion::default_for_epoch(current_epoch),
-            epoch: current_epoch,
+            epoch: Epoch::Specific(current_epoch),
         };
         let contract_identifier =
             contract.expect_resolved_contract_identifier(Some(&self.interpreter.get_tx_sender()));
@@ -657,7 +658,7 @@ impl Session {
             name: format!("contract-{}", self.contracts.len()),
             deployer: ContractDeployer::DefaultDeployer,
             clarity_version: ClarityVersion::default_for_epoch(current_epoch),
-            epoch: current_epoch,
+            epoch: Epoch::Specific(current_epoch),
         };
         let contract_identifier =
             contract.expect_resolved_contract_identifier(Some(&self.interpreter.get_tx_sender()));
