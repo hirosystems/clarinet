@@ -284,7 +284,7 @@ impl ProjectManifest {
             }
         }
 
-        // Merge user-specified boot_contracts with the default list
+        // Always include all boot contracts - the include_boot_contracts setting is no longer used
         let mut boot_contracts = vec![
             "costs".to_string(),
             "pox".to_string(),
