@@ -927,7 +927,7 @@ mod tests {
     use super::*;
     use crate::repl::session::Session;
     use crate::repl::{
-        ClarityCodeSource, ClarityContract, ContractDeployer, SessionSettings,
+        ClarityCodeSource, ClarityContract, ContractDeployer, Epoch, SessionSettings,
         DEFAULT_CLARITY_VERSION, DEFAULT_EPOCH,
     };
 
@@ -941,7 +941,7 @@ mod tests {
             name: name.unwrap_or("contract").to_string(),
             deployer: ContractDeployer::Transient,
             clarity_version: DEFAULT_CLARITY_VERSION,
-            epoch: DEFAULT_EPOCH,
+            epoch: Epoch::Specific(DEFAULT_EPOCH),
         };
         let (ast, diags, _) = session.interpreter.build_ast(&contract);
         Ok((

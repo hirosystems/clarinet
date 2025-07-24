@@ -28,8 +28,8 @@ use clarity_repl::repl::clarity_values::{uint8_to_string, uint8_to_value};
 use clarity_repl::repl::session::CostsReport;
 use clarity_repl::repl::settings::RemoteDataSettings;
 use clarity_repl::repl::{
-    clarity_values, ClarityCodeSource, ClarityContract, ContractDeployer, Session, SessionSettings,
-    DEFAULT_CLARITY_VERSION, DEFAULT_EPOCH,
+    clarity_values, ClarityCodeSource, ClarityContract, ContractDeployer, Epoch, Session,
+    SessionSettings, DEFAULT_CLARITY_VERSION, DEFAULT_EPOCH,
 };
 use gloo_utils::format::JsValueSerdeExt;
 use js_sys::Function as JsFunction;
@@ -899,7 +899,7 @@ impl SDK {
                 name: args.name.clone(),
                 deployer: ContractDeployer::Address(args.sender.to_string()),
                 clarity_version: args.options.clarity_version,
-                epoch: current_epoch,
+                epoch: Epoch::Specific(current_epoch),
             };
 
             match session.deploy_contract(&contract, false, None) {

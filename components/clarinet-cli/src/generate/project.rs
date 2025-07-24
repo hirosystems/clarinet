@@ -169,6 +169,7 @@ cache_dir = "./.cache"
 
 # [contracts.counter]
 # path = "contracts/counter.clar"
+# epoch = "latest"
 
 [repl.analysis]
 passes = ["check_checker"]
