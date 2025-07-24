@@ -258,7 +258,7 @@ pub fn get_boot_contracts_data_with_overrides(
                 code_source: ClarityCodeSource::ContractInMemory(custom_source.clone()),
                 deployer: ContractDeployer::Address(deployer.to_address()),
                 name: contract_name.clone(),
-                epoch,
+                epoch: Epoch::Specific(epoch),
                 clarity_version,
             };
 

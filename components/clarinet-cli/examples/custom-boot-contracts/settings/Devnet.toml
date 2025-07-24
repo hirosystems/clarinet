@@ -114,7 +114,6 @@ disable_bitcoin_explorer = true
 # stacks_explorer_image_url = "blockstack/explorer:latest"
 # bitcoin_explorer_image_url = "quay.io/hirosystems/bitcoin-explorer:devnet"
 # postgres_image_url = "postgres:14"
-# enable_subnet_node = true
 # subnet_node_image_url = "quay.io/hirosystems/subnet-node:devnet"
 # subnet_leader_mnemonic = "female adjust gallery certain visit token during great side clown fitness like hurt clip knife warm bench start reunion globe detail dream depend fortune"
 # subnet_leader_derivation_path = "m/44'/5757'/0'/0/0"

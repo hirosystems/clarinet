@@ -5,7 +5,7 @@ use clarinet_deployments::initiate_session_from_manifest;
 use clarinet_files::{FileLocation, ProjectManifest};
 
 #[test]
-fn test_override_boot_contracts_works_like_readme() {
+fn test_override_boot_contracts() {
     let temp_dir = TempDir::new().expect("Failed to create temp dir");
     let project_path = temp_dir.path();
 
