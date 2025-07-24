@@ -26,7 +26,7 @@ describe("nft basic features", () => {
         asset_identifier: `${simnet.deployer}.simple-nft::nft`,
         raw_value: `0x${Buffer.from(Cl.serialize(Cl.uint(1))).toString("hex")}`,
         recipient: address1,
-        // we can use asymetric for clarity values
+        // we can use asymmetric for clarity values
         value: expect.toBeUint(1),
       },
     });
