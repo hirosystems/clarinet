@@ -4651,6 +4651,7 @@ dependencies = [
  "clarity",
  "serde",
  "stacks-common",
+ "stackslib",
 ]
 
 [[package]]
