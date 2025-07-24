@@ -72,63 +72,9 @@ balance = 100_000_000_000_000
 # btc_address: mjSrB3wS4xab3kYqFktwBzfTdPg367ZJ2d
 
 [simnet]
-# pox_stacking_orders = []
-# orchestrator_port = 20445
-# bitcoin_node_p2p_port = 18444
-# bitcoin_node_rpc_port = 18443
-# bitcoin_node_username = "devnet"
-# bitcoin_node_password = "devnet"
 bitcoin_controller_block_time = 20_000
-# stacks_node_rpc_port = 20443
-# stacks_node_p2p_port = 20444
-# stacks_node_events_observers = ["host.docker.internal:20455"]
-# stacks_api_port = 3999
-# stacks_api_events_port = 3700
-# bitcoin_explorer_port = 8001
-# stacks_explorer_port = 8000
-# miner_mnemonic = "twice kind fence tip hidden tilt action fragile skin nothing glory cousin green tomorrow spring wrist shed math olympic multiply hip blue scout claw"
-# miner_derivation_path = "m/44'/5757'/0'/0/0"
-# working_dir = "tmp/simnet"
-# postgres_port = 5432
-# postgres_username = "postgres"
-# postgres_password = "postgres"
-# postgres_database = "postgres"
-# bitcoin_node_image_url = "quay.io/hirosystems/bitcoind:devnet"
-# stacks_node_image_url = "quay.io/hirosystems/stacks-node:devnet-v2"
-# stacks_api_image_url = "blockstack/stacks-blockchain-api:latest"
-# stacks_explorer_image_url = "blockstack/explorer:latest"
-# bitcoin_explorer_image_url = "quay.io/hirosystems/bitcoin-explorer:devnet"
-# postgres_image_url = "postgres:14"
-# bitcoin_controller_automining_disabled = true
 disable_bitcoin_explorer = true
 disable_stacks_explorer = true
 disable_stacks_api = true
 disable_postgres = true
-# bind_containers_volumes = true
-# stacks_node_env_vars = ["STACKS_LOG_DEBUG=1"]
 enable_subnet_node = false
-# subnet_contract_id = "STXMJXCJDCT4WPF2X1HE42T6ZCCK3TPMBRZ51JEG.subnet"
-# subnet_leader_mnemonic = "female adjust gallery certain visit token during great side clown fitness like hurt clip knife warm bench start reunion globe detail dream depend fortune"
-# disable_subnet_api = true
-enable_next_features = true
-
-# [[simnet.pox_stacking_orders]]
-# start_at_cycle = 3
-# duration = 12
-# wallet = "wallet_1"
-# slots = 2
-# btc_address = "mr1iPkD9N3RJZZxXRk7xF9d36gffa6exNC"
-
-# [[simnet.pox_stacking_orders]]
-# start_at_cycle = 3
-# duration = 12
-# wallet = "wallet_2"
-# slots = 1
-# btc_address = "muYdXKmX9bByAueDe6KFfHd5Ff1gdN9ErG"
-
-# [[simnet.pox_stacking_orders]]
-# start_at_cycle = 3
-# duration = 12
-# wallet = "wallet_3"
-# slots = 1
-# btc_address = "mvZtbibDAAA3WLpY7zXXFqRa3T4XSknBX7"

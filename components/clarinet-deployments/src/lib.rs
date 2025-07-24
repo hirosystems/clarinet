@@ -91,9 +91,6 @@ pub fn setup_session_with_deployment(
 }
 
 pub fn initiate_session_from_manifest(manifest: &ProjectManifest) -> Session {
-    let mut repl_settings = manifest.repl_settings.clone();
-    repl_settings.remote_data.enabled = false;
-
     // For session initialization, we assume simnet context (used for console, tests, etc.)
     // Custom boot contracts are allowed in this context
     let mut include_boot_contracts = manifest.project.boot_contracts.clone();

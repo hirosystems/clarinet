@@ -1,6 +1,6 @@
 # Custom Boot Contracts Example
 
-This example demonstrates how to use override boot contracts in Clarinet with custom implementations.
+This example demonstrates how to use override boot contracts in simnet (`clarinet console` or unit tests with the sdk)
 
 ## Overview
 
