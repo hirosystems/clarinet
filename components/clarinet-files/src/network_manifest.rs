@@ -2,7 +2,6 @@ use std::collections::BTreeMap;
 use std::sync::LazyLock;
 
 use clarinet_utils::{get_bip32_keys_from_mnemonic, mnemonic_from_phrase, random_mnemonic};
-use clarity::address::AddressHashMode;
 use clarity::types::chainstate::{StacksAddress, StacksPrivateKey};
 use clarity::util::hash::bytes_to_hex;
 use clarity::util::secp256k1::Secp256k1PublicKey;
@@ -46,6 +45,7 @@ pub const DEFAULT_EPOCH_2_4: u64 = 104;
 pub const DEFAULT_EPOCH_2_5: u64 = 108;
 pub const DEFAULT_EPOCH_3_0: u64 = 142;
 pub const DEFAULT_EPOCH_3_1: u64 = 144;
+pub const DEFAULT_EPOCH_3_2: u64 = 146;
 
 // Currently, the pox-4 contract has these values hardcoded:
 // https://github.com/stacks-network/stacks-core/blob/e09ab931e2f15ff70f3bb5c2f4d7afb[…]42bd7bec6/stackslib/src/chainstate/stacks/boot/pox-testnet.clar
@@ -173,6 +173,7 @@ pub struct DevnetConfigFile {
     pub epoch_2_5: Option<u64>,
     pub epoch_3_0: Option<u64>,
     pub epoch_3_1: Option<u64>,
+    pub epoch_3_2: Option<u64>,
     pub use_docker_gateway_routing: Option<bool>,
     pub docker_platform: Option<String>,
 }
@@ -326,6 +327,7 @@ pub struct DevnetConfig {
     pub epoch_2_5: u64,
     pub epoch_3_0: u64,
     pub epoch_3_1: u64,
+    pub epoch_3_2: u64,
     pub use_docker_gateway_routing: bool,
     pub docker_platform: Option<String>,
 }
@@ -671,6 +673,10 @@ impl NetworkManifest {
                     devnet_config.epoch_3_1 = Some(*val);
                 }
 
+                if let Some(ref val) = devnet_override.epoch_3_2 {
+                    devnet_config.epoch_3_2 = Some(*val);
+                }
+
                 if let Some(val) = devnet_override.network_id {
                     devnet_config.network_id = Some(val);
                 }
@@ -926,6 +932,7 @@ impl NetworkManifest {
                 epoch_2_5: devnet_config.epoch_2_5.unwrap_or(DEFAULT_EPOCH_2_5),
                 epoch_3_0: devnet_config.epoch_3_0.unwrap_or(DEFAULT_EPOCH_3_0),
                 epoch_3_1: devnet_config.epoch_3_1.unwrap_or(DEFAULT_EPOCH_3_1),
+                epoch_3_2: devnet_config.epoch_3_2.unwrap_or(DEFAULT_EPOCH_3_2),
                 stacks_node_env_vars: devnet_config
                     .stacks_node_env_vars
                     .take()
@@ -1052,6 +1059,7 @@ impl Default for DevnetConfig {
             epoch_2_5: DEFAULT_EPOCH_2_5,
             epoch_3_0: DEFAULT_EPOCH_3_0,
             epoch_3_1: DEFAULT_EPOCH_3_1,
+            epoch_3_2: DEFAULT_EPOCH_3_2,
             use_docker_gateway_routing: false,
             docker_platform: None,
         }
@@ -1094,14 +1102,14 @@ pub fn compute_addresses(
 
     let pub_key = Secp256k1PublicKey::from_slice(&public_key.serialize_compressed()).unwrap();
     let version = if matches!(networks.1, StacksNetwork::Mainnet) {
-        clarity::address::C32_ADDRESS_VERSION_MAINNET_SINGLESIG
+        stacks_common::address::C32_ADDRESS_VERSION_MAINNET_SINGLESIG
     } else {
-        clarity::address::C32_ADDRESS_VERSION_TESTNET_SINGLESIG
+        stacks_common::address::C32_ADDRESS_VERSION_TESTNET_SINGLESIG
     };
 
     let stx_address = StacksAddress::from_public_keys(
         version,
-        &AddressHashMode::SerializeP2PKH,
+        &stacks_common::address::AddressHashMode::SerializeP2PKH,
         1,
         &vec![pub_key],
     )

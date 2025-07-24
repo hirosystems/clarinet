@@ -6,8 +6,6 @@ use clarity::consts::{CHAIN_ID_MAINNET, CHAIN_ID_TESTNET};
 use clarity::types::StacksEpochId;
 use clarity::vm::analysis::{AnalysisDatabase, ContractAnalysis};
 use clarity::vm::ast::{build_ast_with_diagnostics, ContractAST};
-#[cfg(not(target_arch = "wasm32"))]
-use clarity::vm::clarity_wasm::{call_function, initialize_contract};
 use clarity::vm::contexts::{CallStack, ContractContext, Environment, GlobalContext, LocalContext};
 use clarity::vm::contracts::Contract;
 use clarity::vm::costs::{ExecutionCost, LimitedCostTracker};
@@ -121,13 +119,6 @@ impl ClarityInterpreter {
         cost_track: bool,
         eval_hooks: Option<Vec<&mut dyn EvalHook>>,
     ) -> Result<ExecutionResult, Vec<Diagnostic>> {
-        #[cfg(not(target_arch = "wasm32"))]
-        if self.repl_settings.clarity_wasm_mode {
-            self.run_wasm(contract, ast, cost_track, None)
-        } else {
-            self.run_interpreter(contract, ast, cost_track, eval_hooks)
-        }
-        #[cfg(target_arch = "wasm32")]
         self.run_interpreter(contract, ast, cost_track, eval_hooks)
     }
 
@@ -176,77 +167,6 @@ impl ClarityInterpreter {
         };
 
         result.diagnostics = diagnostics.to_vec();
-        Ok(result)
-    }
-
-    #[cfg(not(target_arch = "wasm32"))]
-    fn run_wasm(
-        &mut self,
-        contract: &ClarityContract,
-        ast: Option<&ContractAST>,
-        cost_track: bool,
-        eval_hooks: Option<Vec<&mut dyn EvalHook>>,
-    ) -> Result<ExecutionResult, Vec<Diagnostic>> {
-        use clar2wasm::compile_contract;
-
-        let (ast, mut diagnostics, success) = match ast {
-            Some(ast) => (ast.clone(), vec![], true),
-            None => self.build_ast(contract),
-        };
-
-        let code_source = contract.expect_in_memory_code_source();
-
-        let (annotations, mut annotation_diagnostics) = self.collect_annotations(code_source);
-        diagnostics.append(&mut annotation_diagnostics);
-
-        let (analysis, mut analysis_diagnostics) =
-            match self.run_analysis(contract, &ast, &annotations) {
-                Ok((analysis, diagnostics)) => (analysis, diagnostics),
-                Err(diagnostic) => {
-                    diagnostics.push(diagnostic);
-                    return Err(diagnostics.to_vec());
-                }
-            };
-        diagnostics.append(&mut analysis_diagnostics);
-
-        if !success {
-            return Err(diagnostics.to_vec());
-        }
-
-        let mut module = match compile_contract(analysis.clone()) {
-            Ok(res) => res,
-            Err(e) => {
-                diagnostics.push(Diagnostic {
-                    level: Level::Error,
-                    message: format!("Wasm Generator Error: {e:?}"),
-                    spans: vec![],
-                    suggestion: None,
-                });
-                return Err(diagnostics);
-            }
-        };
-
-        let mut result = match self.execute_wasm(
-            contract,
-            &ast,
-            analysis,
-            &mut module,
-            cost_track,
-            eval_hooks,
-        ) {
-            Ok(result) => result,
-            Err(e) => {
-                diagnostics.push(Diagnostic {
-                    level: Level::Error,
-                    message: format!("Wasm Runtime Error: {e}"),
-                    spans: vec![],
-                    suggestion: None,
-                });
-                return Err(diagnostics.to_vec());
-            }
-        };
-
-        result.diagnostics = diagnostics;
         Ok(result)
     }
 
@@ -550,222 +470,6 @@ impl ClarityInterpreter {
             eval_all(&contract_ast.expressions, &mut contract_context, g, None)
         });
 
-        let value = result.map_err(|e| {
-            let err = format!("Runtime error while interpreting {contract_id}: {e:?}");
-            if let Some(mut eval_hooks) = global_context.eval_hooks.take() {
-                for hook in eval_hooks.iter_mut() {
-                    hook.did_complete(Err(err.clone()));
-                }
-                global_context.eval_hooks = Some(eval_hooks);
-            }
-            err
-        })?;
-
-        let mut cost = None;
-        if cost_track {
-            cost = Some(CostSynthesis::from_cost_tracker(&global_context.cost_track));
-        }
-
-        let mut emitted_events = global_context
-            .event_batches
-            .iter()
-            .flat_map(|b| b.events.clone())
-            .collect::<Vec<_>>();
-
-        let contract_saved =
-            !contract_context.functions.is_empty() || !contract_context.defined_traits.is_empty();
-
-        let eval_result = if contract_saved {
-            let mut functions = BTreeMap::new();
-            for (name, defined_func) in contract_context.functions.iter() {
-                if !defined_func.is_public() {
-                    continue;
-                }
-
-                let args: Vec<_> = defined_func
-                    .get_arguments()
-                    .iter()
-                    .zip(defined_func.get_arg_types().iter())
-                    .map(|(n, t)| format!("({} {})", n.as_str(), t))
-                    .collect();
-
-                functions.insert(name.to_string(), args);
-            }
-            let parsed_contract = ParsedContract {
-                contract_identifier: contract_id.to_string(),
-                code: snippet.to_string(),
-                function_args: functions,
-                ast: contract_ast.clone(),
-                analysis: analysis.clone(),
-            };
-
-            global_context
-                .database
-                .insert_contract_hash(&contract_id, snippet)
-                .unwrap();
-            let contract = Contract { contract_context };
-            global_context
-                .database
-                .insert_contract(&contract_id, contract)
-                .expect("failed to insert contract");
-            global_context
-                .database
-                .set_contract_data_size(&contract_id, 0)
-                .unwrap();
-
-            EvaluationResult::Contract(ContractEvaluationResult {
-                result: value,
-                contract: parsed_contract,
-            })
-        } else {
-            let result = value.unwrap_or(Value::none());
-            EvaluationResult::Snippet(SnippetEvaluationResult { result })
-        };
-
-        global_context.commit().unwrap();
-
-        let (events, accounts_to_credit, accounts_to_debit) =
-            Self::process_events(&mut emitted_events);
-
-        let mut execution_result = ExecutionResult {
-            result: eval_result,
-            events,
-            cost,
-            diagnostics: Vec::new(),
-        };
-
-        if let Some(mut eval_hooks) = global_context.eval_hooks {
-            for hook in eval_hooks.iter_mut() {
-                hook.did_complete(Ok(&mut execution_result));
-            }
-        }
-
-        for (account, token, value) in accounts_to_credit {
-            self.credit_token(account, token, value);
-        }
-
-        for (account, token, value) in accounts_to_debit {
-            self.debit_token(account, token, value);
-        }
-
-        if contract_saved {
-            let mut analysis_db = AnalysisDatabase::new(&mut self.clarity_datastore);
-            analysis_db
-                .execute(|db| db.insert_contract(&contract_id, &analysis))
-                .expect("Unable to save data");
-        }
-
-        Ok(execution_result)
-    }
-
-    #[cfg(not(target_arch = "wasm32"))]
-    fn execute_wasm(
-        &mut self,
-        contract: &ClarityContract,
-        contract_ast: &ContractAST,
-        analysis: ContractAnalysis,
-        wasm_module: &mut clar2wasm::Module,
-        cost_track: bool,
-        eval_hooks: Option<Vec<&mut dyn EvalHook>>,
-    ) -> Result<ExecutionResult, String> {
-        let contract_id = contract.expect_resolved_contract_identifier(Some(&self.tx_sender));
-        let snippet = contract.expect_in_memory_code_source();
-        let mut contract_context =
-            ContractContext::new(contract_id.clone(), contract.clarity_version);
-
-        let show_timings = self.repl_settings.show_timings;
-        let tx_sender = PrincipalData::from(self.tx_sender.clone());
-
-        let mut global_context = self.get_global_context(contract.epoch.resolve(), cost_track)?;
-
-        if let Some(in_hooks) = eval_hooks {
-            let mut hooks: Vec<&mut dyn EvalHook> = Vec::new();
-            for hook in in_hooks {
-                hooks.push(hook);
-            }
-            global_context.eval_hooks = Some(hooks);
-        }
-
-        global_context.begin();
-        let result = global_context.execute(|g| {
-            if contract_ast.expressions.len() == 1 && !snippet.contains("(define-") {
-                let context = LocalContext::new();
-                let mut call_stack = CallStack::new();
-                let mut env = Environment::new(
-                    g,
-                    &contract_context,
-                    &mut call_stack,
-                    Some(tx_sender.clone()),
-                    Some(tx_sender.clone()),
-                    None,
-                );
-
-                // call a function
-                if let List(expression) = &contract_ast.expressions[0].expr {
-                    if let Atom(name) = &expression[0].expr {
-                        if name.to_string() == "contract-call?" {
-                            let Ok(PrincipalData::Contract(contract_id)) = expression[1]
-                                .match_literal_value()
-                                .unwrap()
-                                .clone()
-                                .expect_principal()
-                            else {
-                                unreachable!();
-                            };
-                            let method = expression[2].match_atom().unwrap().to_string();
-                            let mut args = vec![];
-                            for arg in expression[3..].iter() {
-                                let evaluated_arg = eval(arg, &mut env, &context)?;
-                                args.push(evaluated_arg);
-                            }
-
-                            let called_contract =
-                                env.global_context.database.get_contract(&contract_id)?;
-
-                            let start = std::time::Instant::now();
-
-                            let res = match call_function(
-                                &method,
-                                &args,
-                                g,
-                                &called_contract.contract_context,
-                                &mut call_stack,
-                                Some(tx_sender.clone()),
-                                Some(tx_sender),
-                                None,
-                            ) {
-                                Ok(res) => res,
-                                Err(e) => {
-                                    println!("Error while calling function: {e:?}");
-                                    return Err(e);
-                                }
-                            };
-                            if show_timings {
-                                println!(
-                                    "execution time (wasm): {:?}μs",
-                                    start.elapsed().as_micros()
-                                );
-                            }
-                            return Ok(Some(res));
-                        }
-                    }
-                };
-
-                let start = std::time::Instant::now();
-                contract_context.set_wasm_module(wasm_module.emit_wasm());
-                let result = initialize_contract(g, &mut contract_context, None, &analysis)
-                    .map(|v| v.unwrap_or(Value::none()));
-                if show_timings {
-                    println!("execution time (wasm): {:?}μs", start.elapsed().as_micros());
-                }
-
-                return result.map(Some);
-            }
-
-            // deploy a contract
-            contract_context.set_wasm_module(wasm_module.emit_wasm());
-            initialize_contract(g, &mut contract_context, None, &analysis)
-        });
         let value = result.map_err(|e| {
             let err = format!("Runtime error while interpreting {contract_id}: {e:?}");
             if let Some(mut eval_hooks) = global_context.eval_hooks.take() {
@@ -1353,7 +1057,6 @@ mod tests {
         let wasm_settings = Settings {
             analysis: AnalysisSettings::default(),
             remote_data: RemoteDataSettings::default(),
-            clarity_wasm_mode: true,
             show_timings: false,
         };
         let mut interpreter = get_interpreter(Some(wasm_settings));
