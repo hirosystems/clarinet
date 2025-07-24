@@ -36,7 +36,6 @@ fn main() {
     let code = args.subcommand().unwrap();
 
     let settings = SessionSettings {
-        include_boot_contracts: vec!["costs".into(), "costs-2".into(), "costs-3".into()],
         ..Default::default()
     };
 

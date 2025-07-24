@@ -132,50 +132,45 @@ impl Session {
         let deployer = ContractDeployer::Address(tx_sender.to_address());
 
         // Deploy standard boot contracts (with possible overrides)
+        // Always deploy all boot contracts
         for (name, code) in boot_code.iter() {
-            if self
-                .settings
-                .include_boot_contracts
-                .contains(&name.to_string())
+            // Check if there's a custom override for this boot contract
+            let contract_source = if let Some(custom_path) =
+                self.settings.override_boot_contracts_source.get(*name)
             {
-                // Check if there's a custom override for this boot contract
-                let contract_source = if let Some(custom_path) =
-                    self.settings.override_boot_contracts_source.get(*name)
-                {
-                    match crate::repl::boot::load_custom_boot_contract(custom_path) {
-                        Ok(source) => source,
-                        Err(e) => {
-                            eprintln!("Warning: Failed to load custom boot contract {name}: {e}");
-                            code.to_string()
-                        }
+                match crate::repl::boot::load_custom_boot_contract(custom_path) {
+                    Ok(source) => source,
+                    Err(e) => {
+                        eprintln!("Warning: Failed to load custom boot contract {name}: {e}");
+                        code.to_string()
                     }
-                } else {
-                    code.to_string()
-                };
+                }
+            } else {
+                code.to_string()
+            };
 
-                let (epoch, clarity_version) = if (*name).eq("pox-4") {
-                    (StacksEpochId::Epoch25, ClarityVersion::Clarity2)
-                } else if (*name).eq("pox-3") {
-                    (StacksEpochId::Epoch24, ClarityVersion::Clarity2)
-                } else if (*name).eq("pox-2") || (*name).eq("costs-3") {
-                    (StacksEpochId::Epoch21, ClarityVersion::Clarity2)
-                } else if (*name).eq("cost-2") {
-                    (StacksEpochId::Epoch2_05, ClarityVersion::Clarity1)
-                } else {
-                    (StacksEpochId::Epoch20, ClarityVersion::Clarity1)
-                };
+            let (epoch, clarity_version) = if (*name).eq("pox-4") {
+                (StacksEpochId::Epoch25, ClarityVersion::Clarity2)
+            } else if (*name).eq("pox-3") {
+                (StacksEpochId::Epoch24, ClarityVersion::Clarity2)
+            } else if (*name).eq("pox-2") || (*name).eq("costs-3") {
+                (StacksEpochId::Epoch21, ClarityVersion::Clarity2)
+            } else if (*name).eq("cost-2") {
+                (StacksEpochId::Epoch2_05, ClarityVersion::Clarity1)
+            } else {
+                (StacksEpochId::Epoch20, ClarityVersion::Clarity1)
+            };
 
-                let contract = ClarityContract {
-                    code_source: ClarityCodeSource::ContractInMemory(contract_source),
-                    name: name.to_string(),
-                    deployer: deployer.clone(),
-                    clarity_version,
-                    epoch: Epoch::Specific(epoch),
-                };
+            let contract = ClarityContract {
+                code_source: ClarityCodeSource::ContractInMemory(contract_source),
+                name: name.to_string(),
+                deployer: deployer.clone(),
+                clarity_version,
+                epoch: Epoch::Specific(epoch),
+            };
 
-                // Result ignored, boot contracts are trusted to be valid
-                let _ = self.deploy_contract(&contract, false, None);
-            }
+            // Result ignored, boot contracts are trusted to be valid
+            let _ = self.deploy_contract(&contract, false, None);
         }
 
         // Only allow overriding existing boot contracts, not adding new ones
@@ -189,11 +184,6 @@ impl Session {
             // Check if this is a valid boot contract name
             if !crate::repl::boot::BOOT_CONTRACTS_NAMES.contains(&name.as_str()) {
                 eprintln!("Warning: Skipping custom boot contract '{name}' - only existing boot contracts can be overridden. Valid boot contracts are: {:?}", crate::repl::boot::BOOT_CONTRACTS_NAMES);
-                continue;
-            }
-
-            // Only deploy if included in the boot contracts list
-            if !self.settings.include_boot_contracts.contains(&name) {
                 continue;
             }
 
@@ -492,7 +482,7 @@ impl Session {
         let output = Vec::<String>::new();
         let contracts = vec![]; // This is never modified, remove?
 
-        if !self.settings.include_boot_contracts.is_empty() {
+        if !self.settings.override_boot_contracts_source.is_empty() {
             self.load_boot_contracts();
         }
 
@@ -1581,10 +1571,7 @@ mod tests {
 
     #[test]
     fn evaluate_at_block() {
-        let settings = SessionSettings {
-            include_boot_contracts: vec!["costs".into(), "costs-2".into(), "costs-3".into()],
-            ..Default::default()
-        };
+        let settings = SessionSettings::default();
 
         let mut session = Session::new(settings);
         session.start().expect("session could not start");
@@ -1683,10 +1670,7 @@ mod tests {
 
     #[test]
     fn can_call_boot_contract_fn() {
-        let settings = SessionSettings {
-            include_boot_contracts: vec!["pox-4".into()],
-            ..Default::default()
-        };
+        let settings = SessionSettings::default();
         let mut session = Session::new(settings);
         session.update_epoch(StacksEpochId::Epoch25);
         session.load_boot_contracts();

@@ -93,18 +93,8 @@ pub fn setup_session_with_deployment(
 pub fn initiate_session_from_manifest(manifest: &ProjectManifest) -> Session {
     // For session initialization, we assume simnet context (used for console, tests, etc.)
     // Custom boot contracts are allowed in this context
-    let mut include_boot_contracts = manifest.project.boot_contracts.clone();
-
-    // Add contracts from override_boot_contracts_source to include_boot_contracts
-    for contract_name in manifest.project.override_boot_contracts_source.keys() {
-        if !include_boot_contracts.contains(contract_name) {
-            include_boot_contracts.push(contract_name.clone());
-        }
-    }
-
     let settings = SessionSettings {
-        repl_settings,
-        include_boot_contracts,
+        repl_settings: manifest.repl_settings.clone(),
         override_boot_contracts_source: manifest.project.override_boot_contracts_source.clone(),
         ..Default::default()
     };
@@ -208,15 +198,9 @@ pub fn update_session_with_deployment_plan(
         };
 
         for (contract_id, (contract, ast)) in boot_contracts_data {
-            // Only load boot contracts that are in the include_boot_contracts list
-            if session
-                .settings
-                .include_boot_contracts
-                .contains(&contract.name)
-            {
-                let result = session.interpreter.run(&contract, Some(&ast), false, None);
-                boot_contracts.insert(contract_id, result);
-            }
+            // Always load all boot contracts
+            let result = session.interpreter.run(&contract, Some(&ast), false, None);
+            boot_contracts.insert(contract_id, result);
         }
     }
 
@@ -433,7 +417,6 @@ pub async fn generate_default_deployment(
 
     let settings = SessionSettings {
         repl_settings,
-        include_boot_contracts: manifest.project.boot_contracts.clone(),
         override_boot_contracts_source,
         ..Default::default()
     };
@@ -507,7 +490,7 @@ pub async fn generate_default_deployment(
                 deployer: ContractDeployer::Address(default_deployer_address.to_address()),
                 name: contract_name.clone(),
                 clarity_version,
-                epoch,
+                epoch: clarity_repl::repl::Epoch::Specific(epoch),
             };
 
             let (_, diagnostics, ast_success) = session.interpreter.build_ast(&temp_contract);

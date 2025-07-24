@@ -77,4 +77,3 @@ disable_bitcoin_explorer = true
 disable_stacks_explorer = true
 disable_stacks_api = true
 disable_postgres = true
-enable_subnet_node = false
