@@ -4,10 +4,6 @@ use std::io::{Read, Write};
 use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
 
-use clarity::address::{
-    AddressHashMode, C32_ADDRESS_VERSION_MAINNET_MULTISIG, C32_ADDRESS_VERSION_MAINNET_SINGLESIG,
-    C32_ADDRESS_VERSION_TESTNET_MULTISIG, C32_ADDRESS_VERSION_TESTNET_SINGLESIG,
-};
 pub use clarity::codec::StacksMessageCodec;
 use clarity::codec::{
     read_next, read_next_exact, write_next, Error as CodecError, MAX_MESSAGE_LEN,
@@ -26,6 +22,10 @@ use clarity::{
     impl_byte_array_serde,
 };
 use serde::{Deserialize, Serialize};
+use stacks_common::address::{
+    AddressHashMode, C32_ADDRESS_VERSION_MAINNET_MULTISIG, C32_ADDRESS_VERSION_MAINNET_SINGLESIG,
+    C32_ADDRESS_VERSION_TESTNET_MULTISIG, C32_ADDRESS_VERSION_TESTNET_SINGLESIG,
+};
 use stacks_common::util::hash::{Hash160, Sha256Sum, Sha512Trunc256Sum};
 use stacks_common::util::retry::BoundReader;
 use stacks_common::util::secp256k1::{

@@ -3,11 +3,8 @@ name = "clarinet-format"
 version = "0.1.0"
 edition = "2021"
 
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-clarity = { workspace = true, features = ["developer-mode", "devtools", "log"] }
-
-[target.'cfg(target_arch = "wasm32")'.dependencies]
-clarity = { workspace = true, features = ["wasm", "developer-mode", "devtools"] }
+[dependencies]
+clarity = { workspace = true, default-features = false, features = ["developer-mode", "devtools"] }
 
 [dev-dependencies]
 pretty_assertions = { workspace = true }

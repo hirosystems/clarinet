@@ -970,8 +970,9 @@ impl Session {
             Some("2.5") => StacksEpochId::Epoch25,
             Some("3.0") => StacksEpochId::Epoch30,
             Some("3.1") => StacksEpochId::Epoch31,
+            Some("3.2") => StacksEpochId::Epoch32,
             _ => {
-                return "Usage: ::set_epoch 2.0 | 2.05 | 2.1 | 2.2 | 2.3 | 2.4 | 2.5 | 3.0 | 3.1"
+                return "Usage: ::set_epoch 2.0 | 2.05 | 2.1 | 2.2 | 2.3 | 2.4 | 2.5 | 3.0 | 3.1 | 3.2"
                     .red()
                     .to_string()
             }
@@ -1454,6 +1455,12 @@ mod tests {
             session.interpreter.get_block_height(),
             initial_block_height + 1
         );
+
+        // ensure latest epoch is correctly handled
+        let latest_epoch = StacksEpochId::latest().to_string();
+        session.handle_command(&format!("::set_epoch {latest_epoch}"));
+        let current_epoch = session.handle_command("::get_epoch");
+        assert_eq!(current_epoch, format!("Current epoch: {latest_epoch}"));
     }
 
     #[test]

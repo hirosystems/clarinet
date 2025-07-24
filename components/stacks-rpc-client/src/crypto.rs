@@ -1,9 +1,6 @@
 use std::str::FromStr;
 
 use clarinet_utils::get_bip32_keys_from_mnemonic;
-use clarity::address::{
-    AddressHashMode, C32_ADDRESS_VERSION_MAINNET_SINGLESIG, C32_ADDRESS_VERSION_TESTNET_SINGLESIG,
-};
 use clarity::codec::StacksMessageCodec;
 use clarity::types::chainstate::StacksAddress;
 use clarity::util::secp256k1::{MessageSignature, Secp256k1PrivateKey, Secp256k1PublicKey};
@@ -11,6 +8,9 @@ use clarity::vm::types::{PrincipalData, QualifiedContractIdentifier};
 use clarity::vm::{ClarityName, ClarityVersion, ContractName, Value as ClarityValue};
 use libsecp256k1::PublicKey;
 use stacks_codec::codec::*;
+use stacks_common::address::{
+    AddressHashMode, C32_ADDRESS_VERSION_MAINNET_SINGLESIG, C32_ADDRESS_VERSION_TESTNET_SINGLESIG,
+};
 
 #[derive(Clone, Debug)]
 pub struct Wallet {
