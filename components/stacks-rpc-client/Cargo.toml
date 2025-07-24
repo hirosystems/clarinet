@@ -13,8 +13,8 @@ reqwest = { workspace = true, features = ["blocking"] }
 libsecp256k1 = { version = "0.7.0" }
 
 clarity = { workspace = true }
+stacks-codec = { path = "../stacks-codec" }
 clarinet-utils = { path = "../clarinet-utils" }
-stacks-codec = { package = "stacks-codec", path = "../stacks-codec" }
 
 # enable mock stacks rpc for tests
 mockito = { version = "1.6", default-features = false, optional = true }
