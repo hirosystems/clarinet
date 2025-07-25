@@ -833,6 +833,8 @@ dependencies = [
  "bytes",
  "chrono",
  "clar2wasm",
+ "clarinet-deployments",
+ "clarinet-files",
  "clarity",
  "colored",
  "comfy-table",
