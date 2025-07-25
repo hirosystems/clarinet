@@ -18,7 +18,7 @@ pub const MAINNET_23_START_HEIGHT: u32 = 104_359;
 pub const MAINNET_24_START_HEIGHT: u32 = 107_055;
 pub const MAINNET_25_START_HEIGHT: u32 = 147_290;
 pub const MAINNET_30_START_HEIGHT: u32 = 171_833;
-pub const MAINNET_31_START_HEIGHT: u32 = u32::MAX;
+pub const MAINNET_31_START_HEIGHT: u32 = 340_555;
 pub const MAINNET_32_START_HEIGHT: u32 = u32::MAX;
 
 // the current primary testnet starts directly in epoch 2.5 (pox-4 deployment)
