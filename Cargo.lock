@@ -711,7 +711,7 @@ dependencies = [
 [[package]]
 name = "clarity"
 version = "0.0.1"
-source = "git+https://github.com/stacks-network/stacks-core.git?branch=develop#4f3676fac618fa1bfb2da79fac08908e03030ac9"
+source = "git+https://github.com/stacks-network/stacks-core.git?branch=develop#6168284b1ff955b1d2c9c1437c05bbe0886f403f"
 dependencies = [
  "hashbrown 0.15.2",
  "integer-sqrt",
@@ -2445,7 +2445,7 @@ dependencies = [
 [[package]]
 name = "libstackerdb"
 version = "0.0.1"
-source = "git+https://github.com/stacks-network/stacks-core.git?branch=develop#4f3676fac618fa1bfb2da79fac08908e03030ac9"
+source = "git+https://github.com/stacks-network/stacks-core.git?branch=develop#6168284b1ff955b1d2c9c1437c05bbe0886f403f"
 dependencies = [
  "clarity",
  "secp256k1 0.24.3",
@@ -3019,7 +3019,7 @@ checksum = "439ee305def115ba05938db6eb1644ff94165c5ab5e9420d1c1bcedbba909391"
 [[package]]
 name = "pox-locking"
 version = "2.4.0"
-source = "git+https://github.com/stacks-network/stacks-core.git?branch=develop#4f3676fac618fa1bfb2da79fac08908e03030ac9"
+source = "git+https://github.com/stacks-network/stacks-core.git?branch=develop#6168284b1ff955b1d2c9c1437c05bbe0886f403f"
 dependencies = [
  "clarity",
  "slog",
@@ -4131,7 +4131,7 @@ dependencies = [
 [[package]]
 name = "stacks-common"
 version = "0.0.1"
-source = "git+https://github.com/stacks-network/stacks-core.git?branch=develop#4f3676fac618fa1bfb2da79fac08908e03030ac9"
+source = "git+https://github.com/stacks-network/stacks-core.git?branch=develop#6168284b1ff955b1d2c9c1437c05bbe0886f403f"
 dependencies = [
  "chrono",
  "curve25519-dalek",
@@ -4235,7 +4235,7 @@ dependencies = [
 [[package]]
 name = "stackslib"
 version = "0.0.1"
-source = "git+https://github.com/stacks-network/stacks-core.git?branch=develop#4f3676fac618fa1bfb2da79fac08908e03030ac9"
+source = "git+https://github.com/stacks-network/stacks-core.git?branch=develop#6168284b1ff955b1d2c9c1437c05bbe0886f403f"
 dependencies = [
  "clarity",
  "ed25519-dalek",
