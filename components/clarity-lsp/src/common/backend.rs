@@ -700,8 +700,8 @@ mod range_formatting_tests {
             .get("Definition")
             .expect("Expected 'Definition' key")
             .get("uri")
-            .unwrap()
+            .expect("Expected 'uri' key")
             .to_string()
-            .ends_with("test.clar"));
+            .ends_with("test.clar\""));
     }
 }
