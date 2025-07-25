@@ -12,14 +12,14 @@ use clarity_lsp::lsp_types::{
 use clarity_lsp::state::EditorState;
 use crossbeam_channel::{Receiver as MultiplexableReceiver, Select, Sender as MultiplexableSender};
 use serde_json::Value;
-use tower_lsp::jsonrpc::{Error, ErrorCode, Result};
-use tower_lsp::lsp_types::{
+use tower_lsp_server::jsonrpc::{Error, ErrorCode, Result};
+use tower_lsp_server::lsp_types::{
     CompletionParams, CompletionResponse, DidChangeTextDocumentParams, DidCloseTextDocumentParams,
     DidOpenTextDocumentParams, DidSaveTextDocumentParams, DocumentFormattingParams,
     DocumentRangeFormattingParams, ExecuteCommandParams, Hover, HoverParams, InitializeParams,
-    InitializeResult, InitializedParams, MessageType, TextEdit, Url,
+    InitializeResult, InitializedParams, MessageType, TextEdit,
 };
-use tower_lsp::{async_trait, Client, LanguageServer};
+use tower_lsp_server::{Client, LanguageServer};
 
 use super::utils;
 use crate::lsp::clarity_diagnostics_to_tower_lsp_type;
@@ -114,7 +114,7 @@ impl LspNativeBridge {
             if let Ok(url) = location.to_url_string() {
                 self.client
                     .publish_diagnostics(
-                        Url::parse(&url).unwrap(),
+                        url.parse().expect("Failed to parse URL"),
                         clarity_diagnostics_to_tower_lsp_type(&diags),
                         None,
                     )
@@ -128,7 +128,6 @@ impl LspNativeBridge {
     }
 }
 
-#[async_trait]
 impl LanguageServer for LspNativeBridge {
     async fn initialize(&self, params: InitializeParams) -> Result<InitializeResult> {
         let _ = match self.request_tx.lock() {

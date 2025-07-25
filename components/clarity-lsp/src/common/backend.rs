@@ -592,8 +592,9 @@ mod range_formatting_tests {
     use clarity_repl::clarity::ClarityVersion;
     use lsp_types::{
         DocumentRangeFormattingParams, FormattingOptions, Position, Range, TextDocumentIdentifier,
-        Url, WorkDoneProgressParams,
+        WorkDoneProgressParams,
     };
+    use serde_json::json;
 
     use super::*;
     use crate::common::state::EditorState;
@@ -602,7 +603,7 @@ mod range_formatting_tests {
         let mut editor_state = EditorState::new();
 
         let contract_location = FileLocation::FileSystem {
-            path: PathBuf::from("test.clar"),
+            path: PathBuf::from("/test.clar"),
         };
 
         editor_state.insert_active_contract(
@@ -623,7 +624,7 @@ mod range_formatting_tests {
 
         let params = DocumentRangeFormattingParams {
             text_document: TextDocumentIdentifier {
-                uri: Url::parse("file:///test.clar").unwrap(),
+                uri: "file:///test.clar".parse().unwrap(),
             },
             range: Range {
                 start: Position {
@@ -651,5 +652,45 @@ mod range_formatting_tests {
         let request = LspRequest::DocumentRangeFormatting(params);
 
         assert!(process_request(request, &editor_state_input).is_ok());
+    }
+
+    #[test]
+    fn test_go_to_definitions() {
+        let source = "(define-constant N 1) (define-read-only (get-N) N)";
+        let editor_state_input = create_test_editor_state(source.to_owned());
+
+        let params = GotoDefinitionParams {
+            text_document_position_params: lsp_types::TextDocumentPositionParams {
+                text_document: lsp_types::TextDocumentIdentifier {
+                    uri: "file:///test.clar".parse().unwrap(),
+                },
+                // Position inside the 'N' constant
+                position: Position {
+                    line: 0,
+                    character: 49,
+                },
+            },
+            work_done_progress_params: WorkDoneProgressParams {
+                work_done_token: None,
+            },
+            partial_result_params: lsp_types::PartialResultParams {
+                partial_result_token: None,
+            },
+        };
+        let request = LspRequest::Definition(params);
+        let response =
+            process_request(request, &editor_state_input).expect("Failed to process request");
+
+        if let LspRequestResponse::Definition(Some(location)) = &response {
+            assert_eq!(location.uri.scheme().unwrap().as_str(), "file");
+            assert_eq!(location.uri.path().as_str(), "/test.clar");
+        } else {
+            panic!("Expected a Definition response, got: {response:?}");
+        }
+        let response_json = json!(response);
+        assert_eq!(
+            response_json.get("Definition").and_then(|v| v.get("uri")),
+            Some(&json!("file:///test.clar"))
+        );
     }
 }

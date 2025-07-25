@@ -18,6 +18,7 @@ use clarity_repl::clarity::{ClarityName, ClarityVersion, StacksEpochId, Symbolic
 use clarity_repl::repl::{ContractDeployer, DEFAULT_CLARITY_VERSION};
 use lsp_types::{
     CompletionItem, DocumentSymbol, Hover, Location, MessageType, Position, Range, SignatureHelp,
+    Uri,
 };
 
 use super::requests::capabilities::InitializationOptions;
@@ -367,17 +368,14 @@ impl EditorState {
             definitions_holder.insert(get_definitions(expressions, contract.issuer.clone()))
         });
 
+        let uri: Uri = contract_location.to_url_string().ok()?.parse().ok()?;
         match definitions.get(&position_hash)? {
-            DefinitionLocation::Internal(range) => Some(Location {
-                uri: contract_location.try_into().ok()?,
-                range: *range,
-            }),
+            DefinitionLocation::Internal(range) => Some(Location { uri, range: *range }),
             DefinitionLocation::External(contract_identifier, name) => {
                 let metadata = self.contracts_lookup.get(contract_location)?;
                 let protocol = self.protocols.get(&metadata.manifest_location)?;
                 let definition_contract_location =
                     protocol.locations_lookup.get(contract_identifier)?;
-                let uri = definition_contract_location.try_into().ok()?;
 
                 // if the contract is opened and eventually contains unsaved changes,
                 // its public definitions are computed on the fly, which is fairly fast

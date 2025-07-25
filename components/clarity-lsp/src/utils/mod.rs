@@ -2,7 +2,7 @@ use clarinet_files::FileLocation;
 use clarity_repl::clarity::vm::diagnostic::{
     Diagnostic as ClarityDiagnostic, Level as ClarityLevel,
 };
-use lsp_types::{Diagnostic as LspDiagnostic, DiagnosticSeverity, Position, Range, Url};
+use lsp_types::{Diagnostic as LspDiagnostic, DiagnosticSeverity, Position, Range, Uri};
 
 #[allow(unused_macros)]
 #[cfg(target_arch = "wasm32")]
@@ -55,7 +55,7 @@ pub fn clarity_diagnostic_to_lsp_type(diagnostic: &ClarityDiagnostic) -> LspDiag
     }
 }
 
-pub fn get_manifest_location(text_document_uri: &Url) -> Option<FileLocation> {
+pub fn get_manifest_location(text_document_uri: &Uri) -> Option<FileLocation> {
     let file_location = text_document_uri.to_string();
     if !file_location.ends_with("Clarinet.toml") {
         return None;
@@ -63,7 +63,7 @@ pub fn get_manifest_location(text_document_uri: &Url) -> Option<FileLocation> {
     FileLocation::try_parse(&file_location, None)
 }
 
-pub fn get_contract_location(text_document_uri: &Url) -> Option<FileLocation> {
+pub fn get_contract_location(text_document_uri: &Uri) -> Option<FileLocation> {
     let file_location = text_document_uri.to_string();
     if !file_location.ends_with(".clar") {
         return None;
