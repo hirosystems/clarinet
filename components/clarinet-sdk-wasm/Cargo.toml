@@ -28,7 +28,7 @@ clarinet-deployments = { path = "../clarinet-deployments", default-features = fa
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3.0"
-clarity = { workspace = true }
+clarity = { workspace = true, default-features = false }
 
 [features]
 default = []

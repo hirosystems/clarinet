@@ -5,9 +5,6 @@ use std::sync::mpsc::{Receiver, Sender};
 use bitcoincore_rpc::{Auth, Client};
 use clarinet_files::{AccountConfig, NetworkManifest, StacksNetwork};
 use clarinet_utils::get_bip32_keys_from_mnemonic;
-use clarity_repl::clarity::address::{
-    AddressHashMode, C32_ADDRESS_VERSION_MAINNET_SINGLESIG, C32_ADDRESS_VERSION_TESTNET_SINGLESIG,
-};
 use clarity_repl::clarity::chainstate::StacksAddress;
 use clarity_repl::clarity::codec::StacksMessageCodec;
 use clarity_repl::clarity::util::secp256k1::{
@@ -31,6 +28,9 @@ use stacks_codec::codec::{
     TransactionContractCall, TransactionPayload, TransactionPostConditionMode,
     TransactionPublicKeyEncoding, TransactionSmartContract, TransactionSpendingCondition,
     TransactionVersion,
+};
+use stacks_common::address::{
+    AddressHashMode, C32_ADDRESS_VERSION_MAINNET_SINGLESIG, C32_ADDRESS_VERSION_TESTNET_SINGLESIG,
 };
 use stacks_rpc_client::StacksRpc;
 
@@ -742,6 +742,7 @@ pub fn apply_on_chain_deployment(
                 EpochSpec::Epoch2_5 => network_manifest.devnet.as_ref().unwrap().epoch_2_5,
                 EpochSpec::Epoch3_0 => network_manifest.devnet.as_ref().unwrap().epoch_3_0,
                 EpochSpec::Epoch3_1 => network_manifest.devnet.as_ref().unwrap().epoch_3_1,
+                EpochSpec::Epoch3_2 => network_manifest.devnet.as_ref().unwrap().epoch_3_2,
             };
             let mut epoch_transition_successful =
                 current_bitcoin_block_height > after_bitcoin_block;

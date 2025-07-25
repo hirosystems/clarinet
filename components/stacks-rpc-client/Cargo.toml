@@ -12,7 +12,8 @@ serde_derive = "1"
 reqwest = { workspace = true, features = ["blocking"] }
 libsecp256k1 = { version = "0.7.0" }
 
-clarity = { workspace = true }
+clarity = { workspace = true, default-features = false }
+stacks-common = { workspace = true, default-features = false }
 clarinet-utils = { path = "../clarinet-utils" }
 stacks-codec = { package = "stacks-codec", path = "../stacks-codec" }
 

@@ -27,7 +27,6 @@ use clarity_repl::clarity::vm::analysis::AnalysisDatabase;
 use clarity_repl::clarity::vm::costs::LimitedCostTracker;
 use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
 use clarity_repl::clarity::ClarityVersion;
-use clarity_repl::frontend::terminal::print_clarity_wasm_warning;
 use clarity_repl::repl::diagnostic::output_diagnostic;
 use clarity_repl::repl::settings::{ApiUrl, RemoteDataSettings};
 use clarity_repl::repl::{ClarityCodeSource, ClarityContract, ContractDeployer, DEFAULT_EPOCH};
@@ -444,10 +443,6 @@ struct Console {
     /// Initial remote Stacks block height
     #[clap(long = "remote-data-initial-height", short = 'b')]
     pub remote_data_initial_height: Option<u32>,
-
-    /// Allow the Clarity Wasm preview to run in parallel with the Clarity interpreter (beta)
-    #[clap(long = "enable-clarity-wasm")]
-    pub enable_clarity_wasm: bool,
 }
 
 #[derive(Parser, PartialEq, Clone, Debug)]
@@ -517,9 +512,6 @@ struct Check {
         conflicts_with = "use_on_disk_deployment_plan"
     )]
     pub use_computed_deployment_plan: bool,
-    /// Allow the Clarity Wasm preview to run in parallel with the Clarity interpreter (beta)
-    #[clap(long = "enable-clarity-wasm")]
-    pub enable_clarity_wasm: bool,
 }
 
 #[derive(Parser, PartialEq, Clone, Debug)]
@@ -1079,33 +1071,12 @@ pub fn main() {
                             std::process::exit(1);
                         }
 
-                        if cmd.enable_clarity_wasm {
-                            let mut manifest_wasm = manifest.clone();
-                            manifest_wasm.repl_settings.clarity_wasm_mode = true;
-                            let (_, _, wasm_artifacts) = load_deployment_and_artifacts_or_exit(
-                                &manifest_wasm,
-                                &cmd.deployment_plan_path,
-                                cmd.use_on_disk_deployment_plan,
-                                cmd.use_computed_deployment_plan,
-                            );
-
-                            compare_wasm_artifacts(&deployment, &artifacts, &wasm_artifacts);
-
-                            Terminal::load(artifacts.session, Some(wasm_artifacts.session))
-                        } else {
-                            Terminal::load(artifacts.session, None)
-                        }
+                        Terminal::load(artifacts.session, None)
                     }
                     None => {
                         let mut settings = repl::SessionSettings::default();
                         settings.repl_settings.remote_data = remote_data_settings.clone();
-                        if cmd.enable_clarity_wasm {
-                            let mut settings_wasm = repl::SessionSettings::default();
-                            settings_wasm.repl_settings.clarity_wasm_mode = true;
-                            Terminal::new(settings, Some(settings_wasm))
-                        } else {
-                            Terminal::new(settings, None)
-                        }
+                        Terminal::new(settings, None)
                     }
                 };
                 let reload = terminal.start();
@@ -1218,19 +1189,6 @@ pub fn main() {
                 cmd.use_on_disk_deployment_plan,
                 cmd.use_computed_deployment_plan,
             );
-
-            if cmd.enable_clarity_wasm {
-                #[allow(clippy::redundant_clone)]
-                let mut manifest_wasm = manifest.clone();
-                manifest_wasm.repl_settings.clarity_wasm_mode = true;
-                let (_, _, wasm_artifacts) = load_deployment_and_artifacts_or_exit(
-                    &manifest_wasm,
-                    &cmd.deployment_plan_path,
-                    cmd.use_on_disk_deployment_plan,
-                    cmd.use_computed_deployment_plan,
-                );
-                compare_wasm_artifacts(&deployment, &artifacts, &wasm_artifacts);
-            }
 
             let diags_digest = DiagnosticsDigest::new(&artifacts.diags, &deployment);
             if diags_digest.has_feedbacks() {
@@ -1634,37 +1592,6 @@ fn load_deployment_if_exists(
         }
     } else {
         Some(load_deployment(manifest, &default_deployment_location))
-    }
-}
-
-fn compare_wasm_artifacts(
-    deployment: &DeploymentSpecification,
-    artifacts: &DeploymentGenerationArtifacts,
-    wasm_artifacts: &DeploymentGenerationArtifacts,
-) {
-    let mut print_warning = false;
-    for contract in deployment.contracts.keys() {
-        let diags = artifacts.diags.get(contract);
-        let wasm_diags = wasm_artifacts.diags.get(contract);
-        if diags != wasm_diags {
-            print_warning = true;
-            println!("Diagnostics of contract {contract} differs between clarity and clarity-wasm");
-            dbg!(diags);
-            dbg!(wasm_diags);
-        }
-        let value = artifacts.results_values.get(contract);
-        let wasm_value = wasm_artifacts.results_values.get(contract);
-        if (diags.is_some() && wasm_diags.is_some()) && (value != wasm_value) {
-            print_warning = true;
-            println!(
-                "Evaluation value of contract {contract} differs between clarity and clarity-wasm"
-            );
-            dbg!(value);
-            dbg!(wasm_value);
-        };
-    }
-    if print_warning {
-        print_clarity_wasm_warning();
     }
 }
 

@@ -40,6 +40,7 @@ fn epoch_to_peer_version(epoch: StacksEpochId) -> u8 {
         StacksEpochId::Epoch25 => PEER_VERSION_EPOCH_2_5,
         StacksEpochId::Epoch30 => PEER_VERSION_EPOCH_3_0,
         StacksEpochId::Epoch31 => PEER_VERSION_EPOCH_3_1,
+        StacksEpochId::Epoch32 => PEER_VERSION_EPOCH_3_2,
     }
 }
 
@@ -592,7 +593,7 @@ impl ClarityBackingStore for ClarityDatastore {
     }
 
     #[cfg(not(target_arch = "wasm32"))]
-    fn get_side_store(&mut self) -> &::clarity::rusqlite::Connection {
+    fn get_side_store(&mut self) -> &rusqlite::Connection {
         panic!("Datastore cannot get_side_store")
     }
 }
@@ -1120,9 +1121,9 @@ impl BurnStateDB for Datastore {
                     .get(&current_chain_tip)
                     .map(|block| block.burn_block_height)
             }
-            // preserve the 3.0 and 3.1 special behavior of burn-block-height
+            // preserve the 3.0 -> 3.2 special behavior of burn-block-height
             // https://github.com/stacks-network/stacks-core/pull/5524
-            Epoch30 | Epoch31 => Some(self.burn_chain_height),
+            Epoch30 | Epoch31 | Epoch32 => Some(self.burn_chain_height),
         }
     }
 

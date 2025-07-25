@@ -28,4 +28,4 @@ hmac = { version = "0.7.1" }
 hex = { version = "0.3.2" }
 colored = { workspace = true }
 dirs = { version = "6.0.0" }
-chrono = { version = "0.4.31" }
+chrono = { workspace = true}
