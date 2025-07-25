@@ -601,7 +601,7 @@ mod range_formatting_tests {
 
     fn get_root_path() -> PathBuf {
         if cfg!(windows) {
-            PathBuf::from("C:\\") // or use env::var("SystemDrive")
+            PathBuf::from(std::env::var("SystemDrive").unwrap_or_else(|_| "C:".to_string()) + "\\")
         } else {
             PathBuf::from("/")
         }
