@@ -47,12 +47,12 @@ web-sys = { version = "=0.3.77" }
 indoc = "2.0.3"
 
 [patch.crates-io]
-# chainhook-sdk = { git = "https://github.com/hirosystems/chainhook.git", branch = "develop" }
-# chainhook-types = { git = "https://github.com/hirosystems/chainhook.git", branch = "develop" }
-chainhook-sdk = { path = "../chainhook/components/chainhook-sdk" }
-chainhook-types = { path = "../chainhook/components/chainhook-types-rs" }
 stacks-codec = { path = "./components/stacks-codec" }
 hiro-system-kit = { path = "./components/hiro-system-kit" }
+chainhook-sdk = { git = "https://github.com/hirosystems/chainhook.git", branch = "chore/update-clarinet-and-clarity" }
+chainhook-types = { git = "https://github.com/hirosystems/chainhook.git", branch = "chore/update-clarinet-and-clarity" }
+# chainhook-sdk = { path = "../chainhook/components/chainhook-sdk" }
+# chainhook-types = { path = "../chainhook/components/chainhook-types-rs" }
 
 # [patch.'https://github.com/stacks-network/stacks-core.git']
 # clarity = { path = "../stacks-core/clarity" }
