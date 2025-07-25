@@ -584,7 +584,7 @@ pub fn process_mutating_request(
 }
 
 #[cfg(test)]
-mod range_formatting_tests {
+mod lsp_tests {
     use std::collections::HashMap;
     use std::path::PathBuf;
 
