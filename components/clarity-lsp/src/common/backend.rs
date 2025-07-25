@@ -584,7 +584,7 @@ pub fn process_mutating_request(
 }
 
 #[cfg(test)]
-mod range_formatting_tests {
+mod lsp_tests {
     use std::collections::HashMap;
     use std::path::PathBuf;
 
@@ -592,17 +592,26 @@ mod range_formatting_tests {
     use clarity_repl::clarity::ClarityVersion;
     use lsp_types::{
         DocumentRangeFormattingParams, FormattingOptions, Position, Range, TextDocumentIdentifier,
-        Url, WorkDoneProgressParams,
+        WorkDoneProgressParams,
     };
+    use serde_json::json;
 
     use super::*;
     use crate::common::state::EditorState;
+
+    fn get_root_path() -> PathBuf {
+        if cfg!(windows) {
+            PathBuf::from(std::env::var("SystemDrive").unwrap_or_else(|_| "C:".to_string()) + "\\")
+        } else {
+            PathBuf::from("/")
+        }
+    }
 
     fn create_test_editor_state(source: String) -> EditorStateInput {
         let mut editor_state = EditorState::new();
 
         let contract_location = FileLocation::FileSystem {
-            path: PathBuf::from("test.clar"),
+            path: get_root_path().join("test.clar"),
         };
 
         editor_state.insert_active_contract(
@@ -617,13 +626,13 @@ mod range_formatting_tests {
 
     #[test]
     fn test_range_formatting_comments() {
-        let source = "(ok true)\n\n(define-public (foo)\n  ;; this is a comment\n   (ok   true)\n)";
+        let source = "(ok true)\n\n(define-public (foo)\n  ;; this is a comment\n   (ok true)\n)";
 
         let editor_state_input = create_test_editor_state(source.to_owned());
 
         let params = DocumentRangeFormattingParams {
             text_document: TextDocumentIdentifier {
-                uri: Url::parse("file:///test.clar").unwrap(),
+                uri: "file:///test.clar".parse().unwrap(),
             },
             range: Range {
                 start: Position {
@@ -647,9 +656,52 @@ mod range_formatting_tests {
                 work_done_token: None,
             },
         };
-
         let request = LspRequest::DocumentRangeFormatting(params);
-
         assert!(process_request(request, &editor_state_input).is_ok());
+    }
+
+    #[test]
+    fn test_go_to_definitions() {
+        let source = "(define-constant N 1) (define-read-only (get-N) N)";
+        let editor_state_input = create_test_editor_state(source.to_owned());
+
+        let path = get_root_path().join("test.clar");
+        let contract_location = FileLocation::FileSystem { path: path.clone() };
+
+        let params = GotoDefinitionParams {
+            text_document_position_params: lsp_types::TextDocumentPositionParams {
+                text_document: lsp_types::TextDocumentIdentifier {
+                    uri: contract_location.to_url_string().unwrap().parse().unwrap(),
+                },
+                // Position inside the 'N' constant
+                position: Position {
+                    line: 0,
+                    character: 49,
+                },
+            },
+            work_done_progress_params: WorkDoneProgressParams {
+                work_done_token: None,
+            },
+            partial_result_params: lsp_types::PartialResultParams {
+                partial_result_token: None,
+            },
+        };
+        let request = LspRequest::Definition(params);
+        let response =
+            process_request(request, &editor_state_input).expect("Failed to process request");
+
+        let LspRequestResponse::Definition(Some(location)) = &response else {
+            panic!("Expected a Definition response, got: {response:?}");
+        };
+
+        assert_eq!(location.uri.scheme().unwrap().as_str(), "file");
+        let response_json = json!(response);
+        assert!(response_json
+            .get("Definition")
+            .expect("Expected 'Definition' key")
+            .get("uri")
+            .expect("Expected 'uri' key")
+            .to_string()
+            .ends_with("test.clar\""));
     }
 }

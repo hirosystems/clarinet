@@ -67,24 +67,6 @@ impl fmt::Display for FileLocation {
     }
 }
 
-impl TryInto<Url> for &FileLocation {
-    type Error = &'static str;
-
-    fn try_into(self) -> Result<Url, Self::Error> {
-        match self {
-            #[cfg(target_arch = "wasm32")]
-            FileLocation::FileSystem { .. } => {
-                Err("Url::from_file_path() not available on target architecture")
-            }
-            #[cfg(not(target_arch = "wasm32"))]
-            FileLocation::FileSystem { path } => {
-                Url::from_file_path(path).map_err(|()| "Url::from_file_path() failed")
-            }
-            FileLocation::Url { url } => Ok(url.clone()),
-        }
-    }
-}
-
 impl FileLocation {
     pub fn try_parse(
         location_string: &str,
@@ -367,16 +349,15 @@ impl FileLocation {
 
     pub fn to_url_string(&self) -> Result<String, String> {
         match self {
-            #[cfg(not(target_arch = "wasm32"))]
-            FileLocation::FileSystem { path } => {
-                let file_path = self.to_string();
-                let url = Url::from_file_path(file_path)
-                    .map_err(|_| format!("unable to conver path {} to url", path.display()))?;
-                Ok(url.to_string())
+            #[cfg(target_arch = "wasm32")]
+            FileLocation::FileSystem { .. } => {
+                Err("Url::from_file_path is not supported in wasm32".to_string())
             }
+            #[cfg(not(target_arch = "wasm32"))]
+            FileLocation::FileSystem { path } => Url::from_file_path(path)
+                .map_err(|_| format!("unable to convert path {} to url", path.display()))
+                .map(String::from),
             FileLocation::Url { url } => Ok(url.to_string()),
-            #[allow(unreachable_patterns)]
-            _ => unreachable!(),
         }
     }
 
