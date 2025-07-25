@@ -659,10 +659,15 @@ mod range_formatting_tests {
         let source = "(define-constant N 1) (define-read-only (get-N) N)";
         let editor_state_input = create_test_editor_state(source.to_owned());
 
+        let location = FileLocation::FileSystem {
+            path: PathBuf::from("/test.clar"),
+        };
+        let location_string = location.to_url_string().unwrap();
+
         let params = GotoDefinitionParams {
             text_document_position_params: lsp_types::TextDocumentPositionParams {
                 text_document: lsp_types::TextDocumentIdentifier {
-                    uri: "file:///test.clar".parse().unwrap(),
+                    uri: location_string.parse().unwrap(),
                 },
                 // Position inside the 'N' constant
                 position: Position {
@@ -690,7 +695,7 @@ mod range_formatting_tests {
         let response_json = json!(response);
         assert_eq!(
             response_json.get("Definition").and_then(|v| v.get("uri")),
-            Some(&json!("file:///test.clar"))
+            Some(&json!(&location_string))
         );
     }
 }
