@@ -177,7 +177,7 @@ impl LspVscodeBridge {
             }
 
             for (location, diags) in aggregated_diagnostics.into_iter() {
-                if let Ok(uri) = location.to_string().parse() {
+                if let Ok(uri) = location.to_url_string()?.parse() {
                     send_diagnostic.call1(
                         &JsValue::NULL,
                         &encode_to_js(&PublishDiagnosticsParams {
