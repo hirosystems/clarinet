@@ -356,7 +356,7 @@ impl FileLocation {
             #[cfg(not(target_arch = "wasm32"))]
             FileLocation::FileSystem { path } => Url::from_file_path(path)
                 .map_err(|_| format!("unable to convert path {} to url", path.display()))
-                .map(|url| url.to_string()),
+                .map(String::from),
             FileLocation::Url { url } => Ok(url.to_string()),
         }
     }
