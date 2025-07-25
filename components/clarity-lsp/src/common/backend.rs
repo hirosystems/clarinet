@@ -681,12 +681,12 @@ mod range_formatting_tests {
         let response =
             process_request(request, &editor_state_input).expect("Failed to process request");
 
-        if let LspRequestResponse::Definition(Some(location)) = &response {
-            assert_eq!(location.uri.scheme().unwrap().as_str(), "file");
-            assert_eq!(location.uri.path().as_str(), "/test.clar");
-        } else {
+        let LspRequestResponse::Definition(Some(location)) = &response else {
             panic!("Expected a Definition response, got: {response:?}");
-        }
+        };
+
+        assert_eq!(location.uri.scheme().unwrap().as_str(), "file");
+        assert_eq!(location.uri.path().as_str(), "/test.clar");
         let response_json = json!(response);
         println!("Response JSON: {response_json}");
         assert_eq!(
