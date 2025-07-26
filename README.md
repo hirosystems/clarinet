@@ -90,7 +90,7 @@ Before contributing to Clarinet, please ensure you meet the following requiremen
 
 This repo follows the [Conventional Commit](https://www.conventionalcommits.org/en/v1.0.0/#summary) specification when writing commit messages.
 
-**Note**It is important that any pull requests you submit have commit messages that follow this standard.
+**Note:** It is important that any pull requests you submit have commit messages that follow this standard.
 
 To start contributing:
 
