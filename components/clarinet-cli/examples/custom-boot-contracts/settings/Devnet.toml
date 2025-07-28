@@ -114,16 +114,6 @@ disable_bitcoin_explorer = true
 # stacks_explorer_image_url = "blockstack/explorer:latest"
 # bitcoin_explorer_image_url = "quay.io/hirosystems/bitcoin-explorer:devnet"
 # postgres_image_url = "postgres:14"
-# subnet_node_image_url = "quay.io/hirosystems/subnet-node:devnet"
-# subnet_leader_mnemonic = "female adjust gallery certain visit token during great side clown fitness like hurt clip knife warm bench start reunion globe detail dream depend fortune"
-# subnet_leader_derivation_path = "m/44'/5757'/0'/0/0"
-# subnet_contract_id = "STXMJXCJDCT4WPF2X1HE42T6ZCCK3TPMBRZ51JEG.subnet"
-# subnet_node_rpc_port = 30443
-# subnet_node_p2p_port = 30444
-# subnet_events_ingestion_port = 30445
-# subnet_node_events_observers = ["host.docker.internal:8002"]
-# subnet_api_image_url = "quay.io/hirosystems/subnet-api:devnet"
-# subnet_api_postgres_database = "subnet_api"
 
 # epoch_2_0 = 100
 # epoch_2_05 = 100
