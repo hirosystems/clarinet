@@ -33,7 +33,7 @@ describe("simnet can get code coverage", () => {
 
     simnet.callPublicFn("counter", "increment", [], address1);
 
-    const reports = simnet.collectReport(false, "");
+    const reports = simnet.collectReport("");
     expect(reports.coverage.length).toBe(0);
   });
 
@@ -48,7 +48,7 @@ describe("simnet can get code coverage", () => {
     simnet.callPublicFn("counter", "increment", [], address1);
     simnet.callPrivateFn("counter", "inner-increment", [], address1);
 
-    const reports = simnet.collectReport(false, "");
+    const reports = simnet.collectReport("");
 
     // increment is called twice
     expect(reports.coverage.includes("FNDA:2,increment")).toBe(true);
@@ -64,7 +64,7 @@ describe("simnet can get costs reports", () => {
     const simnet = await initSimnet("tests/fixtures/Clarinet.toml", true);
     simnet.callPublicFn("counter", "increment", [], address1);
 
-    const reports = simnet.collectReport(false, "");
+    const reports = simnet.collectReport("");
     expect(() => JSON.parse(reports.costs)).not.toThrow();
 
     const parsedReports = JSON.parse(reports.costs);
@@ -78,7 +78,7 @@ describe("simnet can get costs reports", () => {
     });
     simnet.callPublicFn("counter", "increment", [], address1);
 
-    const reports = simnet.collectReport(false, "");
+    const reports = simnet.collectReport("");
     expect(() => JSON.parse(reports.costs)).not.toThrow();
 
     const parsedReports = JSON.parse(reports.costs);
@@ -99,7 +99,7 @@ describe("simnet can report both costs and coverage", () => {
     });
     simnet.callPublicFn("counter", "increment", [], address1);
 
-    const reports = simnet.collectReport(false, "");
+    const reports = simnet.collectReport("");
 
     const parsedReports = JSON.parse(reports.costs);
     expect(parsedReports).toHaveLength(1);
@@ -117,7 +117,7 @@ describe("simnet.run-snippet and .execute also report coverage", () => {
     simnet.execute("(contract-call? .counter increment)");
     simnet.execute("(contract-call? .counter increment)");
 
-    const reports = simnet.collectReport(false, "");
+    const reports = simnet.collectReport("");
     // line 30, within the increment function, is executed twice
     expect(reports.coverage).toContain("DA:30,2");
   });
@@ -130,7 +130,7 @@ describe("simnet.run-snippet and .execute also report coverage", () => {
     simnet.runSnippet("(contract-call? .counter increment)");
     simnet.runSnippet("(contract-call? .counter increment)");
 
-    const reports = simnet.collectReport(false, "");
+    const reports = simnet.collectReport("");
     // line 30, within the increment function, is executed twice
     expect(reports.coverage).toContain("DA:30,2");
   });
