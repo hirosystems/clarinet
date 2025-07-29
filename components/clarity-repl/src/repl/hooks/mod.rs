@@ -1,3 +1,3 @@
 pub mod logger;
-pub mod tracer;
 pub mod perf;
+pub mod tracer;

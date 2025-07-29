@@ -1,14 +1,11 @@
-use clarity::vm::costs::ExecutionCost;
-use clarity::vm::errors::Error;
-use clarity::vm::types::QualifiedContractIdentifier;
-use clarity::vm::SymbolicExpressionType;
-use clarity::vm::{
-    contexts::{Environment, LocalContext},
-    types::Value,
-    EvalHook, SymbolicExpression,
-};
 use std::fmt::Display;
 use std::io::Write;
+
+use clarity::vm::contexts::{Environment, LocalContext};
+use clarity::vm::costs::ExecutionCost;
+use clarity::vm::errors::Error;
+use clarity::vm::types::{QualifiedContractIdentifier, Value};
+use clarity::vm::{EvalHook, SymbolicExpression, SymbolicExpressionType};
 
 struct StackEntry {
     contract: QualifiedContractIdentifier,
