@@ -34,7 +34,7 @@ tar = "0.4.44"
 indoc = { workspace = true }
 
 clarity = { workspace = true }
-stackslib = { git = "https://github.com/stacks-network/stacks-core.git", branch="feat/clarity-wasm-develop", package = "stackslib" }
+stackslib = { workspace = true }
 chainhook-sdk = { version = "0.12" }
 chainhook-types = { version = "1.3.7" }
 

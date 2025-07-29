@@ -1,5 +1,3 @@
-use std::str::FromStr;
-
 use clarinet_utils::get_bip32_keys_from_mnemonic;
 use clarity::address::{
     AddressHashMode, C32_ADDRESS_VERSION_MAINNET_SINGLESIG, C32_ADDRESS_VERSION_TESTNET_SINGLESIG,
