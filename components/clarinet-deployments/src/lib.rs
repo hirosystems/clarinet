@@ -1154,6 +1154,31 @@ pub async fn generate_default_deployment_with_boot_contracts(
         contracts: contracts_map,
     };
 
+    // Check for custom boot contract validation errors and return error if any
+    if !asts_success && matches!(network, StacksNetwork::Simnet) {
+        let mut error_messages = Vec::new();
+        for (contract_id, diagnostics) in &contract_diags {
+            if !diagnostics.is_empty() {
+                let contract_name = contract_id.name.to_string();
+                let error_details: Vec<String> = diagnostics
+                    .iter()
+                    .map(|d| format!("  - {}", d.message))
+                    .collect();
+                error_messages.push(format!(
+                    "'{}' has validation errors:\n{}",
+                    contract_name,
+                    error_details.join("\n")
+                ));
+            }
+        }
+        if !error_messages.is_empty() {
+            return Err(format!(
+                "Custom boot contract validation failed:\n{}",
+                error_messages.join("\n\n")
+            ));
+        }
+    }
+
     let artifacts = DeploymentGenerationArtifacts {
         asts: contract_asts,
         deps: dependencies,

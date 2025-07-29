@@ -268,7 +268,6 @@ impl ProjectManifest {
             }
         }
 
-
         // Include all standard boot contracts
         let mut boot_contracts = vec![
             "costs".to_string(),
