@@ -95,6 +95,8 @@ pub fn initiate_session_from_manifest(manifest: &ProjectManifest) -> Session {
     // Custom boot contracts are allowed in this context
     let settings = SessionSettings {
         repl_settings: manifest.repl_settings.clone(),
+        disk_cache_enabled: true,
+        cache_location: Some(manifest.project.cache_location.to_path_buf()),
         override_boot_contracts_source: manifest.project.override_boot_contracts_source.clone(),
         ..Default::default()
     };
@@ -181,24 +183,16 @@ pub fn update_session_with_deployment_plan(
 
     let mut boot_contracts = BTreeMap::new();
     if !session.settings.repl_settings.remote_data.enabled {
-        // Only use custom boot contracts for simnet deployments
+        // Load boot contracts (with custom overrides if specified)
         let boot_contracts_data = if session.settings.override_boot_contracts_source.is_empty() {
             BOOT_CONTRACTS_DATA.clone()
         } else {
-            // Check if this is a simnet deployment by looking at the genesis field
-            let is_simnet = deployment.genesis.is_some();
-            if is_simnet {
-                clarity_repl::repl::boot::get_boot_contracts_data_with_overrides(
-                    &session.settings.override_boot_contracts_source,
-                )
-            } else {
-                // For non-simnet deployments, ignore custom boot contracts
-                BOOT_CONTRACTS_DATA.clone()
-            }
+            clarity_repl::repl::boot::get_boot_contracts_data_with_overrides(
+                &session.settings.override_boot_contracts_source,
+            )
         };
 
         for (contract_id, (contract, ast)) in boot_contracts_data {
-            // Always load all boot contracts
             let result = session.interpreter.run(&contract, Some(&ast), false, None);
             boot_contracts.insert(contract_id, result);
         }
@@ -313,7 +307,25 @@ fn handle_emulated_contract_call(
     result
 }
 
+// Main function that always includes boot contracts by default
 pub async fn generate_default_deployment(
+    manifest: &ProjectManifest,
+    network: &StacksNetwork,
+    no_batch: bool,
+    file_accessor: Option<&dyn FileAccessor>,
+    forced_min_epoch: Option<StacksEpochId>,
+) -> Result<(DeploymentSpecification, DeploymentGenerationArtifacts), String> {
+    generate_default_deployment_with_boot_contracts(
+        manifest,
+        network,
+        no_batch,
+        file_accessor,
+        forced_min_epoch,
+    )
+    .await
+}
+
+pub async fn generate_default_deployment_with_boot_contracts(
     manifest: &ProjectManifest,
     network: &StacksNetwork,
     no_batch: bool,
@@ -405,7 +417,7 @@ pub async fn generate_default_deployment(
     let mut repl_settings = manifest.repl_settings.clone();
     repl_settings.remote_data.enabled = false;
 
-    // Only use custom boot contracts for simnet
+    // Custom boot contracts are only supported on simnet
     let override_boot_contracts_source = if matches!(network, StacksNetwork::Simnet) {
         manifest.project.override_boot_contracts_source.clone()
     } else {
@@ -443,6 +455,10 @@ pub async fn generate_default_deployment(
         requirements_data.append(&mut boot_contracts_asts);
     }
 
+    // Initialize diagnostics collection and success tracking early
+    let mut contract_diags: HashMap<QualifiedContractIdentifier, Vec<Diagnostic>> = HashMap::new();
+    let mut asts_success = true;
+
     // Validate custom boot contracts from override_boot_contracts_source
     if !settings.override_boot_contracts_source.is_empty() && !simnet_remote_data {
         let mut session = Session::new(settings.clone());
@@ -453,15 +469,27 @@ pub async fn generate_default_deployment(
             }
 
             // Load and validate the custom boot contract
-            let custom_source = match clarity_repl::repl::boot::load_custom_boot_contract(file_path)
-            {
-                Ok(source) => source,
-                Err(e) => {
-                    return Err(format!(
-                        "Failed to load custom boot contract '{contract_name}' from '{file_path}': {e}"
-                    ));
+            let custom_source = match file_accessor {
+                None => {
+                    // Fallback to file system when no file_accessor is provided
+                    std::fs::read_to_string(file_path)
+                        .map_err(|e| format!("Failed to read boot contract file {file_path}: {e}"))
                 }
-            };
+                Some(file_accessor) => {
+                    let sources = file_accessor
+                        .read_files(vec![file_path.to_string()])
+                        .await
+                        .map_err(|e| {
+                            format!("Failed to read boot contract file {file_path}: {e}")
+                        })?;
+                    sources
+                        .get(file_path)
+                        .ok_or_else(|| {
+                            format!("Unable to read custom boot contract: {contract_name}")
+                        })
+                        .cloned()
+                }
+            }?;
 
             // Use standard epoch/version mapping for known boot contracts
             let (epoch, clarity_version) = match contract_name.as_str() {
@@ -502,25 +530,31 @@ pub async fn generate_default_deployment(
                     // Deployment succeeded, continue with AST validation
                 }
                 Err(deploy_errors) => {
-                    let error_messages: Vec<String> =
-                        deploy_errors.iter().map(|d| d.message.clone()).collect();
-                    return Err(format!(
-                        "Custom boot contract '{}' is invalid:\n{}",
-                        contract_name,
-                        error_messages.join("\n")
-                    ));
+                    // Collect deployment errors instead of returning immediately
+                    contract_diags.insert(
+                        QualifiedContractIdentifier::new(
+                            default_deployer_address.clone(),
+                            ContractName::try_from(contract_name.clone())
+                                .unwrap_or_else(|_| ContractName::from("unknown")),
+                        ),
+                        deploy_errors,
+                    );
+                    asts_success = false;
+                    continue;
                 }
             }
 
-            // Validate the custom boot contract
+            // Collect AST diagnostics instead of returning immediately
             if !ast_success {
-                let error_messages: Vec<String> =
-                    diagnostics.iter().map(|d| d.message.clone()).collect();
-                return Err(format!(
-                    "Custom boot contract '{}' is invalid:\n{}",
-                    contract_name,
-                    error_messages.join("\n")
-                ));
+                contract_diags.insert(
+                    QualifiedContractIdentifier::new(
+                        default_deployer_address.clone(),
+                        ContractName::try_from(contract_name.clone())
+                            .unwrap_or_else(|_| ContractName::from("unknown")),
+                    ),
+                    diagnostics,
+                );
+                asts_success = false;
             }
         }
     }
@@ -543,19 +577,42 @@ pub async fn generate_default_deployment(
                 continue;
             }
 
-            // Load the additional boot contract source
-            let mut contract_location = base_location.clone();
-            contract_location
-                .append_path(&format!("custom-boot-contracts/{contract_name}.clar"))?;
+            // Get the configured path for this boot contract, or use default path
+            let contract_path = manifest
+                .project
+                .override_boot_contracts_source
+                .get(contract_name)
+                .map(|path| {
+                    // If the path is relative, make it relative to the project root
+                    if path.starts_with("./") || path.starts_with("../") {
+                        let mut full_path = base_location.clone();
+                        full_path
+                            .append_path(path.trim_start_matches("./").trim_start_matches("../"))?;
+                        Ok(full_path)
+                    } else {
+                        // Assume absolute path
+                        FileLocation::from_path_string(path)
+                    }
+                })
+                .transpose()?
+                .unwrap_or_else(|| {
+                    // Default fallback path
+                    let mut default_path = base_location.clone();
+                    default_path
+                        .append_path(&format!("custom-boot-contracts/{contract_name}.clar"))
+                        .unwrap();
+                    default_path
+                });
 
+            // Load the additional boot contract source
             let source = match file_accessor {
-                None => contract_location.read_content_as_utf8()?,
+                None => contract_path.read_content_as_utf8()?,
                 Some(file_accessor) => {
                     let sources = file_accessor
-                        .read_files(vec![contract_location.to_string()])
+                        .read_files(vec![contract_path.to_string()])
                         .await?;
                     sources
-                        .get(&contract_location.to_string())
+                        .get(&contract_path.to_string())
                         .ok_or(format!(
                             "Unable to read additional boot contract: {contract_name}",
                         ))?
@@ -570,7 +627,6 @@ pub async fn generate_default_deployment(
                     .map_err(|_| format!("Invalid contract name: {contract_name}"))?,
             );
 
-            // Add to requirements data for AST building
             let mut session = Session::new(settings.clone());
             let contract = ClarityContract {
                 code_source: ClarityCodeSource::ContractInMemory(source.clone()),
@@ -589,27 +645,17 @@ pub async fn generate_default_deployment(
                     // Deployment succeeded, continue with AST validation
                 }
                 Err(deploy_errors) => {
-                    let error_messages: Vec<String> =
-                        deploy_errors.iter().map(|d| d.message.clone()).collect();
-                    return Err(format!(
-                        "Custom boot contract '{}' from '{}' is invalid:\n{}",
-                        contract_name,
-                        contract_location,
-                        error_messages.join("\n")
-                    ));
+                    // Collect deployment errors instead of returning immediately
+                    contract_diags.insert(contract_id.clone(), deploy_errors);
+                    asts_success = false;
+                    continue;
                 }
             }
 
-            // Validate the custom boot contract
+            // Collect AST diagnostics instead of returning immediately
             if !ast_success {
-                let error_messages: Vec<String> =
-                    diagnostics.iter().map(|d| d.message.clone()).collect();
-                return Err(format!(
-                    "Custom boot contract '{}' from '{}' is invalid:\n{}",
-                    contract_name,
-                    contract_location,
-                    error_messages.join("\n")
-                ));
+                contract_diags.insert(contract_id.clone(), diagnostics);
+                asts_success = false;
             }
 
             requirements_data.insert(contract_id.clone(), (DEFAULT_CLARITY_VERSION, ast));
@@ -620,7 +666,7 @@ pub async fn generate_default_deployment(
                     .map_err(|_| format!("Invalid contract name: {contract_name}"))?,
                 emulated_sender: default_deployer_address.clone(),
                 source: source.clone(),
-                location: contract_location.clone(),
+                location: contract_path.clone(),
                 clarity_version: DEFAULT_CLARITY_VERSION,
             };
 
@@ -628,7 +674,7 @@ pub async fn generate_default_deployment(
             add_transaction_to_epoch(&mut transactions, tx, &DEFAULT_EPOCH.into());
 
             // Add to contracts map
-            contracts_map.insert(contract_id, (source, contract_location));
+            contracts_map.insert(contract_id, (source, contract_path));
         }
     }
 
@@ -987,9 +1033,6 @@ pub async fn generate_default_deployment(
 
     let mut contract_asts = BTreeMap::new();
     let mut contract_data = BTreeMap::new();
-    let mut contract_diags = HashMap::new();
-
-    let mut asts_success = true;
 
     for (contract_id, contract) in contracts_sources.into_iter() {
         let (ast, diags, ast_success) = session.interpreter.build_ast(&contract);
@@ -1098,15 +1141,7 @@ pub async fn generate_default_deployment(
         bitcoin_node,
         network: network.clone(),
         genesis: if matches!(network, StacksNetwork::Simnet) {
-            // Include both standard boot contracts and custom boot contracts from override_boot_contracts_source
-            let mut genesis_contracts = manifest.project.boot_contracts.clone();
-
-            // Add contracts from override_boot_contracts_source to genesis contracts
-            for contract_name in manifest.project.override_boot_contracts_source.keys() {
-                if !genesis_contracts.contains(contract_name) {
-                    genesis_contracts.push(contract_name.clone());
-                }
-            }
+            let genesis_contracts = manifest.project.boot_contracts.clone();
 
             Some(GenesisSpecification {
                 wallets,

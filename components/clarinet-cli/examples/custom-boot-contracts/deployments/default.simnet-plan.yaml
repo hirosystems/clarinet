@@ -55,6 +55,5 @@ genesis:
     - costs-3
     - cost-voting
     - bns
-    - pox-5
 plan:
   batches: []
