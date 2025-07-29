@@ -136,7 +136,7 @@ describe("test pox-3", () => {
     expect(stackStx.events).toHaveLength(2);
 
     const bootContractsPath = "./contracts/boot_contracts/";
-    const { coverage } = simnet.collectReport(bootContractsPath);
+    const { coverage } = simnet.collectReport(true, bootContractsPath);
     expect(coverage).toContain(`SF:${bootContractsPath}/pox-3`);
     expect(coverage).toContain("FNDA:1,stack-stx");
   });
