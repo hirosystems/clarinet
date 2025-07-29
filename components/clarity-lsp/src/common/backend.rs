@@ -661,7 +661,7 @@ mod lsp_tests {
     }
 
     #[test]
-    fn test_go_to_definitions() {
+    fn test_go_to_definition() {
         let source = "(define-constant N 1) (define-read-only (get-N) N)";
         let editor_state_input = create_test_editor_state(source.to_owned());
 
