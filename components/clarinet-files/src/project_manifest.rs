@@ -34,8 +34,6 @@ pub struct ProjectConfigFile {
     requirements: Option<TomlValue>,
     boot_contracts: Option<Vec<String>>,
     override_boot_contracts_source: Option<BTreeMap<String, String>>,
-    #[serde(rename = "simnet_override_boot_contracts_source")]
-    simnet_override_boot_contracts_source: Option<BTreeMap<String, String>>,
 
     // The fields below have been moved into repl above, but are kept here for
     // backwards compatibility.
@@ -148,8 +146,6 @@ pub struct ProjectConfig {
     pub boot_contracts: Vec<String>,
     #[serde(skip_deserializing)]
     pub override_boot_contracts_source: BTreeMap<String, String>,
-    #[serde(skip_deserializing)]
-    pub simnet_override_boot_contracts_source: BTreeMap<String, String>,
 }
 
 fn cache_location_deserializer<'de, D>(des: D) -> Result<FileLocation, D::Error>
@@ -272,19 +268,8 @@ impl ProjectManifest {
             }
         }
 
-        // Parse simnet-specific override boot contracts source configuration
-        let mut simnet_override_boot_contracts_source = BTreeMap::new();
-        if let Some(overrides) = project_manifest_file
-            .project
-            .simnet_override_boot_contracts_source
-        {
-            for (contract_name, contract_path) in overrides.iter() {
-                simnet_override_boot_contracts_source
-                    .insert(contract_name.clone(), contract_path.clone());
-            }
-        }
 
-        // Always include all boot contracts - the include_boot_contracts setting is no longer used
+        // Include all standard boot contracts
         let mut boot_contracts = vec![
             "costs".to_string(),
             "pox".to_string(),
@@ -322,7 +307,6 @@ impl ProjectManifest {
             cache_location,
             boot_contracts,
             override_boot_contracts_source: override_boot_contracts_source.clone(),
-            simnet_override_boot_contracts_source: simnet_override_boot_contracts_source.clone(),
         };
 
         let mut config = ProjectManifest {

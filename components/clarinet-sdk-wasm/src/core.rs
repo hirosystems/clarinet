@@ -11,9 +11,10 @@ use clarinet_deployments::{
     generate_default_deployment, initiate_session_from_manifest,
     update_session_with_deployment_plan,
 };
-use clarinet_files::{
-    FileAccessor, FileLocation, ProjectManifest, StacksNetwork, WASMFileSystemAccessor,
-};
+use clarinet_files::{FileAccessor, FileLocation, ProjectManifest, StacksNetwork};
+
+#[cfg(target_arch = "wasm32")]
+use clarinet_files::WASMFileSystemAccessor;
 use clarity_repl::clarity::analysis::contract_interface_builder::{
     ContractInterface, ContractInterfaceFunction, ContractInterfaceFunctionAccess,
 };
@@ -300,7 +301,12 @@ impl SDK {
     pub fn new(fs_request: JsFunction, options: Option<SDKOptions>) -> Self {
         panic::set_hook(Box::new(console_error_panic_hook::hook));
 
+        #[cfg(target_arch = "wasm32")]
         let file_accessor = Box::new(WASMFileSystemAccessor::new(fs_request));
+
+        #[cfg(not(target_arch = "wasm32"))]
+        let file_accessor: Box<dyn FileAccessor> =
+            panic!("WASMFileSystemAccessor only available on wasm32");
 
         let track_coverage = options.as_ref().is_some_and(|o| o.track_coverage);
         let track_costs = options.as_ref().is_some_and(|o| o.track_costs);
@@ -1112,7 +1118,11 @@ impl SDK {
     // this method empty the session costs and coverage reports
     // and returns this report
     #[wasm_bindgen(js_name=collectReport)]
-    pub fn collect_report(&mut self, boot_contracts_path: String) -> Result<SessionReport, String> {
+    pub fn collect_report(
+        &mut self,
+        include_boot_contracts: bool,
+        boot_contracts_path: String,
+    ) -> Result<SessionReport, String> {
         let contracts_locations = self.contracts_locations.clone();
         let session = self.get_session_mut();
 
@@ -1126,13 +1136,14 @@ impl SDK {
             contract_paths.insert(contract_id.name.to_string(), contract_location.to_string());
         }
 
-        // Always include boot contracts
-        for (contract_id, (_, ast)) in clarity_repl::repl::boot::BOOT_CONTRACTS_DATA.iter() {
-            asts.insert(contract_id.clone(), ast.clone());
-            contract_paths.insert(
-                contract_id.name.to_string(),
-                format!("{boot_contracts_path}/{}.clar", contract_id.name),
-            );
+        if include_boot_contracts {
+            for (contract_id, (_, ast)) in clarity_repl::repl::boot::BOOT_CONTRACTS_DATA.iter() {
+                asts.insert(contract_id.clone(), ast.clone());
+                contract_paths.insert(
+                    contract_id.name.to_string(),
+                    format!("{boot_contracts_path}/{}.clar", contract_id.name),
+                );
+            }
         }
 
         let coverage = session.collect_lcov_content(&asts, &contract_paths);
