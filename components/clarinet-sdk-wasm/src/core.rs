@@ -11,8 +11,6 @@ use clarinet_deployments::{
     generate_default_deployment, initiate_session_from_manifest,
     update_session_with_deployment_plan,
 };
-#[cfg(target_arch = "wasm32")]
-use clarinet_files::WASMFileSystemAccessor;
 use clarinet_files::{FileAccessor, FileLocation, ProjectManifest, StacksNetwork};
 use clarity_repl::clarity::analysis::contract_interface_builder::{
     ContractInterface, ContractInterfaceFunction, ContractInterfaceFunctionAccess,
