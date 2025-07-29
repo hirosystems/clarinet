@@ -620,6 +620,26 @@ pub async fn generate_default_deployment_with_boot_contracts(
                 }
             };
 
+            let mut session = Session::new(settings.clone());
+            let (epoch, _clarity_version) = match contract_name.as_str() {
+                "pox-4" | "signers" | "signers-voting" => {
+                    (StacksEpochId::Epoch25, ClarityVersion::Clarity2)
+                }
+                "pox-3" => (StacksEpochId::Epoch24, ClarityVersion::Clarity2),
+                "pox-2" | "costs-3" => (StacksEpochId::Epoch21, ClarityVersion::Clarity2),
+                "costs-2" => (StacksEpochId::Epoch2_05, ClarityVersion::Clarity1),
+                "genesis" | "lockup" | "bns" | "cost-voting" | "costs" | "pox" => {
+                    (StacksEpochId::Epoch20, ClarityVersion::Clarity1)
+                }
+                _ => {
+                    return Err(format!(
+                        "Unknown boot contract '{contract_name}' - cannot validate"
+                    ));
+                }
+            };
+            // Set the session to the correct epoch for validation
+            session.update_epoch(epoch);
+
             // Create contract ID for the additional boot contract
             let contract_id = QualifiedContractIdentifier::new(
                 default_deployer_address.clone(),
@@ -1156,9 +1176,27 @@ pub async fn generate_default_deployment_with_boot_contracts(
 
     // Check for custom boot contract validation errors and return error if any
     if !asts_success && matches!(network, StacksNetwork::Simnet) {
-        // For custom boot contracts, we want to preserve the original error format
-        // so we don't intercept and reformat the error here
-        // The original error will be handled by the diagnostics digest below
+        let mut error_messages = Vec::new();
+        for (contract_id, diagnostics) in &contract_diags {
+            if !diagnostics.is_empty() {
+                let contract_name = contract_id.name.to_string();
+                let error_details: Vec<String> = diagnostics
+                    .iter()
+                    .map(|d| format!("  - {}", d.message))
+                    .collect();
+                error_messages.push(format!(
+                    "'{}' has validation errors:\n{}",
+                    contract_name,
+                    error_details.join("\n")
+                ));
+            }
+        }
+        if !error_messages.is_empty() {
+            return Err(format!(
+                "Custom boot contract validation failed:\n{}",
+                error_messages.join("\n\n")
+            ));
+        }
     }
 
     let artifacts = DeploymentGenerationArtifacts {
