@@ -1117,7 +1117,11 @@ impl SDK {
     // this method empty the session costs and coverage reports
     // and returns this report
     #[wasm_bindgen(js_name=collectReport)]
-    pub fn collect_report(&mut self, boot_contracts_path: String) -> Result<SessionReport, String> {
+    pub fn collect_report(
+        &mut self,
+        include_boot_contracts: bool,
+        boot_contracts_path: String,
+    ) -> Result<SessionReport, String> {
         let contracts_locations = self.contracts_locations.clone();
         let session = self.get_session_mut();
 
@@ -1131,7 +1135,7 @@ impl SDK {
             contract_paths.insert(contract_id.name.to_string(), contract_location.to_string());
         }
 
-        if !boot_contracts_path.is_empty() {
+        if include_boot_contracts {
             for (contract_id, (_, ast)) in clarity_repl::repl::boot::BOOT_CONTRACTS_DATA.iter() {
                 asts.insert(contract_id.clone(), ast.clone());
                 contract_paths.insert(
