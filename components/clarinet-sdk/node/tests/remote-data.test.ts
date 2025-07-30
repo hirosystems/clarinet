@@ -49,7 +49,7 @@ describe("simnet remote interactions", async () => {
   it("can call a remote contract", async () => {
     await simnet.initEmptySession({
       enabled: true,
-      api_url: "https://api.testnet.hiro.so",
+      api_url,
       initial_height: 56230,
     });
     const { result } = simnet.callReadOnlyFn(counterAddress, "get-count", [], sender);
@@ -59,7 +59,7 @@ describe("simnet remote interactions", async () => {
   it("can call a remote contract", async () => {
     await simnet.initEmptySession({
       enabled: true,
-      api_url: "https://api.testnet.hiro.so",
+      api_url,
       initial_height: 57000,
     });
     const { result } = simnet.callReadOnlyFn(counterAddress, "get-count", [], sender);
@@ -69,7 +69,7 @@ describe("simnet remote interactions", async () => {
   it("can use at-block", async () => {
     await simnet.initEmptySession({
       enabled: true,
-      api_url: "https://api.testnet.hiro.so",
+      api_url,
       initial_height: 57000,
     });
     const { result: resultAt56230 } = simnet.callReadOnlyFn(
@@ -91,7 +91,7 @@ describe("simnet remote interactions", async () => {
   it("caches metadata", async () => {
     await simnet.initEmptySession({
       enabled: true,
-      api_url: "https://api.testnet.hiro.so",
+      api_url,
       initial_height: 56230,
     });
     const { result } = simnet.callReadOnlyFn(counterAddress, "get-count", [], sender);
@@ -109,7 +109,7 @@ describe("simnet remote interactions", async () => {
   it("throws an error if the contract is not available at a given block height", async () => {
     await simnet.initEmptySession({
       enabled: true,
-      api_url: "https://api.testnet.hiro.so",
+      api_url,
       // the counter contract is deployed at 41613
       initial_height: 41000,
     });
@@ -121,7 +121,7 @@ describe("simnet remote interactions", async () => {
   it("throws an error if the method is not available on an existing contract", async () => {
     await simnet.initEmptySession({
       enabled: true,
-      api_url: "https://api.testnet.hiro.so",
+      api_url,
       // the counter contract is deployed at 41613
       initial_height: 56231,
     });

@@ -117,15 +117,23 @@ impl From<SettingsFile> for Settings {
 #[derive(Debug, Default, Clone, Deserialize, Serialize)]
 pub struct RemoteDataSettingsFile {
     enabled: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     api_url: Option<ApiUrl>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     initial_height: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    use_mainnet_wallets: Option<bool>,
 }
 
 #[derive(Debug, Default, Clone, Deserialize, Serialize)]
 pub struct RemoteDataSettings {
     pub enabled: bool,
+    #[serde(default)]
     pub api_url: ApiUrl,
+    #[serde(default)]
     pub initial_height: Option<u32>,
+    #[serde(default)]
+    pub use_mainnet_wallets: bool,
 }
 
 #[derive(Debug, Default, Clone, Deserialize, Serialize)]
@@ -143,6 +151,7 @@ impl From<RemoteDataSettingsFile> for RemoteDataSettings {
             enabled: file.enabled.unwrap_or_default(),
             api_url: file.api_url.unwrap_or_default(),
             initial_height: file.initial_height,
+            use_mainnet_wallets: file.use_mainnet_wallets.unwrap_or_default(),
         }
     }
 }

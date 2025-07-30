@@ -891,6 +891,7 @@ pub fn main() {
                     let res = NetworkManifest::from_project_manifest_location(
                         &manifest.location,
                         &network_moved.get_networks(),
+                        manifest.use_mainnet_wallets(),
                         Some(&manifest.project.cache_location),
                         None,
                     );
@@ -1044,12 +1045,6 @@ pub fn main() {
             }
         },
         Command::Console(cmd) => {
-            let remote_data_settings = RemoteDataSettings {
-                enabled: cmd.enable_remote_data,
-                api_url: cmd.remote_data_api_url.unwrap_or_default(),
-                initial_height: cmd.remote_data_initial_height,
-            };
-
             // Loop to handle `::reload` command
             loop {
                 let manifest = load_manifest_or_warn(cmd.manifest_path.clone());
@@ -1097,6 +1092,12 @@ pub fn main() {
                         }
                     }
                     None => {
+                        let remote_data_settings = RemoteDataSettings {
+                            enabled: cmd.enable_remote_data,
+                            api_url: cmd.remote_data_api_url.clone().unwrap_or_default(),
+                            initial_height: cmd.remote_data_initial_height,
+                            use_mainnet_wallets: true,
+                        };
                         let mut settings = repl::SessionSettings::default();
                         settings.repl_settings.remote_data = remote_data_settings.clone();
                         if cmd.enable_clarity_wasm {
