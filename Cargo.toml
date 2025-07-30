@@ -60,5 +60,5 @@ chainhook-types = { git = "https://github.com/hirosystems/chainhook.git", branch
 # [patch.'https://github.com/stacks-network/stacks-core.git']
 # clarity = { path = "../stacks-core/clarity" }
 # stacks-common = { path = "../stacks-core/stacks-common" }
-# stackslib = { path = "../stacks-core/stackslib"  }
+# stackslib = { path = "../stacks-core/stackslib" }
 # pox-locking = { path = "../stacks-core/pox-locking" }
