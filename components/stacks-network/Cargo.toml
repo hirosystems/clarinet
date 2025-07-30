@@ -47,7 +47,7 @@ libc = "0.2.173"
 
 [dev-dependencies]
 pretty_assertions = { workspace = true }
-stacks-rpc-client = { path = "../stacks-rpc-client", features = ["test"] }
+stacks-rpc-client = { path = "../stacks-rpc-client", features = ["mock"] }
 
 [lib]
 name = "stacks_network"

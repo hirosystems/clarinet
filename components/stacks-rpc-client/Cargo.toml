@@ -20,6 +20,4 @@ stacks-codec = { package = "stacks-codec", path = "../stacks-codec" }
 mockito = { version = "1.6", default-features = false, optional = true }
 
 [features]
-default = []
 mock = ["mockito"]
-test = ["mock"]

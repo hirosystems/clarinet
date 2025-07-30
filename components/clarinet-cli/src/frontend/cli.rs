@@ -1096,7 +1096,7 @@ pub fn main() {
                             enabled: cmd.enable_remote_data,
                             api_url: cmd.remote_data_api_url.clone().unwrap_or_default(),
                             initial_height: cmd.remote_data_initial_height,
-                            use_mainnet_wallets: true,
+                            use_mainnet_wallets: false,
                         };
                         let mut settings = repl::SessionSettings::default();
                         settings.repl_settings.remote_data = remote_data_settings.clone();
