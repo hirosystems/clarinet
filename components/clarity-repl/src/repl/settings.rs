@@ -82,8 +82,6 @@ pub struct Settings {
     pub analysis: analysis::Settings,
     pub remote_data: RemoteDataSettings,
     #[serde(skip_serializing, skip_deserializing)]
-    pub clarity_wasm_mode: bool,
-    #[serde(skip_serializing, skip_deserializing)]
     pub show_timings: bool,
 }
 
@@ -108,7 +106,6 @@ impl From<SettingsFile> for Settings {
         Self {
             analysis,
             remote_data,
-            clarity_wasm_mode: false,
             show_timings: false,
         }
     }

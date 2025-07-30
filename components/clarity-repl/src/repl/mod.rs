@@ -24,7 +24,7 @@ pub use session::Session;
 pub use settings::{SessionSettings, Settings, SettingsFile};
 
 pub const DEFAULT_CLARITY_VERSION: ClarityVersion = ClarityVersion::Clarity3;
-pub const DEFAULT_EPOCH: StacksEpochId = StacksEpochId::Epoch31;
+pub const DEFAULT_EPOCH: StacksEpochId = StacksEpochId::Epoch32;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Epoch {

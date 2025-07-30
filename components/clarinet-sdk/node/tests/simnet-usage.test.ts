@@ -86,9 +86,9 @@ describe("basic simnet interactions", () => {
 
     // @ts-ignore
     // "0" is an invalid epoch
-    // it logs that 0 is invalid and defaults to 3.1
+    // it logs that 0 is invalid and defaults to latest
     simnet.setEpoch("0");
-    expect(simnet.currentEpoch).toBe("3.1");
+    expect(simnet.currentEpoch).toBe("3.2");
   });
 
   it("can get default clarity version for current epoch", () => {
