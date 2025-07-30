@@ -24,6 +24,7 @@ fn init_session(initial_heigth: u32) -> Session {
         enabled: true,
         api_url: ApiUrl("https://api.testnet.hiro.so".to_string()),
         initial_height: Some(initial_heigth),
+        use_mainnet_wallets: false,
     };
     Session::new(settings)
 }
@@ -275,6 +276,7 @@ fn it_handles_chain_constants() {
         enabled: true,
         api_url: ApiUrl("https://api.hiro.so".to_string()),
         initial_height: Some(535000),
+        use_mainnet_wallets: false,
     };
     let mut session = Session::new(settings);
     let result = eval_snippet(&mut session, "is-in-mainnet");

@@ -128,6 +128,7 @@ impl DevnetEventObserverConfig {
             None => NetworkManifest::from_project_manifest_location(
                 &manifest.location,
                 &StacksNetwork::Devnet.get_networks(),
+                false,
                 Some(&manifest.project.cache_location),
                 None,
             )

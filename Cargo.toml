@@ -46,6 +46,9 @@ wasm-bindgen-futures = { version = "=0.4.50" }
 web-sys = { version = "=0.3.77" }
 indoc = "2.0.3"
 
+# dev dependencies
+mockito = { version = "1.6", default-features = false }
+
 [patch.crates-io]
 stacks-codec = { path = "./components/stacks-codec" }
 hiro-system-kit = { path = "./components/hiro-system-kit" }

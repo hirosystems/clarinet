@@ -883,6 +883,7 @@ pub fn main() {
                     let res = NetworkManifest::from_project_manifest_location(
                         &manifest.location,
                         &network_moved.get_networks(),
+                        manifest.use_mainnet_wallets(),
                         Some(&manifest.project.cache_location),
                         None,
                     );
@@ -1036,12 +1037,6 @@ pub fn main() {
             }
         },
         Command::Console(cmd) => {
-            let remote_data_settings = RemoteDataSettings {
-                enabled: cmd.enable_remote_data,
-                api_url: cmd.remote_data_api_url.unwrap_or_default(),
-                initial_height: cmd.remote_data_initial_height,
-            };
-
             // Loop to handle `::reload` command
             loop {
                 let manifest = load_manifest_or_warn(cmd.manifest_path.clone());
@@ -1074,6 +1069,12 @@ pub fn main() {
                         Terminal::load(artifacts.session, None)
                     }
                     None => {
+                        let remote_data_settings = RemoteDataSettings {
+                            enabled: cmd.enable_remote_data,
+                            api_url: cmd.remote_data_api_url.clone().unwrap_or_default(),
+                            initial_height: cmd.remote_data_initial_height,
+                            use_mainnet_wallets: false,
+                        };
                         let mut settings = repl::SessionSettings::default();
                         settings.repl_settings.remote_data = remote_data_settings.clone();
                         Terminal::new(settings, None)
@@ -1364,7 +1365,7 @@ fn get_manifest_location_or_warn(path: Option<String>) -> Option<FileLocation> {
     }
 }
 
-fn load_manifest_or_exit(
+pub fn load_manifest_or_exit(
     path: Option<String>,
     allow_remote_data_fetching: bool,
 ) -> ProjectManifest {
@@ -1390,7 +1391,7 @@ fn load_manifest_or_warn(path: Option<String>) -> Option<ProjectManifest> {
         .ok()
 }
 
-fn load_deployment_and_artifacts_or_exit(
+pub fn load_deployment_and_artifacts_or_exit(
     manifest: &ProjectManifest,
     deployment_plan_path: &Option<String>,
     force_on_disk: bool,

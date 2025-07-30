@@ -1,0 +1,10 @@
+[project]
+name = 'fixtures'
+description = 'sample project to test clarinet-sdk'
+telemetry = false
+cache_dir = './.cache'
+requirements = []
+
+[repl.remote_data]
+enabled = true
+initial_height = 522000

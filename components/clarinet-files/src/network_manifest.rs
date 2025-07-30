@@ -70,7 +70,7 @@ pub enum StacksNetwork {
     Mainnet,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum BitcoinNetwork {
     Regtest,
@@ -358,6 +358,7 @@ impl NetworkManifest {
     pub fn from_project_manifest_location(
         project_manifest_location: &FileLocation,
         networks: &(BitcoinNetwork, StacksNetwork),
+        use_mainnet_wallets: bool,
         cache_location: Option<&FileLocation>,
         devnet_override: Option<DevnetConfigFile>,
     ) -> Result<NetworkManifest, String> {
@@ -366,6 +367,7 @@ impl NetworkManifest {
         NetworkManifest::from_location(
             &network_manifest_location,
             networks,
+            use_mainnet_wallets,
             cache_location,
             devnet_override,
         )
@@ -374,6 +376,7 @@ impl NetworkManifest {
     pub async fn from_project_manifest_location_using_file_accessor(
         location: &FileLocation,
         networks: &(BitcoinNetwork, StacksNetwork),
+        use_mainnet_wallets: bool,
         file_accessor: &dyn FileAccessor,
     ) -> Result<NetworkManifest, String> {
         let mut network_manifest_location = location.get_parent_location()?;
@@ -387,6 +390,7 @@ impl NetworkManifest {
         NetworkManifest::from_network_manifest_file(
             &mut network_manifest_file,
             networks,
+            use_mainnet_wallets,
             None,
             None,
         )
@@ -395,6 +399,7 @@ impl NetworkManifest {
     pub fn from_location(
         location: &FileLocation,
         networks: &(BitcoinNetwork, StacksNetwork),
+        use_mainnet_wallets: bool,
         cache_location: Option<&FileLocation>,
         devnet_override: Option<DevnetConfigFile>,
     ) -> Result<NetworkManifest, String> {
@@ -404,6 +409,7 @@ impl NetworkManifest {
         NetworkManifest::from_network_manifest_file(
             &mut network_manifest_file,
             networks,
+            use_mainnet_wallets,
             cache_location,
             devnet_override,
         )
@@ -412,6 +418,7 @@ impl NetworkManifest {
     pub fn from_network_manifest_file(
         network_manifest_file: &mut NetworkManifestFile,
         networks: &(BitcoinNetwork, StacksNetwork),
+        use_mainnet_wallets: bool,
         cache_location: Option<&FileLocation>,
         devnet_override: Option<DevnetConfigFile>,
     ) -> Result<NetworkManifest, String> {
@@ -469,8 +476,13 @@ impl NetworkManifest {
                         _ => DEFAULT_DERIVATION_PATH.to_string(),
                     };
 
+                    let addresses_network = if use_mainnet_wallets {
+                        (networks.0.clone(), StacksNetwork::Mainnet)
+                    } else {
+                        networks.clone()
+                    };
                     let (stx_address, btc_address, _) =
-                        compute_addresses(&mnemonic, &derivation, networks);
+                        compute_addresses(&mnemonic, &derivation, &addresses_network);
 
                     accounts.insert(
                         account_name.to_string(),
