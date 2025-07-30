@@ -11,7 +11,9 @@ use clarinet_deployments::{
     generate_default_deployment, initiate_session_from_manifest,
     update_session_with_deployment_plan,
 };
-use clarinet_files::{FileAccessor, FileLocation, ProjectManifest, StacksNetwork};
+use clarinet_files::{
+    FileAccessor, FileLocation, ProjectManifest, StacksNetwork, WASMFileSystemAccessor,
+};
 use clarity_repl::clarity::analysis::contract_interface_builder::{
     ContractInterface, ContractInterfaceFunction, ContractInterfaceFunctionAccess,
 };
@@ -298,12 +300,7 @@ impl SDK {
     pub fn new(fs_request: JsFunction, options: Option<SDKOptions>) -> Self {
         panic::set_hook(Box::new(console_error_panic_hook::hook));
 
-        #[cfg(target_arch = "wasm32")]
         let file_accessor = Box::new(WASMFileSystemAccessor::new(fs_request));
-
-        #[cfg(not(target_arch = "wasm32"))]
-        let file_accessor: Box<dyn FileAccessor> =
-            panic!("WASMFileSystemAccessor only available on wasm32");
 
         let track_coverage = options.as_ref().is_some_and(|o| o.track_coverage);
         let track_costs = options.as_ref().is_some_and(|o| o.track_costs);
