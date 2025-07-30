@@ -1407,7 +1407,7 @@ fn get_manifest_location_or_warn(path: Option<String>) -> Option<FileLocation> {
     }
 }
 
-fn load_manifest_or_exit(
+pub fn load_manifest_or_exit(
     path: Option<String>,
     allow_remote_data_fetching: bool,
 ) -> ProjectManifest {
@@ -1433,7 +1433,7 @@ fn load_manifest_or_warn(path: Option<String>) -> Option<ProjectManifest> {
         .ok()
 }
 
-fn load_deployment_and_artifacts_or_exit(
+pub fn load_deployment_and_artifacts_or_exit(
     manifest: &ProjectManifest,
     deployment_plan_path: &Option<String>,
     force_on_disk: bool,

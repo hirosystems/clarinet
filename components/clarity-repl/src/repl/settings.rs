@@ -130,9 +130,9 @@ pub struct RemoteDataSettings {
     pub enabled: bool,
     #[serde(default)]
     pub api_url: ApiUrl,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub initial_height: Option<u32>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub use_mainnet_wallets: bool,
 }
 
@@ -174,11 +174,16 @@ impl RemoteDataSettings {
             None => info.stacks_tip_height,
         };
 
+        let is_mainnet = info.network_id == 1;
+        if self.use_mainnet_wallets && !is_mainnet {
+            uprint!("Warning: `use_mainnet_wallets`, but the API url is not mainnet. This may lead to unexpected behavior.");
+        }
+
         Ok(RemoteNetworkInfo {
             api_url: self.api_url.clone(),
             initial_height,
             network_id: info.network_id,
-            is_mainnet: info.network_id == 1,
+            is_mainnet,
             cache_location,
         })
     }

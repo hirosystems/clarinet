@@ -5,7 +5,7 @@ import { describe, expect, it, beforeEach, afterEach, afterAll, beforeAll } from
 
 // test the built package and not the source code
 // makes it simpler to handle wasm build
-import { getSDK } from "..";
+import { getSDK, initSimnet } from "..";
 
 const api_url = "https://api.testnet.hiro.so";
 const counterAddress = "STJCAB2T9TR2EJM7YS4DM2CGBBVTF7BV237Y8KNV.counter";
@@ -128,5 +128,24 @@ describe("simnet remote interactions", async () => {
     expect(() => simnet.callReadOnlyFn(counterAddress, "doesnt-exist", [], sender)).toThrowError(
       `Call contract function error: ${counterAddress}::doesnt-exist() -> Method 'doesnt-exist' does not exist on contract '${counterAddress}'`,
     );
+  });
+});
+
+describe("repl settings", async () => {
+  it("can use testnet wallet addresses by default", async () => {
+    const simnet = await initSimnet("tests/fixtures/ManifestWithMXSDefault.toml", false);
+    const accounts = simnet.getAccounts();
+    expect([...accounts.values()].every((v) => v.startsWith("ST"))).toBe(true);
+    expect(simnet.deployer).toBe("ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM");
+  });
+
+  it("can use mainnet wallet addresses", async () => {
+    const simnet = await initSimnet("tests/fixtures/ManifestWithMXS.toml", false);
+    const accounts = simnet.getAccounts();
+    expect([...accounts.values()].every((v) => v.startsWith("SP"))).toBe(true);
+    expect(simnet.deployer).toBe("SP1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRCBGD7R");
+    const interfaces = simnet.getContractsInterfaces();
+    console.log(interfaces);
+    expect([...interfaces.keys()].every((v) => v.startsWith(simnet.deployer))).toBe(true);
   });
 });
