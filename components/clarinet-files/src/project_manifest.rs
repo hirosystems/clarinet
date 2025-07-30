@@ -377,6 +377,10 @@ impl ProjectManifest {
         config.project.requirements = Some(config_requirements);
         Ok(config)
     }
+
+    pub fn use_mainnet_wallets(&self) -> bool {
+        self.repl_settings.remote_data.enabled && self.repl_settings.remote_data.use_mainnet_wallets
+    }
 }
 
 fn get_epoch_and_clarity_version(

@@ -307,6 +307,7 @@ pub async fn generate_default_deployment(
         None => NetworkManifest::from_project_manifest_location(
             &manifest.location,
             &network.get_networks(),
+            manifest.use_mainnet_wallets(),
             Some(&manifest.project.cache_location),
             None,
         )?,
@@ -314,6 +315,7 @@ pub async fn generate_default_deployment(
             NetworkManifest::from_project_manifest_location_using_file_accessor(
                 &manifest.location,
                 &network.get_networks(),
+                manifest.use_mainnet_wallets(),
                 file_accessor,
             )
             .await?

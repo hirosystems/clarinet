@@ -82,6 +82,7 @@ impl DevnetOrchestrator {
             None => NetworkManifest::from_project_manifest_location(
                 &manifest.location,
                 &StacksNetwork::Devnet.get_networks(),
+                false,
                 Some(&manifest.project.cache_location),
                 devnet_override,
             ),

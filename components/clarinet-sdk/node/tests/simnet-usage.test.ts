@@ -62,7 +62,7 @@ describe("basic simnet interactions", () => {
     );
   });
 
-  it("exposes devnet stacks accounts", () => {
+  it("exposes simnet stacks accounts", () => {
     const accounts = simnet.getAccounts();
 
     expect(accounts).toHaveLength(4);
