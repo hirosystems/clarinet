@@ -1173,3 +1173,23 @@ pub fn is_in_reward_phase(
 fn compute_btc_address(_public_key: &PublicKey, _network: &BitcoinNetwork) -> String {
     "__not_implemented__".to_string()
 }
+
+#[cfg(test)]
+mod tests {
+    use clarity_repl::repl::DEFAULT_EPOCH;
+
+    use crate::{DEFAULT_STACKS_NODE_IMAGE, DEFAULT_STACKS_SIGNER_IMAGE};
+
+    #[test]
+    fn test_default_stacks_docker_images_version() {
+        let epoch = DEFAULT_EPOCH.to_string();
+
+        assert!(
+            DEFAULT_STACKS_NODE_IMAGE.starts_with(epoch.as_str()),
+            "The defautl Stacks node image {DEFAULT_STACKS_NODE_IMAGE} does not start with {epoch}"
+        );
+        assert!(DEFAULT_STACKS_SIGNER_IMAGE.starts_with(epoch.as_str()),
+            "The defautl Stacks signer image {DEFAULT_STACKS_SIGNER_IMAGE} does not start with {epoch}"
+        );
+    }
+}

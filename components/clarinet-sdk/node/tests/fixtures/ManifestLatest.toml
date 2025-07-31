@@ -1,0 +1,21 @@
+[project]
+name = 'fixtures'
+description = 'test setting epoch to "latest"'
+telemetry = false
+cache_dir = './.cache'
+requirements = []
+
+[contracts.multiplier-trait]
+path = 'contracts/multiplier-trait.clar'
+clarity_version = 2
+epoch = 2.4
+
+[contracts.multiplier-contract]
+path = 'contracts/multiplier-contract.clar'
+clarity_version = 2
+epoch = 2.4
+
+[contracts.counter]
+path = 'contracts/counter.clar'
+clarity_version = 2
+epoch = "latest"
