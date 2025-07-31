@@ -2,6 +2,7 @@
 
 ##### New Features
 
+- Set epoch 3.2 height (#1944) (a6231c6f)
 - Add support for epoch 3.2 and remove clarity wasm (#1932) (69dd1846)
 - Allow mainnet dev wallets in mxs (#1942) (03b04e61)
 - Allow 'latest' as epoch and default on new contracts (#1927) (c176840b)
