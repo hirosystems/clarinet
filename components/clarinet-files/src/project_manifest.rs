@@ -227,6 +227,51 @@ impl ProjectManifest {
         )
     }
 
+    // process a contract and add it to the configuration
+    fn register_contract(
+        contract_name: &str,
+        contract_path: &str,
+        deployer: ContractDeployer,
+        epoch: Option<&str>,
+        clarity_version: Option<&str>,
+        project_root_location: &FileLocation,
+        config_contracts: &mut BTreeMap<String, ClarityContract>,
+        contracts_settings: &mut HashMap<FileLocation, ClarityContractMetadata>,
+    ) -> Result<(), String> {
+        let code_source = match PathBuf::from_str(contract_path) {
+            Ok(path) => ClarityCodeSource::ContractOnDisk(path),
+            Err(e) => return Err(format!("unable to parse path {contract_path} ({e})")),
+        };
+
+        let (parsed_epoch, parsed_clarity_version) =
+            get_epoch_and_clarity_version(epoch, clarity_version)?;
+
+        config_contracts.insert(
+            contract_name.to_string(),
+            ClarityContract {
+                name: contract_name.to_string(),
+                deployer: deployer.clone(),
+                code_source,
+                clarity_version: parsed_clarity_version,
+                epoch: clarity_repl::repl::Epoch::Specific(parsed_epoch),
+            },
+        );
+
+        let mut contract_location = project_root_location.clone();
+        contract_location.append_path(contract_path)?;
+        contracts_settings.insert(
+            contract_location,
+            ClarityContractMetadata {
+                name: contract_name.to_string(),
+                deployer,
+                clarity_version: parsed_clarity_version,
+                epoch: parsed_epoch,
+            },
+        );
+
+        Ok(())
+    }
+
     pub fn from_project_manifest_file(
         project_manifest_file: ProjectManifestFile,
         manifest_location: &FileLocation,
@@ -336,12 +381,7 @@ impl ProjectManifest {
                     else {
                         continue;
                     };
-                    let code_source = match PathBuf::from_str(contract_path) {
-                        Ok(path) => ClarityCodeSource::ContractOnDisk(path),
-                        Err(e) => {
-                            return Err(format!("unable to parse path {contract_path} ({e})"))
-                        }
-                    };
+
                     let deployer = match contract_settings.get("deployer") {
                         Some(TomlValue::String(path)) => {
                             ContractDeployer::LabeledDeployer(path.clone())
@@ -368,38 +408,36 @@ impl ProjectManifest {
                         _ => return Err(INVALID_CLARITY_VERSION.into()),
                     };
 
-                    let (epoch, clarity_version) = get_epoch_and_clarity_version(
+                    ProjectManifest::register_contract(
+                        contract_name,
+                        contract_path,
+                        deployer,
                         parsed_epoch.as_deref(),
                         parsed_clarity_version.as_deref(),
+                        &project_root_location,
+                        &mut config_contracts,
+                        &mut contracts_settings,
                     )?;
-
-                    config_contracts.insert(
-                        contract_name.to_string(),
-                        ClarityContract {
-                            name: contract_name.to_string(),
-                            deployer: deployer.clone(),
-                            code_source,
-                            clarity_version,
-                            epoch: clarity_repl::repl::Epoch::Specific(epoch),
-                        },
-                    );
-
-                    let mut contract_location = project_root_location.clone();
-                    contract_location.append_path(contract_path)?;
-                    contracts_settings.insert(
-                        contract_location,
-                        ClarityContractMetadata {
-                            name: contract_name.to_string(),
-                            deployer,
-                            clarity_version,
-                            epoch,
-                        },
-                    );
                 }
             }
         };
         config.contracts = config_contracts;
         config.contracts_settings = contracts_settings;
+
+        // Process custom-boot-contracts and add them to contracts_settings
+        for (contract_name, contract_path) in config.project.override_boot_contracts_source.iter() {
+            ProjectManifest::register_contract(
+                contract_name,
+                contract_path,
+                ContractDeployer::DefaultDeployer,
+                None,
+                None,
+                &project_root_location,
+                &mut config.contracts,
+                &mut config.contracts_settings,
+            )?;
+        }
+
         config.project.requirements = Some(config_requirements);
         Ok(config)
     }
@@ -633,5 +671,39 @@ mod tests {
             manifest.project.override_boot_contracts_source.get("pox-x"),
             None
         );
+    }
+
+    #[test]
+    fn test_custom_boot_contracts_in_contracts_settings() {
+        let manifest_toml = toml! {
+            [project]
+            name = "test-project"
+            telemetry = false
+            [project.override_boot_contracts_source]
+            "pox-4" = "./custom-boot-contracts/pox-4.clar"
+        };
+        let manifest_file: ProjectManifestFile = manifest_toml.clone().try_into().unwrap();
+        let location = FileLocation::from_path("/tmp/clarinet.toml".into());
+
+        let manifest =
+            ProjectManifest::from_project_manifest_file(manifest_file, &location, false).unwrap();
+
+        // Verify that custom boot contracts are added to contracts_settings
+        assert_eq!(manifest.contracts_settings.len(), 1);
+
+        // Check that the contract locations are properly constructed
+        let mut expected_pox4_location = FileLocation::from_path("/tmp".into());
+        expected_pox4_location
+            .append_path("custom-boot-contracts/pox-4.clar")
+            .unwrap();
+
+        // Verify pox-4 contract is in contracts_settings
+        let pox4_metadata = manifest.contracts_settings.get(&expected_pox4_location);
+        assert!(pox4_metadata.is_some());
+        assert_eq!(pox4_metadata.unwrap().name, "pox-4");
+
+        // Verify that contracts are also added to the contracts map
+        assert_eq!(manifest.contracts.len(), 1);
+        assert!(manifest.contracts.contains_key("pox-4"));
     }
 }
