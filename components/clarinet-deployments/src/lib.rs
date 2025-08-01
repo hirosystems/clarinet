@@ -1184,18 +1184,23 @@ pub async fn generate_default_deployment_with_boot_contracts(
                     .iter()
                     .map(|d| format!("  - {}", d.message))
                     .collect();
-                error_messages.push(format!(
-                    "'{}' has validation errors:\n{}",
-                    contract_name,
-                    error_details.join("\n")
-                ));
+                if manifest
+                    .project
+                    .override_boot_contracts_source
+                    .contains_key(&contract_name)
+                {
+                    error_messages.push(format!(
+                        "Custom boot contract validation failed:\n{}",
+                        error_messages.join("\n\n")
+                    ));
+                } else {
+                    error_messages.push(format!(
+                        "'{}' has validation errors:\n{}",
+                        contract_name,
+                        error_details.join("\n")
+                    ));
+                }
             }
-        }
-        if !error_messages.is_empty() {
-            return Err(format!(
-                "Custom boot contract validation failed:\n{}",
-                error_messages.join("\n\n")
-            ));
         }
     }
 
