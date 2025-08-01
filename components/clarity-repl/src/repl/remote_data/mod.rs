@@ -3,11 +3,13 @@ use clarity::types::chainstate::{
 };
 use clarity::types::StacksEpochId;
 use clarity::vm::errors::InterpreterResult;
+use clarity::vm::types::QualifiedContractIdentifier;
 use serde::de::{DeserializeOwned, Error as SerdeError};
 use serde::{Deserialize, Deserializer};
 
 use crate::repl::settings::ApiUrl;
 
+pub mod context;
 pub mod fs;
 mod http_request;
 pub const MAINNET_20_START_HEIGHT: u32 = 1;
@@ -92,6 +94,12 @@ fn epoch_for_testnet_height(height: u32) -> StacksEpochId {
 #[derive(Deserialize)]
 pub struct ClarityDataResponse {
     pub data: String,
+}
+
+#[derive(Deserialize)]
+pub struct ContractSource {
+    pub source: String,
+    pub publish_height: u32,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -222,6 +230,16 @@ impl HttpClient {
             Ok(data) => Ok(Some(data.data.trim_start_matches("0x").to_string())),
             Err(_) => Ok(None),
         }
+    }
+
+    pub fn fetch_contract(
+        &self,
+        contract: &QualifiedContractIdentifier,
+    ) -> Result<ContractSource, String> {
+        self.get::<ContractSource>(&format!(
+            "/v2/contracts/source/{}/{}?proof=false",
+            contract.issuer, contract.name
+        ))
     }
 }
 #[cfg(test)]
