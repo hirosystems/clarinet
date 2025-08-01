@@ -1,26 +1,20 @@
 use clarity::vm::contexts::GlobalContext;
+use clarity::vm::costs::MemoryConsumer;
 use clarity::vm::database::{
     DataMapMetadata, DataVariableMetadata, FungibleTokenMetadata, NonFungibleTokenMetadata,
 };
 use clarity::vm::errors::InterpreterResult as Result;
 use clarity::vm::functions::define::DefineResult;
 use clarity::vm::types::PrincipalData;
-use clarity::vm::{
-    eval, functions, CallStack, ContractContext, Environment, LocalContext, SymbolicExpression,
-    Value,
-};
+use clarity::vm::{functions, CallStack, ContractContext, Environment, SymbolicExpression};
 
 #[allow(clippy::result_large_err)]
 pub fn set_contract_context(
     expressions: &[SymbolicExpression],
     contract_context: &mut ContractContext,
     global_context: &mut GlobalContext,
-) -> Result<Option<Value>> {
-    let mut last_executed = None;
-    let context = LocalContext::new();
-
-    // todo: should set contract_context.data_size?
-
+) -> Result<()> {
+    let mut total_memory_use = 0;
     let publisher: PrincipalData = contract_context.contract_identifier.issuer.clone().into();
 
     for exp in expressions {
@@ -38,6 +32,8 @@ pub fn set_contract_context(
         })?;
         match try_define {
             DefineResult::Variable(name, value) => {
+                let value_memory_use = value.get_memory_use()?;
+                total_memory_use += value_memory_use;
                 contract_context.variables.insert(name, value);
             }
             DefineResult::Function(name, value) => {
@@ -75,26 +71,11 @@ pub fn set_contract_context(
             DefineResult::ImplTrait(trait_identifier) => {
                 contract_context.implemented_traits.insert(trait_identifier);
             }
-            DefineResult::NoDefine => {
-                // not a define function, evaluate normally.
-                global_context.execute(|global_context| {
-                    let mut call_stack = CallStack::new();
-                    let mut env = Environment::new(
-                        global_context,
-                        contract_context,
-                        &mut call_stack,
-                        Some(publisher.clone()),
-                        Some(publisher.clone()),
-                        None,
-                    );
-
-                    let result = eval(exp, &mut env, &context)?;
-                    last_executed = Some(result);
-                    Ok(())
-                })?;
-            }
+            DefineResult::NoDefine => {}
         }
     }
 
-    Ok(last_executed)
+    contract_context.data_size = total_memory_use;
+
+    Ok(())
 }
