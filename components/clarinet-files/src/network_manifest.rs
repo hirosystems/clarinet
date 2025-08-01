@@ -1186,10 +1186,10 @@ mod tests {
 
         assert!(
             DEFAULT_STACKS_NODE_IMAGE.starts_with(epoch.as_str()),
-            "The defautl Stacks node image {DEFAULT_STACKS_NODE_IMAGE} does not start with {epoch}"
+            "The default Stacks node image {DEFAULT_STACKS_NODE_IMAGE} does not start with {epoch}"
         );
         assert!(DEFAULT_STACKS_SIGNER_IMAGE.starts_with(epoch.as_str()),
-            "The defautl Stacks signer image {DEFAULT_STACKS_SIGNER_IMAGE} does not start with {epoch}"
+            "The default Stacks signer image {DEFAULT_STACKS_SIGNER_IMAGE} does not start with {epoch}"
         );
     }
 }
