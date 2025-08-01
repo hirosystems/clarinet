@@ -409,7 +409,6 @@ impl ClarityDatastore {
             .ok_or(InterpreterError::Expect(format!(
                 "No analysis metadata found for contract: {contract_id}",
             )))?;
-
         let analysis = serde_json::from_str::<ContractAnalysis>(&analysis_str)
             .map_err(|e| InterpreterError::Expect(format!("Failed to parse analysis: {e}")))?;
 
@@ -447,16 +446,18 @@ impl ClarityDatastore {
         // )?;
 
         // option 3
-        // directly call vm::contracts::Contract
-        // probable suffer the same issue as option 2
-        // ContractContextResponse::initialize_from_ast(
-        //     contract_id.clone(),
-        //     &contract_ast,
-        //     None,
-        //     &mut global_context,
-        //     analysis.clarity_version,
-        // )
-        // .map_err(|e| InterpreterError::Expect(format!("Failed to initialize contract: {e}")))?;
+        // directly call vm::contracts::Contract, same issue as option 2
+        // global_context.execute(|g| {
+        //     ContractContextResponse::initialize_from_ast(
+        //         contract_id.clone(),
+        //         &contract_ast,
+        //         None,
+        //         g,
+        //         analysis.clarity_version,
+        //     )
+        //     .map_err(|e| InterpreterError::Expect(format!("Failed to initialize contract: {e}")))?;
+        //     Ok(())
+        // })?;
 
         Ok(contract_context)
     }
@@ -652,6 +653,7 @@ impl ClarityBackingStore for ClarityDatastore {
         key: &str,
         value: &str,
     ) -> Result<()> {
+        println!("insert_metadata({contract}, {key})");
         self.metadata
             .insert((contract.to_string(), key.to_string()), value.to_string());
         Ok(())
@@ -662,6 +664,7 @@ impl ClarityBackingStore for ClarityDatastore {
         contract: &QualifiedContractIdentifier,
         key: &str,
     ) -> Result<Option<String>> {
+        println!("get_metadata({contract}, {key})");
         let metadata = self.metadata.get(&(contract.to_string(), key.to_string()));
         if metadata.is_some() {
             return Ok(metadata.cloned());
