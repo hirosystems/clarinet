@@ -641,7 +641,6 @@ impl ClarityBackingStore for ClarityDatastore {
         key: &str,
         value: &str,
     ) -> Result<()> {
-        println!("insert_metadata({contract}, {key})");
         self.metadata
             .insert((contract.to_string(), key.to_string()), value.to_string());
         Ok(())
@@ -652,7 +651,6 @@ impl ClarityBackingStore for ClarityDatastore {
         contract: &QualifiedContractIdentifier,
         key: &str,
     ) -> Result<Option<String>> {
-        println!("get_metadata({contract}, {key})");
         let metadata = self.metadata.get(&(contract.to_string(), key.to_string()));
         if metadata.is_some() {
             return Ok(metadata.cloned());
