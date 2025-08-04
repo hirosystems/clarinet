@@ -392,6 +392,8 @@ fn get_epoch_and_clarity_version(
 
     let epoch = match settings_epoch {
         None => StacksEpochId::Epoch2_05, // Keep the existing default unchanged
+        // The "latest" epoch means the current epoch that is running on mainnet
+        // Which can differ from `StacksEpochId::latest()` if it hasn't been activated yet
         Some("latest") => DEFAULT_EPOCH,
         Some(epoch) => match epoch {
             "2" | "2.0" => StacksEpochId::Epoch20,
