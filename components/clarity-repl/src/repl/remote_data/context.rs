@@ -9,7 +9,6 @@ use clarity::vm::errors::{CheckErrors, InterpreterResult as Result};
 use clarity::vm::functions::define::DefineFunctionsParsed;
 use clarity::vm::types::{parse_name_type_pairs, TypeSignature};
 use clarity::vm::{analysis, ClarityName, ContractContext, SymbolicExpression, Value};
-use reqwest::dns::Name;
 
 #[allow(clippy::result_large_err)]
 fn handle_function(
