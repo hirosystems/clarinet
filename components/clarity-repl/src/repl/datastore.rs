@@ -441,6 +441,7 @@ impl ClarityDatastore {
         contract_context.data_size = contract_size;
 
         context::set_contract_context(
+            &analysis,
             &contract_ast.expressions,
             &mut contract_context,
             &mut global_context,
