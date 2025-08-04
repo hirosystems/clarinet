@@ -8,7 +8,8 @@ use clarity::vm::database::{
 use clarity::vm::errors::{CheckErrors, InterpreterResult as Result};
 use clarity::vm::functions::define::DefineFunctionsParsed;
 use clarity::vm::types::{parse_name_type_pairs, TypeSignature};
-use clarity::vm::{ClarityName, ContractContext, SymbolicExpression, Value};
+use clarity::vm::{analysis, ClarityName, ContractContext, SymbolicExpression, Value};
+use reqwest::dns::Name;
 
 #[allow(clippy::result_large_err)]
 fn handle_function(
@@ -36,6 +37,7 @@ fn handle_function(
 // that doesn't evaluate the expressions, but only gets the types
 #[allow(clippy::result_large_err)]
 pub fn set_contract_context(
+    analysis: &analysis::ContractAnalysis,
     expressions: &[SymbolicExpression],
     contract_context: &mut ContractContext,
     global_context: &mut GlobalContext,
@@ -53,24 +55,26 @@ pub fn set_contract_context(
                         .variables
                         .insert(name.clone(), Value::none());
                 }
-                DefineFunctionsParsed::PersistedVariable {
-                    name, data_type, ..
-                } => {
+                DefineFunctionsParsed::PersistedVariable { name, .. } => {
                     contract_context.persisted_names.insert(name.clone());
-                    let value_type = TypeSignature::parse_type_repr(epoch, data_type, &mut ct)?;
-                    let variable_data = DataVariableMetadata { value_type };
+                    let value_type = analysis
+                        .get_persisted_variable_type(name)
+                        .ok_or(CheckErrors::Expects(format!(
+                            "Failed to get {name} value type"
+                        )))?
+                        .clone();
                     contract_context
                         .meta_data_var
-                        .insert(name.clone(), variable_data);
+                        .insert(name.clone(), DataVariableMetadata { value_type });
                 }
-                DefineFunctionsParsed::Map {
-                    name,
-                    key_type,
-                    value_type,
-                } => {
+                DefineFunctionsParsed::Map { name, .. } => {
                     contract_context.persisted_names.insert(name.clone());
-                    let key_type = TypeSignature::parse_type_repr(epoch, key_type, &mut ct)?;
-                    let value_type = TypeSignature::parse_type_repr(epoch, value_type, &mut ct)?;
+                    let (key_type, value_type) = analysis
+                        .get_map_type(name)
+                        .ok_or(CheckErrors::Expects(format!(
+                            "Failed to get {name} map type"
+                        )))?
+                        .clone();
                     contract_context.meta_data_map.insert(
                         name.clone(),
                         DataMapMetadata {
@@ -125,13 +129,13 @@ pub fn set_contract_context(
                     let data_type = FungibleTokenMetadata { total_supply: None };
                     contract_context.meta_ft.insert(name.clone(), data_type);
                 }
-                DefineFunctionsParsed::Trait { name, functions } => {
-                    let trait_signature = TypeSignature::parse_trait_type_repr(
-                        functions,
-                        &mut ct,
-                        epoch,
-                        *contract_context.get_clarity_version(),
-                    )?;
+                DefineFunctionsParsed::Trait { name, .. } => {
+                    let trait_signature = analysis
+                        .get_defined_trait(name)
+                        .ok_or(CheckErrors::Expects(format!(
+                            "Failed to get trait {name} signature"
+                        )))?
+                        .clone();
                     contract_context
                         .defined_traits
                         .insert(name.clone(), trait_signature);
