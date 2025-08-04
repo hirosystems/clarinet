@@ -32,6 +32,8 @@ fn handle_function(
     ))
 }
 
+// this is a simplified version of `clarity::vm::eval_all`
+// that doesn't evaluate the expressions, but only gets the types
 #[allow(clippy::result_large_err)]
 pub fn set_contract_context(
     expressions: &[SymbolicExpression],
