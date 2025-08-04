@@ -402,8 +402,6 @@ impl ClarityDatastore {
             InterpreterError::Expect(format!("Failed to fetch contract source: {e}"))
         })?;
 
-        // when this is called, the "analysis" should have already been fetched
-        // and will be returned from the cache
         let analysis_str = self
             .get_metadata(contract_id, AnalysisDatabase::storage_key())?
             .ok_or(InterpreterError::Expect(format!(
@@ -411,6 +409,19 @@ impl ClarityDatastore {
             )))?;
         let analysis = serde_json::from_str::<ContractAnalysis>(&analysis_str)
             .map_err(|e| InterpreterError::Expect(format!("Failed to parse analysis: {e}")))?;
+
+        let contract_size_key_str = ClarityDatabase::make_metadata_key(
+            StoreType::Contract,
+            ContractDataVarName::ContractSize.as_str(),
+        );
+        let contract_size_str = self
+            .get_metadata(contract_id, &contract_size_key_str)?
+            .ok_or(InterpreterError::Expect(format!(
+                "No contract size metadata found for contract: {contract_id}",
+            )))?;
+        let contract_size: u64 = contract_size_str
+            .parse()
+            .map_err(|e| InterpreterError::Expect(format!("Failed to parse contract size: {e}")))?;
 
         let contract_ast = build_ast_with_rules(
             contract_id,
@@ -427,37 +438,13 @@ impl ClarityDatastore {
             GlobalContext::new(true, network_id, database, cost_tracker, analysis.epoch);
         let mut contract_context =
             ContractContext::new(contract_id.clone(), analysis.clarity_version);
+        contract_context.data_size = contract_size;
 
-        // option 1: custom set_contract_context (eval_all re-implemented)
         context::set_contract_context(
             &contract_ast.expressions,
             &mut contract_context,
             &mut global_context,
         )?;
-
-        // option 2: call eval_all directly
-        // doesn't "just work"™
-        // values seems to conflict in the datastore
-        // let r = eval_all(
-        //     &contract_ast.expressions,
-        //     &mut contract_context,
-        //     &mut global_context,
-        //     None,
-        // )?;
-
-        // option 3
-        // directly call vm::contracts::Contract, same issue as option 2
-        // global_context.execute(|g| {
-        //     ContractContextResponse::initialize_from_ast(
-        //         contract_id.clone(),
-        //         &contract_ast,
-        //         None,
-        //         g,
-        //         analysis.clarity_version,
-        //     )
-        //     .map_err(|e| InterpreterError::Expect(format!("Failed to initialize contract: {e}")))?;
-        //     Ok(())
-        // })?;
 
         Ok(contract_context)
     }
