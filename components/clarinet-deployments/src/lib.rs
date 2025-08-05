@@ -557,31 +557,7 @@ pub async fn generate_default_deployment_with_boot_contracts(
             }
 
             // Get the configured path for this custom boot contract, or use default path
-            let contract_path = manifest
-                .project
-                .override_boot_contracts_source
-                .get(contract_name)
-                .map(|path| {
-                    // If the path is relative, make it relative to the project root
-                    if path.starts_with("./") || path.starts_with("../") {
-                        let mut full_path = base_location.clone();
-                        full_path
-                            .append_path(path.trim_start_matches("./").trim_start_matches("../"))?;
-                        Ok(full_path)
-                    } else {
-                        // Assume absolute path
-                        FileLocation::from_path_string(path)
-                    }
-                })
-                .transpose()?
-                .unwrap_or_else(|| {
-                    // Default fallback path
-                    let mut default_path = base_location.clone();
-                    default_path
-                        .append_path(&format!("custom-boot-contracts/{contract_name}.clar"))
-                        .unwrap();
-                    default_path
-                });
+            let contract_path = get_boot_contract_path(manifest, contract_name, &base_location)?;
 
             // Load the additional boot contract source
             let source = match file_accessor {
@@ -1189,6 +1165,40 @@ fn add_transaction_to_epoch(
         }
     };
     epoch_transactions.push(transaction);
+}
+
+/// Get the configured path for a custom boot contract, or use default path
+fn get_boot_contract_path(
+    manifest: &ProjectManifest,
+    contract_name: &str,
+    base_location: &FileLocation,
+) -> Result<FileLocation, String> {
+    // Check if there's a configured path for this boot contract
+    if let Some(configured_path) = manifest
+        .project
+        .override_boot_contracts_source
+        .get(contract_name)
+    {
+        let configured_location = FileLocation::try_parse(configured_path, Some(base_location))
+            .ok_or_else(|| {
+                format!("Invalid path for boot contract '{contract_name}': {configured_path}")
+            })?;
+
+        // Check if the configured path exists
+        if !configured_location.exists() {
+            eprintln!("Warning: Boot contract '{contract_name}' is configured at '{configured_path}' but the file does not exist.");
+            return Err(format!(
+                "Boot contract '{contract_name}' not found at configured location: {configured_path}"
+            ));
+        }
+
+        Ok(configured_location)
+    } else {
+        // No configured path specified
+        Err(format!(
+            "No path configured for boot contract '{contract_name}'"
+        ))
+    }
 }
 
 pub fn get_default_deployment_path(
