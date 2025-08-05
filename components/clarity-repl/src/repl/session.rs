@@ -48,8 +48,7 @@ pub struct Session {
     pub interpreter: ClarityInterpreter,
     pub show_costs: bool,
     pub executed: Vec<String>,
-    // api_reference: HashMap<String, String>,
-    // keywords_reference: HashMap<String, String>,
+
     coverage_hook: Option<CoverageHook>,
     logger_hook: Option<LoggerHook>,
 }
@@ -75,8 +74,7 @@ impl Session {
             show_costs: false,
             settings,
             executed: Vec::new(),
-            // api_reference: build_api_reference(),
-            // keywords_reference: clarity_keywords(),
+
             coverage_hook: None,
             logger_hook: None,
         }
