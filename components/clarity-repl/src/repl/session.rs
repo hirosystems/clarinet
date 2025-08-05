@@ -193,6 +193,8 @@ impl Session {
             #[cfg(not(target_arch = "wasm32"))]
             cmd if cmd.starts_with("::trace") => self.trace(&mut output, cmd),
             #[cfg(not(target_arch = "wasm32"))]
+            cmd if cmd.starts_with("::perf") => self.perf(&mut output, cmd),
+            #[cfg(not(target_arch = "wasm32"))]
             cmd if cmd.starts_with("::get_costs") => self.get_costs(&mut output, cmd),
 
             cmd if cmd.starts_with("::") => {
@@ -413,6 +415,28 @@ impl Session {
         let mut tracer = TracerHook::new(snippet.to_string());
 
         match self.eval_with_hooks(snippet.to_string(), Some(vec![&mut tracer]), false) {
+            Ok(_) => (),
+            Err(diagnostics) => {
+                let lines = snippet.lines();
+                let formatted_lines: Vec<String> = lines.map(|l| l.to_string()).collect();
+                for d in diagnostics {
+                    output.append(&mut output_diagnostic(&d, "<snippet>", &formatted_lines));
+                }
+            }
+        };
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn perf(&mut self, output: &mut Vec<String>, cmd: &str) {
+        use super::hooks::perf::PerfHook;
+
+        let Some((_, snippet)) = cmd.split_once(' ') else {
+            return output.push("Usage: ::perf <expr>".red().to_string());
+        };
+
+        let mut perf = PerfHook::new();
+
+        match self.eval_with_hooks(snippet.to_string(), Some(vec![&mut perf]), true) {
             Ok(_) => (),
             Err(diagnostics) => {
                 let lines = snippet.lines();
