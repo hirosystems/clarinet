@@ -5,6 +5,7 @@ extern crate serde_derive;
 
 pub mod clarinetrc;
 
+#[cfg(not(target_arch = "wasm32"))]
 pub mod devnet_diff;
 mod network_manifest;
 mod project_manifest;
