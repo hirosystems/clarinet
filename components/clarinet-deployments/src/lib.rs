@@ -523,27 +523,6 @@ pub async fn generate_default_deployment_with_boot_contracts(
 
             let (_, diagnostics, ast_success) = session.interpreter.build_ast(&temp_contract);
 
-            // Try to deploy the contract to catch any runtime errors that build_ast might miss
-            let deploy_result = session.deploy_contract(&temp_contract, false, None);
-            match deploy_result {
-                Ok(_) => {
-                    // Deployment succeeded, continue with AST validation
-                }
-                Err(deploy_errors) => {
-                    // Collect deployment errors instead of returning immediately
-                    contract_diags.insert(
-                        QualifiedContractIdentifier::new(
-                            default_deployer_address.clone(),
-                            ContractName::try_from(contract_name.clone())
-                                .unwrap_or_else(|_| ContractName::from("unknown")),
-                        ),
-                        deploy_errors,
-                    );
-                    asts_success = false;
-                    continue;
-                }
-            }
-
             // Collect AST diagnostics instead of returning immediately
             if !ast_success {
                 contract_diags.insert(
@@ -577,7 +556,7 @@ pub async fn generate_default_deployment_with_boot_contracts(
                 continue;
             }
 
-            // Get the configured path for this boot contract, or use default path
+            // Get the configured path for this custom boot contract, or use default path
             let contract_path = manifest
                 .project
                 .override_boot_contracts_source
@@ -619,26 +598,6 @@ pub async fn generate_default_deployment_with_boot_contracts(
                         .clone()
                 }
             };
-
-            let mut session = Session::new(settings.clone());
-            let (epoch, _clarity_version) = match contract_name.as_str() {
-                "pox-4" | "signers" | "signers-voting" => {
-                    (StacksEpochId::Epoch25, ClarityVersion::Clarity2)
-                }
-                "pox-3" => (StacksEpochId::Epoch24, ClarityVersion::Clarity2),
-                "pox-2" | "costs-3" => (StacksEpochId::Epoch21, ClarityVersion::Clarity2),
-                "costs-2" => (StacksEpochId::Epoch2_05, ClarityVersion::Clarity1),
-                "genesis" | "lockup" | "bns" | "cost-voting" | "costs" | "pox" => {
-                    (StacksEpochId::Epoch20, ClarityVersion::Clarity1)
-                }
-                _ => {
-                    return Err(format!(
-                        "Unknown boot contract '{contract_name}' - cannot validate"
-                    ));
-                }
-            };
-            // Set the session to the correct epoch for validation
-            session.update_epoch(epoch);
 
             // Create contract ID for the additional boot contract
             let contract_id = QualifiedContractIdentifier::new(
