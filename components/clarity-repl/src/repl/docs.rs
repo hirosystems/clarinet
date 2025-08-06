@@ -42,7 +42,6 @@ fn clarity_keywords() -> HashMap<String, String> {
             let doc = format!("Description\n{}\n\nExamples\n{}", description, key.example);
             (key.name.to_string(), doc)
         })
-        })
         .collect()
 }
 
