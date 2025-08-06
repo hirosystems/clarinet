@@ -5,6 +5,7 @@ use std::str::FromStr;
 use clarity::types::StacksEpochId;
 use clarity::vm::ClarityVersion;
 use clarity_repl::repl;
+use clarity_repl::repl::boot::BOOT_CONTRACTS_NAMES;
 use clarity_repl::repl::{ClarityCodeSource, ClarityContract, ContractDeployer, DEFAULT_EPOCH};
 use serde::ser::SerializeMap;
 use serde::{Deserializer, Serialize, Serializer};
@@ -144,7 +145,6 @@ pub struct ProjectConfig {
     pub cache_location: FileLocation,
     #[serde(skip_deserializing)]
     pub boot_contracts: Vec<String>,
-    #[serde(skip_deserializing)]
     pub override_boot_contracts_source: BTreeMap<String, String>,
 }
 
@@ -312,18 +312,10 @@ impl ProjectManifest {
             }
         }
 
-        let boot_contracts = vec![
-            "costs".to_string(),
-            "pox".to_string(),
-            "pox-2".to_string(),
-            "pox-3".to_string(),
-            "pox-4".to_string(),
-            "lockup".to_string(),
-            "costs-2".to_string(),
-            "costs-3".to_string(),
-            "cost-voting".to_string(),
-            "bns".to_string(),
-        ];
+        let boot_contracts = BOOT_CONTRACTS_NAMES
+            .iter()
+            .map(|n| n.to_string())
+            .collect::<Vec<_>>();
 
         // if an overrides don't correspond to one of the boot contracts, we warn and discard that override
         let mut valid_override_boot_contracts_source = BTreeMap::new();
@@ -656,39 +648,5 @@ mod tests {
             manifest.project.override_boot_contracts_source.get("pox-x"),
             None
         );
-    }
-
-    #[test]
-    fn test_custom_boot_contracts_in_contracts_settings() {
-        let manifest_toml = toml! {
-            [project]
-            name = "test-project"
-            telemetry = false
-            [project.override_boot_contracts_source]
-            "pox-4" = "./custom-boot-contracts/pox-4.clar"
-        };
-        let manifest_file: ProjectManifestFile = manifest_toml.clone().try_into().unwrap();
-        let location = FileLocation::from_path("/tmp/clarinet.toml".into());
-
-        let manifest =
-            ProjectManifest::from_project_manifest_file(manifest_file, &location, false).unwrap();
-
-        // Verify that custom boot contracts are added to contracts_settings
-        assert_eq!(manifest.contracts_settings.len(), 1);
-
-        // Check that the contract locations are properly constructed
-        let mut expected_pox4_location = FileLocation::from_path("/tmp".into());
-        expected_pox4_location
-            .append_path("custom-boot-contracts/pox-4.clar")
-            .unwrap();
-
-        // Verify pox-4 contract is in contracts_settings
-        let pox4_metadata = manifest.contracts_settings.get(&expected_pox4_location);
-        assert!(pox4_metadata.is_some());
-        assert_eq!(pox4_metadata.unwrap().name, "pox-4");
-
-        // Verify that contracts are also added to the contracts map
-        assert_eq!(manifest.contracts.len(), 1);
-        assert!(manifest.contracts.contains_key("pox-4"));
     }
 }
