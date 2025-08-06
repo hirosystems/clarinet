@@ -423,21 +423,6 @@ impl ProjectManifest {
         };
         config.contracts = config_contracts;
         config.contracts_settings = contracts_settings;
-
-        // Process custom-boot-contracts and add them to contracts_settings
-        for (contract_name, contract_path) in config.project.override_boot_contracts_source.iter() {
-            ProjectManifest::register_contract(
-                contract_name,
-                contract_path,
-                ContractDeployer::DefaultDeployer,
-                None,
-                None,
-                &project_root_location,
-                &mut config.contracts,
-                &mut config.contracts_settings,
-            )?;
-        }
-
         config.project.requirements = Some(config_requirements);
         Ok(config)
     }
