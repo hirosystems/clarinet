@@ -172,19 +172,11 @@ pub static BOOT_CONTRACTS_DATA: LazyLock<
     );
     for (deployer, boot_code) in deploy.iter() {
         for (name, code) in boot_code.iter() {
-            let (epoch, clarity_version) = match *name {
-                "pox-4" | "signers" | "signers-voting" => {
-                    (StacksEpochId::Epoch25, ClarityVersion::Clarity2)
-                }
-                "pox-3" => (StacksEpochId::Epoch24, ClarityVersion::Clarity2),
-                "pox-2" | "costs-3" => (StacksEpochId::Epoch21, ClarityVersion::Clarity2),
-                "costs-2" => (StacksEpochId::Epoch2_05, ClarityVersion::Clarity1),
-                "genesis" | "lockup" | "bns" | "cost-voting" | "costs" | "pox" => {
+            let (epoch, clarity_version) = get_boot_contract_epoch_and_clarity_version(name)
+                .unwrap_or({
+                    // Fallback to default epoch and clarity version for unknown contracts
                     (StacksEpochId::Epoch20, ClarityVersion::Clarity1)
-                }
-                _ => panic!("Unknown boot contract: {}", name),
-            };
-
+                });
             let boot_contract = ClarityContract {
                 code_source: ClarityCodeSource::ContractInMemory(code.to_string()),
                 deployer: ContractDeployer::Address(deployer.to_address()),
@@ -236,21 +228,14 @@ pub fn get_boot_contracts_data_with_overrides(
         };
 
         // Use standard epoch/version mapping for known boot contracts
-        let (epoch, clarity_version) = match contract_name.as_str() {
-            "pox-4" | "signers" | "signers-voting" => {
-                (StacksEpochId::Epoch25, ClarityVersion::Clarity2)
-            }
-            "pox-3" => (StacksEpochId::Epoch24, ClarityVersion::Clarity2),
-            "pox-2" | "costs-3" => (StacksEpochId::Epoch21, ClarityVersion::Clarity2),
-            "costs-2" => (StacksEpochId::Epoch2_05, ClarityVersion::Clarity1),
-            "genesis" | "lockup" | "bns" | "cost-voting" | "costs" | "pox" => {
-                (StacksEpochId::Epoch20, ClarityVersion::Clarity1)
-            }
-            _ => {
-                eprintln!("Warning: Unknown boot contract '{contract_name}' - skipping");
-                continue;
-            }
-        };
+        let (epoch, clarity_version) = get_boot_contract_epoch_and_clarity_version(
+            contract_name.as_str(),
+        )
+        .unwrap_or_else(|e| {
+            eprintln!("Warning: Failed to get epoch/clarity version for {contract_name}: {e}");
+            // Fallback to default epoch and clarity version
+            (StacksEpochId::Epoch20, ClarityVersion::Clarity1)
+        });
 
         // Create contracts for both testnet and mainnet
         for deployer in [&*BOOT_TESTNET_PRINCIPAL, &*BOOT_MAINNET_PRINCIPAL] {
@@ -270,4 +255,26 @@ pub fn get_boot_contracts_data_with_overrides(
         }
     }
     result
+}
+
+pub fn get_boot_contract_epoch_and_clarity_version(
+    contract_name: &str,
+) -> Result<(StacksEpochId, ClarityVersion), String> {
+    let (epoch, clarity_version) = match contract_name {
+        "pox-4" | "signers" | "signers-voting" => {
+            (StacksEpochId::Epoch25, ClarityVersion::Clarity2)
+        }
+        "pox-3" => (StacksEpochId::Epoch24, ClarityVersion::Clarity2),
+        "pox-2" | "costs-3" => (StacksEpochId::Epoch21, ClarityVersion::Clarity2),
+        "costs-2" => (StacksEpochId::Epoch2_05, ClarityVersion::Clarity1),
+        "genesis" | "lockup" | "bns" | "cost-voting" | "costs" | "pox" => {
+            (StacksEpochId::Epoch20, ClarityVersion::Clarity1)
+        }
+        _ => {
+            return Err(format!(
+                "Unknown boot contract '{contract_name}' - cannot validate"
+            ));
+        }
+    };
+    Ok((epoch, clarity_version))
 }

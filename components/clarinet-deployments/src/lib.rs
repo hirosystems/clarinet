@@ -18,16 +18,15 @@ use clarity_repl::clarity::vm::ast::ContractAST;
 use clarity_repl::clarity::vm::diagnostic::Diagnostic;
 use clarity_repl::clarity::vm::types::{PrincipalData, QualifiedContractIdentifier};
 use clarity_repl::clarity::vm::{
-    ClarityVersion, ContractName, EvaluationResult, ExecutionResult, SymbolicExpression,
+    ContractName, EvaluationResult, ExecutionResult, SymbolicExpression,
 };
 use clarity_repl::clarity::StacksEpochId;
 use clarity_repl::repl::boot::{
-    BOOT_CONTRACTS_DATA, SBTC_DEPOSIT_MAINNET_ADDRESS, SBTC_MAINNET_ADDRESS,
-    SBTC_TESTNET_ADDRESS_PRINCIPAL, SBTC_TOKEN_MAINNET_ADDRESS,
+    get_boot_contract_epoch_and_clarity_version, BOOT_CONTRACTS_DATA, SBTC_DEPOSIT_MAINNET_ADDRESS,
+    SBTC_MAINNET_ADDRESS, SBTC_TESTNET_ADDRESS_PRINCIPAL, SBTC_TOKEN_MAINNET_ADDRESS,
 };
 use clarity_repl::repl::{
-    ClarityCodeSource, ClarityContract, ContractDeployer, Session, SessionSettings,
-    DEFAULT_CLARITY_VERSION, DEFAULT_EPOCH,
+    ClarityCodeSource, ClarityContract, ContractDeployer, Session, SessionSettings, DEFAULT_EPOCH,
 };
 use types::{
     ContractPublishSpecification, DeploymentGenerationArtifacts, EmulatedContractCallSpecification,
@@ -491,23 +490,8 @@ pub async fn generate_default_deployment_with_boot_contracts(
                 }
             }?;
 
-            // Use standard epoch/version mapping for known boot contracts
-            let (epoch, clarity_version) = match contract_name.as_str() {
-                "pox-4" | "signers" | "signers-voting" => {
-                    (StacksEpochId::Epoch25, ClarityVersion::Clarity2)
-                }
-                "pox-3" => (StacksEpochId::Epoch24, ClarityVersion::Clarity2),
-                "pox-2" | "costs-3" => (StacksEpochId::Epoch21, ClarityVersion::Clarity2),
-                "costs-2" => (StacksEpochId::Epoch2_05, ClarityVersion::Clarity1),
-                "genesis" | "lockup" | "bns" | "cost-voting" | "costs" | "pox" => {
-                    (StacksEpochId::Epoch20, ClarityVersion::Clarity1)
-                }
-                _ => {
-                    return Err(format!(
-                        "Unknown boot contract '{contract_name}' - cannot validate"
-                    ));
-                }
-            };
+            let (epoch, clarity_version) =
+                get_boot_contract_epoch_and_clarity_version(contract_name.as_str())?;
 
             // Set the session to the correct epoch for validation
             session.update_epoch(epoch);
