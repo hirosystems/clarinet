@@ -511,8 +511,6 @@ pub async fn generate_default_deployment_with_boot_contracts(
 
             // Set the session to the correct epoch for validation
             session.update_epoch(epoch);
-
-            // Create a temporary contract for validation
             let temp_contract = ClarityContract {
                 code_source: ClarityCodeSource::ContractInMemory(custom_source),
                 deployer: ContractDeployer::Address(default_deployer_address.to_address()),
@@ -535,101 +533,6 @@ pub async fn generate_default_deployment_with_boot_contracts(
                 );
                 asts_success = false;
             }
-        }
-    }
-
-    // Only allow overriding existing boot contracts, not adding new ones
-    if matches!(network, StacksNetwork::Simnet) && !simnet_remote_data {
-        let base_location = manifest.location.get_parent_location()?;
-        for contract_name in &manifest.project.boot_contracts {
-            // Skip if this is already a standard boot contract
-            if boot_contracts_ids
-                .iter()
-                .any(|id| id.name.to_string() == *contract_name)
-            {
-                continue;
-            }
-
-            // Check if this is a valid boot contract name
-            if !clarity_repl::repl::boot::BOOT_CONTRACTS_NAMES.contains(&contract_name.as_str()) {
-                eprintln!("Warning: Skipping custom boot contract '{contract_name}' - only existing boot contracts can be overridden. Valid boot contracts are: {:?}", clarity_repl::repl::boot::BOOT_CONTRACTS_NAMES);
-                continue;
-            }
-
-            // Get the configured path for this custom boot contract, or use default path
-            let contract_path = get_boot_contract_path(manifest, contract_name, &base_location)?;
-
-            // Load the additional boot contract source
-            let source = match file_accessor {
-                None => contract_path.read_content_as_utf8()?,
-                Some(file_accessor) => {
-                    let sources = file_accessor
-                        .read_files(vec![contract_path.to_string()])
-                        .await?;
-                    sources
-                        .get(&contract_path.to_string())
-                        .ok_or(format!(
-                            "Unable to read additional boot contract: {contract_name}",
-                        ))?
-                        .clone()
-                }
-            };
-
-            // Create contract ID for the additional boot contract
-            let contract_id = QualifiedContractIdentifier::new(
-                default_deployer_address.clone(),
-                ContractName::try_from(contract_name.clone())
-                    .map_err(|_| format!("Invalid contract name: {contract_name}"))?,
-            );
-
-            let mut session = Session::new(settings.clone());
-            let contract = ClarityContract {
-                code_source: ClarityCodeSource::ContractInMemory(source.clone()),
-                deployer: ContractDeployer::Address(default_deployer_address.to_address()),
-                name: contract_name.clone(),
-                clarity_version: DEFAULT_CLARITY_VERSION,
-                epoch: clarity_repl::repl::Epoch::Specific(DEFAULT_EPOCH),
-            };
-
-            let (ast, diagnostics, ast_success) = session.interpreter.build_ast(&contract);
-
-            // Try to deploy the contract to catch any runtime errors that build_ast might miss
-            let deploy_result = session.deploy_contract(&contract, false, None);
-            match deploy_result {
-                Ok(_) => {
-                    // Deployment succeeded, continue with AST validation
-                }
-                Err(deploy_errors) => {
-                    // Collect deployment errors instead of returning immediately
-                    contract_diags.insert(contract_id.clone(), deploy_errors);
-                    asts_success = false;
-                    continue;
-                }
-            }
-
-            // Collect AST diagnostics instead of returning immediately
-            if !ast_success {
-                contract_diags.insert(contract_id.clone(), diagnostics);
-                asts_success = false;
-            }
-
-            requirements_data.insert(contract_id.clone(), (DEFAULT_CLARITY_VERSION, ast));
-
-            // Add as emulated contract publish transaction
-            let data = EmulatedContractPublishSpecification {
-                contract_name: ContractName::try_from(contract_name.clone())
-                    .map_err(|_| format!("Invalid contract name: {contract_name}"))?,
-                emulated_sender: default_deployer_address.clone(),
-                source: source.clone(),
-                location: contract_path.clone(),
-                clarity_version: DEFAULT_CLARITY_VERSION,
-            };
-
-            let tx = TransactionSpecification::EmulatedContractPublish(data);
-            add_transaction_to_epoch(&mut transactions, tx, &DEFAULT_EPOCH.into());
-
-            // Add to contracts map
-            contracts_map.insert(contract_id, (source, contract_path));
         }
     }
 
