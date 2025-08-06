@@ -36,12 +36,12 @@ fn build_api_reference() -> HashMap<String, String> {
 fn clarity_keywords() -> HashMap<String, String> {
     NativeVariables::ALL
         .iter()
-        .filter_map(|func| {
-            make_keyword_reference(func).map(|key| {
-                let description = normalize_description(key.description);
-                let doc = format!("Description\n{}\n\nExamples\n{}", description, key.example);
-                (key.name.to_string(), doc)
-            })
+        .filter_map(make_keyword_reference)
+        .map(|key| {
+            let description = normalize_description(key.description);
+            let doc = format!("Description\n{}\n\nExamples\n{}", description, key.example);
+            (key.name.to_string(), doc)
+        })
         })
         .collect()
 }
