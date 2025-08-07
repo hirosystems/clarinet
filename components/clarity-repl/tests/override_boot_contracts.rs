@@ -9,7 +9,6 @@ fn test_override_boot_contracts() {
     let temp_dir = TempDir::new().expect("Failed to create temp dir");
     let project_path = temp_dir.path();
 
-    // Write Clarinet.toml with override_boot_contracts_source for pox-4
     let pox4_path = project_path.join("pox-4.clar");
     let clarinet_toml = format!(
         r#"
@@ -27,7 +26,6 @@ pox-4 = "{}"
     fs::write(project_path.join("Clarinet.toml"), clarinet_toml)
         .expect("Failed to write Clarinet.toml");
 
-    // custom pox-4.clar contract
     let custom_pox4 = r#"
 (define-public (print-something)
     (ok (print "Hello, world!"))
@@ -51,6 +49,5 @@ pox-4 = "{}"
     assert!(result.is_ok());
     let execution_result = result.unwrap();
     assert!(execution_result.diagnostics.is_empty());
-    // Clean up
     temp_dir.close().expect("Failed to clean up temp dir");
 }

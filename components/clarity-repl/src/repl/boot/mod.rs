@@ -194,7 +194,6 @@ pub static BOOT_CONTRACTS_DATA: LazyLock<
     result
 });
 
-/// Load custom boot contract source from file
 pub fn load_custom_boot_contract(path: &str) -> Result<String, String> {
     fs::read_to_string(path).map_err(|e| format!("Failed to read boot contract file {path}: {e}"))
 }
@@ -212,13 +211,11 @@ pub fn get_boot_contracts_data_with_overrides(
     );
 
     for (contract_name, file_path) in overrides {
-        // Only allow overriding existing boot contracts
         if !BOOT_CONTRACTS_NAMES.contains(&contract_name.as_str()) {
             eprintln!("Warning: Skipping custom boot contract '{contract_name}' - only existing boot contracts can be overridden. Valid boot contracts are: {BOOT_CONTRACTS_NAMES:?}");
             continue;
         }
 
-        // Load custom source
         let custom_source = match load_custom_boot_contract(file_path) {
             Ok(source) => source,
             Err(e) => {
@@ -237,7 +234,6 @@ pub fn get_boot_contracts_data_with_overrides(
             (StacksEpochId::Epoch20, ClarityVersion::Clarity1)
         });
 
-        // Create contracts for both testnet and mainnet
         for deployer in [&*BOOT_TESTNET_PRINCIPAL, &*BOOT_MAINNET_PRINCIPAL] {
             let boot_contract = ClarityContract {
                 code_source: ClarityCodeSource::ContractInMemory(custom_source.clone()),

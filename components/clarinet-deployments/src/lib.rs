@@ -90,8 +90,6 @@ pub fn setup_session_with_deployment(
 }
 
 pub fn initiate_session_from_manifest(manifest: &ProjectManifest) -> Session {
-    // For session initialization, we assume simnet context (used for console, tests, etc.)
-    // Custom boot contracts are allowed in this context
     let settings = SessionSettings {
         repl_settings: manifest.repl_settings.clone(),
         disk_cache_enabled: true,
@@ -306,25 +304,7 @@ fn handle_emulated_contract_call(
     result
 }
 
-// Main function that always includes boot contracts by default
 pub async fn generate_default_deployment(
-    manifest: &ProjectManifest,
-    network: &StacksNetwork,
-    no_batch: bool,
-    file_accessor: Option<&dyn FileAccessor>,
-    forced_min_epoch: Option<StacksEpochId>,
-) -> Result<(DeploymentSpecification, DeploymentGenerationArtifacts), String> {
-    generate_default_deployment_with_boot_contracts(
-        manifest,
-        network,
-        no_batch,
-        file_accessor,
-        forced_min_epoch,
-    )
-    .await
-}
-
-pub async fn generate_default_deployment_with_boot_contracts(
     manifest: &ProjectManifest,
     network: &StacksNetwork,
     no_batch: bool,
@@ -416,7 +396,6 @@ pub async fn generate_default_deployment_with_boot_contracts(
     let mut repl_settings = manifest.repl_settings.clone();
     repl_settings.remote_data.enabled = false;
 
-    // Custom boot contracts are only supported on simnet
     let override_boot_contracts_source = if matches!(network, StacksNetwork::Simnet) {
         manifest.project.override_boot_contracts_source.clone()
     } else {
@@ -505,7 +484,6 @@ pub async fn generate_default_deployment_with_boot_contracts(
 
             let (_, diagnostics, ast_success) = session.interpreter.build_ast(&temp_contract);
 
-            // Collect AST diagnostics instead of returning immediately
             if !ast_success {
                 contract_diags.insert(
                     QualifiedContractIdentifier::new(

@@ -707,7 +707,6 @@ mod lsp_tests {
 
     #[test]
     fn test_custom_boot_contract_recognition() {
-        // Create a test manifest with custom boot contracts
         let manifest_content = r#"
 [project]
 name = "test-project"

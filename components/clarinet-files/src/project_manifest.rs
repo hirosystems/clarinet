@@ -317,7 +317,7 @@ impl ProjectManifest {
             .map(|n| n.to_string())
             .collect::<Vec<_>>();
 
-        // if an overrides don't correspond to one of the boot contracts, we warn and discard that override
+        // if an override doesn't correspond with one of the boot contracts, we warn and discard that override
         let mut valid_override_boot_contracts_source = BTreeMap::new();
         for (contract_name, contract_path) in override_boot_contracts_source.iter() {
             if !boot_contracts.contains(contract_name) {
