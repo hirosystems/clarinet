@@ -1,5 +1,5 @@
 [network]
-name = "devnet"
+name = "simnet"
 
 [accounts.deployer]
 mnemonic = "twice kind fence tip hidden tilt action fragile skin nothing glory cousin green tomorrow spring wrist shed math olympic multiply hip blue scout claw"
@@ -71,7 +71,7 @@ balance = 100_000_000_000_000
 # stx_address: STNHKEPYEPJ8ET55ZZ0M5A34J0R3N5FM2CMMMAZ6
 # btc_address: mjSrB3wS4xab3kYqFktwBzfTdPg367ZJ2d
 
-[devnet]
+[simnet]
 bitcoin_controller_block_time = 20_000
 disable_bitcoin_explorer = true
 disable_stacks_explorer = true

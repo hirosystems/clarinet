@@ -5,6 +5,7 @@ use std::str::FromStr;
 use clarity::types::StacksEpochId;
 use clarity::vm::ClarityVersion;
 use clarity_repl::repl;
+use clarity_repl::repl::boot::BOOT_CONTRACTS_NAMES;
 use clarity_repl::repl::{ClarityCodeSource, ClarityContract, ContractDeployer, DEFAULT_EPOCH};
 use serde::ser::SerializeMap;
 use serde::{Deserializer, Serialize, Serializer};
@@ -33,6 +34,7 @@ pub struct ProjectConfigFile {
     telemetry: Option<bool>,
     requirements: Option<TomlValue>,
     boot_contracts: Option<Vec<String>>,
+    override_boot_contracts_source: Option<BTreeMap<String, String>>,
 
     // The fields below have been moved into repl above, but are kept here for
     // backwards compatibility.
@@ -143,6 +145,7 @@ pub struct ProjectConfig {
     pub cache_location: FileLocation,
     #[serde(skip_deserializing)]
     pub boot_contracts: Vec<String>,
+    pub override_boot_contracts_source: BTreeMap<String, String>,
 }
 
 fn cache_location_deserializer<'de, D>(des: D) -> Result<FileLocation, D::Error>
@@ -224,6 +227,51 @@ impl ProjectManifest {
         )
     }
 
+    // process a contract and add it to the configuration
+    fn register_contract(
+        contract_name: &str,
+        contract_path: &str,
+        deployer: ContractDeployer,
+        epoch: Option<&str>,
+        clarity_version: Option<&str>,
+        project_root_location: &FileLocation,
+        config_contracts: &mut BTreeMap<String, ClarityContract>,
+        contracts_settings: &mut HashMap<FileLocation, ClarityContractMetadata>,
+    ) -> Result<(), String> {
+        let code_source = match PathBuf::from_str(contract_path) {
+            Ok(path) => ClarityCodeSource::ContractOnDisk(path),
+            Err(e) => return Err(format!("unable to parse path {contract_path} ({e})")),
+        };
+
+        let (parsed_epoch, parsed_clarity_version) =
+            get_epoch_and_clarity_version(epoch, clarity_version)?;
+
+        config_contracts.insert(
+            contract_name.to_string(),
+            ClarityContract {
+                name: contract_name.to_string(),
+                deployer: deployer.clone(),
+                code_source,
+                clarity_version: parsed_clarity_version,
+                epoch: clarity_repl::repl::Epoch::Specific(parsed_epoch),
+            },
+        );
+
+        let mut contract_location = project_root_location.clone();
+        contract_location.append_path(contract_path)?;
+        contracts_settings.insert(
+            contract_location,
+            ClarityContractMetadata {
+                name: contract_name.to_string(),
+                deployer,
+                clarity_version: parsed_clarity_version,
+                epoch: parsed_epoch,
+            },
+        );
+
+        Ok(())
+    }
+
     pub fn from_project_manifest_file(
         project_manifest_file: ProjectManifestFile,
         manifest_location: &FileLocation,
@@ -257,6 +305,30 @@ impl ProjectManifest {
             }
         };
 
+        let mut override_boot_contracts_source = BTreeMap::new();
+        if let Some(overrides) = project_manifest_file.project.override_boot_contracts_source {
+            for (contract_name, contract_path) in overrides.iter() {
+                override_boot_contracts_source.insert(contract_name.clone(), contract_path.clone());
+            }
+        }
+
+        let boot_contracts = BOOT_CONTRACTS_NAMES
+            .iter()
+            .map(|n| n.to_string())
+            .collect::<Vec<_>>();
+
+        // if an override doesn't correspond with one of the boot contracts, we warn and discard that override
+        let mut valid_override_boot_contracts_source = BTreeMap::new();
+        for (contract_name, contract_path) in override_boot_contracts_source.iter() {
+            if !boot_contracts.contains(contract_name) {
+                eprintln!("Warning: {contract_name} custom boot contract was not included because it's not part of the set of default boot contracts");
+                eprintln!("Available boot contracts: {boot_contracts:?}");
+            } else {
+                valid_override_boot_contracts_source
+                    .insert(contract_name.clone(), contract_path.clone());
+            }
+        }
+
         let project = ProjectConfig {
             name: project_name,
             requirements: None,
@@ -267,18 +339,8 @@ impl ProjectManifest {
             authors: project_manifest_file.project.authors.unwrap_or_default(),
             telemetry: project_manifest_file.project.telemetry.unwrap_or(false),
             cache_location,
-            boot_contracts: vec![
-                "costs".to_string(),
-                "pox".to_string(),
-                "pox-2".to_string(),
-                "pox-3".to_string(),
-                "pox-4".to_string(),
-                "lockup".to_string(),
-                "costs-2".to_string(),
-                "costs-3".to_string(),
-                "cost-voting".to_string(),
-                "bns".to_string(),
-            ],
+            boot_contracts,
+            override_boot_contracts_source: valid_override_boot_contracts_source,
         };
 
         let mut config = ProjectManifest {
@@ -303,6 +365,7 @@ impl ProjectManifest {
                 }
             }
         };
+
         if let Some(TomlValue::Table(contracts)) = project_manifest_file.contracts {
             for (contract_name, contract_settings) in contracts.iter() {
                 if let TomlValue::Table(contract_settings) = contract_settings {
@@ -310,12 +373,7 @@ impl ProjectManifest {
                     else {
                         continue;
                     };
-                    let code_source = match PathBuf::from_str(contract_path) {
-                        Ok(path) => ClarityCodeSource::ContractOnDisk(path),
-                        Err(e) => {
-                            return Err(format!("unable to parse path {contract_path} ({e})"))
-                        }
-                    };
+
                     let deployer = match contract_settings.get("deployer") {
                         Some(TomlValue::String(path)) => {
                             ContractDeployer::LabeledDeployer(path.clone())
@@ -342,33 +400,16 @@ impl ProjectManifest {
                         _ => return Err(INVALID_CLARITY_VERSION.into()),
                     };
 
-                    let (epoch, clarity_version) = get_epoch_and_clarity_version(
+                    ProjectManifest::register_contract(
+                        contract_name,
+                        contract_path,
+                        deployer,
                         parsed_epoch.as_deref(),
                         parsed_clarity_version.as_deref(),
+                        &project_root_location,
+                        &mut config_contracts,
+                        &mut contracts_settings,
                     )?;
-
-                    config_contracts.insert(
-                        contract_name.to_string(),
-                        ClarityContract {
-                            name: contract_name.to_string(),
-                            deployer: deployer.clone(),
-                            code_source,
-                            clarity_version,
-                            epoch: clarity_repl::repl::Epoch::Specific(epoch),
-                        },
-                    );
-
-                    let mut contract_location = project_root_location.clone();
-                    contract_location.append_path(contract_path)?;
-                    contracts_settings.insert(
-                        contract_location,
-                        ClarityContractMetadata {
-                            name: contract_name.to_string(),
-                            deployer,
-                            clarity_version,
-                            epoch,
-                        },
-                    );
                 }
             }
         };
@@ -523,5 +564,89 @@ mod tests {
             Some(&latest_clarity_version.to_string().replace("Clarity ", "")),
         );
         assert_eq!(result, Ok((latest_epoch, latest_clarity_version)));
+    }
+
+    #[test]
+    fn test_override_boot_contracts_source_parsing() {
+        let manifest_toml = toml! {
+            [project]
+            name = "test-project"
+            telemetry = false
+            [project.override_boot_contracts_source]
+            "pox-4" = "./custom-boot-contracts/pox-4.clar"
+            "costs" = "./custom-boot-contracts/costs.clar"
+        };
+        let manifest_file: ProjectManifestFile = manifest_toml.clone().try_into().unwrap();
+        let location = FileLocation::from_path("/tmp/clarinet.toml".into());
+
+        let manifest =
+            ProjectManifest::from_project_manifest_file(manifest_file, &location, false).unwrap();
+
+        assert_eq!(manifest.project.override_boot_contracts_source.len(), 2);
+        assert_eq!(
+            manifest.project.override_boot_contracts_source.get("pox-4"),
+            Some(&"./custom-boot-contracts/pox-4.clar".to_string())
+        );
+        assert_eq!(
+            manifest.project.override_boot_contracts_source.get("costs"),
+            Some(&"./custom-boot-contracts/costs.clar".to_string())
+        );
+    }
+
+    #[test]
+    fn test_override_boot_contracts_source_with_invalid_contract() {
+        let manifest_toml = toml! {
+            [project]
+            name = "test-project"
+            telemetry = false
+            [project.override_boot_contracts_source]
+            "pox-4" = "./custom-boot-contracts/pox-4.clar"
+            "pox-x" = "./custom-boot-contracts/pox-x.clar"
+            "costs" = "./custom-boot-contracts/costs.clar"
+        };
+        let manifest_file: ProjectManifestFile = manifest_toml.clone().try_into().unwrap();
+        let location = FileLocation::from_path("/tmp/clarinet.toml".into());
+
+        let manifest =
+            ProjectManifest::from_project_manifest_file(manifest_file, &location, false).unwrap();
+
+        // Only valid contracts should be included
+        assert_eq!(manifest.project.override_boot_contracts_source.len(), 2);
+        assert_eq!(
+            manifest.project.override_boot_contracts_source.get("pox-4"),
+            Some(&"./custom-boot-contracts/pox-4.clar".to_string())
+        );
+        assert_eq!(
+            manifest.project.override_boot_contracts_source.get("costs"),
+            Some(&"./custom-boot-contracts/costs.clar".to_string())
+        );
+        // Invalid contract should not be included
+        assert_eq!(
+            manifest.project.override_boot_contracts_source.get("pox-x"),
+            None
+        );
+    }
+
+    #[test]
+    fn test_warning_message_for_invalid_boot_contract() {
+        let manifest_toml = toml! {
+            [project]
+            name = "test-project"
+            telemetry = false
+            [project.override_boot_contracts_source]
+            "pox-x" = "./custom-boot-contracts/pox-x.clar"
+        };
+        let manifest_file: ProjectManifestFile = manifest_toml.clone().try_into().unwrap();
+        let location = FileLocation::from_path("/tmp/clarinet.toml".into());
+
+        let manifest =
+            ProjectManifest::from_project_manifest_file(manifest_file, &location, false).unwrap();
+
+        // Verify that the invalid contract was filtered out
+        assert_eq!(manifest.project.override_boot_contracts_source.len(), 0);
+        assert_eq!(
+            manifest.project.override_boot_contracts_source.get("pox-x"),
+            None
+        );
     }
 }

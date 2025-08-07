@@ -29,6 +29,7 @@ use super::{
     SessionSettings,
 };
 use crate::analysis::coverage::CoverageHook;
+use crate::repl::boot::get_boot_contract_epoch_and_clarity_version;
 use crate::repl::clarity_values::value_to_string;
 use crate::utils::serialize_event;
 
@@ -131,35 +132,36 @@ impl Session {
         let tx_sender = self.interpreter.get_tx_sender();
         let deployer = ContractDeployer::Address(tx_sender.to_address());
 
+        // Deploy standard boot contracts (with possible overrides)
+        // Always deploy all boot contracts
         for (name, code) in boot_code.iter() {
-            if self
-                .settings
-                .include_boot_contracts
-                .contains(&name.to_string())
+            // Check if there's a custom override for this boot contract
+            let contract_source = if let Some(custom_path) =
+                self.settings.override_boot_contracts_source.get(*name)
             {
-                let (epoch, clarity_version) = if (*name).eq("pox-4") {
-                    (StacksEpochId::Epoch25, ClarityVersion::Clarity2)
-                } else if (*name).eq("pox-3") {
-                    (StacksEpochId::Epoch24, ClarityVersion::Clarity2)
-                } else if (*name).eq("pox-2") || (*name).eq("costs-3") {
-                    (StacksEpochId::Epoch21, ClarityVersion::Clarity2)
-                } else if (*name).eq("cost-2") {
-                    (StacksEpochId::Epoch2_05, ClarityVersion::Clarity1)
-                } else {
-                    (StacksEpochId::Epoch20, ClarityVersion::Clarity1)
-                };
+                match crate::repl::boot::load_custom_boot_contract(custom_path) {
+                    Ok(source) => source,
+                    Err(e) => {
+                        eprintln!("Warning: Failed to load custom boot contract {name}: {e}");
+                        code.to_string()
+                    }
+                }
+            } else {
+                code.to_string()
+            };
 
-                let contract = ClarityContract {
-                    code_source: ClarityCodeSource::ContractInMemory(code.to_string()),
-                    name: name.to_string(),
-                    deployer: deployer.clone(),
-                    clarity_version,
-                    epoch: Epoch::Specific(epoch),
-                };
+            let (epoch, clarity_version) = get_boot_contract_epoch_and_clarity_version(name);
 
-                // Result ignored, boot contracts are trusted to be valid
-                let _ = self.deploy_contract(&contract, false, None);
-            }
+            let contract = ClarityContract {
+                code_source: ClarityCodeSource::ContractInMemory(contract_source),
+                name: name.to_string(),
+                deployer: deployer.clone(),
+                clarity_version,
+                epoch: Epoch::Specific(epoch),
+            };
+
+            // Result ignored, boot contracts are trusted to be valid
+            let _ = self.deploy_contract(&contract, false, None);
         }
     }
 
@@ -422,9 +424,7 @@ impl Session {
         let output = Vec::<String>::new();
         let contracts = vec![]; // This is never modified, remove?
 
-        if !self.settings.include_boot_contracts.is_empty() {
-            self.load_boot_contracts();
-        }
+        self.load_boot_contracts();
 
         for account in &self.settings.initial_accounts {
             let Ok(recipient) = PrincipalData::parse(&account.address) else {
@@ -1511,10 +1511,7 @@ mod tests {
 
     #[test]
     fn evaluate_at_block() {
-        let settings = SessionSettings {
-            include_boot_contracts: vec!["costs".into(), "costs-2".into(), "costs-3".into()],
-            ..Default::default()
-        };
+        let settings = SessionSettings::default();
 
         let mut session = Session::new(settings);
         session.start().expect("session could not start");
@@ -1613,10 +1610,7 @@ mod tests {
 
     #[test]
     fn can_call_boot_contract_fn() {
-        let settings = SessionSettings {
-            include_boot_contracts: vec!["pox-4".into()],
-            ..Default::default()
-        };
+        let settings = SessionSettings::default();
         let mut session = Session::new(settings);
         session.update_epoch(StacksEpochId::Epoch25);
         session.load_boot_contracts();
