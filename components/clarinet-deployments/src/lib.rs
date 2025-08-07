@@ -470,7 +470,7 @@ pub async fn generate_default_deployment(
             }?;
 
             let (epoch, clarity_version) =
-                get_boot_contract_epoch_and_clarity_version(contract_name.as_str())?;
+                get_boot_contract_epoch_and_clarity_version(contract_name.as_str());
 
             // Set the session to the correct epoch for validation
             session.update_epoch(epoch);

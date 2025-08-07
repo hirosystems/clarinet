@@ -29,6 +29,7 @@ use super::{
     SessionSettings,
 };
 use crate::analysis::coverage::CoverageHook;
+use crate::repl::boot::get_boot_contract_epoch_and_clarity_version;
 use crate::repl::clarity_values::value_to_string;
 use crate::utils::serialize_event;
 
@@ -149,17 +150,7 @@ impl Session {
                 code.to_string()
             };
 
-            let (epoch, clarity_version) = if (*name).eq("pox-4") {
-                (StacksEpochId::Epoch25, ClarityVersion::Clarity2)
-            } else if (*name).eq("pox-3") {
-                (StacksEpochId::Epoch24, ClarityVersion::Clarity2)
-            } else if (*name).eq("pox-2") || (*name).eq("costs-3") {
-                (StacksEpochId::Epoch21, ClarityVersion::Clarity2)
-            } else if (*name).eq("cost-2") {
-                (StacksEpochId::Epoch2_05, ClarityVersion::Clarity1)
-            } else {
-                (StacksEpochId::Epoch20, ClarityVersion::Clarity1)
-            };
+            let (epoch, clarity_version) = get_boot_contract_epoch_and_clarity_version(name);
 
             let contract = ClarityContract {
                 code_source: ClarityCodeSource::ContractInMemory(contract_source),
