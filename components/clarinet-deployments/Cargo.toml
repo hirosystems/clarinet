@@ -13,7 +13,8 @@ serde_yaml = "0.8.23"
 strum = { workspace = true, features = ["derive"] }
 rand = { workspace = true }
 reqwest = { workspace = true }
-clarity = { workspace = true }
+clarity = { workspace = true, default-features = false }
+stacks-common = { workspace = true, default-features = false }
 
 clarity-repl = { path = "../clarity-repl", default-features = false }
 clarinet-files = { path = "../clarinet-files" }

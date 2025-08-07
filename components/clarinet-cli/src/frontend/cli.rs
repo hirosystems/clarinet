@@ -27,7 +27,6 @@ use clarity_repl::clarity::vm::analysis::AnalysisDatabase;
 use clarity_repl::clarity::vm::costs::LimitedCostTracker;
 use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
 use clarity_repl::clarity::ClarityVersion;
-use clarity_repl::frontend::terminal::print_clarity_wasm_warning;
 use clarity_repl::repl::diagnostic::output_diagnostic;
 use clarity_repl::repl::settings::{ApiUrl, RemoteDataSettings};
 use clarity_repl::repl::{ClarityCodeSource, ClarityContract, ContractDeployer, DEFAULT_EPOCH};
@@ -126,6 +125,9 @@ struct Formatter {
     #[clap(long = "stdin", conflicts_with_all = ["in_place", "file"])]
     /// Read from stdin (and output to stdout)
     pub stdin: bool,
+    #[clap(long = "check", conflicts_with_all = ["in_place", "dry_run", "stdin"])]
+    /// Check if files are properly formatted without modifying them
+    pub check: bool,
 }
 
 impl Formatter {
@@ -441,10 +443,6 @@ struct Console {
     /// Initial remote Stacks block height
     #[clap(long = "remote-data-initial-height", short = 'b')]
     pub remote_data_initial_height: Option<u32>,
-
-    /// Allow the Clarity Wasm preview to run in parallel with the Clarity interpreter (beta)
-    #[clap(long = "enable-clarity-wasm")]
-    pub enable_clarity_wasm: bool,
 }
 
 #[derive(Parser, PartialEq, Clone, Debug)]
@@ -514,9 +512,6 @@ struct Check {
         conflicts_with = "use_on_disk_deployment_plan"
     )]
     pub use_computed_deployment_plan: bool,
-    /// Allow the Clarity Wasm preview to run in parallel with the Clarity interpreter (beta)
-    #[clap(long = "enable-clarity-wasm")]
-    pub enable_clarity_wasm: bool,
 }
 
 #[derive(Parser, PartialEq, Clone, Debug)]
@@ -888,6 +883,7 @@ pub fn main() {
                     let res = NetworkManifest::from_project_manifest_location(
                         &manifest.location,
                         &network_moved.get_networks(),
+                        manifest.use_mainnet_wallets(),
                         Some(&manifest.project.cache_location),
                         None,
                     );
@@ -1041,12 +1037,6 @@ pub fn main() {
             }
         },
         Command::Console(cmd) => {
-            let remote_data_settings = RemoteDataSettings {
-                enabled: cmd.enable_remote_data,
-                api_url: cmd.remote_data_api_url.unwrap_or_default(),
-                initial_height: cmd.remote_data_initial_height,
-            };
-
             // Loop to handle `::reload` command
             loop {
                 let manifest = load_manifest_or_warn(cmd.manifest_path.clone());
@@ -1076,33 +1066,18 @@ pub fn main() {
                             std::process::exit(1);
                         }
 
-                        if cmd.enable_clarity_wasm {
-                            let mut manifest_wasm = manifest.clone();
-                            manifest_wasm.repl_settings.clarity_wasm_mode = true;
-                            let (_, _, wasm_artifacts) = load_deployment_and_artifacts_or_exit(
-                                &manifest_wasm,
-                                &cmd.deployment_plan_path,
-                                cmd.use_on_disk_deployment_plan,
-                                cmd.use_computed_deployment_plan,
-                            );
-
-                            compare_wasm_artifacts(&deployment, &artifacts, &wasm_artifacts);
-
-                            Terminal::load(artifacts.session, Some(wasm_artifacts.session))
-                        } else {
-                            Terminal::load(artifacts.session, None)
-                        }
+                        Terminal::load(artifacts.session, None)
                     }
                     None => {
+                        let remote_data_settings = RemoteDataSettings {
+                            enabled: cmd.enable_remote_data,
+                            api_url: cmd.remote_data_api_url.clone().unwrap_or_default(),
+                            initial_height: cmd.remote_data_initial_height,
+                            use_mainnet_wallets: false,
+                        };
                         let mut settings = repl::SessionSettings::default();
                         settings.repl_settings.remote_data = remote_data_settings.clone();
-                        if cmd.enable_clarity_wasm {
-                            let mut settings_wasm = repl::SessionSettings::default();
-                            settings_wasm.repl_settings.clarity_wasm_mode = true;
-                            Terminal::new(settings, Some(settings_wasm))
-                        } else {
-                            Terminal::new(settings, None)
-                        }
+                        Terminal::new(settings, None)
                     }
                 };
                 let reload = terminal.start();
@@ -1163,7 +1138,7 @@ pub fn main() {
                 deployer: ContractDeployer::Transient,
                 name: "transient".to_string(),
                 clarity_version: ClarityVersion::default_for_epoch(epoch),
-                epoch,
+                epoch: clarity_repl::repl::Epoch::Specific(epoch),
             };
             let (ast, mut diagnostics, mut success) = session.interpreter.build_ast(&contract);
             let (annotations, mut annotation_diagnostics) = session
@@ -1175,7 +1150,7 @@ pub fn main() {
                 contract_id,
                 ast.expressions,
                 LimitedCostTracker::new_free(),
-                contract.epoch,
+                contract.epoch.resolve(),
                 contract.clarity_version,
             );
             let mut analysis_db = AnalysisDatabase::new(&mut session.interpreter.clarity_datastore);
@@ -1215,19 +1190,6 @@ pub fn main() {
                 cmd.use_on_disk_deployment_plan,
                 cmd.use_computed_deployment_plan,
             );
-
-            if cmd.enable_clarity_wasm {
-                #[allow(clippy::redundant_clone)]
-                let mut manifest_wasm = manifest.clone();
-                manifest_wasm.repl_settings.clarity_wasm_mode = true;
-                let (_, _, wasm_artifacts) = load_deployment_and_artifacts_or_exit(
-                    &manifest_wasm,
-                    &cmd.deployment_plan_path,
-                    cmd.use_on_disk_deployment_plan,
-                    cmd.use_computed_deployment_plan,
-                );
-                compare_wasm_artifacts(&deployment, &artifacts, &wasm_artifacts);
-            }
 
             let diags_digest = DiagnosticsDigest::new(&artifacts.diags, &deployment);
             if diags_digest.has_feedbacks() {
@@ -1305,10 +1267,21 @@ pub fn main() {
             }
             let formatter = ClarityFormatter::new(settings);
 
+            let mut all_files_formatted = true;
+            let mut unformatted_files = Vec::new();
+
             for source in sources {
                 let input = source.get_input();
                 let output = formatter.format(&input);
-                if cmd.in_place {
+
+                if cmd.check {
+                    if let Some(file_path) = source.file_path() {
+                        if input != output {
+                            all_files_formatted = false;
+                            unformatted_files.push(file_path.to_string());
+                        }
+                    }
+                } else if cmd.in_place {
                     let file_path = source
                         .file_path()
                         .expect("No file path for in-place formatting");
@@ -1316,7 +1289,30 @@ pub fn main() {
                 } else if cmd.dry_run || source.is_stdin() {
                     println!("{output}");
                 } else {
-                    eprintln!("required flags: in-place or dry-run");
+                    eprintln!("required flags: in-place, dry-run, or check");
+                    std::process::exit(1);
+                }
+            }
+
+            if cmd.check {
+                if all_files_formatted {
+                    println!("{} All files are properly formatted", green!("✔"));
+                    std::process::exit(0);
+                } else {
+                    eprintln!(
+                        "{} {} {} formatting",
+                        red!("✗"),
+                        unformatted_files.len(),
+                        if unformatted_files.len() == 1 {
+                            "file needs"
+                        } else {
+                            "files need"
+                        }
+                    );
+                    for file in unformatted_files {
+                        eprintln!("  {file}");
+                    }
+                    std::process::exit(1);
                 }
             }
         }
@@ -1369,7 +1365,7 @@ fn get_manifest_location_or_warn(path: Option<String>) -> Option<FileLocation> {
     }
 }
 
-fn load_manifest_or_exit(
+pub fn load_manifest_or_exit(
     path: Option<String>,
     allow_remote_data_fetching: bool,
 ) -> ProjectManifest {
@@ -1395,7 +1391,7 @@ fn load_manifest_or_warn(path: Option<String>) -> Option<ProjectManifest> {
         .ok()
 }
 
-fn load_deployment_and_artifacts_or_exit(
+pub fn load_deployment_and_artifacts_or_exit(
     manifest: &ProjectManifest,
     deployment_plan_path: &Option<String>,
     force_on_disk: bool,
@@ -1597,37 +1593,6 @@ fn load_deployment_if_exists(
         }
     } else {
         Some(load_deployment(manifest, &default_deployment_location))
-    }
-}
-
-fn compare_wasm_artifacts(
-    deployment: &DeploymentSpecification,
-    artifacts: &DeploymentGenerationArtifacts,
-    wasm_artifacts: &DeploymentGenerationArtifacts,
-) {
-    let mut print_warning = false;
-    for contract in deployment.contracts.keys() {
-        let diags = artifacts.diags.get(contract);
-        let wasm_diags = wasm_artifacts.diags.get(contract);
-        if diags != wasm_diags {
-            print_warning = true;
-            println!("Diagnostics of contract {contract} differs between clarity and clarity-wasm");
-            dbg!(diags);
-            dbg!(wasm_diags);
-        }
-        let value = artifacts.results_values.get(contract);
-        let wasm_value = wasm_artifacts.results_values.get(contract);
-        if (diags.is_some() && wasm_diags.is_some()) && (value != wasm_value) {
-            print_warning = true;
-            println!(
-                "Evaluation value of contract {contract} differs between clarity and clarity-wasm"
-            );
-            dbg!(value);
-            dbg!(wasm_value);
-        };
-    }
-    if print_warning {
-        print_clarity_wasm_warning();
     }
 }
 

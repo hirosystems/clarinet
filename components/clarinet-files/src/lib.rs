@@ -5,6 +5,7 @@ extern crate serde_derive;
 
 pub mod clarinetrc;
 
+#[cfg(not(target_arch = "wasm32"))]
 pub mod devnet_diff;
 mod network_manifest;
 mod project_manifest;
@@ -26,12 +27,10 @@ pub use network_manifest::{
     NetworkManifestFile, PoxStackingOrder, DEFAULT_BITCOIN_EXPLORER_IMAGE,
     DEFAULT_BITCOIN_NODE_IMAGE, DEFAULT_DERIVATION_PATH, DEFAULT_DOCKER_PLATFORM,
     DEFAULT_EPOCH_2_0, DEFAULT_EPOCH_2_05, DEFAULT_EPOCH_2_1, DEFAULT_EPOCH_2_2, DEFAULT_EPOCH_2_3,
-    DEFAULT_EPOCH_2_4, DEFAULT_EPOCH_2_5, DEFAULT_EPOCH_3_0, DEFAULT_EPOCH_3_1,
+    DEFAULT_EPOCH_2_4, DEFAULT_EPOCH_2_5, DEFAULT_EPOCH_3_0, DEFAULT_EPOCH_3_1, DEFAULT_EPOCH_3_2,
     DEFAULT_FAUCET_MNEMONIC, DEFAULT_FIRST_BURN_HEADER_HEIGHT, DEFAULT_POSTGRES_IMAGE,
     DEFAULT_STACKER_MNEMONIC, DEFAULT_STACKS_API_IMAGE, DEFAULT_STACKS_EXPLORER_IMAGE,
     DEFAULT_STACKS_MINER_MNEMONIC, DEFAULT_STACKS_NODE_IMAGE, DEFAULT_STACKS_SIGNER_IMAGE,
-    DEFAULT_SUBNET_API_IMAGE, DEFAULT_SUBNET_CONTRACT_ID, DEFAULT_SUBNET_MNEMONIC,
-    DEFAULT_SUBNET_NODE_IMAGE,
 };
 pub use project_manifest::{
     ProjectManifest, ProjectManifestFile, RequirementConfig, INVALID_CLARITY_VERSION,
@@ -65,24 +64,6 @@ impl fmt::Display for FileLocation {
         match self {
             FileLocation::FileSystem { path } => write!(f, "{}", path.display()),
             FileLocation::Url { url } => write!(f, "{url}"),
-        }
-    }
-}
-
-impl TryInto<Url> for &FileLocation {
-    type Error = &'static str;
-
-    fn try_into(self) -> Result<Url, Self::Error> {
-        match self {
-            #[cfg(target_arch = "wasm32")]
-            FileLocation::FileSystem { .. } => {
-                Err("Url::from_file_path() not available on target architecture")
-            }
-            #[cfg(not(target_arch = "wasm32"))]
-            FileLocation::FileSystem { path } => {
-                Url::from_file_path(path).map_err(|()| "Url::from_file_path() failed")
-            }
-            FileLocation::Url { url } => Ok(url.clone()),
         }
     }
 }
@@ -369,16 +350,15 @@ impl FileLocation {
 
     pub fn to_url_string(&self) -> Result<String, String> {
         match self {
-            #[cfg(not(target_arch = "wasm32"))]
-            FileLocation::FileSystem { path } => {
-                let file_path = self.to_string();
-                let url = Url::from_file_path(file_path)
-                    .map_err(|_| format!("unable to conver path {} to url", path.display()))?;
-                Ok(url.to_string())
+            #[cfg(target_arch = "wasm32")]
+            FileLocation::FileSystem { .. } => {
+                Err("Url::from_file_path is not supported in wasm32".to_string())
             }
+            #[cfg(not(target_arch = "wasm32"))]
+            FileLocation::FileSystem { path } => Url::from_file_path(path)
+                .map_err(|_| format!("unable to convert path {} to url", path.display()))
+                .map(String::from),
             FileLocation::Url { url } => Ok(url.to_string()),
-            #[allow(unreachable_patterns)]
-            _ => unreachable!(),
         }
     }
 

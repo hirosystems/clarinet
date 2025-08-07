@@ -6,7 +6,7 @@ license = "GPL-3.0"
 description = "Stack wire format implementation"
 
 [dependencies]
-clarity = { workspace = true, features = ["developer-mode", "log"] }
-stacks-common = { workspace = true, features = ["vrf"] }
+clarity = { workspace = true, default-features = false, features = ["developer-mode"] }
+stacks-common = { workspace = true, default-features = false }
 
 serde = { version = "1", features = ["derive"] }

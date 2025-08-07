@@ -5,7 +5,7 @@ use std::str::FromStr;
 use clarity::types::StacksEpochId;
 use clarity::vm::ClarityVersion;
 use clarity_repl::repl;
-use clarity_repl::repl::{ClarityCodeSource, ClarityContract, ContractDeployer};
+use clarity_repl::repl::{ClarityCodeSource, ClarityContract, ContractDeployer, DEFAULT_EPOCH};
 use serde::ser::SerializeMap;
 use serde::{Deserializer, Serialize, Serializer};
 use serde_json::Value as JsonValue;
@@ -123,7 +123,7 @@ where
             name: contract_name.clone(),
             deployer,
             clarity_version,
-            epoch,
+            epoch: clarity_repl::repl::Epoch::Specific(epoch),
         };
 
         map.insert(contract_name, cc);
@@ -354,7 +354,7 @@ impl ProjectManifest {
                             deployer: deployer.clone(),
                             code_source,
                             clarity_version,
-                            epoch,
+                            epoch: clarity_repl::repl::Epoch::Specific(epoch),
                         },
                     );
 
@@ -377,6 +377,10 @@ impl ProjectManifest {
         config.project.requirements = Some(config_requirements);
         Ok(config)
     }
+
+    pub fn use_mainnet_wallets(&self) -> bool {
+        self.repl_settings.remote_data.enabled && self.repl_settings.remote_data.use_mainnet_wallets
+    }
 }
 
 fn get_epoch_and_clarity_version(
@@ -387,7 +391,10 @@ fn get_epoch_and_clarity_version(
     // if epoch is specified but not version: use the default version for that epoch
 
     let epoch = match settings_epoch {
-        None => StacksEpochId::Epoch2_05,
+        None => StacksEpochId::Epoch2_05, // Keep the existing default unchanged
+        // The "latest" epoch means the current epoch that is running on mainnet
+        // Which can differ from `StacksEpochId::latest()` if it hasn't been activated yet
+        Some("latest") => DEFAULT_EPOCH,
         Some(epoch) => match epoch {
             "2" | "2.0" => StacksEpochId::Epoch20,
             "2.05" => StacksEpochId::Epoch2_05,
@@ -398,8 +405,9 @@ fn get_epoch_and_clarity_version(
             "2.5" => StacksEpochId::Epoch25,
             "3" | "3.0" => StacksEpochId::Epoch30,
             "3.1" => StacksEpochId::Epoch31,
+            "3.2" => StacksEpochId::Epoch32,
             _ => return Err(
-                "epoch field invalid (value supported: 2.0, 2.05, 2.1, 2.2, 2.3, 2.4, 3.0, 3.1)"
+                "epoch field invalid (value supported: 2.0, 2.05, 2.1, 2.2, 2.3, 2.4, 3.0, 3.1, 3.2, latest)"
                     .into(),
             ),
         },
@@ -503,5 +511,17 @@ mod tests {
         // no epoch 2.05, version 2 -> error
         let result = get_epoch_and_clarity_version(Some("2.1"), Some("2"));
         assert_eq!(result, Ok((Epoch21, Clarity2)));
+    }
+
+    #[test]
+    fn test_latest_epoch_and_clarity_version() {
+        let latest_epoch = StacksEpochId::latest();
+        let latest_clarity_version = ClarityVersion::latest();
+        let result = get_epoch_and_clarity_version(
+            Some(&latest_epoch.to_string()),
+            // Replace "Clarity N" to "N" for clarity version
+            Some(&latest_clarity_version.to_string().replace("Clarity ", "")),
+        );
+        assert_eq!(result, Ok((latest_epoch, latest_clarity_version)));
     }
 }

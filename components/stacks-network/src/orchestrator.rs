@@ -10,7 +10,6 @@ use bollard::container::{
     PruneContainersOptions, WaitContainerOptions,
 };
 use bollard::errors::Error as DockerError;
-use bollard::exec::CreateExecOptions;
 use bollard::image::CreateImageOptions;
 use bollard::models::{HostConfig, PortBinding};
 use bollard::network::{CreateNetworkOptions, PruneNetworksOptions};
@@ -53,8 +52,6 @@ pub struct DevnetOrchestrator {
     bitcoin_node_container_id: Option<String>,
     bitcoin_explorer_container_id: Option<String>,
     postgres_container_id: Option<String>,
-    subnet_node_container_id: Option<String>,
-    subnet_api_container_id: Option<String>,
     docker_client: Option<Docker>,
     services_map_hosts: Option<ServicesMapHosts>,
     save_container_logs: bool,
@@ -67,8 +64,6 @@ pub struct ServicesMapHosts {
     pub postgres_host: String,
     pub stacks_explorer_host: String,
     pub bitcoin_explorer_host: String,
-    pub subnet_node_host: String,
-    pub subnet_api_host: String,
 }
 
 pub static EXCLUDED_STACKS_SNAPSHOT_FILES: &[&str] =
@@ -87,6 +82,7 @@ impl DevnetOrchestrator {
             None => NetworkManifest::from_project_manifest_location(
                 &manifest.location,
                 &StacksNetwork::Devnet.get_networks(),
+                false,
                 Some(&manifest.project.cache_location),
                 devnet_override,
             ),
@@ -175,8 +171,6 @@ impl DevnetOrchestrator {
             bitcoin_node_container_id: None,
             bitcoin_explorer_container_id: None,
             postgres_container_id: None,
-            subnet_node_container_id: None,
-            subnet_api_container_id: None,
             services_map_hosts: None,
             save_container_logs: false,
         })
@@ -202,8 +196,6 @@ impl DevnetOrchestrator {
             stacks_api_host: format!("stacks-blockchain-api.{namespace}.svc.cluster.local:3999"),
             stacks_explorer_host: "localhost".into(), // todo (micaiah)
             bitcoin_explorer_host: "localhost".into(), // todo (micaiah)
-            subnet_node_host: "localhost".into(),     // todo (micaiah)
-            subnet_api_host: "localhost".into(),      // todo (micaiah)
         };
 
         self.services_map_hosts = Some(services_map_hosts.clone());
@@ -273,8 +265,6 @@ impl DevnetOrchestrator {
                     "{}:{}",
                     gateway, devnet_config.bitcoin_explorer_port
                 ),
-                subnet_node_host: format!("{}:{}", gateway, devnet_config.subnet_node_rpc_port),
-                subnet_api_host: format!("{}:{}", gateway, devnet_config.subnet_api_port),
             }
         } else {
             ServicesMapHosts {
@@ -284,8 +274,6 @@ impl DevnetOrchestrator {
                 stacks_api_host: format!("localhost:{}", devnet_config.stacks_api_port),
                 stacks_explorer_host: format!("localhost:{}", devnet_config.stacks_explorer_port),
                 bitcoin_explorer_host: format!("localhost:{}", devnet_config.bitcoin_explorer_port),
-                subnet_node_host: format!("localhost:{}", devnet_config.subnet_node_rpc_port),
-                subnet_api_host: format!("localhost:{}", devnet_config.subnet_api_port),
             }
         };
 
@@ -320,8 +308,6 @@ impl DevnetOrchestrator {
         let disable_stacks_api = devnet_config.disable_stacks_api;
         let disable_stacks_explorer = devnet_config.disable_stacks_explorer;
         let disable_bitcoin_explorer = devnet_config.disable_bitcoin_explorer;
-        let enable_subnet_node = devnet_config.enable_subnet_node;
-        let disable_subnet_api = devnet_config.disable_subnet_api;
 
         let _ = fs::create_dir(&devnet_config.working_dir);
         let _ = fs::create_dir(format!("{}/conf", devnet_config.working_dir));
@@ -330,11 +316,9 @@ impl DevnetOrchestrator {
         let bitcoin_explorer_port = devnet_config.bitcoin_explorer_port;
         let stacks_explorer_port = devnet_config.stacks_explorer_port;
         let stacks_api_port = devnet_config.stacks_api_port;
-        let subnet_api_port = devnet_config.subnet_api_port;
 
         send_status_update(
             &event_tx,
-            enable_subnet_node,
             &self.logger,
             "bitcoin-node",
             Status::Red,
@@ -343,7 +327,6 @@ impl DevnetOrchestrator {
 
         send_status_update(
             &event_tx,
-            enable_subnet_node,
             &self.logger,
             "stacks-node",
             Status::Red,
@@ -352,7 +335,6 @@ impl DevnetOrchestrator {
 
         send_status_update(
             &event_tx,
-            enable_subnet_node,
             &self.logger,
             "stacks-signers",
             Status::Red,
@@ -362,7 +344,6 @@ impl DevnetOrchestrator {
         if !disable_stacks_api {
             send_status_update(
                 &event_tx,
-                enable_subnet_node,
                 &self.logger,
                 "stacks-api",
                 Status::Red,
@@ -372,7 +353,6 @@ impl DevnetOrchestrator {
         if !disable_stacks_explorer {
             send_status_update(
                 &event_tx,
-                enable_subnet_node,
                 &self.logger,
                 "stacks-explorer",
                 Status::Red,
@@ -382,28 +362,8 @@ impl DevnetOrchestrator {
         if !disable_bitcoin_explorer {
             send_status_update(
                 &event_tx,
-                enable_subnet_node,
                 &self.logger,
                 "bitcoin-explorer",
-                Status::Red,
-                "initializing",
-            );
-        }
-
-        if enable_subnet_node {
-            send_status_update(
-                &event_tx,
-                enable_subnet_node,
-                &self.logger,
-                "subnet-node",
-                Status::Red,
-                "initializing",
-            );
-            send_status_update(
-                &event_tx,
-                enable_subnet_node,
-                &self.logger,
-                "subnet-api",
                 Status::Red,
                 "initializing",
             );
@@ -418,7 +378,6 @@ impl DevnetOrchestrator {
         let _ = event_tx.send(DevnetEvent::info("Starting bitcoin-node".to_string()));
         send_status_update(
             &event_tx,
-            enable_subnet_node,
             &self.logger,
             "bitcoin-node",
             Status::Yellow,
@@ -434,7 +393,6 @@ impl DevnetOrchestrator {
         };
         send_status_update(
             &event_tx,
-            enable_subnet_node,
             &self.logger,
             "bitcoin-node",
             Status::Yellow,
@@ -478,13 +436,11 @@ impl DevnetOrchestrator {
         if !disable_stacks_api {
             send_status_update(
                 &event_tx,
-                enable_subnet_node,
                 &self.logger,
                 "stacks-api",
                 Status::Yellow,
                 "preparing container",
             );
-
             let _ = event_tx.send(DevnetEvent::info("Starting stacks-api".to_string()));
             match self.prepare_stacks_api_container(ctx).await {
                 Ok(_) => {}
@@ -494,9 +450,9 @@ impl DevnetOrchestrator {
                     return Err(message);
                 }
             };
+
             send_status_update(
                 &event_tx,
-                enable_subnet_node,
                 &self.logger,
                 "stacks-api",
                 Status::Green,
@@ -513,68 +469,10 @@ impl DevnetOrchestrator {
             };
         }
 
-        // Start subnet node
-        if enable_subnet_node {
-            let _ = event_tx.send(DevnetEvent::info("Starting subnet-node".to_string()));
-            match self.prepare_subnet_node_container(boot_index, ctx).await {
-                Ok(_) => {}
-                Err(message) => {
-                    let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
-                    self.kill(ctx, Some(&message)).await;
-                    return Err(message);
-                }
-            };
-            send_status_update(
-                &event_tx,
-                enable_subnet_node,
-                &self.logger,
-                "subnet-node",
-                Status::Yellow,
-                "booting",
-            );
-            match self.boot_subnet_node_container().await {
-                Ok(_) => {}
-                Err(message) => {
-                    let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
-                    self.kill(ctx, Some(&message)).await;
-                    return Err(message);
-                }
-            };
-
-            if !disable_subnet_api {
-                let _ = event_tx.send(DevnetEvent::info("Starting subnet-api".to_string()));
-                match self.prepare_subnet_api_container(ctx).await {
-                    Ok(_) => {}
-                    Err(message) => {
-                        let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
-                        self.kill(ctx, Some(&message)).await;
-                        return Err(message);
-                    }
-                };
-                send_status_update(
-                    &event_tx,
-                    enable_subnet_node,
-                    &self.logger,
-                    "subnet-api",
-                    Status::Green,
-                    &format!("http://localhost:{subnet_api_port}/doc"),
-                );
-                match self.boot_subnet_api_container().await {
-                    Ok(_) => {}
-                    Err(message) => {
-                        let _ = event_tx.send(DevnetEvent::FatalError(message.clone()));
-                        self.kill(ctx, Some(&message)).await;
-                        return Err(message);
-                    }
-                };
-            }
-        }
-
         // Start stacks-node
         let _ = event_tx.send(DevnetEvent::info("Starting stacks-node".to_string()));
         send_status_update(
             &event_tx,
-            enable_subnet_node,
             &self.logger,
             "stacks-node",
             Status::Yellow,
@@ -590,7 +488,6 @@ impl DevnetOrchestrator {
         };
         send_status_update(
             &event_tx,
-            enable_subnet_node,
             &self.logger,
             "stacks-node",
             Status::Yellow,
@@ -615,7 +512,6 @@ impl DevnetOrchestrator {
             let _ = event_tx.send(DevnetEvent::info(format!("Starting stacks-signer-{i}")));
             send_status_update(
                 &event_tx,
-                enable_subnet_node,
                 &self.logger,
                 "stacks-signers",
                 Status::Yellow,
@@ -634,7 +530,6 @@ impl DevnetOrchestrator {
             };
             send_status_update(
                 &event_tx,
-                enable_subnet_node,
                 &self.logger,
                 "stacks-signers",
                 Status::Yellow,
@@ -657,7 +552,6 @@ impl DevnetOrchestrator {
         );
         send_status_update(
             &event_tx,
-            enable_subnet_node,
             &self.logger,
             "stacks-signers",
             Status::Green,
@@ -668,7 +562,6 @@ impl DevnetOrchestrator {
         if !disable_stacks_explorer {
             send_status_update(
                 &event_tx,
-                enable_subnet_node,
                 &self.logger,
                 "stacks-explorer",
                 Status::Yellow,
@@ -693,7 +586,6 @@ impl DevnetOrchestrator {
             };
             send_status_update(
                 &event_tx,
-                enable_subnet_node,
                 &self.logger,
                 "stacks-explorer",
                 Status::Green,
@@ -705,7 +597,6 @@ impl DevnetOrchestrator {
         if !disable_bitcoin_explorer {
             send_status_update(
                 &event_tx,
-                enable_subnet_node,
                 &self.logger,
                 "bitcoin-explorer",
                 Status::Yellow,
@@ -730,7 +621,6 @@ impl DevnetOrchestrator {
             };
             send_status_update(
                 &event_tx,
-                enable_subnet_node,
                 &self.logger,
                 "bitcoin-explorer",
                 Status::Green,
@@ -748,7 +638,6 @@ impl DevnetOrchestrator {
                 Ok(false) => {
                     send_status_update(
                         &event_tx,
-                        enable_subnet_node,
                         &self.logger,
                         "bitcoin-node",
                         Status::Yellow,
@@ -757,7 +646,6 @@ impl DevnetOrchestrator {
 
                     send_status_update(
                         &event_tx,
-                        enable_subnet_node,
                         &self.logger,
                         "stacks-node",
                         Status::Yellow,
@@ -1198,18 +1086,6 @@ events_keys = ["*"]
             ));
         }
 
-        if devnet_config.enable_subnet_node {
-            stacks_conf.push_str(&format!(
-                r#"
-# Add subnet-node as an event observer
-[[events_observer]]
-endpoint = "subnet-node.{}:{}"
-events_keys = ["*"]
-"#,
-                self.network_name, devnet_config.subnet_events_ingestion_port
-            ));
-        }
-
         for chains_coordinator in devnet_config.stacks_node_events_observers.iter() {
             stacks_conf.push_str(&format!(
                 r#"
@@ -1556,255 +1432,6 @@ db_path = "stacks-signer-{signer_id}.sqlite"
         Ok(())
     }
 
-    pub fn prepare_subnet_node_config(&self, boot_index: u32) -> Result<Config<String>, String> {
-        let devnet_config = match &self.network_config {
-            Some(network_config) => match &network_config.devnet {
-                Some(devnet_config) => devnet_config,
-                _ => return Err("unable to get devnet configuration".into()),
-            },
-            _ => return Err("unable to get Docker client".into()),
-        };
-
-        let mut port_bindings = HashMap::new();
-        port_bindings.insert(
-            format!("{}/tcp", devnet_config.subnet_node_p2p_port),
-            Some(vec![PortBinding {
-                host_ip: Some(String::from("0.0.0.0")),
-                host_port: Some(format!("{}", devnet_config.subnet_node_p2p_port)),
-            }]),
-        );
-        port_bindings.insert(
-            format!("{}/tcp", devnet_config.subnet_node_rpc_port),
-            Some(vec![PortBinding {
-                host_ip: Some(String::from("0.0.0.0")),
-                host_port: Some(format!("{}", devnet_config.subnet_node_rpc_port)),
-            }]),
-        );
-        port_bindings.insert(
-            format!("{}/tcp", devnet_config.subnet_events_ingestion_port),
-            Some(vec![PortBinding {
-                host_ip: Some(String::from("0.0.0.0")),
-                host_port: Some(format!("{}", devnet_config.subnet_events_ingestion_port)),
-            }]),
-        );
-
-        let mut subnet_conf = format!(
-            r#"
-[node]
-working_dir = "/devnet"
-rpc_bind = "0.0.0.0:{subnet_node_rpc_port}"
-p2p_bind = "0.0.0.0:{subnet_node_p2p_port}"
-miner = true
-seed = "{subnet_leader_secret_key_hex}"
-mining_key = "{subnet_leader_secret_key_hex}"
-local_peer_seed = "{subnet_leader_secret_key_hex}"
-wait_time_for_microblocks = {wait_time_for_microblocks}
-wait_before_first_anchored_block = 0
-
-[miner]
-first_attempt_time_ms = {first_attempt_time_ms}
-self_signing_seed = 1
-# microblock_attempt_time_ms = 15_000
-
-[burnchain]
-chain = "stacks_layer_1"
-mode = "subnet"
-first_burn_header_height = {first_burn_header_height}
-peer_host = "host.docker.internal"
-rpc_port = {stacks_node_rpc_port}
-peer_port = {stacks_node_p2p_port}
-contract_identifier = "{subnet_contract_id}"
-observer_port = {subnet_events_ingestion_port}
-
-# Add orchestrator (docker-host) as an event observer
-# [[events_observer]]
-# endpoint = "host.docker.internal:{orchestrator_port}"
-# events_keys = ["*"]
-"#,
-            subnet_node_rpc_port = devnet_config.subnet_node_rpc_port,
-            subnet_node_p2p_port = devnet_config.subnet_node_p2p_port,
-            subnet_leader_secret_key_hex = devnet_config.subnet_leader_secret_key_hex,
-            stacks_node_rpc_port = devnet_config.stacks_node_rpc_port,
-            stacks_node_p2p_port = devnet_config.stacks_node_p2p_port,
-            orchestrator_port = devnet_config.orchestrator_ingestion_port,
-            subnet_events_ingestion_port = devnet_config.subnet_events_ingestion_port,
-            first_burn_header_height = 0,
-            subnet_contract_id = devnet_config.remapped_subnet_contract_id,
-            wait_time_for_microblocks = devnet_config.stacks_node_wait_time_for_microblocks,
-            first_attempt_time_ms = devnet_config.stacks_node_first_attempt_time_ms,
-        );
-
-        for events_observer in devnet_config.subnet_node_events_observers.iter() {
-            subnet_conf.push_str(&format!(
-                r#"
-[[events_observer]]
-endpoint = "{events_observer}"
-events_keys = ["*"]
-"#,
-            ));
-        }
-
-        if !devnet_config.disable_subnet_api {
-            subnet_conf.push_str(&format!(
-                r#"
-# Add subnet-api as an event observer
-[[events_observer]]
-endpoint = "subnet-api.{}:{}"
-events_keys = ["*"]
-"#,
-                self.network_name, devnet_config.subnet_api_events_port
-            ));
-        }
-
-        let mut subnet_conf_path = PathBuf::from(&devnet_config.working_dir);
-        subnet_conf_path.push("conf/Subnet.toml");
-        let mut file = File::create(subnet_conf_path.clone()).map_err(|e| {
-            format!(
-                "unable to create Subnet.toml ({}): {:?}",
-                subnet_conf_path.to_str().unwrap(),
-                e
-            )
-        })?;
-        file.write_all(subnet_conf.as_bytes())
-            .map_err(|e| format!("unable to write Subnet.toml: {e:?}"))?;
-
-        let mut stacks_node_data_path = PathBuf::from(&devnet_config.working_dir);
-        stacks_node_data_path.push("data");
-        stacks_node_data_path.push(boot_index.to_string());
-        let _ = fs::create_dir(stacks_node_data_path.clone()).map_err(|e| {
-            format!(
-                "unable to create stacks node data path ({}): {:?}",
-                stacks_node_data_path.to_str().unwrap(),
-                e
-            )
-        });
-
-        stacks_node_data_path.push("subnet");
-
-        let mut exposed_ports = HashMap::new();
-        exposed_ports.insert(
-            format!("{}/tcp", devnet_config.subnet_node_rpc_port),
-            HashMap::new(),
-        );
-        exposed_ports.insert(
-            format!("{}/tcp", devnet_config.subnet_node_p2p_port),
-            HashMap::new(),
-        );
-        exposed_ports.insert(
-            format!("{}/tcp", devnet_config.subnet_events_ingestion_port),
-            HashMap::new(),
-        );
-
-        let mut labels = HashMap::new();
-        labels.insert("project".to_string(), self.network_name.to_string());
-        labels.insert("reset".to_string(), "true".to_string());
-
-        let mut binds = vec![format!(
-            "{}/conf:/src/subnet-node/",
-            devnet_config.working_dir
-        )];
-
-        if devnet_config.bind_containers_volumes {
-            binds.push(format!(
-                "{}/data/{}/subnet:/devnet/",
-                devnet_config.working_dir, boot_index
-            ))
-        }
-
-        let mut env = vec![
-            "STACKS_LOG_PP=1".to_string(),
-            "STACKS_LOG_DEBUG=1".to_string(),
-        ];
-        env.append(&mut devnet_config.subnet_node_env_vars.clone());
-
-        let config = Config {
-            labels: Some(labels),
-            image: Some(devnet_config.subnet_node_image_url.clone()),
-            // domainname: Some(self.network_name.to_string()),
-            tty: None,
-            exposed_ports: Some(exposed_ports),
-            entrypoint: Some(vec![
-                "subnet-node".into(),
-                "start".into(),
-                "--config=/src/subnet-node/Subnet.toml".into(),
-            ]),
-            env: Some(env),
-            host_config: Some(HostConfig {
-                auto_remove: Some(true),
-                binds: Some(binds),
-                network_mode: Some(self.network_name.clone()),
-                port_bindings: Some(port_bindings),
-                extra_hosts: Some(vec!["host.docker.internal:host-gateway".into()]),
-                ..Default::default()
-            }),
-            ..Default::default()
-        };
-
-        Ok(config)
-    }
-
-    pub async fn prepare_subnet_node_container(
-        &mut self,
-        boot_index: u32,
-        ctx: &Context,
-    ) -> Result<(), String> {
-        let docker = self.docker_client.as_ref().ok_or(DOCKER_ERR_MSG)?;
-        let devnet_config = self.get_devnet_config()?;
-
-        let platform = devnet_config
-            .docker_platform
-            .clone()
-            .unwrap_or(DEFAULT_DOCKER_PLATFORM.to_string());
-        let _info = docker
-            .create_image(
-                Some(CreateImageOptions {
-                    from_image: devnet_config.subnet_node_image_url.clone(),
-                    platform: platform.clone(),
-                    ..Default::default()
-                }),
-                None,
-                None,
-            )
-            .try_collect::<Vec<_>>()
-            .await
-            .map_err(|e| format!("unable to create image: {e}"))?;
-        let options = CreateContainerOptions {
-            name: format!("subnet-node.{}", self.network_name),
-            platform: Some(platform),
-        };
-
-        let config = self.prepare_subnet_node_config(boot_index)?;
-
-        let container = docker
-            .create_container::<String, String>(Some(options), config)
-            .await
-            .map_err(|e| format!("unable to create container: {e}"))?
-            .id;
-
-        ctx.try_log(|logger| slog::info!(logger, "Created container subnet-node: {}", container));
-        self.subnet_node_container_id = Some(container);
-
-        Ok(())
-    }
-
-    pub async fn boot_subnet_node_container(&self) -> Result<(), String> {
-        let container = match &self.subnet_node_container_id {
-            Some(container) => container.clone(),
-            _ => return Err("unable to boot container".to_string()),
-        };
-
-        let Some(docker) = &self.docker_client else {
-            return Err("unable to get Docker client".into());
-        };
-
-        docker
-            .start_container::<String>(&container, None)
-            .await
-            .map_err(|e| format!("unable to start container - {e}"))?;
-
-        Ok(())
-    }
-
     pub async fn prepare_stacks_api_container(&mut self, ctx: &Context) -> Result<(), String> {
         let docker = self
             .docker_client
@@ -2003,286 +1630,6 @@ events_keys = ["*"]
                 ctx.try_log(|logger| slog::info!(logger, "Events import completed successfully"));
             }
         }
-        Ok(())
-    }
-
-    pub async fn prepare_subnet_api_container(&mut self, ctx: &Context) -> Result<(), String> {
-        // NOTE: this doesn't use docker_and_configs because of a borrow checker issue
-        let (docker, _, devnet_config) = match (&self.docker_client, &self.network_config) {
-            (Some(ref docker), Some(ref network_config)) => match network_config.devnet {
-                Some(ref devnet_config) => (docker, network_config, devnet_config),
-                _ => return Err("unable to get devnet configuration".into()),
-            },
-            _ => return Err("unable to get Docker client".into()),
-        };
-
-        let platform = devnet_config
-            .docker_platform
-            .clone()
-            .unwrap_or(DEFAULT_DOCKER_PLATFORM.to_string());
-        let _info = docker
-            .create_image(
-                Some(CreateImageOptions {
-                    from_image: devnet_config.subnet_api_image_url.clone(),
-                    platform: platform.clone(),
-                    ..Default::default()
-                }),
-                None,
-                None,
-            )
-            .try_collect::<Vec<_>>()
-            .await
-            .map_err(|e| format!("unable to create image: {e}"))?;
-        let options = CreateContainerOptions {
-            name: format!("subnet-api.{}", self.network_name),
-            platform: Some(platform),
-        };
-
-        let mut port_bindings = HashMap::new();
-        port_bindings.insert(
-            format!("{}/tcp", devnet_config.subnet_api_port),
-            Some(vec![PortBinding {
-                host_ip: Some(String::from("0.0.0.0")),
-                host_port: Some(format!("{}", devnet_config.subnet_api_port)),
-            }]),
-        );
-
-        let mut exposed_ports = HashMap::new();
-        exposed_ports.insert(
-            format!("{}/tcp", devnet_config.subnet_api_port),
-            HashMap::new(),
-        );
-
-        let mut labels = HashMap::new();
-        labels.insert("project".to_string(), self.network_name.to_string());
-
-        let mut env = vec![
-            format!("STACKS_CORE_RPC_HOST=subnet-node.{}", self.network_name),
-            format!("STACKS_BLOCKCHAIN_API_DB=pg"),
-            format!(
-                "STACKS_CORE_RPC_PORT={}",
-                devnet_config.subnet_node_rpc_port
-            ),
-            format!(
-                "STACKS_BLOCKCHAIN_API_PORT={}",
-                devnet_config.subnet_api_port
-            ),
-            format!("STACKS_BLOCKCHAIN_API_HOST=0.0.0.0"),
-            format!(
-                "STACKS_CORE_EVENT_PORT={}",
-                devnet_config.subnet_api_events_port
-            ),
-            format!("STACKS_CORE_EVENT_HOST=0.0.0.0"),
-            format!("STACKS_API_ENABLE_FT_METADATA=1"),
-            format!("PG_HOST=postgres.{}", self.network_name),
-            format!("PG_PORT={}", devnet_config.postgres_port),
-            format!("PG_USER={}", devnet_config.postgres_username),
-            format!("PG_PASSWORD={}", devnet_config.postgres_password),
-            format!("PG_DATABASE={}", devnet_config.subnet_api_postgres_database),
-            format!("STACKS_CHAIN_ID=0x55005500"),
-            format!("CUSTOM_CHAIN_IDS=testnet=0x55005500"),
-            format!("V2_POX_MIN_AMOUNT_USTX=90000000260"),
-            "NODE_ENV=development".to_string(),
-        ];
-        env.append(&mut devnet_config.subnet_api_env_vars.clone());
-
-        let config = Config {
-            labels: Some(labels),
-            image: Some(devnet_config.subnet_api_image_url.clone()),
-            // domainname: Some(self.network_name.to_string()),
-            tty: None,
-            exposed_ports: Some(exposed_ports),
-            env: Some(env),
-            host_config: Some(HostConfig {
-                auto_remove: Some(true),
-                network_mode: Some(self.network_name.clone()),
-                port_bindings: Some(port_bindings),
-                extra_hosts: Some(vec!["host.docker.internal:host-gateway".into()]),
-                ..Default::default()
-            }),
-            ..Default::default()
-        };
-
-        let container = docker
-            .create_container::<String, String>(Some(options), config)
-            .await
-            .map_err(|e| format!("unable to create container: {e}"))?
-            .id;
-
-        ctx.try_log(|logger| slog::info!(logger, "Created container subnet-api: {}", container));
-        self.subnet_api_container_id = Some(container.clone());
-
-        let import_path = PathBuf::from(&devnet_config.working_dir).join("import_events_path");
-        if import_path.exists() {
-            // Read the path to the events file
-            let events_path_str = fs::read_to_string(&import_path)
-                .map_err(|e| format!("unable to read import path file: {e:?}"))?;
-            let events_path = PathBuf::from(events_path_str);
-
-            if events_path.exists() {
-                ctx.try_log(|logger| {
-                    slog::info!(logger, "Importing events from {}", events_path.display())
-                });
-
-                // Read the events file
-                let file_content = fs::read(&events_path)
-                    .map_err(|e| format!("unable to read events file: {e:?}"))?;
-
-                // Create a tar archive with the events file
-                let tmp_dir = PathBuf::from(&devnet_config.working_dir).join("tmp_import");
-                let _ = fs::remove_dir_all(&tmp_dir); // Remove if exists
-                fs::create_dir_all(&tmp_dir)
-                    .map_err(|e| format!("unable to create temporary directory: {e:?}"))?;
-
-                // Copy the events file to the temp directory
-                let tmp_events_file = tmp_dir.join("events_cache.tsv");
-                fs::write(&tmp_events_file, &file_content)
-                    .map_err(|e| format!("unable to write temporary events file: {e:?}"))?;
-
-                // Create a tar archive
-                let tar_file = tmp_dir.join("events_import.tar");
-                let status = std::process::Command::new("tar")
-                    .args([
-                        "-cf",
-                        tar_file.to_str().unwrap(),
-                        "-C",
-                        tmp_dir.to_str().unwrap(),
-                        "events_cache.tsv",
-                    ])
-                    .status()
-                    .map_err(|e| format!("unable to create tar: {e:?}"))?;
-
-                if !status.success() {
-                    return Err("Failed to create tar archive".to_string());
-                }
-
-                // Read the tar file
-                let tar_content =
-                    fs::read(&tar_file).map_err(|e| format!("unable to read tar file: {e:?}"))?;
-
-                // Copy the tar to the container
-                let container_id = container.clone();
-                docker
-                    .upload_to_container(
-                        &container_id,
-                        Some(bollard::container::UploadToContainerOptions {
-                            path: "/tmp",
-                            ..Default::default()
-                        }),
-                        tar_content.into(),
-                    )
-                    .await
-                    .map_err(|e| format!("unable to copy tar to container: {e}"))?;
-
-                // Extract the tar in the container
-                let config = CreateExecOptions {
-                    cmd: Some(vec!["tar", "-xf", "/tmp/events_import.tar", "-C", "/tmp"]),
-                    attach_stdout: Some(false),
-                    attach_stderr: Some(false),
-                    ..Default::default()
-                };
-
-                let exec = docker
-                    .create_exec(&container_id, config)
-                    .await
-                    .map_err(|e| format!("unable to create exec command for extraction: {e}"))?;
-
-                let _ = docker
-                    .start_exec(&exec.id, None)
-                    .await
-                    .map_err(|e| format!("unable to extract tar in container: {e}"))?;
-
-                ctx.try_log(|logger| slog::info!(logger, "Events file copied to container"));
-
-                // Wait a bit more to ensure the API is fully started before importing
-                std::thread::sleep(std::time::Duration::from_secs(10));
-
-                // Run the import command
-                let config = CreateExecOptions {
-                    cmd: Some(vec![
-                        "node",
-                        "/app/dist/index.js",
-                        "import-events",
-                        "--file",
-                        "/tmp/events_cache.tsv",
-                        "--wipe-db",
-                    ]),
-                    attach_stdout: Some(true),
-                    attach_stderr: Some(true),
-                    ..Default::default()
-                };
-
-                let exec = docker
-                    .create_exec(&container_id, config)
-                    .await
-                    .map_err(|e| format!("unable to create exec command for import: {e}"))?;
-
-                let _output = docker
-                    .start_exec(&exec.id, None)
-                    .await
-                    .map_err(|e| format!("unable to import events: {e}"))?;
-
-                ctx.try_log(|logger| slog::info!(logger, "Events import completed"));
-
-                // Remove the temporary path file and directory
-                let _ = fs::remove_file(&import_path);
-                let _ = fs::remove_dir_all(tmp_dir);
-            }
-        }
-
-        Ok(())
-    }
-
-    pub async fn boot_subnet_api_container(&self) -> Result<(), String> {
-        // Before booting the subnet-api, we need to create an additional DB in the postgres container.
-        let docker = self.docker_client.as_ref().ok_or(DOCKER_ERR_MSG)?;
-        let devnet_config = self.get_devnet_config()?;
-
-        let postgres_container = match &self.postgres_container_id {
-            Some(container) => container.clone(),
-            _ => return Err("unable to boot container".to_string()),
-        };
-
-        let psql_command = format!(
-            "CREATE DATABASE {};",
-            devnet_config.subnet_api_postgres_database
-        );
-
-        let config = CreateExecOptions {
-            cmd: Some(vec!["psql", "-U", "postgres", "-c", psql_command.as_str()]),
-            attach_stdout: Some(false),
-            attach_stderr: Some(false),
-            ..Default::default()
-        };
-
-        let exec = docker
-            .create_exec::<&str>(&postgres_container, config)
-            .await
-            .map_err(|e| formatted_docker_error("unable to create exec command", e))?;
-
-        // Pause to ensure the postgres container is ready.
-        // TODO
-        std::thread::sleep(std::time::Duration::from_secs(10));
-
-        let _res = docker
-            .start_exec(&exec.id, None)
-            .await
-            .map_err(|e| formatted_docker_error("unable to start exec command", e))?;
-
-        let container = match &self.subnet_api_container_id {
-            Some(container) => container.clone(),
-            _ => return Err("unable to boot container".to_string()),
-        };
-
-        let Some(docker) = &self.docker_client else {
-            return Err("unable to get Docker client".into());
-        };
-
-        docker
-            .start_container::<String>(&container, None)
-            .await
-            .map_err(|e| formatted_docker_error("unable to start stacks-api container", e))?;
-
         Ok(())
     }
 
@@ -2776,8 +2123,6 @@ events_keys = ["*"]
             self.stacks_api_container_id.clone(),
             self.postgres_container_id.clone(),
             self.stacks_node_container_id.clone(),
-            self.subnet_node_container_id.clone(),
-            self.subnet_api_container_id.clone(),
         ];
 
         let signers_container_ids = self.stacks_signers_containers_ids.clone();

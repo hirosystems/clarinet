@@ -22,7 +22,7 @@ categories = [
 ]
 
 [dependencies]
-chrono = "0.4.31"
+chrono = { workspace = true }
 colored = { workspace = true }
 regex = "1.7"
 reqwest = { workspace = true, features = ["blocking"] }
@@ -32,8 +32,8 @@ serde_json = { version = "1.0.47", features = ["unbounded_depth"] }
 sha2 = "0.10"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-clarity = { workspace = true, default-features = false, features = ["developer-mode", "devtools", "log"] }
-clar2wasm = { git = "https://github.com/stacks-network/clarity-wasm.git", branch = "main" }
+clarity = { workspace = true, default-features = false, features = ["rusqlite", "developer-mode", "devtools"] }
+rusqlite = { version = "0.31.0", features = ["bundled"] }
 pox-locking = { workspace = true, default-features = true }
 
 comfy-table = "7.1.4"
@@ -52,8 +52,8 @@ log = { version = "0.4.16", optional = true }
 memchr = { version = "2.4.1", optional = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-clarity = { workspace = true, features = ["wasm", "developer-mode", "devtools"] }
-pox-locking = { workspace = true, default-features = false, features = ["wasm"] }
+clarity = { workspace = true, default-features = false, features = ["developer-mode", "devtools", "wasm-web"] }
+pox-locking = { workspace = true, default-features = false }
 
 comfy-table = { version = "7.1.4", default-features = false }
 js-sys = { version = "0.3" }
@@ -65,7 +65,7 @@ web-sys = { workspace = true }
 [dev-dependencies]
 test-case = "*"
 divan = "0.1"
-mockito = { version = "1.6", default-features = false }
+mockito = { workspace = true }
 tempfile = "3.19"
 
 [lib]

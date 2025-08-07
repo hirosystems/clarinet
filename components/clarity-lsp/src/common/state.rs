@@ -369,7 +369,7 @@ impl EditorState {
 
         match definitions.get(&position_hash)? {
             DefinitionLocation::Internal(range) => Some(Location {
-                uri: contract_location.try_into().ok()?,
+                uri: contract_location.to_url_string().ok()?.parse().ok()?,
                 range: *range,
             }),
             DefinitionLocation::External(contract_identifier, name) => {
@@ -377,7 +377,11 @@ impl EditorState {
                 let protocol = self.protocols.get(&metadata.manifest_location)?;
                 let definition_contract_location =
                     protocol.locations_lookup.get(contract_identifier)?;
-                let uri = definition_contract_location.try_into().ok()?;
+                let uri = definition_contract_location
+                    .to_url_string()
+                    .ok()?
+                    .parse()
+                    .ok()?;
 
                 // if the contract is opened and eventually contains unsaved changes,
                 // its public definitions are computed on the fly, which is fairly fast

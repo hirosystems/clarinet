@@ -1,11 +1,10 @@
 use clarinet_files::{
     DEFAULT_BITCOIN_EXPLORER_IMAGE, DEFAULT_BITCOIN_NODE_IMAGE, DEFAULT_DERIVATION_PATH,
     DEFAULT_EPOCH_2_0, DEFAULT_EPOCH_2_05, DEFAULT_EPOCH_2_1, DEFAULT_EPOCH_2_2, DEFAULT_EPOCH_2_3,
-    DEFAULT_EPOCH_2_4, DEFAULT_EPOCH_2_5, DEFAULT_EPOCH_3_0, DEFAULT_EPOCH_3_1,
+    DEFAULT_EPOCH_2_4, DEFAULT_EPOCH_2_5, DEFAULT_EPOCH_3_0, DEFAULT_EPOCH_3_1, DEFAULT_EPOCH_3_2,
     DEFAULT_FAUCET_MNEMONIC, DEFAULT_POSTGRES_IMAGE, DEFAULT_STACKER_MNEMONIC,
     DEFAULT_STACKS_API_IMAGE, DEFAULT_STACKS_EXPLORER_IMAGE, DEFAULT_STACKS_MINER_MNEMONIC,
-    DEFAULT_STACKS_NODE_IMAGE, DEFAULT_STACKS_SIGNER_IMAGE, DEFAULT_SUBNET_API_IMAGE,
-    DEFAULT_SUBNET_CONTRACT_ID, DEFAULT_SUBNET_MNEMONIC, DEFAULT_SUBNET_NODE_IMAGE,
+    DEFAULT_STACKS_NODE_IMAGE, DEFAULT_STACKS_SIGNER_IMAGE,
 };
 
 use super::changes::{Changes, DirectoryCreation, FileCreation};
@@ -170,6 +169,7 @@ cache_dir = "./.cache"
 
 # [contracts.counter]
 # path = "contracts/counter.clar"
+# epoch = "latest"
 
 [repl.analysis]
 passes = ["check_checker"]
@@ -310,7 +310,6 @@ sbtc_balance = 1_000_000_000
 disable_stacks_explorer = false
 disable_stacks_api = false
 # disable_postgres = false
-# disable_subnet_api = false
 # disable_bitcoin_explorer = true
 # working_dir = "tmp/devnet"
 # stacks_node_events_observers = ["host.docker.internal:8002"]
@@ -343,17 +342,6 @@ disable_stacks_api = false
 # stacks_explorer_image_url = "{DEFAULT_STACKS_EXPLORER_IMAGE}"
 # bitcoin_explorer_image_url = "{DEFAULT_BITCOIN_EXPLORER_IMAGE}"
 # postgres_image_url = "{DEFAULT_POSTGRES_IMAGE}"
-# enable_subnet_node = true
-# subnet_node_image_url = "{DEFAULT_SUBNET_NODE_IMAGE}"
-# subnet_leader_mnemonic = "{DEFAULT_SUBNET_MNEMONIC}"
-# subnet_leader_derivation_path = "{DEFAULT_DERIVATION_PATH}"
-# subnet_contract_id = "{DEFAULT_SUBNET_CONTRACT_ID}"
-# subnet_node_rpc_port = 30443
-# subnet_node_p2p_port = 30444
-# subnet_events_ingestion_port = 30445
-# subnet_node_events_observers = ["host.docker.internal:8002"]
-# subnet_api_image_url = "{DEFAULT_SUBNET_API_IMAGE}"
-# subnet_api_postgres_database = "subnet_api"
 
 # epoch_2_0 = {DEFAULT_EPOCH_2_0}
 # epoch_2_05 = {DEFAULT_EPOCH_2_05}
@@ -364,6 +352,7 @@ disable_stacks_api = false
 # epoch_2_5 = {DEFAULT_EPOCH_2_5}
 # epoch_3_0 = {DEFAULT_EPOCH_3_0}
 # epoch_3_1 = {DEFAULT_EPOCH_3_1}
+# epoch_3_2 = {DEFAULT_EPOCH_3_2}
 
 # Send some stacking orders
 [[devnet.pox_stacking_orders]]
@@ -422,7 +411,6 @@ btc_address = "mvZtbibDAAA3WLpY7zXXFqRa3T4XSknBX7"
   "dependencies": {{
     "@hirosystems/clarinet-sdk": "^3.0.2",
     "@stacks/transactions": "^7.0.6",
-    "@types/node": "^22.15.18",
     "chokidar-cli": "^3.0.0",
     "vitest": "^3.1.3",
     "vitest-environment-clarinet": "^2.3.0"

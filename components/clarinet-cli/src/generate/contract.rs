@@ -4,7 +4,7 @@ use std::str::FromStr;
 
 use clarinet_files::FileLocation;
 use clarity_repl::repl::{
-    ClarityCodeSource, ClarityContract, ContractDeployer, DEFAULT_CLARITY_VERSION, DEFAULT_EPOCH,
+    ClarityCodeSource, ClarityContract, ContractDeployer, DEFAULT_CLARITY_VERSION,
 };
 
 use super::changes::{Changes, FileCreation, FileDeletion, TOMLEdition};
@@ -215,7 +215,7 @@ describe("example tests", () => {
             deployer: ContractDeployer::DefaultDeployer,
             name: self.contract_name.clone(),
             clarity_version: DEFAULT_CLARITY_VERSION,
-            epoch: DEFAULT_EPOCH,
+            epoch: clarity_repl::repl::Epoch::Latest,
         };
         let mut contracts_to_add = HashMap::new();
         contracts_to_add.insert(self.contract_name.clone(), contract_config);

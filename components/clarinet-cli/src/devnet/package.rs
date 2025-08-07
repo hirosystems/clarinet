@@ -56,6 +56,7 @@ pub fn pack(file_name: Option<String>, project_manifest: ProjectManifest) -> Res
     let network_manifest = NetworkManifest::from_project_manifest_location(
         &project_manifest.location,
         &StacksNetwork::Devnet.get_networks(),
+        false,
         None,
         None,
     )

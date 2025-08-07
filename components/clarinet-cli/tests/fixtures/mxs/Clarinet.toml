@@ -1,0 +1,13 @@
+[project]
+name = 'mxs-test'
+
+[contracts.counter]
+path = 'counter.clar'
+epoch = 'latest'
+clarity_version = 3
+
+[repl.remote_data]
+enabled = true
+api_url = 'https://api.hiro.so'
+initial_height = 522000
+use_mainnet_wallets = true

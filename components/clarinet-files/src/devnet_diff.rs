@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use bitcoin::hex::DisplayHex;
+
 pub use crate::DevnetConfig;
 
 /// Config which fields to check for differences
@@ -82,6 +84,19 @@ impl DevnetDiffConfig {
             // With the default snapshot, the devnet starts at epoch 3.0
             // So users can set custom higher epoch heights
 
+            // Signers
+            SignificantField {
+                name: "stacks_signers_keys".to_string(),
+                extractor: make_extractor(|config| {
+                    let mut keys: Vec<String> = config
+                        .stacks_signers_keys
+                        .iter()
+                        .map(|key| clarity::types::PrivateKey::to_bytes(key).to_lower_hex_string())
+                        .collect();
+                    keys.sort();
+                    keys.join(",")
+                }),
+            },
             // Stacking orders
             SignificantField {
                 name: "pox_stacking_orders".to_string(),

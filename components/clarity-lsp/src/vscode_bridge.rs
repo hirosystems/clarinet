@@ -14,7 +14,7 @@ use lsp_types::request::{
 };
 use lsp_types::{
     DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
-    DidSaveTextDocumentParams, MessageType, PublishDiagnosticsParams, Url,
+    DidSaveTextDocumentParams, MessageType, PublishDiagnosticsParams,
 };
 use serde::Serialize;
 use serde_wasm_bindgen::{from_value as decode_from_js, to_value as encode_to_js, Serializer};
@@ -177,7 +177,7 @@ impl LspVscodeBridge {
             }
 
             for (location, diags) in aggregated_diagnostics.into_iter() {
-                if let Ok(uri) = Url::parse(&location.to_string()) {
+                if let Ok(uri) = location.to_url_string()?.parse() {
                     send_diagnostic.call1(
                         &JsValue::NULL,
                         &encode_to_js(&PublishDiagnosticsParams {

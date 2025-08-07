@@ -86,7 +86,7 @@ jobs:
         run: cargo install cargo-audit || true
 
       - name: Run audit
-        run: cargo audit --ignore RUSTSEC-2022-0028 --ignore RUSTSEC-2024-0438
+        run: cargo audit --ignore RUSTSEC-2022-0028
 
       - name: Run rustfmt
         run: cargo fmt-stacks --check

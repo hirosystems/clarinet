@@ -2,6 +2,8 @@ pub mod boot;
 pub mod clarity_values;
 pub mod datastore;
 pub mod diagnostic;
+#[cfg(not(target_arch = "wasm32"))]
+mod docs;
 pub mod hooks;
 pub mod interpreter;
 pub mod remote_data;
@@ -24,7 +26,109 @@ pub use session::Session;
 pub use settings::{SessionSettings, Settings, SettingsFile};
 
 pub const DEFAULT_CLARITY_VERSION: ClarityVersion = ClarityVersion::Clarity3;
-pub const DEFAULT_EPOCH: StacksEpochId = StacksEpochId::Epoch31;
+pub const DEFAULT_EPOCH: StacksEpochId = StacksEpochId::Epoch32;
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Epoch {
+    Specific(StacksEpochId),
+    Latest,
+}
+
+impl PartialEq<StacksEpochId> for Epoch {
+    fn eq(&self, other: &StacksEpochId) -> bool {
+        match self {
+            Epoch::Specific(epoch) => epoch == other,
+            Epoch::Latest => &DEFAULT_EPOCH == other,
+        }
+    }
+}
+
+impl Serialize for Epoch {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match self {
+            Epoch::Specific(epoch) => serializer.serialize_str(&format!("{epoch}")),
+            Epoch::Latest => serializer.serialize_str("latest"),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for Epoch {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct EpochVisitor;
+
+        impl<'de> serde::de::Visitor<'de> for EpochVisitor {
+            type Value = Epoch;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("a string or StacksEpochId")
+            }
+
+            fn visit_str<E>(self, value: &str) -> Result<Epoch, E>
+            where
+                E: serde::de::Error,
+            {
+                if value == "latest" {
+                    Ok(Epoch::Latest)
+                } else {
+                    Err(serde::de::Error::custom(format!(
+                        "unknown epoch value: {value}"
+                    )))
+                }
+            }
+
+            fn visit_f64<E>(self, value: f64) -> Result<Epoch, E>
+            where
+                E: serde::de::Error,
+            {
+                // Handle numeric epoch values by converting to StacksEpochId
+                let epoch = match value {
+                    1.0 => StacksEpochId::Epoch10,
+                    2.0 => StacksEpochId::Epoch20,
+                    2.05 => StacksEpochId::Epoch2_05,
+                    2.1 => StacksEpochId::Epoch21,
+                    2.2 => StacksEpochId::Epoch22,
+                    2.3 => StacksEpochId::Epoch23,
+                    2.4 => StacksEpochId::Epoch24,
+                    2.5 => StacksEpochId::Epoch25,
+                    3.0 => StacksEpochId::Epoch30,
+                    3.1 => StacksEpochId::Epoch31,
+                    _ => {
+                        return Err(serde::de::Error::custom(format!(
+                            "unknown epoch value: {value}"
+                        )))
+                    }
+                };
+                Ok(Epoch::Specific(epoch))
+            }
+        }
+
+        deserializer.deserialize_any(EpochVisitor)
+    }
+}
+
+impl Epoch {
+    pub fn resolve(&self) -> StacksEpochId {
+        match self {
+            Epoch::Specific(epoch) => *epoch,
+            Epoch::Latest => DEFAULT_EPOCH,
+        }
+    }
+}
+
+impl Display for Epoch {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Epoch::Specific(epoch) => write!(f, "{epoch}"),
+            Epoch::Latest => write!(f, "latest"),
+        }
+    }
+}
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct ClarityContract {
@@ -32,7 +136,7 @@ pub struct ClarityContract {
     pub name: String,
     pub deployer: ContractDeployer,
     pub clarity_version: ClarityVersion,
-    pub epoch: StacksEpochId,
+    pub epoch: Epoch,
 }
 
 impl Serialize for ClarityContract {
@@ -65,38 +169,7 @@ impl Serialize for ClarityContract {
                 map.serialize_entry("clarity_version", &3)?;
             }
         }
-        match self.epoch {
-            StacksEpochId::Epoch10 => {
-                map.serialize_entry("epoch", &1.0)?;
-            }
-            StacksEpochId::Epoch20 => {
-                map.serialize_entry("epoch", &2.0)?;
-            }
-            StacksEpochId::Epoch2_05 => {
-                map.serialize_entry("epoch", &2.05)?;
-            }
-            StacksEpochId::Epoch21 => {
-                map.serialize_entry("epoch", &2.1)?;
-            }
-            StacksEpochId::Epoch22 => {
-                map.serialize_entry("epoch", &2.2)?;
-            }
-            StacksEpochId::Epoch23 => {
-                map.serialize_entry("epoch", &2.3)?;
-            }
-            StacksEpochId::Epoch24 => {
-                map.serialize_entry("epoch", &2.4)?;
-            }
-            StacksEpochId::Epoch25 => {
-                map.serialize_entry("epoch", &2.5)?;
-            }
-            StacksEpochId::Epoch30 => {
-                map.serialize_entry("epoch", &3.0)?;
-            }
-            StacksEpochId::Epoch31 => {
-                map.serialize_entry("epoch", &3.1)?;
-            }
-        }
+        map.serialize_entry("epoch", &self.epoch)?;
         map.end()
     }
 }

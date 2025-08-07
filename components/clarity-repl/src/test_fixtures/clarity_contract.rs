@@ -2,7 +2,8 @@ use clarity::types::StacksEpochId;
 use clarity::vm::ClarityVersion;
 
 use crate::repl::{
-    ClarityCodeSource, ClarityContract, ContractDeployer, DEFAULT_CLARITY_VERSION, DEFAULT_EPOCH,
+    ClarityCodeSource, ClarityContract, ContractDeployer, Epoch, DEFAULT_CLARITY_VERSION,
+    DEFAULT_EPOCH,
 };
 
 impl ClarityContract {
@@ -23,7 +24,7 @@ impl ClarityContract {
             name: "contract".into(),
             deployer: ContractDeployer::DefaultDeployer,
             clarity_version: DEFAULT_CLARITY_VERSION,
-            epoch: DEFAULT_EPOCH,
+            epoch: Epoch::Specific(DEFAULT_EPOCH),
         }
     }
 }
@@ -66,18 +67,19 @@ impl ClarityContractBuilder {
     }
 
     pub fn epoch(mut self, epoch: StacksEpochId) -> Self {
-        self.contract.epoch = epoch;
+        self.contract.epoch = Epoch::Specific(epoch);
         self
     }
 
     pub fn build(self) -> ClarityContract {
-        let default_version = ClarityVersion::default_for_epoch(self.contract.epoch);
+        let default_version = ClarityVersion::default_for_epoch(self.contract.epoch.resolve());
         let clarity_version = self.contract.clarity_version;
 
         if clarity_version > default_version {
             panic!(
                 "invalid clarity version {} for epoch {}",
-                clarity_version, self.contract.epoch
+                clarity_version,
+                self.contract.epoch.resolve()
             );
         }
 

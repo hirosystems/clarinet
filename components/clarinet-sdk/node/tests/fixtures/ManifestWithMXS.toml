@@ -1,0 +1,22 @@
+[project]
+name = 'fixtures'
+description = 'sample project to test clarinet-sdk'
+telemetry = false
+cache_dir = './.cache'
+requirements = []
+
+[contracts.multiplier-trait]
+path = 'contracts/multiplier-trait.clar'
+clarity_version = 2
+epoch = 2.4
+
+[contracts.counter]
+path = 'contracts/counter.clar'
+clarity_version = 2
+epoch = 2.4
+
+[repl.remote_data]
+enabled = true
+api_url = 'https://api.hiro.so'
+initial_height = 522000
+use_mainnet_wallets = true

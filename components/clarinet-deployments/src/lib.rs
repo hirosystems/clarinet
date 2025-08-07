@@ -26,8 +26,7 @@ use clarity_repl::repl::boot::{
     SBTC_TESTNET_ADDRESS_PRINCIPAL, SBTC_TOKEN_MAINNET_ADDRESS,
 };
 use clarity_repl::repl::{
-    ClarityCodeSource, ClarityContract, ContractDeployer, Session, SessionSettings,
-    DEFAULT_CLARITY_VERSION, DEFAULT_EPOCH,
+    ClarityCodeSource, ClarityContract, ContractDeployer, Session, SessionSettings, DEFAULT_EPOCH,
 };
 use types::{
     ContractPublishSpecification, DeploymentGenerationArtifacts, EmulatedContractCallSpecification,
@@ -260,7 +259,7 @@ fn handle_emulated_contract_publish(
         deployer: ContractDeployer::Address(tx.emulated_sender.to_string()),
         name: tx.contract_name.to_string(),
         clarity_version: tx.clarity_version,
-        epoch,
+        epoch: clarity_repl::repl::Epoch::Specific(epoch),
     };
 
     let result = session.deploy_contract(&contract, false, contract_ast);
@@ -308,6 +307,7 @@ pub async fn generate_default_deployment(
         None => NetworkManifest::from_project_manifest_location(
             &manifest.location,
             &network.get_networks(),
+            manifest.use_mainnet_wallets(),
             Some(&manifest.project.cache_location),
             None,
         )?,
@@ -315,6 +315,7 @@ pub async fn generate_default_deployment(
             NetworkManifest::from_project_manifest_location_using_file_accessor(
                 &manifest.location,
                 &network.get_networks(),
+                manifest.use_mainnet_wallets(),
                 file_accessor,
             )
             .await?
@@ -409,21 +410,6 @@ pub async fn generate_default_deployment(
 
     let mut queue = VecDeque::new();
 
-    if let Some(ref devnet) = network_manifest.devnet {
-        if devnet.enable_subnet_node {
-            let contract_id = match QualifiedContractIdentifier::parse(&devnet.subnet_contract_id) {
-                Ok(contract_id) => contract_id,
-                Err(_e) => {
-                    return Err(format!(
-                        "malformatted subnet_contract_id: {}",
-                        devnet.subnet_contract_id
-                    ))
-                }
-            };
-            queue.push_front((contract_id, Some(DEFAULT_CLARITY_VERSION)));
-        }
-    }
-
     let mut contract_epochs = HashMap::new();
 
     // Build the ASTs / DependencySet for requirements - step required for Simnet/Devnet/Testnet/Mainnet
@@ -504,20 +490,6 @@ pub async fn generate_default_deployment(
                         let mut remap_principals = BTreeMap::new();
                         remap_principals
                             .insert(contract_id.issuer.clone(), default_deployer_address.clone());
-                        match network_manifest.devnet {
-                            Some(ref devnet)
-                                if devnet.subnet_contract_id == contract_id.to_string() =>
-                            {
-                                remap_principals.insert(
-                                    contract_id.issuer.clone(),
-                                    PrincipalData::parse_standard_principal(
-                                        &devnet.subnet_leader_stx_address,
-                                    )
-                                    .unwrap(),
-                                );
-                            }
-                            _ => {}
-                        }
 
                         let data = RequirementPublishSpecification {
                             contract_id: contract_id.clone(),
@@ -562,7 +534,7 @@ pub async fn generate_default_deployment(
                         name: contract_id.name.to_string(),
                         deployer: ContractDeployer::ContractIdentifier(contract_id.clone()),
                         clarity_version,
-                        epoch,
+                        epoch: clarity_repl::repl::Epoch::Specific(epoch),
                     };
                     let (ast, _, _) = session.interpreter.build_ast(&contract);
                     (clarity_version, ast)
@@ -747,8 +719,8 @@ pub async fn generate_default_deployment(
         let contract_id = QualifiedContractIdentifier::new(sender.clone(), contract_name.clone());
 
         let epoch = match forced_min_epoch {
-            Some(min_epoch) => std::cmp::max(min_epoch, contract_config.epoch),
-            None => contract_config.epoch,
+            Some(min_epoch) => std::cmp::max(min_epoch, contract_config.epoch.resolve()),
+            None => contract_config.epoch.resolve(),
         };
 
         contracts_sources.insert(
@@ -758,7 +730,7 @@ pub async fn generate_default_deployment(
                 deployer: ContractDeployer::Address(sender.to_address()),
                 name: contract_name.to_string(),
                 clarity_version: contract_config.clarity_version,
-                epoch,
+                epoch: clarity_repl::repl::Epoch::Specific(epoch),
             },
         );
 
@@ -800,7 +772,7 @@ pub async fn generate_default_deployment(
         contract_asts.insert(contract_id.clone(), ast.clone());
         contract_data.insert(contract_id.clone(), (contract.clarity_version, ast));
         contract_diags.insert(contract_id.clone(), diags);
-        contract_epochs.insert(contract_id, contract.epoch);
+        contract_epochs.insert(contract_id, contract.epoch.resolve());
         asts_success = asts_success && ast_success;
     }
 
