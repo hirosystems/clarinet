@@ -587,7 +587,7 @@ checksum = "f46ad14479a25103f283c0f10005961cf086d8dc42205bb44c46ac563475dca6"
 
 [[package]]
 name = "clarinet-cli"
-version = "3.4.0"
+version = "3.5.0"
 dependencies = [
  "clap",
  "clap_complete",
@@ -619,7 +619,7 @@ dependencies = [
 
 [[package]]
 name = "clarinet-deployments"
-version = "3.4.0"
+version = "3.5.0"
 dependencies = [
  "base58",
  "base64 0.22.1",
@@ -649,7 +649,7 @@ dependencies = [
 
 [[package]]
 name = "clarinet-files"
-version = "3.4.0"
+version = "3.5.0"
 dependencies = [
  "bitcoin",
  "clarinet-utils",
@@ -682,7 +682,7 @@ dependencies = [
 
 [[package]]
 name = "clarinet-sdk-wasm"
-version = "3.4.0"
+version = "3.5.0"
 dependencies = [
  "clarinet-deployments",
  "clarinet-files",
@@ -713,7 +713,7 @@ dependencies = [
 [[package]]
 name = "clarity"
 version = "0.0.1"
-source = "git+https://github.com/stacks-network/stacks-core.git?branch=develop#799953e64e4733bc639a75f680cd216037446c9e"
+source = "git+https://github.com/stacks-network/stacks-core.git?branch=develop#c21aea770c8294f7d9cc44ea9cb9771ca099ab12"
 dependencies = [
  "hashbrown 0.15.2",
  "integer-sqrt",
@@ -730,7 +730,7 @@ dependencies = [
 
 [[package]]
 name = "clarity-events"
-version = "3.4.0"
+version = "3.5.0"
 dependencies = [
  "clap",
  "clarinet-files",
@@ -742,7 +742,7 @@ dependencies = [
 
 [[package]]
 name = "clarity-lsp"
-version = "3.4.0"
+version = "3.5.0"
 dependencies = [
  "clarinet-deployments",
  "clarinet-files",
@@ -762,7 +762,7 @@ dependencies = [
 
 [[package]]
 name = "clarity-repl"
-version = "3.4.0"
+version = "3.5.0"
 dependencies = [
  "bytes",
  "chrono",
@@ -4125,7 +4125,7 @@ dependencies = [
 
 [[package]]
 name = "stacks-codec"
-version = "3.4.0"
+version = "3.5.0"
 dependencies = [
  "clarity",
  "serde",
@@ -4135,7 +4135,7 @@ dependencies = [
 [[package]]
 name = "stacks-common"
 version = "0.0.1"
-source = "git+https://github.com/stacks-network/stacks-core.git?branch=develop#799953e64e4733bc639a75f680cd216037446c9e"
+source = "git+https://github.com/stacks-network/stacks-core.git?branch=develop#c21aea770c8294f7d9cc44ea9cb9771ca099ab12"
 dependencies = [
  "chrono",
  "curve25519-dalek",
@@ -4163,7 +4163,7 @@ dependencies = [
 
 [[package]]
 name = "stacks-devnet-js"
-version = "3.4.0"
+version = "3.5.0"
 dependencies = [
  "clarinet-deployments",
  "clarinet-files",
@@ -4178,7 +4178,7 @@ dependencies = [
 
 [[package]]
 name = "stacks-network"
-version = "3.4.0"
+version = "3.5.0"
 dependencies = [
  "base58",
  "bitcoincore-rpc",
@@ -4222,7 +4222,7 @@ dependencies = [
 
 [[package]]
 name = "stacks-rpc-client"
-version = "3.4.0"
+version = "3.5.0"
 dependencies = [
  "clarinet-utils",
  "clarity",
