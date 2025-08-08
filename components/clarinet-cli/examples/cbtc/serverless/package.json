@@ -17,6 +17,6 @@
     "@stacks/transactions": "^5.0.0",
     "bitcore-lib": "10.5.3",
     "dotenv": "^16.0.1",
-    "serverless": "^3.36.0"
+    "serverless": "^4.18.0"
   }
 }
