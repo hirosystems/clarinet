@@ -44,7 +44,7 @@ jobs:
         run: |
           CARGO_VERSION=v$(grep "version" Cargo.toml | head -n 1 | cut -d\" -f2)
           if [[ "${CARGO_VERSION}" != "${LATEST_RELEASE}" ]]; then
-            echo "::set-output name=TAG::${CARGO_VERSION}"
+            echo "TAG=${CARGO_VERSION}" >> $GITHUB_OUTPUT
             echo "::warning::Will create release for version: ${CARGO_VERSION}"
           else
             echo "::warning::Will not create a release"
@@ -295,9 +295,9 @@ jobs:
         id: variables
         run: |
           dir
-          echo "::set-output name=version::${GITHUB_REF#refs/tags/v}"
-          echo "::set-output name=KEYPAIR_NAME::gt-standard-keypair"
-          echo "::set-output name=CERTIFICATE_NAME::gt-certificate"
+          echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+          echo "KEYPAIR_NAME=gt-standard-keypair" >> $GITHUB_OUTPUT
+          echo "CERTIFICATE_NAME=gt-certificate" >> $GITHUB_OUTPUT
           echo "SM_HOST=${{ secrets.SM_HOST }}" >> "$GITHUB_ENV"
           echo "SM_API_KEY=${{ secrets.SM_API_KEY }}" >> "$GITHUB_ENV"
           echo "SM_CLIENT_CERT_FILE=D:\\Certificate_pkcs12.p12" >> "$GITHUB_ENV"
