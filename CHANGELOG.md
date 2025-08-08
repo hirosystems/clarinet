@@ -1,21 +1,21 @@
-#### 2025-08-07
-
-##### Chores
-
-* **deps:**  bump tmp from 0.2.3 to 0.2.4 in /components/clarity-vscode (#1952) (e9cd9dee)
-*  make stacks_signer_keys significant for devnet diff (#1950) (017506eb)
+# [3.5.0](https://github.com/hirosystems/clarinet/compare/v3.4.0...v3.5.0) (2025-08-08)
 
 ##### New Features
 
-*  custom boot contracts  (#1915) (ae34a3dc)
+- Use latest explorer (#1954) (e6a624a5)
+- Custom boot contracts (#1915) (ae34a3dc)
+
+##### Chores
+
+- Make stacks_signer_keys significant for devnet diff (#1950) (017506eb)
 
 ##### Other Changes
 
-*  add epoch tests (#1945) (9e78c066)
+- Add epoch tests (#1945) (9e78c066)
 
 ##### Refactors
 
-*  rework session api reference (#1951) (b38a5ff2)
+- Rework session api reference (#1951) (b38a5ff2)
 
 # [3.4.0](https://github.com/hirosystems/clarinet/compare/v3.3.0...v3.4.0) (2025-07-31)
 
