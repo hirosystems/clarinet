@@ -286,6 +286,14 @@ fn it_handles_chain_constants() {
 }
 
 #[test]
+fn it_parses_contracts() {
+    let mut session = init_session(57000);
+    let snippet = format!("(contract-call? '{COUNTER_ADDR} get-count)");
+    let result = eval_snippet(&mut session, &snippet);
+    assert_eq!(result, Value::UInt(1));
+}
+
+#[test]
 fn it_saves_metadata_to_cache() {
     let mut session = init_session(57000);
     let snippet = format!("(contract-call? '{COUNTER_ADDR} get-count)");
