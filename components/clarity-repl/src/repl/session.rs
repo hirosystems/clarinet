@@ -428,16 +428,48 @@ impl Session {
 
     #[cfg(not(target_arch = "wasm32"))]
     pub fn perf(&mut self, output: &mut Vec<String>, cmd: &str) {
-        use super::hooks::perf::PerfHook;
+        use super::hooks::perf::{CostField, PerfHook};
 
-        let Some((_, snippet)) = cmd.split_once(' ') else {
-            return output.push("Usage: ::perf <expr>".red().to_string());
+        let parts: Vec<&str> = cmd.split_whitespace().collect();
+        if parts.len() < 3 {
+            return output.push("Usage: ::perf <cost_field> <expr>".red().to_string());
+        }
+
+        let cost_field_str = parts[1];
+        let snippet = parts[2..].join(" ");
+
+        let Some(cost_field) = CostField::from_str(cost_field_str) else {
+            let valid_fields = [
+                "runtime",
+                "read_length",
+                "read_count",
+                "write_length",
+                "write_count",
+            ];
+            let valid_fields_str = valid_fields.join(", ");
+            return output.push(
+                format!(
+                    "Invalid cost field '{}'. Valid fields: {}",
+                    cost_field_str, valid_fields_str
+                )
+                .red()
+                .to_string(),
+            );
         };
 
-        let mut perf = PerfHook::new();
+        let mut perf = PerfHook::new(cost_field);
 
         match self.eval_with_hooks(snippet.to_string(), Some(vec![&mut perf]), true) {
-            Ok(_) => (),
+            Ok(_) => {
+                output.push(
+                    format!(
+                        "Performance data written to perf.data (tracking {})",
+                        cost_field.name()
+                    )
+                    .green()
+                    .to_string(),
+                );
+            }
             Err(diagnostics) => {
                 let lines = snippet.lines();
                 let formatted_lines: Vec<String> = lines.map(|l| l.to_string()).collect();
@@ -811,6 +843,12 @@ impl Session {
         output.push(format!(
             "{}",
             "::trace <expr>\t\t\t\tGenerate an execution trace for <expr>".yellow()
+        ));
+        #[cfg(not(target_arch = "wasm32"))]
+        output.push(format!(
+            "{}",
+            "::perf <cost_field> <expr>\t\tGenerate performance data tracking specific cost field"
+                .yellow()
         ));
         #[cfg(not(target_arch = "wasm32"))]
         output.push(format!(
@@ -1316,9 +1354,11 @@ mod tests {
 
     use super::*;
     use crate::repl::boot::{BOOT_MAINNET_ADDRESS, BOOT_TESTNET_ADDRESS};
+    use crate::repl::hooks::perf::CostField;
     use crate::repl::settings::Account;
     use crate::repl::DEFAULT_EPOCH;
     use crate::test_fixtures::clarity_contract::ClarityContractBuilder;
+    use clarity::vm::costs::ExecutionCost;
 
     #[track_caller]
     fn run_session_snippet(session: &mut Session, snippet: &str) -> Value {

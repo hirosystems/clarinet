@@ -7,6 +7,48 @@ use clarity::vm::errors::Error;
 use clarity::vm::types::{QualifiedContractIdentifier, Value};
 use clarity::vm::{EvalHook, SymbolicExpression, SymbolicExpressionType};
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum CostField {
+    Runtime,
+    ReadLength,
+    ReadCount,
+    WriteLength,
+    WriteCount,
+}
+
+impl CostField {
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s.to_lowercase().as_str() {
+            "runtime" => Some(CostField::Runtime),
+            "read_length" | "readlength" => Some(CostField::ReadLength),
+            "read_count" | "readcount" => Some(CostField::ReadCount),
+            "write_length" | "writelength" => Some(CostField::WriteLength),
+            "write_count" | "writecount" => Some(CostField::WriteCount),
+            _ => None,
+        }
+    }
+
+    pub fn get_value(&self, cost: &ExecutionCost) -> u64 {
+        match self {
+            CostField::Runtime => cost.runtime,
+            CostField::ReadLength => cost.read_length,
+            CostField::ReadCount => cost.read_count,
+            CostField::WriteLength => cost.write_length,
+            CostField::WriteCount => cost.write_count,
+        }
+    }
+
+    pub fn name(&self) -> &'static str {
+        match self {
+            CostField::Runtime => "runtime",
+            CostField::ReadLength => "read_length",
+            CostField::ReadCount => "read_count",
+            CostField::WriteLength => "write_length",
+            CostField::WriteCount => "write_count",
+        }
+    }
+}
+
 struct StackEntry {
     contract: QualifiedContractIdentifier,
     function: String,
@@ -32,10 +74,12 @@ pub struct PerfHook {
     writer: Box<dyn Write>,
     /// Stack of expressions
     expr_stack: Vec<StackEntry>,
+    /// Specific cost field to track
+    cost_field: CostField,
 }
 
 impl PerfHook {
-    pub fn new() -> PerfHook {
+    pub fn new(cost_field: CostField) -> PerfHook {
         const DEFAULT_OUTPUT: &str = "perf.data";
         let writer: Box<dyn Write> = Box::new(
             std::fs::File::create(DEFAULT_OUTPUT).expect("Failed to create perf output file"),
@@ -43,13 +87,14 @@ impl PerfHook {
         PerfHook {
             writer,
             expr_stack: Vec::new(),
+            cost_field,
         }
     }
 }
 
 impl Default for PerfHook {
     fn default() -> Self {
-        Self::new()
+        Self::new(CostField::Runtime)
     }
 }
 
@@ -139,8 +184,12 @@ impl EvalHook for PerfHook {
             .expect("cost diff calculation failed");
 
         // Write the performance data to the output
-        writeln!(self.writer, "{call_stack} {}", cost.runtime)
-            .expect("Failed to write to perf output");
+        writeln!(
+            self.writer,
+            "{call_stack} {}",
+            self.cost_field.get_value(&cost)
+        )
+        .expect("Failed to write to perf output");
 
         // Add the cost of this expression and its descendents to the parent
         // expression's cost so that it is not double-counted.
