@@ -31,6 +31,7 @@ use clarity_repl::repl::{
     clarity_values, ClarityCodeSource, ClarityContract, ContractDeployer, Epoch, Session,
     SessionSettings, DEFAULT_CLARITY_VERSION, DEFAULT_EPOCH,
 };
+use clarity_repl::repl::hooks::perf::CostField;
 use gloo_utils::format::JsValueSerdeExt;
 use js_sys::Function as JsFunction;
 use serde::{Deserialize, Serialize};
@@ -266,16 +267,31 @@ pub struct SDKOptions {
     pub track_costs: bool,
     #[wasm_bindgen(js_name = trackCoverage)]
     pub track_coverage: bool,
+    #[wasm_bindgen(js_name = trackPerformance)]
+    pub track_performance: bool,
+    performance_cost_field: String,
 }
 
 #[wasm_bindgen]
 impl SDKOptions {
     #[wasm_bindgen(constructor)]
-    pub fn new(track_costs: bool, track_coverage: bool) -> Self {
+    pub fn new(track_costs: bool, track_coverage: bool, track_performance: Option<bool>, performance_cost_field: Option<String>) -> Self {
         Self {
             track_costs,
             track_coverage,
+            track_performance: track_performance.unwrap_or(false),
+            performance_cost_field: performance_cost_field.unwrap_or_else(|| "runtime".to_string()),
         }
+    }
+
+    #[wasm_bindgen(getter, js_name = performanceCostField)]
+    pub fn performance_cost_field(&self) -> String {
+        self.performance_cost_field.clone()
+    }
+
+    #[wasm_bindgen(setter, js_name = performanceCostField)]
+    pub fn set_performance_cost_field(&mut self, field: String) {
+        self.performance_cost_field = field;
     }
 }
 
@@ -304,6 +320,10 @@ impl SDK {
 
         let track_coverage = options.as_ref().is_some_and(|o| o.track_coverage);
         let track_costs = options.as_ref().is_some_and(|o| o.track_costs);
+        let track_performance = options.as_ref().is_some_and(|o| o.track_performance);
+        let performance_cost_field = options.as_ref()
+            .map(|opts| opts.performance_cost_field.clone())
+            .unwrap_or_else(|| "runtime".to_string());
 
         Self {
             deployer: String::new(),
@@ -316,6 +336,8 @@ impl SDK {
             options: SDKOptions {
                 track_coverage,
                 track_costs,
+                track_performance,
+                performance_cost_field,
             },
             current_test_name: String::new(),
             costs_reports: vec![],
@@ -466,6 +488,11 @@ impl SDK {
         let mut session = initiate_session_from_manifest(&manifest);
         if self.options.track_coverage {
             session.enable_coverage();
+        }
+        if self.options.track_performance {
+            let cost_field = CostField::from_str(&self.options.performance_cost_field)
+                .unwrap_or(CostField::Runtime);
+            session.enable_performance(cost_field);
         }
         session.enable_logger_hook();
         let executed_contracts = update_session_with_deployment_plan(

@@ -22,11 +22,21 @@ BigInt.prototype.toJSON = function () {
   return this.toString();
 };
 
-type Options = { trackCosts: boolean; trackCoverage: boolean };
+type Options = {
+  trackCosts: boolean;
+  trackCoverage: boolean;
+  trackPerformance?: boolean;
+  performanceCostField?: string;
+};
 
 export async function getSDK(options?: Options): Promise<Simnet> {
   const module = await wasmModule;
-  let sdkOptions = new SDKOptions(!!options?.trackCosts, !!options?.trackCoverage);
+  let sdkOptions = new SDKOptions(
+    !!options?.trackCosts,
+    !!options?.trackCoverage,
+    !!options?.trackPerformance,
+    options?.performanceCostField,
+  );
 
   const simnet = new Proxy(new module.SDK(vfs, sdkOptions), getSessionProxy()) as unknown as Simnet;
   return simnet;
@@ -39,7 +49,12 @@ function memoizedInit() {
   return async (
     manifestPath = "./Clarinet.toml",
     noCache = false,
-    options?: { trackCosts: boolean; trackCoverage: boolean },
+    options?: {
+      trackCosts: boolean;
+      trackCoverage: boolean;
+      trackPerformance?: boolean;
+      performanceCostField?: string;
+    },
   ) => {
     if (noCache || !simnet) {
       simnet = await getSDK(options);

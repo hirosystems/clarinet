@@ -27,6 +27,7 @@ use super::boot::{
 };
 use super::diagnostic::output_diagnostic;
 use super::hooks::logger::LoggerHook;
+use super::hooks::perf::{CostField, PerfHook};
 use super::interpreter::ContractCallError;
 use super::{
     ClarityCodeSource, ClarityContract, ClarityInterpreter, ContractDeployer, Epoch,
@@ -57,6 +58,7 @@ pub struct Session {
 
     coverage_hook: Option<CoverageHook>,
     logger_hook: Option<LoggerHook>,
+    perf_hook: Option<PerfHook>,
 }
 
 impl Session {
@@ -85,6 +87,7 @@ impl Session {
 
             coverage_hook: None,
             logger_hook: None,
+            perf_hook: None,
         }
     }
 
@@ -94,6 +97,10 @@ impl Session {
 
     pub fn enable_logger_hook(&mut self) {
         self.logger_hook = Some(LoggerHook::new());
+    }
+
+    pub fn enable_performance(&mut self, cost_field: CostField) {
+        self.perf_hook = Some(PerfHook::new(cost_field));
     }
 
     pub fn set_test_name(&mut self, name: String) {
@@ -562,6 +569,9 @@ impl Session {
         if let Some(ref mut logger_hook) = self.logger_hook {
             hooks.push(logger_hook);
         }
+        if let Some(ref mut perf_hook) = self.perf_hook {
+            hooks.push(perf_hook);
+        }
 
         if contract.clarity_version > ClarityVersion::default_for_epoch(contract.epoch.resolve()) {
             let diagnostic = Diagnostic {
@@ -615,6 +625,9 @@ impl Session {
         }
         if let Some(ref mut logger_hook) = self.logger_hook {
             hooks.push(logger_hook);
+        }
+        if let Some(ref mut perf_hook) = self.perf_hook {
+            hooks.push(perf_hook);
         }
 
         let current_epoch = self.interpreter.datastore.get_current_epoch();
@@ -678,6 +691,9 @@ impl Session {
         }
         if let Some(ref mut logger_hook) = self.logger_hook {
             hooks.push(logger_hook);
+        }
+        if let Some(ref mut perf_hook) = self.perf_hook {
+            hooks.push(perf_hook);
         }
 
         let result = self
