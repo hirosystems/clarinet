@@ -78,12 +78,28 @@ pub struct PerfHook {
     cost_field: CostField,
 }
 
+impl Clone for PerfHook {
+    fn clone(&self) -> Self {
+        PerfHook::new(self.cost_field)
+    }
+}
+
 impl PerfHook {
     pub fn new(cost_field: CostField) -> PerfHook {
-        const DEFAULT_OUTPUT: &str = "perf.data";
-        let writer: Box<dyn Write> = Box::new(
-            std::fs::File::create(DEFAULT_OUTPUT).expect("Failed to create perf output file"),
-        );
+        let writer: Box<dyn Write> = {
+            #[cfg(target_arch = "wasm32")]
+            {
+                // In WASM, use a Vec<u8> as buffer instead of file
+                Box::new(Vec::new())
+            }
+            #[cfg(not(target_arch = "wasm32"))]
+            {
+                const DEFAULT_OUTPUT: &str = "perf.data";
+                Box::new(
+                    std::fs::File::create(DEFAULT_OUTPUT).expect("Failed to create perf output file"),
+                )
+            }
+        };
         PerfHook {
             writer,
             expr_stack: Vec::new(),
