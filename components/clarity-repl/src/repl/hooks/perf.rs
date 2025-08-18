@@ -1,5 +1,6 @@
 use std::fmt::Display;
 use std::io::Write;
+use std::any::Any;
 
 use clarity::vm::contexts::{Environment, LocalContext};
 use clarity::vm::costs::ExecutionCost;
@@ -76,6 +77,9 @@ pub struct PerfHook {
     expr_stack: Vec<StackEntry>,
     /// Specific cost field to track
     cost_field: CostField,
+    /// Buffer data for WASM mode
+    #[cfg(target_arch = "wasm32")]
+    buffer_data: Vec<u8>,
 }
 
 impl Clone for PerfHook {
@@ -86,6 +90,10 @@ impl Clone for PerfHook {
 
 impl PerfHook {
     pub fn new(cost_field: CostField) -> PerfHook {
+        Self::new_with_filename(cost_field, "perf.data")
+    }
+
+    pub fn new_with_filename(cost_field: CostField, filename: &str) -> PerfHook {
         let writer: Box<dyn Write> = {
             #[cfg(target_arch = "wasm32")]
             {
@@ -94,9 +102,8 @@ impl PerfHook {
             }
             #[cfg(not(target_arch = "wasm32"))]
             {
-                const DEFAULT_OUTPUT: &str = "perf.data";
                 Box::new(
-                    std::fs::File::create(DEFAULT_OUTPUT).expect("Failed to create perf output file"),
+                    std::fs::File::create(filename).expect("Failed to create perf output file"),
                 )
             }
         };
@@ -104,7 +111,19 @@ impl PerfHook {
             writer,
             expr_stack: Vec::new(),
             cost_field,
+            #[cfg(target_arch = "wasm32")]
+            buffer_data: Vec::new(),
         }
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub fn get_buffer_data(&self) -> Option<String> {
+        String::from_utf8(self.buffer_data.clone()).ok()
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn get_buffer_data(&self) -> Option<String> {
+        None
     }
 }
 
@@ -206,6 +225,13 @@ impl EvalHook for PerfHook {
             self.cost_field.get_value(&cost)
         )
         .expect("Failed to write to perf output");
+
+        // In WASM mode, also store the data in our buffer
+        #[cfg(target_arch = "wasm32")]
+        {
+            let perf_line = format!("{call_stack} {}\n", self.cost_field.get_value(&cost));
+            self.buffer_data.extend_from_slice(perf_line.as_bytes());
+        }
 
         // Add the cost of this expression and its descendents to the parent
         // expression's cost so that it is not double-counted.

@@ -103,6 +103,10 @@ impl Session {
         self.perf_hook = Some(PerfHook::new(cost_field));
     }
 
+    pub fn enable_performance_with_filename(&mut self, cost_field: CostField, filename: &str) {
+        self.perf_hook = Some(PerfHook::new_with_filename(cost_field, filename));
+    }
+
     pub fn set_test_name(&mut self, name: String) {
         if let Some(coverage_hook) = &mut self.coverage_hook {
             coverage_hook.set_current_test_name(name);
@@ -1267,6 +1271,14 @@ impl Session {
     fn keywords(&self) -> String {
         let keywords = self.get_clarity_keywords();
         format!("{}", keywords.join("\n").yellow())
+    }
+
+    pub fn get_performance_data(&self) -> Option<String> {
+        if let Some(ref perf_hook) = self.perf_hook {
+            perf_hook.get_buffer_data()
+        } else {
+            None
+        }
     }
 }
 
