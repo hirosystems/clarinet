@@ -27,7 +27,6 @@ type Options = {
   trackCoverage: boolean;
   trackPerformance?: boolean;
   performanceCostField?: string;
-  performanceFilename?: string;
 };
 
 export async function getSDK(options?: Options): Promise<Simnet> {
@@ -37,7 +36,6 @@ export async function getSDK(options?: Options): Promise<Simnet> {
     !!options?.trackCoverage,
     !!options?.trackPerformance,
     options?.performanceCostField,
-    options?.performanceFilename,
   );
 
   const simnet = new Proxy(new module.SDK(vfs, sdkOptions), getSessionProxy()) as unknown as Simnet;
@@ -56,7 +54,6 @@ function memoizedInit() {
       trackCoverage: boolean;
       trackPerformance?: boolean;
       performanceCostField?: string;
-      performanceFilename?: string;
     },
   ) => {
     if (noCache || !simnet) {

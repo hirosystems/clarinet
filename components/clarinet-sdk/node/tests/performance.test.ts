@@ -27,7 +27,6 @@ beforeEach(async () => {
     trackCoverage: false,
     trackPerformance: true,
     performanceCostField: "runtime",
-    performanceFilename: "performance-tracking.perf.data",
   });
 });
 

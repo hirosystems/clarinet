@@ -270,19 +270,17 @@ pub struct SDKOptions {
     #[wasm_bindgen(js_name = trackPerformance)]
     pub track_performance: bool,
     performance_cost_field: String,
-    performance_filename: String,
 }
 
 #[wasm_bindgen]
 impl SDKOptions {
     #[wasm_bindgen(constructor)]
-    pub fn new(track_costs: bool, track_coverage: bool, track_performance: Option<bool>, performance_cost_field: Option<String>, performance_filename: Option<String>) -> Self {
+    pub fn new(track_costs: bool, track_coverage: bool, track_performance: Option<bool>, performance_cost_field: Option<String>) -> Self {
         Self {
             track_costs,
             track_coverage,
             track_performance: track_performance.unwrap_or(false),
             performance_cost_field: performance_cost_field.unwrap_or_else(|| "runtime".to_string()),
-            performance_filename: performance_filename.unwrap_or_else(|| "perf.data".to_string()),
         }
     }
 
@@ -294,16 +292,6 @@ impl SDKOptions {
     #[wasm_bindgen(setter, js_name = performanceCostField)]
     pub fn set_performance_cost_field(&mut self, field: String) {
         self.performance_cost_field = field;
-    }
-
-    #[wasm_bindgen(getter, js_name = performanceFilename)]
-    pub fn performance_filename(&self) -> String {
-        self.performance_filename.clone()
-    }
-
-    #[wasm_bindgen(setter, js_name = performanceFilename)]
-    pub fn set_performance_filename(&mut self, filename: String) {
-        self.performance_filename = filename;
     }
 }
 
@@ -336,9 +324,6 @@ impl SDK {
         let performance_cost_field = options.as_ref()
             .map(|opts| opts.performance_cost_field.clone())
             .unwrap_or_else(|| "runtime".to_string());
-        let performance_filename = options.as_ref()
-            .map(|opts| opts.performance_filename.clone())
-            .unwrap_or_else(|| "perf.data".to_string());
 
         Self {
             deployer: String::new(),
@@ -353,7 +338,6 @@ impl SDK {
                 track_costs,
                 track_performance,
                 performance_cost_field,
-                performance_filename,
             },
             current_test_name: String::new(),
             costs_reports: vec![],
@@ -508,7 +492,7 @@ impl SDK {
         if self.options.track_performance {
             let cost_field = CostField::from_str(&self.options.performance_cost_field)
                 .unwrap_or(CostField::Runtime);
-            session.enable_performance_with_filename(cost_field, &self.options.performance_filename);
+            session.enable_performance(cost_field);
         }
         session.enable_logger_hook();
         let executed_contracts = update_session_with_deployment_plan(

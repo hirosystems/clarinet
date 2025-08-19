@@ -103,10 +103,6 @@ impl Session {
         self.perf_hook = Some(PerfHook::new(cost_field));
     }
 
-    pub fn enable_performance_with_filename(&mut self, cost_field: CostField, filename: &str) {
-        self.perf_hook = Some(PerfHook::new_with_filename(cost_field, filename));
-    }
-
     pub fn set_test_name(&mut self, name: String) {
         if let Some(coverage_hook) = &mut self.coverage_hook {
             coverage_hook.set_current_test_name(name);
