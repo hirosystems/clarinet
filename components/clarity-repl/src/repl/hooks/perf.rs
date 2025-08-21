@@ -197,15 +197,19 @@ impl EvalHook for PerfHook {
     ) {
         let contract = &env.contract_context.contract_identifier;
 
-        if let Some(contract_source) = env.global_context.database.get_contract_src(contract) {
-            // If we don't have AST mapping, try to build source mapping
-            if self.ast_span_mapping.is_empty() {
-                self.capture_contract_source(&contract_source);
-            }
-        } else {
+        // Check if we need to fetch contract source
+        // Only fetch if we don't have the source AND the expression doesn't have valid span info
+        let needs_source_fetch = env
+            .global_context
+            .database
+            .get_contract_src(contract)
+            .is_none()
+            && has_blank_span(expr);
+
+        if needs_source_fetch {
             // Try to fetch contract source from API and cache it
             if let Err(e) = self.fetch_and_cache_contract_source(env, contract) {
-                eprintln!("️Failed to fetch contract source: {}", e);
+                eprintln!("Failed to fetch contract source: {}", e);
             }
         }
 
@@ -330,7 +334,7 @@ impl PerfHook {
 
     fn add_expression_to_mapping(&mut self, expr: &SymbolicExpression) {
         // Store this expression's span if its not blank
-        if expr.span.start_line > 0 || expr.span.start_column > 0 {
+        if !has_blank_span(expr) {
             self.ast_span_mapping
                 .insert(expr.id, (expr.span.start_line, expr.span.start_column));
         }
@@ -342,14 +346,6 @@ impl PerfHook {
         }
     }
 
-    /// alternative to ast capture
-    pub fn capture_contract_source(&mut self, contract_source: &str) {
-        self.ast_span_mapping.clear();
-        self.build_source_mapping(contract_source);
-    }
-
-    /// Build a simple mapping from src by parsing into SE
-    fn build_source_mapping(&mut self, _contract_source: &str) {}
     /// Fetch contract source from API and cache it in the datastore
     fn fetch_and_cache_contract_source(
         &mut self,
@@ -383,11 +379,6 @@ impl PerfHook {
             .insert_contract_hash(contract, &contract_data.source)
         {
             eprintln!("Failed to cache contract source: {}", e);
-        } else {
-            // Capture the contract source for our mapping if we don't have AST mapping
-            if self.ast_span_mapping.is_empty() {
-                self.capture_contract_source(&contract_data.source);
-            }
         }
 
         Ok(())
@@ -474,6 +465,10 @@ impl PerfHook {
 
         (line, column)
     }
+}
+
+fn has_blank_span(expr: &SymbolicExpression) -> bool {
+    expr.span.start_line == 0 && expr.span.start_column == 0
 }
 
 /// Response structure for the contract source API
