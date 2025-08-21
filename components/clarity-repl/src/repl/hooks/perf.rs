@@ -356,8 +356,8 @@ impl PerfHook {
         env: &mut Environment,
         contract: &QualifiedContractIdentifier,
     ) -> Result<(), String> {
-        // Determine if this is mainnet or testnet based on the contract issuer
-        let is_mainnet = contract.issuer.to_address().contains("SP");
+        let is_mainnet = env.global_context.mainnet;
+
         let api_base = if is_mainnet {
             "https://api.hiro.so"
         } else {
