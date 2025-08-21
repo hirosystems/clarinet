@@ -71,16 +71,70 @@ impl Display for StackEntry {
     }
 }
 
+/// A writer that can also be read from, used for WASM mode
+#[cfg(target_arch = "wasm32")]
+struct ReadableWriter {
+    buffer: Vec<u8>,
+}
+
+#[cfg(target_arch = "wasm32")]
+impl ReadableWriter {
+    fn new() -> Self {
+        Self { buffer: Vec::new() }
+    }
+
+    /// Get the written data as a string
+    pub fn get_data(&self) -> Option<String> {
+        String::from_utf8(self.buffer.clone()).ok()
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+impl Write for ReadableWriter {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        self.buffer.extend_from_slice(buf);
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+enum PerfWriter {
+    #[cfg(not(target_arch = "wasm32"))]
+    File(std::fs::File),
+    #[cfg(target_arch = "wasm32")]
+    Readable(ReadableWriter),
+}
+
+impl Write for PerfWriter {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        match self {
+            #[cfg(not(target_arch = "wasm32"))]
+            PerfWriter::File(file) => file.write(buf),
+            #[cfg(target_arch = "wasm32")]
+            PerfWriter::Readable(writer) => writer.write(buf),
+        }
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        match self {
+            #[cfg(not(target_arch = "wasm32"))]
+            PerfWriter::File(file) => file.flush(),
+            #[cfg(target_arch = "wasm32")]
+            PerfWriter::Readable(writer) => writer.flush(),
+        }
+    }
+}
+
 pub struct PerfHook {
     /// Writer for outputting performance metrics
-    writer: Box<dyn Write>,
+    writer: PerfWriter,
     /// Stack of expressions
     expr_stack: Vec<StackEntry>,
     /// Specific cost field to track
     cost_field: CostField,
-    /// Buffer data for WASM mode
-    #[cfg(target_arch = "wasm32")]
-    buffer_data: Vec<u8>,
     // Store mapping from expression IDs to their original spans from the AST
     ast_span_mapping: HashMap<u64, (u32, u32)>,
 }
@@ -96,17 +150,16 @@ impl PerfHook {
         Self::new_with_filename(cost_field, "perf.data")
     }
 
-    pub fn new_with_filename(cost_field: CostField, filename: &str) -> PerfHook {
-        let writer: Box<dyn Write> = {
+    pub fn new_with_filename(cost_field: CostField, _filename: &str) -> PerfHook {
+        let writer = {
             #[cfg(target_arch = "wasm32")]
             {
-                // In WASM, use a Vec<u8> as buffer instead of file
-                Box::new(Vec::new())
+                PerfWriter::Readable(ReadableWriter::new())
             }
             #[cfg(not(target_arch = "wasm32"))]
             {
-                Box::new(
-                    std::fs::File::create(filename).expect("Failed to create perf output file"),
+                PerfWriter::File(
+                    std::fs::File::create(_filename).expect("Failed to create perf output file"),
                 )
             }
         };
@@ -114,20 +167,18 @@ impl PerfHook {
             writer,
             expr_stack: Vec::new(),
             cost_field,
-            #[cfg(target_arch = "wasm32")]
-            buffer_data: Vec::new(),
             ast_span_mapping: HashMap::new(),
         }
     }
 
-    #[cfg(target_arch = "wasm32")]
+    /// Get the performance data buffer (WASM mode) or None (non-WASM mode)
     pub fn get_buffer_data(&self) -> Option<String> {
-        String::from_utf8(self.buffer_data.clone()).ok()
-    }
-
-    #[cfg(not(target_arch = "wasm32"))]
-    pub fn get_buffer_data(&self) -> Option<String> {
-        None
+        match &self.writer {
+            #[cfg(target_arch = "wasm32")]
+            PerfWriter::Readable(writer) => writer.get_data(),
+            #[cfg(not(target_arch = "wasm32"))]
+            PerfWriter::File(_) => None,
+        }
     }
 }
 
@@ -241,13 +292,6 @@ impl EvalHook for PerfHook {
             self.cost_field.get_value(&cost)
         )
         .expect("Failed to write to perf output");
-
-        // In WASM mode, also store the data in our buffer
-        #[cfg(target_arch = "wasm32")]
-        {
-            let perf_line = format!("{call_stack} {}\n", self.cost_field.get_value(&cost));
-            self.buffer_data.extend_from_slice(perf_line.as_bytes());
-        }
 
         // Add the cost of this expression and its descendents to the parent
         // expression's cost so that it is not double-counted.
