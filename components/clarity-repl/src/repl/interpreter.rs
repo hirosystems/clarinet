@@ -411,7 +411,7 @@ impl ClarityInterpreter {
         &mut self,
         epoch: StacksEpochId,
         cost_track: bool,
-    ) -> Result<GlobalContext, String> {
+    ) -> Result<GlobalContext<'_>, String> {
         let is_mainnet = self
             .remote_network_info
             .as_ref()

@@ -1,7 +1,8 @@
+use std::collections::HashMap;
 use std::fmt::Display;
 use std::io::Write;
-use std::any::Any;
 
+use clarity::vm::ast::ContractAST;
 use clarity::vm::contexts::{Environment, LocalContext};
 use clarity::vm::costs::ExecutionCost;
 use clarity::vm::errors::Error;
@@ -18,7 +19,7 @@ pub enum CostField {
 }
 
 impl CostField {
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub fn parse_from_str(s: &str) -> Option<Self> {
         match s.to_lowercase().as_str() {
             "runtime" => Some(CostField::Runtime),
             "read_length" | "readlength" => Some(CostField::ReadLength),
@@ -80,6 +81,8 @@ pub struct PerfHook {
     /// Buffer data for WASM mode
     #[cfg(target_arch = "wasm32")]
     buffer_data: Vec<u8>,
+    // Store mapping from expression IDs to their original spans from the AST
+    ast_span_mapping: HashMap<u64, (u32, u32)>,
 }
 
 impl Clone for PerfHook {
@@ -113,6 +116,7 @@ impl PerfHook {
             cost_field,
             #[cfg(target_arch = "wasm32")]
             buffer_data: Vec::new(),
+            ast_span_mapping: HashMap::new(),
         }
     }
 
@@ -141,6 +145,18 @@ impl EvalHook for PerfHook {
         expr: &SymbolicExpression,
     ) {
         let contract = &env.contract_context.contract_identifier;
+
+        if let Some(contract_source) = env.global_context.database.get_contract_src(contract) {
+            // If we don't have AST mapping, try to build source mapping
+            if self.ast_span_mapping.is_empty() {
+                self.capture_contract_source(&contract_source);
+            }
+        } else {
+            // Try to fetch contract source from API and cache it
+            if let Err(e) = self.fetch_and_cache_contract_source(env, contract) {
+                eprintln!("️Failed to fetch contract source: {}", e);
+            }
+        }
 
         // Find the current function name in the call stack
         let call_stack = env.call_stack.make_stack_trace();
@@ -171,8 +187,8 @@ impl EvalHook for PerfHook {
         // Record the cost before evaluating this expression
         let cost_before = env.global_context.cost_track.get_total();
 
-        let line = expr.span.start_line;
-        let column = expr.span.start_column;
+        // Get line and column information, with fallback to AST mapping and contract source
+        let (line, column) = self.get_line_column_info(env, contract, expr);
 
         self.expr_stack.push(StackEntry {
             contract: contract.clone(),
@@ -253,4 +269,161 @@ impl EvalHook for PerfHook {
     ) {
         // No action needed after evaluation completion
     }
+}
+
+impl PerfHook {
+    /// Capture the original AST and build a mapping from expression IDs to spans
+    pub fn capture_ast(&mut self, contract_ast: &ContractAST) {
+        self.ast_span_mapping.clear();
+        self.build_span_mapping(contract_ast);
+    }
+
+    fn build_span_mapping(&mut self, contract_ast: &ContractAST) {
+        for expr in &contract_ast.expressions {
+            self.add_expression_to_mapping(expr);
+        }
+    }
+
+    fn add_expression_to_mapping(&mut self, expr: &SymbolicExpression) {
+        // Store this expression's span if its not blank
+        if expr.span.start_line > 0 || expr.span.start_column > 0 {
+            self.ast_span_mapping
+                .insert(expr.id, (expr.span.start_line, expr.span.start_column));
+        }
+
+        if let SymbolicExpressionType::List(list) = &expr.expr {
+            for child in list {
+                self.add_expression_to_mapping(child);
+            }
+        }
+    }
+
+    /// alternative to ast capture
+    pub fn capture_contract_source(&mut self, contract_source: &str) {
+        self.ast_span_mapping.clear();
+        self.build_source_mapping(contract_source);
+    }
+
+    /// Build a simple mapping from src by parsing into SE
+    fn build_source_mapping(&mut self, _contract_source: &str) {}
+    /// Fetch contract source from API and cache it in the datastore
+    fn fetch_and_cache_contract_source(
+        &mut self,
+        env: &mut Environment,
+        contract: &QualifiedContractIdentifier,
+    ) -> Result<(), String> {
+        // Determine if this is mainnet or testnet based on the contract issuer
+        let is_mainnet = contract.issuer.to_address().contains("SP");
+        let api_base = if is_mainnet {
+            "https://api.hiro.so"
+        } else {
+            "https://api.testnet.hiro.so"
+        };
+
+        let contract_deployer = contract.issuer.to_address();
+        let contract_name = contract.name.to_string();
+        let request_url = format!(
+            "{}/v2/contracts/source/{}/{}?proof=0",
+            api_base, contract_deployer, contract_name
+        );
+
+        eprintln!("Fetching contract source from: {}", request_url);
+
+        let response = self.make_http_request(&request_url)?;
+        let contract_data: ContractApiResponse = serde_json::from_str(&response)
+            .map_err(|e| format!("Failed to parse API response: {}", e))?;
+
+        if let Err(e) = env
+            .global_context
+            .database
+            .insert_contract_hash(contract, &contract_data.source)
+        {
+            eprintln!("Failed to cache contract source: {}", e);
+        } else {
+            // Capture the contract source for our mapping if we don't have AST mapping
+            if self.ast_span_mapping.is_empty() {
+                self.capture_contract_source(&contract_data.source);
+            }
+        }
+
+        Ok(())
+    }
+
+    fn make_http_request(&self, url: &str) -> Result<String, String> {
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            use reqwest::blocking::Client;
+            use std::time::Duration;
+
+            let client = Client::builder()
+                .timeout(Duration::from_secs(10))
+                .build()
+                .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
+
+            let response = client
+                .get(url)
+                .header("x-hiro-product", "clarinet-cli")
+                .header("Accept", "application/json")
+                .send()
+                .map_err(|e| format!("HTTP request failed: {}", e))?;
+
+            if !response.status().is_success() {
+                return Err(format!("HTTP error: {}", response.status()));
+            }
+
+            response
+                .text()
+                .map_err(|e| format!("Failed to read response: {}", e))
+        }
+
+        #[cfg(target_arch = "wasm32")]
+        {
+            Err("HTTP requests not supported in WASM mode".to_string())
+        }
+    }
+
+    /// Helper to get line and column information, with fallback to AST mapping and contract source
+    fn get_line_column_info(
+        &self,
+        env: &mut Environment,
+        contract: &QualifiedContractIdentifier,
+        expr: &SymbolicExpression,
+    ) -> (u32, u32) {
+        let mut line = expr.span.start_line;
+        let mut column = expr.span.start_column;
+
+        // If the span information is zero, try to get it from our AST mapping first
+        if line == 0 && column == 0 {
+            if let Some(&(ast_line, ast_column)) = self.ast_span_mapping.get(&expr.id) {
+                line = ast_line;
+                column = ast_column;
+                eprintln!(
+                    "🔍 DEBUG: Found expression {} at line {} column {} from AST mapping",
+                    expr.id, line, column
+                );
+            } else if let Some(_contract_source) =
+                env.global_context.database.get_contract_src(contract)
+            {
+                // TODO: parse into SymExpr to get spans
+                // Use fallback values
+                line = 1;
+                column = 1;
+            } else {
+                line = 1;
+                column = 1;
+            }
+        }
+
+        (line, column)
+    }
+}
+
+/// Response structure for the contract source API
+#[derive(serde::Deserialize)]
+struct ContractApiResponse {
+    source: String,
+    #[allow(dead_code)]
+    publish_height: u32,
+    #[allow(dead_code)]
+    clarity_version: Option<u8>,
 }

@@ -25,13 +25,13 @@ use clarity_repl::clarity::{
     Address, ClarityVersion, EvaluationResult, ExecutionResult, StacksEpochId, SymbolicExpression,
 };
 use clarity_repl::repl::clarity_values::{uint8_to_string, uint8_to_value};
+use clarity_repl::repl::hooks::perf::CostField;
 use clarity_repl::repl::session::CostsReport;
 use clarity_repl::repl::settings::RemoteDataSettings;
 use clarity_repl::repl::{
     clarity_values, ClarityCodeSource, ClarityContract, ContractDeployer, Epoch, Session,
     SessionSettings, DEFAULT_CLARITY_VERSION, DEFAULT_EPOCH,
 };
-use clarity_repl::repl::hooks::perf::CostField;
 use gloo_utils::format::JsValueSerdeExt;
 use js_sys::Function as JsFunction;
 use serde::{Deserialize, Serialize};
@@ -275,7 +275,12 @@ pub struct SDKOptions {
 #[wasm_bindgen]
 impl SDKOptions {
     #[wasm_bindgen(constructor)]
-    pub fn new(track_costs: bool, track_coverage: bool, track_performance: Option<bool>, performance_cost_field: Option<String>) -> Self {
+    pub fn new(
+        track_costs: bool,
+        track_coverage: bool,
+        track_performance: Option<bool>,
+        performance_cost_field: Option<String>,
+    ) -> Self {
         Self {
             track_costs,
             track_coverage,
@@ -321,7 +326,8 @@ impl SDK {
         let track_coverage = options.as_ref().is_some_and(|o| o.track_coverage);
         let track_costs = options.as_ref().is_some_and(|o| o.track_costs);
         let track_performance = options.as_ref().is_some_and(|o| o.track_performance);
-        let performance_cost_field = options.as_ref()
+        let performance_cost_field = options
+            .as_ref()
             .map(|opts| opts.performance_cost_field.clone())
             .unwrap_or_else(|| "runtime".to_string());
 
@@ -490,7 +496,7 @@ impl SDK {
             session.enable_coverage();
         }
         if self.options.track_performance {
-            let cost_field = CostField::from_str(&self.options.performance_cost_field)
+            let cost_field = CostField::parse_from_str(&self.options.performance_cost_field)
                 .unwrap_or(CostField::Runtime);
             session.enable_performance(cost_field);
         }
