@@ -2,12 +2,12 @@ use std::collections::HashMap;
 use std::fmt::Display;
 use std::io::Write;
 
-use clarity::vm::ast::ContractAST;
+use clarity::vm::ast::{build_ast_with_diagnostics, ContractAST};
 use clarity::vm::contexts::{Environment, LocalContext};
 use clarity::vm::costs::ExecutionCost;
 use clarity::vm::errors::Error;
 use clarity::vm::types::{QualifiedContractIdentifier, Value};
-use clarity::vm::{EvalHook, SymbolicExpression, SymbolicExpressionType};
+use clarity::vm::{ClarityVersion, EvalHook, SymbolicExpression, SymbolicExpressionType};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum CostField {
@@ -384,7 +384,7 @@ impl PerfHook {
 
     /// Helper to get line and column information, with fallback to AST mapping and contract source
     fn get_line_column_info(
-        &self,
+        &mut self,
         env: &mut Environment,
         contract: &QualifiedContractIdentifier,
         expr: &SymbolicExpression,
@@ -397,17 +397,31 @@ impl PerfHook {
             if let Some(&(ast_line, ast_column)) = self.ast_span_mapping.get(&expr.id) {
                 line = ast_line;
                 column = ast_column;
-                eprintln!(
-                    "🔍 DEBUG: Found expression {} at line {} column {} from AST mapping",
-                    expr.id, line, column
-                );
-            } else if let Some(_contract_source) =
+            } else if let Some(contract_source) =
                 env.global_context.database.get_contract_src(contract)
             {
-                // TODO: parse into SymExpr to get spans
-                // Use fallback values
-                line = 1;
-                column = 1;
+                // Parse contract source into SymbolicExpressions to get accurate spans
+                let contract_id = QualifiedContractIdentifier::transient();
+                let (ast, _diagnostics, _success) = build_ast_with_diagnostics(
+                    &contract_id,
+                    &contract_source,
+                    &mut (),
+                    ClarityVersion::default_for_epoch(env.global_context.epoch_id),
+                    env.global_context.epoch_id,
+                );
+
+                // Build span mapping from the parsed AST
+                self.build_span_mapping(&ast);
+
+                // Try to get span information from our new mapping
+                if let Some(&(parsed_line, parsed_column)) = self.ast_span_mapping.get(&expr.id) {
+                    line = parsed_line;
+                    column = parsed_column;
+                } else {
+                    // Use fallback values if parsing didn't work
+                    line = 1;
+                    column = 1;
+                }
             } else {
                 line = 1;
                 column = 1;
