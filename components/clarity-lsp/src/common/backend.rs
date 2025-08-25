@@ -166,9 +166,10 @@ pub async fn process_notification(
                         } else {
                             // Check if custom boot contract
                             let contract_name = contract_location
-                                .get_file_name()
+                                .to_path_buf()
+                                .file_stem()
+                                .and_then(|s| s.to_str())
                                 .unwrap_or_default()
-                                .trim_end_matches(".clar")
                                 .to_string();
 
                             if manifest
