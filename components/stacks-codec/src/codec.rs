@@ -801,7 +801,7 @@ impl OrderIndependentMultisigSpendingCondition {
                     if !pubkey.compressed() {
                         have_uncompressed = true;
                     }
-                    *pubkey
+                    pubkey.clone()
                 }
                 TransactionAuthField::Signature(ref pubkey_encoding, ref sigbuf) => {
                     if *pubkey_encoding == TransactionPublicKeyEncoding::Uncompressed {
@@ -1962,11 +1962,11 @@ impl PostConditionPrincipal {
         match *self {
             PostConditionPrincipal::Origin => origin_principal.clone(),
             PostConditionPrincipal::Standard(ref addr) => {
-                PrincipalData::Standard(StandardPrincipalData::from(*addr))
+                PrincipalData::Standard(StandardPrincipalData::from(addr.clone()))
             }
             PostConditionPrincipal::Contract(ref addr, ref contract_name) => {
                 PrincipalData::Contract(QualifiedContractIdentifier::new(
-                    StandardPrincipalData::from(*addr),
+                    StandardPrincipalData::from(addr.clone()),
                     contract_name.clone(),
                 ))
             }
@@ -2198,11 +2198,11 @@ impl StacksTransaction {
     ) -> Result<(), CodecError> {
         match condition {
             TransactionSpendingCondition::Multisig(ref mut cond) => {
-                cond.push_public_key(*pubkey);
+                cond.push_public_key(pubkey.clone());
                 Ok(())
             }
             TransactionSpendingCondition::OrderIndependentMultisig(ref mut cond) => {
-                cond.push_public_key(*pubkey);
+                cond.push_public_key(pubkey.clone());
                 Ok(())
             }
             _ => Err(CodecError::SigningError(
