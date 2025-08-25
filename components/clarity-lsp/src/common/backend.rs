@@ -2,6 +2,7 @@ use std::sync::{Arc, RwLock};
 
 use clarinet_files::{FileAccessor, FileLocation, ProjectManifest};
 use clarity_repl::clarity::diagnostic::Diagnostic;
+use clarity_repl::clarity::vm::ClarityVersion;
 use clarity_repl::repl::ContractDeployer;
 use lsp_types::{
     CompletionItem, CompletionParams, DocumentFormattingParams, DocumentRangeFormattingParams,
@@ -146,7 +147,7 @@ pub async fn process_notification(
                 let clarity_version = match metadata {
                     Some((clarity_version, _)) => clarity_version,
                     None => {
-                        match file_accessor {
+                        let manifest = match file_accessor {
                             None => ProjectManifest::from_location(&manifest_location, false),
                             Some(file_accessor) => {
                                 ProjectManifest::from_file_accessor(
@@ -156,15 +157,34 @@ pub async fn process_notification(
                                 )
                                 .await
                             }
-                        }?
-                        .contracts_settings
-                        .get(&contract_location)
-                        .ok_or(format!(
-                            "No Clarinet.toml is associated to the contract {}",
-                            &contract_location.get_file_name().unwrap_or_default()
-                        ))?
-                        .clone()
-                        .clarity_version
+                        }?;
+
+                        if let Some(contract_metadata) =
+                            manifest.contracts_settings.get(&contract_location)
+                        {
+                            contract_metadata.clarity_version
+                        } else {
+                            // Check if custom boot contract
+                            let contract_name = contract_location
+                                .get_file_name()
+                                .unwrap_or_default()
+                                .trim_end_matches(".clar")
+                                .to_string();
+
+                            if manifest
+                                .project
+                                .override_boot_contracts_source
+                                .contains_key(&contract_name)
+                            {
+                                // Custom boot contracts don't specify clarity versions
+                                ClarityVersion::latest()
+                            } else {
+                                return Err(format!(
+                                    "No Clarinet.toml is associated to the contract {}",
+                                    contract_name
+                                ));
+                            }
+                        }
                     }
                 };
 
