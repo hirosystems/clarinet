@@ -925,7 +925,7 @@ pub async fn publish_stacking_orders(
         let duration = pox_stacking_order.duration;
 
         let signer_key =
-            devnet_config.stacks_signers_keys[i % devnet_config.stacks_signers_keys.len()];
+            devnet_config.stacks_signers_keys[i % devnet_config.stacks_signers_keys.len()].clone();
 
         let stacking_result =
             hiro_system_kit::thread_named("Stacking orders handler").spawn(move || {

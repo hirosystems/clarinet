@@ -2,6 +2,7 @@ use std::sync::{Arc, RwLock};
 
 use clarinet_files::{FileAccessor, FileLocation, ProjectManifest};
 use clarity_repl::clarity::diagnostic::Diagnostic;
+use clarity_repl::repl::boot::get_boot_contract_epoch_and_clarity_version;
 use clarity_repl::repl::ContractDeployer;
 use lsp_types::{
     CompletionItem, CompletionParams, DocumentFormattingParams, DocumentRangeFormattingParams,
@@ -146,7 +147,7 @@ pub async fn process_notification(
                 let clarity_version = match metadata {
                     Some((clarity_version, _)) => clarity_version,
                     None => {
-                        match file_accessor {
+                        let manifest = match file_accessor {
                             None => ProjectManifest::from_location(&manifest_location, false),
                             Some(file_accessor) => {
                                 ProjectManifest::from_file_accessor(
@@ -156,15 +157,36 @@ pub async fn process_notification(
                                 )
                                 .await
                             }
-                        }?
-                        .contracts_settings
-                        .get(&contract_location)
-                        .ok_or(format!(
-                            "No Clarinet.toml is associated to the contract {}",
-                            &contract_location.get_file_name().unwrap_or_default()
-                        ))?
-                        .clone()
-                        .clarity_version
+                        }?;
+
+                        if let Some(contract_metadata) =
+                            manifest.contracts_settings.get(&contract_location)
+                        {
+                            contract_metadata.clarity_version
+                        } else {
+                            // Check if custom boot contract
+                            let contract_name = contract_location
+                                .to_path_buf()
+                                .file_stem()
+                                .and_then(|s| s.to_str())
+                                .unwrap_or_default()
+                                .to_string();
+
+                            if manifest
+                                .project
+                                .override_boot_contracts_source
+                                .contains_key(&contract_name)
+                            {
+                                let (_, version) =
+                                    get_boot_contract_epoch_and_clarity_version(&contract_name);
+                                version
+                            } else {
+                                return Err(format!(
+                                    "No Clarinet.toml is associated to the contract {}",
+                                    contract_name
+                                ));
+                            }
+                        }
                     }
                 };
 
