@@ -2,7 +2,7 @@ use std::sync::{Arc, RwLock};
 
 use clarinet_files::{FileAccessor, FileLocation, ProjectManifest};
 use clarity_repl::clarity::diagnostic::Diagnostic;
-use clarity_repl::clarity::vm::ClarityVersion;
+use clarity_repl::repl::boot::get_boot_contract_epoch_and_clarity_version;
 use clarity_repl::repl::ContractDeployer;
 use lsp_types::{
     CompletionItem, CompletionParams, DocumentFormattingParams, DocumentRangeFormattingParams,
@@ -177,8 +177,9 @@ pub async fn process_notification(
                                 .override_boot_contracts_source
                                 .contains_key(&contract_name)
                             {
-                                // Custom boot contracts don't specify clarity versions
-                                ClarityVersion::latest()
+                                let (_, version) =
+                                    get_boot_contract_epoch_and_clarity_version(&contract_name);
+                                version
                             } else {
                                 return Err(format!(
                                     "No Clarinet.toml is associated to the contract {}",
