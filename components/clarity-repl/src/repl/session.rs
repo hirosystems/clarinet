@@ -259,7 +259,7 @@ impl Session {
         ) {
             Ok((mut output, result)) => {
                 if let EvaluationResult::Contract(contract_result) = result.result.clone() {
-                    let snippet = green!("→ .{} contract successfully stored. Use (contract-call? ...) for invoking the public functions:", contract_result.contract.contract_identifier);
+                    let snippet = green!("→ {} contract successfully stored. Use (contract-call? ...) for invoking the public functions:", contract_result.contract.contract_identifier);
                     output.push(snippet.to_string());
                 };
                 (output, result.cost.clone(), Ok(result))
@@ -386,7 +386,7 @@ impl Session {
         ) {
             Ok((mut output, result)) => {
                 if let EvaluationResult::Contract(contract_result) = result.result {
-                    let snippet = format!("→ .{} contract successfully stored. Use (contract-call? ...) for invoking the public functions:", contract_result.contract.contract_identifier);
+                    let snippet = format!("→ {} contract successfully stored. Use (contract-call? ...) for invoking the public functions:", contract_result.contract.contract_identifier);
                     output.push(snippet.green().to_string());
                 };
                 output
