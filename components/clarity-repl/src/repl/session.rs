@@ -244,6 +244,7 @@ impl Session {
         }
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     fn contract_successfully_stored(
         &mut self,
         output: &mut Vec<String>,
