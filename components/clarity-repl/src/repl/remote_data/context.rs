@@ -8,6 +8,8 @@ use clarity::vm::functions::define::DefineResult;
 use clarity::vm::types::PrincipalData;
 use clarity::vm::{functions, CallStack, ContractContext, Environment, SymbolicExpression};
 
+// this is a simplified version of stacks-core `eval_all()`:
+// https://github.com/stacks-network/stacks-core/blob/d22bad7056968bcde3710cab44fed8394326cd68/clarity/src/vm/mod.rs#L378-L491
 #[allow(clippy::result_large_err)]
 pub fn set_contract_context(
     expressions: &[SymbolicExpression],
