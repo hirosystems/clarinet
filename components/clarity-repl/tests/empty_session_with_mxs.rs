@@ -32,6 +32,9 @@ fn init_session(initial_heigth: u32) -> Session {
 // the counter contract is deployed on testnet at height #41613
 // the initial count value is 0 and is incremented by 1 at #56232
 const COUNTER_ADDR: &str = "STJCAB2T9TR2EJM7YS4DM2CGBBVTF7BV237Y8KNV.counter";
+// counter2 is deployed at #3530220
+// it calls COUNTER_ADDR to dynamically set a constant value
+const COUNTER2_ADDR: &str = "ST22JXZG7Q4AN1100RZ7MMHQP6VF1WJX41SPB94CR.counter2";
 
 #[test]
 fn it_starts_in_the_right_epoch() {
@@ -291,6 +294,23 @@ fn it_parses_contracts() {
     let snippet = format!("(contract-call? '{COUNTER_ADDR} get-count)");
     let result = eval_snippet(&mut session, &snippet);
     assert_eq!(result, Value::UInt(1));
+}
+
+#[test]
+fn it_evualuates_constant_values() {
+    let mut session = init_session(41614);
+    let snippet = format!("(contract-call? '{COUNTER_ADDR} decrement)");
+    let result = eval_snippet(&mut session, &snippet);
+    assert_eq!(result, Value::err_uint(1001));
+}
+
+#[test]
+fn it_properly_evaluates_constant_values() {
+    let mut session = init_session(3530220);
+    // we expect COUNTER2 to hold the count value from COUNTER_ADDR at deployment, which is 2
+    let snippet = format!("(contract-call? '{COUNTER2_ADDR} get-count-at-deploy)");
+    let result = eval_snippet(&mut session, &snippet);
+    assert_eq!(result, Value::UInt(2));
 }
 
 #[test]

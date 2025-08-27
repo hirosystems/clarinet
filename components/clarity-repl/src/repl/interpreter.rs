@@ -328,7 +328,7 @@ impl ClarityInterpreter {
     }
 
     fn get_global_context(
-        &mut self,
+        &'_ mut self,
         epoch: StacksEpochId,
         cost_track: bool,
     ) -> Result<GlobalContext<'_, '_>, String> {

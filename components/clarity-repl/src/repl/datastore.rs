@@ -262,7 +262,7 @@ impl ClarityDatastore {
         AnalysisDatabase::new(self)
     }
 
-    fn as_clarity_db(&mut self) -> ClarityDatabase {
+    fn as_clarity_db(&'_ mut self) -> ClarityDatabase<'_> {
         ClarityDatabase::new(self, &NULL_HEADER_DB, &NULL_BURN_STATE_DB)
     }
 
@@ -441,7 +441,7 @@ impl ClarityDatastore {
         contract_context.data_size = contract_size;
 
         context::set_contract_context(
-            &analysis,
+            // &analysis,
             &contract_ast.expressions,
             &mut contract_context,
             &mut global_context,
