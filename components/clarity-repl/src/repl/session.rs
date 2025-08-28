@@ -1297,12 +1297,10 @@ fn decode_hex(byte_string: &str) -> Result<Vec<u8>, DecodeHexError> {
 #[cfg(test)]
 mod tests {
     use clarity::util::hash::hex_bytes;
-    use clarity::vm::costs::ExecutionCost;
     use clarity::vm::types::TupleData;
 
     use super::*;
     use crate::repl::boot::{BOOT_MAINNET_ADDRESS, BOOT_TESTNET_ADDRESS};
-    use crate::repl::hooks::perf::CostField;
     use crate::repl::settings::Account;
     use crate::repl::DEFAULT_EPOCH;
     use crate::test_fixtures::clarity_contract::ClarityContractBuilder;
