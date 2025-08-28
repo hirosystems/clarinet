@@ -386,9 +386,15 @@ impl ClarityDatastore {
         contract_id: &QualifiedContractIdentifier,
         context_str: Option<String>,
     ) -> Result<ContractContext> {
-        let contract = self.client.fetch_contract(contract_id).map_err(|e| {
-            InterpreterError::Expect(format!("Failed to fetch contract source: {e}"))
-        })?;
+        let contract_src_key = ClarityDatabase::make_metadata_key(
+            StoreType::Contract,
+            ContractDataVarName::ContractSrc.as_str(),
+        );
+        let contract_src =
+            self.get_metadata(contract_id, &contract_src_key)?
+                .ok_or(InterpreterError::Expect(format!(
+                    "No contract source found for contract: {contract_id}",
+                )))?;
 
         let mut contract_context = context_str
             .ok_or(InterpreterError::Expect(format!(
@@ -415,7 +421,7 @@ impl ClarityDatastore {
 
         let contract_ast = build_ast_with_rules(
             contract_id,
-            &contract.source,
+            &contract_src,
             &mut (),
             analysis.clarity_version,
             analysis.epoch,
