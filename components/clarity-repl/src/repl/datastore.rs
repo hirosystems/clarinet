@@ -11,13 +11,10 @@ use clarity::types::StacksEpochId;
 use clarity::util::hash::Sha512Trunc256Sum;
 use clarity::vm::analysis::{AnalysisDatabase, ContractAnalysis};
 use clarity::vm::ast::build_ast_with_rules;
-use clarity::vm::contexts::GlobalContext;
 use clarity::vm::contracts::Contract as ContractContextResponse;
-use clarity::vm::costs::LimitedCostTracker;
 use clarity::vm::database::clarity_db::ContractDataVarName;
 use clarity::vm::database::{
-    BurnStateDB, ClarityBackingStore, ClarityDatabase, HeadersDB, StoreType, NULL_BURN_STATE_DB,
-    NULL_HEADER_DB,
+    BurnStateDB, ClarityBackingStore, ClarityDatabase, HeadersDB, StoreType,
 };
 use clarity::vm::errors::{InterpreterError, InterpreterResult as Result};
 use clarity::vm::types::{
@@ -262,10 +259,6 @@ impl ClarityDatastore {
         AnalysisDatabase::new(self)
     }
 
-    fn as_clarity_db(&'_ mut self) -> ClarityDatabase<'_> {
-        ClarityDatabase::new(self, &NULL_HEADER_DB, &NULL_BURN_STATE_DB)
-    }
-
     /// begin, commit, rollback a save point identified by key
     ///    this is used to clean up any data from aborted blocks
     ///     (NOT aborted transactions that is handled by the clarity vm directly).
@@ -388,62 +381,57 @@ impl ClarityDatastore {
     }
 
     #[allow(clippy::result_large_err)]
-    fn fetch_and_parse_source(
+    fn populate_context_functions(
         &mut self,
         contract_id: &QualifiedContractIdentifier,
+        context_str: Option<String>,
     ) -> Result<ContractContext> {
-        let network_id = self
-            .remote_network_info
-            .as_ref()
-            .map(|i| i.network_id)
-            .unwrap_or(1);
+        let contract_src_key = ClarityDatabase::make_metadata_key(
+            StoreType::Contract,
+            ContractDataVarName::ContractSrc.as_str(),
+        );
+        let contract_src =
+            self.get_metadata(contract_id, &contract_src_key)?
+                .ok_or(InterpreterError::Expect(format!(
+                    "No contract source found for contract: {contract_id}",
+                )))?;
 
-        let contract = self.client.fetch_contract(contract_id).map_err(|e| {
-            InterpreterError::Expect(format!("Failed to fetch contract source: {e}"))
-        })?;
+        let mut contract_context = context_str
+            .ok_or(InterpreterError::Expect(format!(
+                "No contract context found for contract: {contract_id}",
+            )))
+            .and_then(|s| {
+                serde_json::from_str::<ContractContextResponse>(&s).map_err(|e| {
+                    InterpreterError::Expect(format!("Failed to parse contract context: {e}"))
+                })
+            })?
+            .contract_context;
+        contract_context.functions.clear();
 
-        let analysis_str = self
+        let analysis = self
             .get_metadata(contract_id, AnalysisDatabase::storage_key())?
             .ok_or(InterpreterError::Expect(format!(
                 "No analysis metadata found for contract: {contract_id}",
-            )))?;
-        let analysis = serde_json::from_str::<ContractAnalysis>(&analysis_str)
-            .map_err(|e| InterpreterError::Expect(format!("Failed to parse analysis: {e}")))?;
-
-        let contract_size_key_str = ClarityDatabase::make_metadata_key(
-            StoreType::Contract,
-            ContractDataVarName::ContractSize.as_str(),
-        );
-        let contract_size_str = self
-            .get_metadata(contract_id, &contract_size_key_str)?
-            .ok_or(InterpreterError::Expect(format!(
-                "No contract size metadata found for contract: {contract_id}",
-            )))?;
-        let contract_size: u64 = contract_size_str
-            .parse()
-            .map_err(|e| InterpreterError::Expect(format!("Failed to parse contract size: {e}")))?;
+            )))
+            .and_then(|s| {
+                serde_json::from_str::<ContractAnalysis>(&s).map_err(|e| {
+                    InterpreterError::Expect(format!("Failed to parse analysis metadata: {e}"))
+                })
+            })?;
 
         let contract_ast = build_ast_with_rules(
             contract_id,
-            &contract.source,
+            &contract_src,
             &mut (),
             analysis.clarity_version,
             analysis.epoch,
             clarity::vm::ast::ASTRules::Typical,
         )?;
 
-        let cost_tracker = LimitedCostTracker::new_free();
-        let database = self.as_clarity_db();
-        let mut global_context =
-            GlobalContext::new(true, network_id, database, cost_tracker, analysis.epoch);
-        let mut contract_context =
-            ContractContext::new(contract_id.clone(), analysis.clarity_version);
-        contract_context.data_size = contract_size;
-
-        context::set_contract_context(
+        context::set_functions_in_contract_context(
             &contract_ast.expressions,
             &mut contract_context,
-            &mut global_context,
+            &analysis.epoch,
         )?;
 
         Ok(contract_context)
@@ -472,15 +460,19 @@ impl ClarityDatastore {
             return Ok(Some(cached));
         }
 
+        let url = format!("/v2/clarity/metadata/{addr}/{contract}/{key}?tip={tip}");
+        let raw_response = self.client.fetch_clarity_data(&url)?;
+
         let contract_context_key = ClarityDatabase::make_metadata_key(
             StoreType::Contract,
             ContractDataVarName::Contract.as_str(),
         );
         let response = if key == contract_context_key {
-            // instead of directly fetching `vm-metadata::9::contract`,
-            // we fetch the source and build the context locally
-            // giving access to the expressions span that are only available with clarity-vm/developer-mode
-            let contract_context = self.fetch_and_parse_source(contract_id)?;
+            // the `vm-metadata::9::contract`, returns the contracts Context, including the contract AST.
+            // since node don't have the `clarity-vm/developer-mode` cargo feature enabled,
+            // the AST doesn't contain the spans, which are useful for most debugging purposes.
+            // The solution is to fetch the source code of the contract, and parse it locally,
+            let contract_context = self.populate_context_functions(contract_id, raw_response)?;
             let contract_context_response = ContractContextResponse { contract_context };
             Some(
                 serde_json::to_string(&contract_context_response).map_err(|e| {
@@ -488,8 +480,7 @@ impl ClarityDatastore {
                 })?,
             )
         } else {
-            let url = format!("/v2/clarity/metadata/{addr}/{contract}/{key}?tip={tip}");
-            self.client.fetch_clarity_data(&url)?
+            raw_response
         };
 
         if let Some(content) = &response {

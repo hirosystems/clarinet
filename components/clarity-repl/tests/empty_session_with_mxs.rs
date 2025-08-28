@@ -30,7 +30,10 @@ fn init_session(initial_heigth: u32) -> Session {
 }
 
 // the counter contract is deployed on testnet at height #41613
-// the initial count value is 0 and is incremented by 1 at #56232
+// the initial count value is 0 and is incremented:
+//   - at #56232
+//   - at #140788
+//   - at #3530272 (after COUNTER2 is deployed)
 const COUNTER_ADDR: &str = "STJCAB2T9TR2EJM7YS4DM2CGBBVTF7BV237Y8KNV.counter";
 // counter2 is deployed at #3530220
 // it calls COUNTER_ADDR to dynamically set a constant value
@@ -306,7 +309,7 @@ fn it_evualuates_constant_values() {
 
 #[test]
 fn it_properly_evaluates_constant_values() {
-    let mut session = init_session(3530220);
+    let mut session = init_session(3530273);
     // we expect COUNTER2 to hold the count value from COUNTER_ADDR at deployment, which is 2
     let snippet = format!("(contract-call? '{COUNTER2_ADDR} get-count-at-deploy)");
     let result = eval_snippet(&mut session, &snippet);

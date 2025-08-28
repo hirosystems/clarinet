@@ -1,83 +1,93 @@
-use clarity::vm::contexts::GlobalContext;
-use clarity::vm::costs::MemoryConsumer;
-use clarity::vm::database::{
-    DataMapMetadata, DataVariableMetadata, FungibleTokenMetadata, NonFungibleTokenMetadata,
-};
-use clarity::vm::errors::InterpreterResult as Result;
-use clarity::vm::functions::define::DefineResult;
-use clarity::vm::types::PrincipalData;
-use clarity::vm::{functions, CallStack, ContractContext, Environment, SymbolicExpression};
+use clarity::types::StacksEpochId;
+use clarity::vm::callables::{DefineType, DefinedFunction};
+use clarity::vm::costs::LimitedCostTracker;
+use clarity::vm::errors::{CheckErrors, InterpreterResult as Result};
+use clarity::vm::functions::define::DefineFunctionsParsed;
+use clarity::vm::types::parse_name_type_pairs;
+use clarity::vm::{ClarityName, ContractContext, SymbolicExpression};
 
-// this is a simplified version of stacks-core `eval_all()`:
-// https://github.com/stacks-network/stacks-core/blob/d22bad7056968bcde3710cab44fed8394326cd68/clarity/src/vm/mod.rs#L378-L491
 #[allow(clippy::result_large_err)]
-pub fn set_contract_context(
+fn handle_function(
+    epoch_id: &StacksEpochId,
+    signature: &[SymbolicExpression],
+    body: SymbolicExpression,
+    define_type: DefineType,
+    context_name: &str,
+    cost_tracker: &mut LimitedCostTracker,
+) -> Result<(ClarityName, DefinedFunction)> {
+    let (function_symbol, arg_symbols) = signature
+        .split_first()
+        .ok_or(CheckErrors::DefineFunctionBadSignature)?;
+    let function_name = function_symbol
+        .match_atom()
+        .ok_or(CheckErrors::ExpectedName)?;
+    let arguments = parse_name_type_pairs(*epoch_id, arg_symbols, cost_tracker)?;
+    Ok((
+        function_name.clone(),
+        DefinedFunction::new(arguments, body, define_type, function_name, context_name),
+    ))
+}
+
+// this is a simplified version of `clarity::vm::eval_all`
+// that doesn't evaluate the expressions, but only gets the types
+#[allow(clippy::result_large_err)]
+pub fn set_functions_in_contract_context(
     expressions: &[SymbolicExpression],
     contract_context: &mut ContractContext,
-    global_context: &mut GlobalContext,
+    epoch_id: &StacksEpochId,
 ) -> Result<()> {
-    let mut total_memory_use = 0;
-    let publisher: PrincipalData = contract_context.contract_identifier.issuer.clone().into();
+    let context_name = contract_context.contract_identifier.to_string();
+    let mut ct = LimitedCostTracker::Free;
 
     for exp in expressions {
-        let try_define = global_context.execute(|g| {
-            let mut call_stack = CallStack::new();
-            let mut env = Environment::new(
-                g,
-                contract_context,
-                &mut call_stack,
-                Some(publisher.clone()),
-                Some(publisher.clone()),
-                None,
-            );
-            functions::define::evaluate_define(exp, &mut env)
-        })?;
-        match try_define {
-            DefineResult::Variable(name, value) => {
-                let value_memory_use = value.get_memory_use()?;
-                total_memory_use += value_memory_use;
-                contract_context.variables.insert(name, value);
+        let try_define_exp = DefineFunctionsParsed::try_parse(exp);
+        if let Ok(Some(define_exp)) = try_define_exp {
+            match define_exp {
+                DefineFunctionsParsed::PrivateFunction { signature, body } => {
+                    let (name, func) = handle_function(
+                        epoch_id,
+                        signature,
+                        body.clone(),
+                        DefineType::Private,
+                        &context_name,
+                        &mut ct,
+                    )?;
+                    contract_context.functions.insert(name.clone(), func);
+                }
+                DefineFunctionsParsed::ReadOnlyFunction { signature, body } => {
+                    let (name, func) = handle_function(
+                        epoch_id,
+                        signature,
+                        body.clone(),
+                        DefineType::ReadOnly,
+                        &context_name,
+                        &mut ct,
+                    )?;
+                    contract_context.functions.insert(name.clone(), func);
+                }
+                DefineFunctionsParsed::PublicFunction { signature, body } => {
+                    let (name, func) = handle_function(
+                        epoch_id,
+                        signature,
+                        body.clone(),
+                        DefineType::Public,
+                        &context_name,
+                        &mut ct,
+                    )?;
+                    contract_context.functions.insert(name.clone(), func);
+                }
+                DefineFunctionsParsed::Constant { .. }
+                | DefineFunctionsParsed::PersistedVariable { .. }
+                | DefineFunctionsParsed::Map { .. }
+                | DefineFunctionsParsed::NonFungibleToken { .. }
+                | DefineFunctionsParsed::BoundedFungibleToken { .. }
+                | DefineFunctionsParsed::UnboundedFungibleToken { .. }
+                | DefineFunctionsParsed::Trait { .. }
+                | DefineFunctionsParsed::ImplTrait { .. }
+                | DefineFunctionsParsed::UseTrait { .. } => {}
             }
-            DefineResult::Function(name, value) => {
-                contract_context.functions.insert(name, value);
-            }
-            DefineResult::PersistedVariable(name, value_type, _value) => {
-                contract_context.persisted_names.insert(name.clone());
-                let variable_data = DataVariableMetadata { value_type };
-                contract_context.meta_data_var.insert(name, variable_data);
-            }
-            DefineResult::Map(name, key_type, value_type) => {
-                contract_context.persisted_names.insert(name.clone());
-                let data_type = DataMapMetadata {
-                    key_type,
-                    value_type,
-                };
-                contract_context.meta_data_map.insert(name, data_type);
-            }
-            DefineResult::FungibleToken(name, total_supply) => {
-                contract_context.persisted_names.insert(name.clone());
-                let data_type = FungibleTokenMetadata { total_supply };
-                contract_context.meta_ft.insert(name, data_type);
-            }
-            DefineResult::NonFungibleAsset(name, asset_type) => {
-                contract_context.persisted_names.insert(name.clone());
-                let data_type = NonFungibleTokenMetadata {
-                    key_type: asset_type.clone(),
-                };
-                contract_context.meta_nft.insert(name, data_type);
-            }
-            DefineResult::Trait(name, trait_type) => {
-                contract_context.defined_traits.insert(name, trait_type);
-            }
-            DefineResult::UseTrait(_name, _trait_identifier) => {}
-            DefineResult::ImplTrait(trait_identifier) => {
-                contract_context.implemented_traits.insert(trait_identifier);
-            }
-            DefineResult::NoDefine => {}
         }
     }
-
-    contract_context.data_size = total_memory_use;
 
     Ok(())
 }
