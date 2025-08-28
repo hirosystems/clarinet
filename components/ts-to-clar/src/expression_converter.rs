@@ -88,9 +88,12 @@ impl<'a> StatementConverter<'a> {
         {
             Some(ts_to_clar_type(&boxed_type_annotation.type_annotation).unwrap())
         } else {
-            // type annotation is not always needed
-            // but this current approach probably isn't robust enough
-            None
+            // Try to infer type from initializer expression
+            if let Some(init_expr) = &variable_declarator.init {
+                self.infer_type_from_expression(init_expr)
+            } else {
+                None
+            }
         };
 
         let binding_name = if let ast::BindingPattern {
@@ -107,6 +110,45 @@ impl<'a> StatementConverter<'a> {
             .push((binding_name.to_string(), type_annotation.clone()));
 
         type_annotation
+    }
+
+    fn infer_type_from_expression(&self, expr: &Expression<'a>) -> Option<TypeSignature> {
+        match expr {
+            // Handle method call chains like: counts.get(txSender).defaultTo(0)
+            Expression::CallExpression(call_expr) => {
+                if let Expression::StaticMemberExpression(member_expr) = &call_expr.callee {
+                    if member_expr.property.name.as_str() == "defaultTo" {
+                        if let Some(root_type) = self.find_root_data_map_type(&member_expr.object) {
+                            return Some(root_type);
+                        }
+                    }
+                }
+                None
+            }
+            _ => None,
+        }
+    }
+
+    fn find_root_data_map_type(&self, expr: &Expression<'a>) -> Option<TypeSignature> {
+        match expr {
+            Expression::StaticMemberExpression(member_expr) => {
+                self.find_root_data_map_type(&member_expr.object)
+            }
+            Expression::CallExpression(call_expr) => {
+                self.find_root_data_map_type(&call_expr.callee)
+            }
+            Expression::Identifier(ident) => {
+                let var_name = ident.name.as_str();
+                self.ir.data_maps.iter().find_map(|data_map| {
+                    if data_map.name == var_name {
+                        Some(data_map.value_type.clone())
+                    } else {
+                        None
+                    }
+                })
+            }
+            _ => None,
+        }
     }
 
     fn get_parameter_type(&self, param_name: &str) -> Option<&TypeSignature> {
@@ -387,6 +429,16 @@ impl<'a> Traverse<'a, ConverterState<'a>> for StatementConverter<'a> {
             }
             Expression::StaticMemberExpression(member_expr) => {
                 let Expression::Identifier(ident) = &member_expr.object else {
+                    if member_expr.property.name.as_str() == "defaultTo" {
+                        // For defaultTo, we need special handling to get correct argument order
+                        self.lists_stack
+                            .push(PreSymbolicExpression::list(vec![atom("default-to")]));
+                        // Keep the current context type for proper type inference of the default value
+                        // The argument should have the same type as the optional's inner type
+                        self.current_context_type_stack
+                            .push(self.current_context_type.clone());
+                        return;
+                    }
                     return;
                 };
                 let ident_name = ident.name.as_str();
@@ -402,6 +454,27 @@ impl<'a> Traverse<'a, ConverterState<'a>> for StatementConverter<'a> {
                     let atom_name = match member_expr.property.name.as_str() {
                         "get" => "var-get",
                         "set" => "var-set",
+                        _ => return,
+                    };
+                    self.lists_stack
+                        .push(PreSymbolicExpression::list(vec![atom(atom_name)]));
+                    ctx.state.ingest_call_expression = true;
+                    return;
+                }
+
+                // Handle data map access
+                if let Some(data_map) = self
+                    .ir
+                    .data_maps
+                    .iter()
+                    .find(|data_map| data_map.name == ident_name)
+                {
+                    self.current_context_type = Some(data_map.value_type.clone());
+                    let atom_name = match member_expr.property.name.as_str() {
+                        "get" => "map-get?",
+                        "insert" => "map-insert",
+                        "set" => "map-set",
+                        "delete" => "map-delete",
                         _ => return,
                     };
                     self.lists_stack
@@ -442,9 +515,24 @@ impl<'a> Traverse<'a, ConverterState<'a>> for StatementConverter<'a> {
 
     fn exit_call_expression(
         &mut self,
-        _call_expr: &mut ast::CallExpression<'a>,
+        call_expr: &mut ast::CallExpression<'a>,
         ctx: &mut TraverseCtx<'a>,
     ) {
+        if let Expression::StaticMemberExpression(member_expr) = &call_expr.callee {
+            if member_expr.property.name.as_str() == "defaultTo" {
+                // For defaultTo, we need to reorder arguments: (default-to default_value optional_expr)
+                if let Some(current_list) = self.lists_stack.last_mut() {
+                    if let PreSymbolicExpressionType::List(list) = &mut current_list.pre_expr {
+                        if list.len() == 3 {
+                            list.swap(1, 2);
+                        }
+                    }
+                }
+                self.ingest_last_stack_item();
+                return;
+            }
+        }
+
         if ctx.state.ingest_call_expression {
             // Don't ingest immediately if we're inside an object property
             // Let the object property handler take care of it
@@ -1334,6 +1422,60 @@ mod test {
             }"#
         };
         let expected_clar_src = "{ list: (list (list true false)) }";
+        assert_body_eq(ts_src, expected_clar_src);
+    }
+
+    #[test]
+    fn test_data_map_get() {
+        let ts_src = indoc! {
+            r#"const counts = new DataMap<Principal, Uint>();
+            function getMyCount() {
+                const count = counts.get(txSender);
+                return count;
+            }"#
+        };
+        let expected_clar_src = "(let ((count (map-get? counts tx-sender))) count)";
+        assert_body_eq(ts_src, expected_clar_src);
+    }
+
+    #[test]
+    fn test_optional_default_to() {
+        let ts_src = indoc! {
+            r#"const counts = new DataMap<Principal, Uint>();
+            function getMyCount() {
+                return counts.get(txSender).defaultTo(0);
+            }"#
+        };
+        let expected_clar_src = "(default-to u0 (map-get? counts tx-sender))";
+        assert_body_eq(ts_src, expected_clar_src);
+    }
+
+    #[test]
+    fn test_optional_default_to_type_inference() {
+        let ts_src = indoc! {
+            r#"const counts = new DataMap<Principal, Uint>();
+            function getMyCountPlus1() {
+                return counts.get(txSender).defaultTo(0) + 1;
+            }"#
+        };
+        let expected_clar_src = "(+ (default-to u0 (map-get? counts tx-sender)) u1)";
+        assert_body_eq(ts_src, expected_clar_src);
+    }
+
+    #[test]
+    fn test_variable_type_inference() {
+        let ts_src = indoc! {
+            r#"const counts = new DataMap<Principal, Uint>();
+            function getMyCountPlus1() {
+                const currentCount = counts.get(txSender).defaultTo(0);
+                return currentCount + 1;
+            }"#
+        };
+        let expected_clar_src = indoc! {
+            r#"(let ((current-count (default-to u0 (map-get? counts tx-sender))))
+                (+ current-count u1)
+            )"#
+        };
         assert_body_eq(ts_src, expected_clar_src);
     }
 }

@@ -140,7 +140,15 @@ fn convert_expression_with_type(
 
             _ => return Err(anyhow::anyhow!("Unsupported expression for Tuple")),
         },
-        _ => return Err(anyhow::anyhow!("Unsupported type for variable")),
+        ClarityTypeSignature::ResponseType(boxed_types) => match &expr {
+            _ => return Err(anyhow::anyhow!("Invalid expression for Response type")),
+        },
+        _ => {
+            return Err(anyhow::anyhow!(format!(
+                "Unsupported type for variable with {:?} type",
+                r#type
+            )))
+        }
     })
 }
 

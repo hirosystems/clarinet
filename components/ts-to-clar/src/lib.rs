@@ -35,6 +35,7 @@ mod test {
     fn test_transpile_toplevel_data() {
         let src = indoc! {
             "const OWNER_ROLE = new Constant<Uint>(1);
+            const ERR_FORBIDDEN = new Constant<ClError<never, Uint>>(err(4001));
             const count = new DataVar<Uint>(0);
             const msgs = new DataMap<Uint, StringAscii<16>>();
         "};
@@ -44,6 +45,7 @@ mod test {
             clarity_code,
             indoc! {r#"
                 (define-const OWNER_ROLE u1)
+                (define-const ERR_FORBIDDEN (err u4001))
                 (define-data-var count uint u0)
                 (define-map msgs
                   uint
