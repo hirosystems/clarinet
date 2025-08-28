@@ -1,13 +1,11 @@
-use std::collections::HashMap;
 use std::fmt::Display;
 use std::io::Write;
 
-use clarity::vm::ast::{build_ast_with_diagnostics, ContractAST};
 use clarity::vm::contexts::{Environment, LocalContext};
 use clarity::vm::costs::ExecutionCost;
 use clarity::vm::errors::Error;
 use clarity::vm::types::{QualifiedContractIdentifier, Value};
-use clarity::vm::{ClarityVersion, EvalHook, SymbolicExpression, SymbolicExpressionType};
+use clarity::vm::{EvalHook, SymbolicExpression, SymbolicExpressionType};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum CostField {
