@@ -23,6 +23,7 @@ use super::boot::{
 };
 use super::diagnostic::output_diagnostic;
 use super::hooks::logger::LoggerHook;
+use super::hooks::perf::{CostField, PerfHook};
 use super::interpreter::ContractCallError;
 use super::{
     ClarityCodeSource, ClarityContract, ClarityInterpreter, ContractDeployer, Epoch,
@@ -52,6 +53,7 @@ pub struct Session {
 
     coverage_hook: Option<CoverageHook>,
     logger_hook: Option<LoggerHook>,
+    perf_hook: Option<PerfHook>,
 }
 
 impl Session {
@@ -78,6 +80,7 @@ impl Session {
 
             coverage_hook: None,
             logger_hook: None,
+            perf_hook: None,
         }
     }
 
@@ -87,6 +90,10 @@ impl Session {
 
     pub fn enable_logger_hook(&mut self) {
         self.logger_hook = Some(LoggerHook::new());
+    }
+
+    pub fn enable_performance(&mut self, cost_field: CostField) {
+        self.perf_hook = Some(PerfHook::new(cost_field));
     }
 
     pub fn set_test_name(&mut self, name: String) {
@@ -422,16 +429,48 @@ impl Session {
 
     #[cfg(not(target_arch = "wasm32"))]
     pub fn perf(&mut self, output: &mut Vec<String>, cmd: &str) {
-        use super::hooks::perf::PerfHook;
+        use super::hooks::perf::{CostField, PerfHook};
 
-        let Some((_, snippet)) = cmd.split_once(' ') else {
-            return output.push("Usage: ::perf <expr>".red().to_string());
+        let parts: Vec<&str> = cmd.split_whitespace().collect();
+        if parts.len() < 3 {
+            return output.push("Usage: ::perf <cost_field> <expr>".red().to_string());
+        }
+
+        let cost_field_str = parts[1];
+        let snippet = parts[2..].join(" ");
+
+        let Some(cost_field) = CostField::parse_from_str(cost_field_str) else {
+            let valid_fields = [
+                "runtime",
+                "read_length",
+                "read_count",
+                "write_length",
+                "write_count",
+            ];
+            let valid_fields_str = valid_fields.join(", ");
+            return output.push(
+                format!(
+                    "Invalid cost field '{}'. Valid fields: {}",
+                    cost_field_str, valid_fields_str
+                )
+                .red()
+                .to_string(),
+            );
         };
 
-        let mut perf = PerfHook::new();
+        let mut perf = PerfHook::new(cost_field);
 
         match self.eval_with_hooks(snippet.to_string(), Some(vec![&mut perf]), true) {
-            Ok(_) => (),
+            Ok(_) => {
+                output.push(
+                    format!(
+                        "Performance data written to perf.data (tracking {})",
+                        cost_field.name()
+                    )
+                    .green()
+                    .to_string(),
+                );
+            }
             Err(diagnostics) => {
                 let lines = snippet.lines();
                 let formatted_lines: Vec<String> = lines.map(|l| l.to_string()).collect();
@@ -522,6 +561,9 @@ impl Session {
         if let Some(ref mut logger_hook) = self.logger_hook {
             hooks.push(logger_hook);
         }
+        if let Some(ref mut perf_hook) = self.perf_hook {
+            hooks.push(perf_hook);
+        }
 
         if contract.clarity_version > ClarityVersion::default_for_epoch(contract.epoch.resolve()) {
             let diagnostic = Diagnostic {
@@ -575,6 +617,9 @@ impl Session {
         }
         if let Some(ref mut logger_hook) = self.logger_hook {
             hooks.push(logger_hook);
+        }
+        if let Some(ref mut perf_hook) = self.perf_hook {
+            hooks.push(perf_hook);
         }
 
         let current_epoch = self.interpreter.datastore.get_current_epoch();
@@ -638,6 +683,9 @@ impl Session {
         }
         if let Some(ref mut logger_hook) = self.logger_hook {
             hooks.push(logger_hook);
+        }
+        if let Some(ref mut perf_hook) = self.perf_hook {
+            hooks.push(perf_hook);
         }
 
         let result = self
@@ -775,6 +823,12 @@ impl Session {
         output.push(format!(
             "{}",
             "::trace <expr>\t\t\t\tGenerate an execution trace for <expr>".yellow()
+        ));
+        #[cfg(not(target_arch = "wasm32"))]
+        output.push(format!(
+            "{}",
+            "::perf <cost_field> <expr>\t\tGenerate performance data tracking specific cost field"
+                .yellow()
         ));
         #[cfg(not(target_arch = "wasm32"))]
         output.push(format!(
@@ -1188,6 +1242,14 @@ impl Session {
             ),
         }
     }
+
+    pub fn get_performance_data(&self) -> Option<String> {
+        if let Some(ref perf_hook) = self.perf_hook {
+            perf_hook.get_buffer_data()
+        } else {
+            None
+        }
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -1235,10 +1297,12 @@ fn decode_hex(byte_string: &str) -> Result<Vec<u8>, DecodeHexError> {
 #[cfg(test)]
 mod tests {
     use clarity::util::hash::hex_bytes;
+    use clarity::vm::costs::ExecutionCost;
     use clarity::vm::types::TupleData;
 
     use super::*;
     use crate::repl::boot::{BOOT_MAINNET_ADDRESS, BOOT_TESTNET_ADDRESS};
+    use crate::repl::hooks::perf::CostField;
     use crate::repl::settings::Account;
     use crate::repl::DEFAULT_EPOCH;
     use crate::test_fixtures::clarity_contract::ClarityContractBuilder;

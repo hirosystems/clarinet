@@ -1,11 +1,55 @@
+use std::collections::HashMap;
 use std::fmt::Display;
 use std::io::Write;
 
+use clarity::vm::ast::{build_ast_with_diagnostics, ContractAST};
 use clarity::vm::contexts::{Environment, LocalContext};
 use clarity::vm::costs::ExecutionCost;
 use clarity::vm::errors::Error;
 use clarity::vm::types::{QualifiedContractIdentifier, Value};
-use clarity::vm::{EvalHook, SymbolicExpression, SymbolicExpressionType};
+use clarity::vm::{ClarityVersion, EvalHook, SymbolicExpression, SymbolicExpressionType};
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum CostField {
+    Runtime,
+    ReadLength,
+    ReadCount,
+    WriteLength,
+    WriteCount,
+}
+
+impl CostField {
+    pub fn parse_from_str(s: &str) -> Option<Self> {
+        match s.to_lowercase().as_str() {
+            "runtime" => Some(CostField::Runtime),
+            "read_length" | "readlength" => Some(CostField::ReadLength),
+            "read_count" | "readcount" => Some(CostField::ReadCount),
+            "write_length" | "writelength" => Some(CostField::WriteLength),
+            "write_count" | "writecount" => Some(CostField::WriteCount),
+            _ => None,
+        }
+    }
+
+    pub fn get_value(&self, cost: &ExecutionCost) -> u64 {
+        match self {
+            CostField::Runtime => cost.runtime,
+            CostField::ReadLength => cost.read_length,
+            CostField::ReadCount => cost.read_count,
+            CostField::WriteLength => cost.write_length,
+            CostField::WriteCount => cost.write_count,
+        }
+    }
+
+    pub fn name(&self) -> &'static str {
+        match self {
+            CostField::Runtime => "runtime",
+            CostField::ReadLength => "read_length",
+            CostField::ReadCount => "read_count",
+            CostField::WriteLength => "write_length",
+            CostField::WriteCount => "write_count",
+        }
+    }
+}
 
 struct StackEntry {
     contract: QualifiedContractIdentifier,
@@ -27,29 +71,117 @@ impl Display for StackEntry {
     }
 }
 
+/// A writer that can also be read from, used for WASM mode
+#[cfg(target_arch = "wasm32")]
+struct ReadableWriter {
+    buffer: Vec<u8>,
+}
+
+#[cfg(target_arch = "wasm32")]
+impl ReadableWriter {
+    fn new() -> Self {
+        Self { buffer: Vec::new() }
+    }
+
+    /// Get the written data as a string
+    pub fn get_data(&self) -> Option<String> {
+        String::from_utf8(self.buffer.clone()).ok()
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+impl Write for ReadableWriter {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        self.buffer.extend_from_slice(buf);
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+enum PerfWriter {
+    #[cfg(not(target_arch = "wasm32"))]
+    File(std::fs::File),
+    #[cfg(target_arch = "wasm32")]
+    Readable(ReadableWriter),
+}
+
+impl Write for PerfWriter {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        match self {
+            #[cfg(not(target_arch = "wasm32"))]
+            PerfWriter::File(file) => file.write(buf),
+            #[cfg(target_arch = "wasm32")]
+            PerfWriter::Readable(writer) => writer.write(buf),
+        }
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        match self {
+            #[cfg(not(target_arch = "wasm32"))]
+            PerfWriter::File(file) => file.flush(),
+            #[cfg(target_arch = "wasm32")]
+            PerfWriter::Readable(writer) => writer.flush(),
+        }
+    }
+}
+
 pub struct PerfHook {
     /// Writer for outputting performance metrics
-    writer: Box<dyn Write>,
+    writer: PerfWriter,
     /// Stack of expressions
     expr_stack: Vec<StackEntry>,
+    /// Specific cost field to track
+    cost_field: CostField,
+}
+
+impl Clone for PerfHook {
+    fn clone(&self) -> Self {
+        PerfHook::new(self.cost_field)
+    }
 }
 
 impl PerfHook {
-    pub fn new() -> PerfHook {
-        const DEFAULT_OUTPUT: &str = "perf.data";
-        let writer: Box<dyn Write> = Box::new(
-            std::fs::File::create(DEFAULT_OUTPUT).expect("Failed to create perf output file"),
-        );
+    pub fn new(cost_field: CostField) -> PerfHook {
+        Self::new_with_filename(cost_field, "perf.data")
+    }
+
+    pub fn new_with_filename(cost_field: CostField, _filename: &str) -> PerfHook {
+        let writer = {
+            #[cfg(target_arch = "wasm32")]
+            {
+                PerfWriter::Readable(ReadableWriter::new())
+            }
+            #[cfg(not(target_arch = "wasm32"))]
+            {
+                PerfWriter::File(
+                    std::fs::File::create(_filename).expect("Failed to create perf output file"),
+                )
+            }
+        };
         PerfHook {
             writer,
             expr_stack: Vec::new(),
+            cost_field,
+        }
+    }
+
+    /// Get the performance data buffer (WASM mode) or None (non-WASM mode)
+    pub fn get_buffer_data(&self) -> Option<String> {
+        match &self.writer {
+            #[cfg(target_arch = "wasm32")]
+            PerfWriter::Readable(writer) => writer.get_data(),
+            #[cfg(not(target_arch = "wasm32"))]
+            PerfWriter::File(_) => None,
         }
     }
 }
 
 impl Default for PerfHook {
     fn default() -> Self {
-        Self::new()
+        Self::new(CostField::Runtime)
     }
 }
 
@@ -139,8 +271,12 @@ impl EvalHook for PerfHook {
             .expect("cost diff calculation failed");
 
         // Write the performance data to the output
-        writeln!(self.writer, "{call_stack} {}", cost.runtime)
-            .expect("Failed to write to perf output");
+        writeln!(
+            self.writer,
+            "{call_stack} {}",
+            self.cost_field.get_value(&cost)
+        )
+        .expect("Failed to write to perf output");
 
         // Add the cost of this expression and its descendents to the parent
         // expression's cost so that it is not double-counted.
