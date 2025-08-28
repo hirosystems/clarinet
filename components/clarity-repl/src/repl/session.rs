@@ -96,13 +96,6 @@ impl Session {
         self.perf_hook = Some(PerfHook::new(cost_field));
     }
 
-    /// Capture AST for performance hook if available
-    pub fn capture_ast_for_performance(&mut self, contract_ast: &ContractAST) {
-        if let Some(ref mut perf_hook) = self.perf_hook {
-            perf_hook.capture_ast(contract_ast);
-        }
-    }
-
     pub fn set_test_name(&mut self, name: String) {
         if let Some(coverage_hook) = &mut self.coverage_hook {
             coverage_hook.set_current_test_name(name);

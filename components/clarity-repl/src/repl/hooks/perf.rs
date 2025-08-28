@@ -135,8 +135,6 @@ pub struct PerfHook {
     expr_stack: Vec<StackEntry>,
     /// Specific cost field to track
     cost_field: CostField,
-    // Store mapping from expression IDs to their original spans from the AST
-    ast_span_mapping: HashMap<u64, (u32, u32)>,
 }
 
 impl Clone for PerfHook {
@@ -167,7 +165,6 @@ impl PerfHook {
             writer,
             expr_stack: Vec::new(),
             cost_field,
-            ast_span_mapping: HashMap::new(),
         }
     }
 
@@ -196,22 +193,6 @@ impl EvalHook for PerfHook {
         expr: &SymbolicExpression,
     ) {
         let contract = &env.contract_context.contract_identifier;
-
-        // Check if we need to fetch contract source
-        // Only fetch if we don't have the source AND the expression doesn't have valid span info
-        let needs_source_fetch = env
-            .global_context
-            .database
-            .get_contract_src(contract)
-            .is_none()
-            && has_blank_span(expr);
-
-        if needs_source_fetch {
-            // Try to fetch contract source from API and cache it
-            if let Err(e) = self.fetch_and_cache_contract_source(env, contract) {
-                eprintln!("Failed to fetch contract source: {}", e);
-            }
-        }
 
         // Find the current function name in the call stack
         let call_stack = env.call_stack.make_stack_trace();
@@ -242,8 +223,8 @@ impl EvalHook for PerfHook {
         // Record the cost before evaluating this expression
         let cost_before = env.global_context.cost_track.get_total();
 
-        // Get line and column information, with fallback to AST mapping and contract source
-        let (line, column) = self.get_line_column_info(env, contract, expr);
+        let line = expr.span.start_line;
+        let column = expr.span.start_column;
 
         self.expr_stack.push(StackEntry {
             contract: contract.clone(),
@@ -317,166 +298,4 @@ impl EvalHook for PerfHook {
     ) {
         // No action needed after evaluation completion
     }
-}
-
-impl PerfHook {
-    /// Capture the original AST and build a mapping from expression IDs to spans
-    pub fn capture_ast(&mut self, contract_ast: &ContractAST) {
-        self.ast_span_mapping.clear();
-        self.build_span_mapping(contract_ast);
-    }
-
-    fn build_span_mapping(&mut self, contract_ast: &ContractAST) {
-        for expr in &contract_ast.expressions {
-            self.add_expression_to_mapping(expr);
-        }
-    }
-
-    fn add_expression_to_mapping(&mut self, expr: &SymbolicExpression) {
-        // Store this expression's span if its not blank
-        if !has_blank_span(expr) {
-            self.ast_span_mapping
-                .insert(expr.id, (expr.span.start_line, expr.span.start_column));
-        }
-
-        if let SymbolicExpressionType::List(list) = &expr.expr {
-            for child in list {
-                self.add_expression_to_mapping(child);
-            }
-        }
-    }
-
-    /// Fetch contract source from API and cache it in the datastore
-    fn fetch_and_cache_contract_source(
-        &mut self,
-        env: &mut Environment,
-        contract: &QualifiedContractIdentifier,
-    ) -> Result<(), String> {
-        let is_mainnet = env.global_context.mainnet;
-
-        let api_base = if is_mainnet {
-            "https://api.hiro.so"
-        } else {
-            "https://api.testnet.hiro.so"
-        };
-
-        let contract_deployer = contract.issuer.to_address();
-        let contract_name = contract.name.to_string();
-        let request_url = format!(
-            "{}/v2/contracts/source/{}/{}?proof=0",
-            api_base, contract_deployer, contract_name
-        );
-
-        eprintln!("Fetching contract source from: {}", request_url);
-
-        let response = self.make_http_request(&request_url)?;
-        let contract_data: ContractApiResponse = serde_json::from_str(&response)
-            .map_err(|e| format!("Failed to parse API response: {}", e))?;
-
-        if let Err(e) = env
-            .global_context
-            .database
-            .insert_contract_hash(contract, &contract_data.source)
-        {
-            eprintln!("Failed to cache contract source: {}", e);
-        }
-
-        Ok(())
-    }
-
-    fn make_http_request(&self, url: &str) -> Result<String, String> {
-        #[cfg(not(target_arch = "wasm32"))]
-        {
-            use reqwest::blocking::Client;
-            use std::time::Duration;
-
-            let client = Client::builder()
-                .timeout(Duration::from_secs(10))
-                .build()
-                .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
-
-            let response = client
-                .get(url)
-                .header("x-hiro-product", "clarinet-cli")
-                .header("Accept", "application/json")
-                .send()
-                .map_err(|e| format!("HTTP request failed: {}", e))?;
-
-            if !response.status().is_success() {
-                return Err(format!("HTTP error: {}", response.status()));
-            }
-
-            response
-                .text()
-                .map_err(|e| format!("Failed to read response: {}", e))
-        }
-
-        #[cfg(target_arch = "wasm32")]
-        {
-            Err("HTTP requests not supported in WASM mode".to_string())
-        }
-    }
-
-    /// Helper to get line and column information, with fallback to AST mapping and contract source
-    fn get_line_column_info(
-        &mut self,
-        env: &mut Environment,
-        contract: &QualifiedContractIdentifier,
-        expr: &SymbolicExpression,
-    ) -> (u32, u32) {
-        let mut line = expr.span.start_line;
-        let mut column = expr.span.start_column;
-
-        // If the span information is zero, try to get it from our AST mapping first
-        if line == 0 && column == 0 {
-            if let Some(&(ast_line, ast_column)) = self.ast_span_mapping.get(&expr.id) {
-                line = ast_line;
-                column = ast_column;
-            } else if let Some(contract_source) =
-                env.global_context.database.get_contract_src(contract)
-            {
-                // Parse contract source into SymbolicExpressions to get accurate spans
-                let contract_id = QualifiedContractIdentifier::transient();
-                let (ast, _diagnostics, _success) = build_ast_with_diagnostics(
-                    &contract_id,
-                    &contract_source,
-                    &mut (),
-                    ClarityVersion::default_for_epoch(env.global_context.epoch_id),
-                    env.global_context.epoch_id,
-                );
-
-                // Build span mapping from the parsed AST
-                self.build_span_mapping(&ast);
-
-                // Try to get span information from our new mapping
-                if let Some(&(parsed_line, parsed_column)) = self.ast_span_mapping.get(&expr.id) {
-                    line = parsed_line;
-                    column = parsed_column;
-                } else {
-                    // Use fallback values if parsing didn't work
-                    line = 1;
-                    column = 1;
-                }
-            } else {
-                line = 1;
-                column = 1;
-            }
-        }
-
-        (line, column)
-    }
-}
-
-fn has_blank_span(expr: &SymbolicExpression) -> bool {
-    expr.span.start_line == 0 && expr.span.start_column == 0
-}
-
-/// Response structure for the contract source API
-#[derive(serde::Deserialize)]
-struct ContractApiResponse {
-    source: String,
-    #[allow(dead_code)]
-    publish_height: u32,
-    #[allow(dead_code)]
-    clarity_version: Option<u8>,
 }
