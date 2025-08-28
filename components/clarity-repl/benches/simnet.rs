@@ -3,7 +3,7 @@ use std::hint::black_box;
 use clarity::vm::types::QualifiedContractIdentifier;
 use clarity::vm::{EvaluationResult, ExecutionResult, SymbolicExpression, Value as ClarityValue};
 use clarity_repl::repl::{
-    ClarityCodeSource, ClarityContract, ContractDeployer, Session, SessionSettings,
+    ClarityCodeSource, ClarityContract, ContractDeployer, Epoch, Session, SessionSettings,
     DEFAULT_CLARITY_VERSION, DEFAULT_EPOCH,
 };
 use divan::Bencher;
@@ -56,7 +56,7 @@ fn init_session() -> Session {
         name: "contract".into(),
         deployer: ContractDeployer::DefaultDeployer,
         clarity_version: DEFAULT_CLARITY_VERSION,
-        epoch: DEFAULT_EPOCH,
+        epoch: Epoch::Specific(DEFAULT_EPOCH),
     };
 
     let _ = session.deploy_contract(&contract, false, None);

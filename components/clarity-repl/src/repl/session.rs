@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 use std::fmt;
 use std::fmt::Write as _;
 use std::num::ParseIntError;
@@ -10,11 +10,7 @@ use clarity::types::StacksEpochId;
 use clarity::vm::analysis::ContractAnalysis;
 use clarity::vm::ast::ContractAST;
 use clarity::vm::diagnostic::{Diagnostic, Level};
-use clarity::vm::docs::{make_api_reference, make_define_reference, make_keyword_reference};
-use clarity::vm::functions::define::DefineFunctions;
-use clarity::vm::functions::NativeFunctions;
 use clarity::vm::types::{PrincipalData, QualifiedContractIdentifier, Value};
-use clarity::vm::variables::NativeVariables;
 use clarity::vm::{
     ClarityVersion, CostSynthesis, EvalHook, EvaluationResult, ExecutionResult, ParsedContract,
     SymbolicExpression,
@@ -33,6 +29,7 @@ use super::{
     SessionSettings,
 };
 use crate::analysis::coverage::CoverageHook;
+use crate::repl::boot::get_boot_contract_epoch_and_clarity_version;
 use crate::repl::clarity_values::value_to_string;
 use crate::utils::serialize_event;
 
@@ -50,10 +47,8 @@ pub struct Session {
     pub settings: SessionSettings,
     pub contracts: BTreeMap<QualifiedContractIdentifier, ParsedContract>,
     pub interpreter: ClarityInterpreter,
-    api_reference: HashMap<String, String>,
     pub show_costs: bool,
     pub executed: Vec<String>,
-    keywords_reference: HashMap<String, String>,
 
     coverage_hook: Option<CoverageHook>,
     logger_hook: Option<LoggerHook>,
@@ -77,11 +72,9 @@ impl Session {
                 settings.cache_location.clone(),
             ),
             contracts: BTreeMap::new(),
-            api_reference: build_api_reference(),
             show_costs: false,
             settings,
             executed: Vec::new(),
-            keywords_reference: clarity_keywords(),
 
             coverage_hook: None,
             logger_hook: None,
@@ -139,35 +132,36 @@ impl Session {
         let tx_sender = self.interpreter.get_tx_sender();
         let deployer = ContractDeployer::Address(tx_sender.to_address());
 
+        // Deploy standard boot contracts (with possible overrides)
+        // Always deploy all boot contracts
         for (name, code) in boot_code.iter() {
-            if self
-                .settings
-                .include_boot_contracts
-                .contains(&name.to_string())
+            // Check if there's a custom override for this boot contract
+            let contract_source = if let Some(custom_path) =
+                self.settings.override_boot_contracts_source.get(*name)
             {
-                let (epoch, clarity_version) = if (*name).eq("pox-4") {
-                    (StacksEpochId::Epoch25, ClarityVersion::Clarity2)
-                } else if (*name).eq("pox-3") {
-                    (StacksEpochId::Epoch24, ClarityVersion::Clarity2)
-                } else if (*name).eq("pox-2") || (*name).eq("costs-3") {
-                    (StacksEpochId::Epoch21, ClarityVersion::Clarity2)
-                } else if (*name).eq("cost-2") {
-                    (StacksEpochId::Epoch2_05, ClarityVersion::Clarity1)
-                } else {
-                    (StacksEpochId::Epoch20, ClarityVersion::Clarity1)
-                };
+                match crate::repl::boot::load_custom_boot_contract(custom_path) {
+                    Ok(source) => source,
+                    Err(e) => {
+                        eprintln!("Warning: Failed to load custom boot contract {name}: {e}");
+                        code.to_string()
+                    }
+                }
+            } else {
+                code.to_string()
+            };
 
-                let contract = ClarityContract {
-                    code_source: ClarityCodeSource::ContractInMemory(code.to_string()),
-                    name: name.to_string(),
-                    deployer: deployer.clone(),
-                    clarity_version,
-                    epoch: Epoch::Specific(epoch),
-                };
+            let (epoch, clarity_version) = get_boot_contract_epoch_and_clarity_version(name);
 
-                // Result ignored, boot contracts are trusted to be valid
-                let _ = self.deploy_contract(&contract, false, None);
-            }
+            let contract = ClarityContract {
+                code_source: ClarityCodeSource::ContractInMemory(contract_source),
+                name: name.to_string(),
+                deployer: deployer.clone(),
+                clarity_version,
+                epoch: Epoch::Specific(epoch),
+            };
+
+            // Result ignored, boot contracts are trusted to be valid
+            let _ = self.deploy_contract(&contract, false, None);
         }
     }
 
@@ -454,9 +448,7 @@ impl Session {
         let output = Vec::<String>::new();
         let contracts = vec![]; // This is never modified, remove?
 
-        if !self.settings.include_boot_contracts.is_empty() {
-            self.load_boot_contracts();
-        }
+        self.load_boot_contracts();
 
         for account in &self.settings.initial_accounts {
             let Ok(recipient) = PrincipalData::parse(&account.address) else {
@@ -703,34 +695,6 @@ impl Session {
         }
     }
 
-    pub fn lookup_functions_or_keywords_docs(&self, exp: &str) -> Option<&String> {
-        if let Some(function_doc) = self.api_reference.get(exp) {
-            return Some(function_doc);
-        }
-
-        self.keywords_reference.get(exp)
-    }
-
-    pub fn get_api_reference_index(&self) -> Vec<String> {
-        let mut keys = self
-            .api_reference
-            .keys()
-            .map(String::from)
-            .collect::<Vec<String>>();
-        keys.sort();
-        keys
-    }
-
-    pub fn get_clarity_keywords(&self) -> Vec<String> {
-        let mut keys = self
-            .keywords_reference
-            .keys()
-            .map(String::from)
-            .collect::<Vec<String>>();
-        keys.sort();
-        keys
-    }
-
     fn display_help(&self) -> String {
         let mut output: Vec<String> = vec![];
 
@@ -950,9 +914,9 @@ impl Session {
         format!("Current height: {height}")
     }
 
-    fn get_account_name(&self, address: &String) -> Option<&String> {
+    fn get_account_name(&self, address: &str) -> Option<&str> {
         for account in self.settings.initial_accounts.iter() {
-            if &account.address == address {
+            if account.address == address {
                 return Some(&account.name);
             }
         }
@@ -994,8 +958,9 @@ impl Session {
             Some("2.5") => StacksEpochId::Epoch25,
             Some("3.0") => StacksEpochId::Epoch30,
             Some("3.1") => StacksEpochId::Epoch31,
+            Some("3.2") => StacksEpochId::Epoch32,
             _ => {
-                return "Usage: ::set_epoch 2.0 | 2.05 | 2.1 | 2.2 | 2.3 | 2.4 | 2.5 | 3.0 | 3.1"
+                return "Usage: ::set_epoch 2.0 | 2.05 | 2.1 | 2.2 | 2.3 | 2.4 | 2.5 | 3.0 | 3.1 | 3.2"
                     .red()
                     .to_string()
             }
@@ -1187,8 +1152,23 @@ impl Session {
 
     #[cfg(not(target_arch = "wasm32"))]
     fn display_functions(&self) -> String {
-        let api_reference_index = self.get_api_reference_index();
-        format!("{}", api_reference_index.join("\n").yellow())
+        use crate::repl::docs::CLARITY_STD_INDEX;
+        format!("{}", CLARITY_STD_INDEX.join("\n").yellow())
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn keywords(&self) -> String {
+        use crate::repl::docs::CLARITY_KEYWORDS_INDEX;
+        format!("{}", CLARITY_KEYWORDS_INDEX.join("\n").yellow())
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn lookup_functions_or_keywords_docs(&self, exp: &str) -> Option<&str> {
+        use crate::repl::docs::{CLARITY_KEYWORDS_REF, CLARITY_STD_REF};
+        CLARITY_STD_REF
+            .get(exp)
+            .or_else(|| CLARITY_KEYWORDS_REF.get(exp))
+            .map(|s| s.as_str())
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -1207,12 +1187,6 @@ impl Session {
                 "It looks like there aren't matches for your search".red()
             ),
         }
-    }
-
-    #[cfg(not(target_arch = "wasm32"))]
-    fn keywords(&self) -> String {
-        let keywords = self.get_clarity_keywords();
-        format!("{}", keywords.join("\n").yellow())
     }
 }
 
@@ -1255,57 +1229,6 @@ fn decode_hex(byte_string: &str) -> Result<Vec<u8>, DecodeHexError> {
         Ok(result) => Ok(result),
         Err(e) => Err(DecodeHexError::ParseError(e)),
     }
-}
-
-fn build_api_reference() -> HashMap<String, String> {
-    let mut api_reference = HashMap::new();
-    for func in NativeFunctions::ALL.iter() {
-        let api = make_api_reference(func);
-        let description = {
-            let mut s = api.description.to_string();
-            s = s.replace('\n', " ");
-            s
-        };
-        let doc = format!(
-            "Usage\n{}\n\nDescription\n{}\n\nExamples\n{}",
-            api.signature, description, api.example
-        );
-        api_reference.insert(api.name, doc);
-    }
-
-    for func in DefineFunctions::ALL.iter() {
-        let api = make_define_reference(func);
-        let description = {
-            let mut s = api.description.to_string();
-            s = s.replace('\n', " ");
-            s
-        };
-        let doc = format!(
-            "Usage\n{}\n\nDescription\n{}\n\nExamples\n{}",
-            api.signature, description, api.example
-        );
-        api_reference.insert(api.name, doc);
-    }
-
-    api_reference
-}
-
-fn clarity_keywords() -> HashMap<String, String> {
-    let mut keywords = HashMap::new();
-
-    for func in NativeVariables::ALL.iter() {
-        if let Some(key) = make_keyword_reference(func) {
-            let description = {
-                let mut s = key.description.to_string();
-                s = s.replace('\n', " ");
-                s
-            };
-            let doc = format!("Description\n{}\n\nExamples\n{}", description, key.example);
-            keywords.insert(key.name.to_string(), doc);
-        }
-    }
-
-    keywords
 }
 
 #[allow(clippy::items_after_test_module)]
@@ -1478,6 +1401,12 @@ mod tests {
             session.interpreter.get_block_height(),
             initial_block_height + 1
         );
+
+        // ensure latest epoch is correctly handled
+        let latest_epoch = StacksEpochId::latest().to_string();
+        session.handle_command(&format!("::set_epoch {latest_epoch}"));
+        let current_epoch = session.handle_command("::get_epoch");
+        assert_eq!(current_epoch, format!("Current epoch: {latest_epoch}"));
     }
 
     #[test]
@@ -1606,10 +1535,7 @@ mod tests {
 
     #[test]
     fn evaluate_at_block() {
-        let settings = SessionSettings {
-            include_boot_contracts: vec!["costs".into(), "costs-2".into(), "costs-3".into()],
-            ..Default::default()
-        };
+        let settings = SessionSettings::default();
 
         let mut session = Session::new(settings);
         session.start().expect("session could not start");
@@ -1708,10 +1634,7 @@ mod tests {
 
     #[test]
     fn can_call_boot_contract_fn() {
-        let settings = SessionSettings {
-            include_boot_contracts: vec!["pox-4".into()],
-            ..Default::default()
-        };
+        let settings = SessionSettings::default();
         let mut session = Session::new(settings);
         session.update_epoch(StacksEpochId::Epoch25);
         session.load_boot_contracts();

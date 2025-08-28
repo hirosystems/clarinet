@@ -74,6 +74,7 @@ async fn it_can_call_remote_data() {
         enabled: true,
         api_url: ApiUrl("https://api.testnet.hiro.so".to_string()),
         initial_height: Some(42000),
+        use_mainnet_wallets: false,
     };
     let _ = sdk
         .init_empty_session(JsValue::from_serde(&options).unwrap())

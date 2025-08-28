@@ -19,14 +19,16 @@ members = [
 default-members = ["components/clarinet-cli"]
 
 [workspace.package]
-version = "3.3.0"
+version = "3.5.0"
 
 [workspace.dependencies]
-clarity = { git = "https://github.com/stacks-network/stacks-core.git", branch="feat/clarity-wasm-develop", package = "clarity", default-features = false }
-stacks-common = { git = "https://github.com/stacks-network/stacks-core.git", branch="feat/clarity-wasm-develop", package = "stacks-common", default-features = false }
-pox-locking = { git = "https://github.com/stacks-network/stacks-core.git", branch="feat/clarity-wasm-develop", package = "pox-locking", default-features = false }
+clarity = { git = "https://github.com/stacks-network/stacks-core.git", branch="develop", package = "clarity", default-features = false }
+stacks-common = { git = "https://github.com/stacks-network/stacks-core.git", branch="develop", package = "stacks-common", default-features = false }
+pox-locking = { git = "https://github.com/stacks-network/stacks-core.git", branch="develop", package = "pox-locking", default-features = false }
+stackslib = { git = "https://github.com/stacks-network/stacks-core.git", branch="develop", package = "stackslib", default-features = false}
 
 colored = { version = "3" }
+chrono = { version = "0.4.31" }
 crossterm = { version = "0.28" }
 pretty_assertions = "1.4"
 rand = "0.8.5"
@@ -37,18 +39,23 @@ reqwest = { version = "0.12.22", default-features = false, features = [
 ] }
 strum = { version = "0.27.1" }
 toml = { version = "0.5.6", features = ["preserve_order"] }
-tokio = { version = "1.46.1", features = ["full"] }
-tokio-util = { version = "0.7.15", features = ["codec"] }
+tokio = { version = "1.47.0", features = ["full"] }
+tokio-util = { version = "0.7.16", features = ["codec"] }
 wasm-bindgen = { version = "=0.2.100" }
 wasm-bindgen-futures = { version = "=0.4.50" }
 web-sys = { version = "=0.3.77" }
 indoc = "2.0.3"
 
+# dev dependencies
+mockito = { version = "1.6", default-features = false }
+
 [patch.crates-io]
-chainhook-sdk = { git = "https://github.com/hirosystems/chainhook.git", branch = "develop" }
-chainhook-types = { git = "https://github.com/hirosystems/chainhook.git", branch = "develop" }
 stacks-codec = { path = "./components/stacks-codec" }
 hiro-system-kit = { path = "./components/hiro-system-kit" }
+chainhook-sdk = { git = "https://github.com/hirosystems/chainhook.git", branch = "chore/update-clarinet-and-clarity" }
+chainhook-types = { git = "https://github.com/hirosystems/chainhook.git", branch = "chore/update-clarinet-and-clarity" }
+# chainhook-sdk = { path = "../chainhook/components/chainhook-sdk" }
+# chainhook-types = { path = "../chainhook/components/chainhook-types-rs" }
 
 # [patch.'https://github.com/stacks-network/stacks-core.git']
 # clarity = { path = "../stacks-core/clarity" }

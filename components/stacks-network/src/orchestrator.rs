@@ -82,6 +82,7 @@ impl DevnetOrchestrator {
             None => NetworkManifest::from_project_manifest_location(
                 &manifest.location,
                 &StacksNetwork::Devnet.get_networks(),
+                false,
                 Some(&manifest.project.cache_location),
                 devnet_override,
             ),
@@ -888,12 +889,15 @@ rpcport={bitcoin_node_rpc_port}
             panic!("unable to get Docker client");
         };
         let res = docker.list_containers(options).await;
-        let containers = res.map_err(|e|
-            formatdoc!("
+        let url = "https://docs.hiro.so/tools/clarinet/local-blockchain-development#common-issues";
+        let containers = res.map_err(|e| {
+            formatdoc!(
+                "
                 unable to communicate with Docker: {e}
-                visit https://docs.hiro.so/clarinet/troubleshooting#i-am-unable-to-start-devnet-though-my-docker-is-running to resolve this issue.
-            ")
-        )?;
+                visit {url} to resolve this issue.
+            "
+            )
+        })?;
 
         let options = KillContainerOptions { signal: "SIGKILL" };
 

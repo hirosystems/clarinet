@@ -2,7 +2,6 @@ use std::collections::BTreeMap;
 use std::sync::LazyLock;
 
 use clarinet_utils::{get_bip32_keys_from_mnemonic, mnemonic_from_phrase, random_mnemonic};
-use clarity::address::AddressHashMode;
 use clarity::types::chainstate::{StacksAddress, StacksPrivateKey};
 use clarity::util::hash::bytes_to_hex;
 use clarity::util::secp256k1::Secp256k1PublicKey;
@@ -14,8 +13,8 @@ use super::{FileAccessor, FileLocation};
 
 pub const DEFAULT_DERIVATION_PATH: &str = "m/44'/5757'/0'/0/0";
 
-pub const DEFAULT_STACKS_NODE_IMAGE: &str = "blockstack/stacks-blockchain:3.1.0.0.13-alpine";
-pub const DEFAULT_STACKS_SIGNER_IMAGE: &str = "blockstack/stacks-signer:3.1.0.0.13.0-alpine";
+pub const DEFAULT_STACKS_NODE_IMAGE: &str = "blockstack/stacks-blockchain:3.2.0.0.0-alpine";
+pub const DEFAULT_STACKS_SIGNER_IMAGE: &str = "blockstack/stacks-signer:3.2.0.0.0.0-alpine";
 pub const DEFAULT_STACKS_API_IMAGE: &str = "hirosystems/stacks-blockchain-api:latest";
 
 pub const DEFAULT_POSTGRES_IMAGE: &str = "postgres:alpine";
@@ -23,8 +22,7 @@ pub const DEFAULT_POSTGRES_IMAGE: &str = "postgres:alpine";
 pub const DEFAULT_BITCOIN_NODE_IMAGE: &str = "lncm/bitcoind:v27.2";
 pub const DEFAULT_BITCOIN_EXPLORER_IMAGE: &str = "quay.io/hirosystems/bitcoin-explorer:devnet";
 
-// This is the latest Explorer image before the "hybrid version" with SSR
-pub const DEFAULT_STACKS_EXPLORER_IMAGE: &str = "hirosystems/explorer:1.276.1";
+pub const DEFAULT_STACKS_EXPLORER_IMAGE: &str = "hirosystems/explorer:latest";
 
 pub const DEFAULT_STACKS_MINER_MNEMONIC: &str = "fragile loan twenty basic net assault jazz absorb diet talk art shock innocent float punch travel gadget embrace caught blossom hockey surround initial reduce";
 pub const DEFAULT_FAUCET_MNEMONIC: &str = "shadow private easily thought say logic fault paddle word top book during ignore notable orange flight clock image wealth health outside kitten belt reform";
@@ -46,6 +44,7 @@ pub const DEFAULT_EPOCH_2_4: u64 = 104;
 pub const DEFAULT_EPOCH_2_5: u64 = 108;
 pub const DEFAULT_EPOCH_3_0: u64 = 142;
 pub const DEFAULT_EPOCH_3_1: u64 = 144;
+pub const DEFAULT_EPOCH_3_2: u64 = 146;
 
 // Currently, the pox-4 contract has these values hardcoded:
 // https://github.com/stacks-network/stacks-core/blob/e09ab931e2f15ff70f3bb5c2f4d7afb[…]42bd7bec6/stackslib/src/chainstate/stacks/boot/pox-testnet.clar
@@ -70,7 +69,7 @@ pub enum StacksNetwork {
     Mainnet,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum BitcoinNetwork {
     Regtest,
@@ -173,6 +172,7 @@ pub struct DevnetConfigFile {
     pub epoch_2_5: Option<u64>,
     pub epoch_3_0: Option<u64>,
     pub epoch_3_1: Option<u64>,
+    pub epoch_3_2: Option<u64>,
     pub use_docker_gateway_routing: Option<bool>,
     pub docker_platform: Option<String>,
 }
@@ -326,6 +326,7 @@ pub struct DevnetConfig {
     pub epoch_2_5: u64,
     pub epoch_3_0: u64,
     pub epoch_3_1: u64,
+    pub epoch_3_2: u64,
     pub use_docker_gateway_routing: bool,
     pub docker_platform: Option<String>,
 }
@@ -356,6 +357,7 @@ impl NetworkManifest {
     pub fn from_project_manifest_location(
         project_manifest_location: &FileLocation,
         networks: &(BitcoinNetwork, StacksNetwork),
+        use_mainnet_wallets: bool,
         cache_location: Option<&FileLocation>,
         devnet_override: Option<DevnetConfigFile>,
     ) -> Result<NetworkManifest, String> {
@@ -364,6 +366,7 @@ impl NetworkManifest {
         NetworkManifest::from_location(
             &network_manifest_location,
             networks,
+            use_mainnet_wallets,
             cache_location,
             devnet_override,
         )
@@ -372,6 +375,7 @@ impl NetworkManifest {
     pub async fn from_project_manifest_location_using_file_accessor(
         location: &FileLocation,
         networks: &(BitcoinNetwork, StacksNetwork),
+        use_mainnet_wallets: bool,
         file_accessor: &dyn FileAccessor,
     ) -> Result<NetworkManifest, String> {
         let mut network_manifest_location = location.get_parent_location()?;
@@ -385,6 +389,7 @@ impl NetworkManifest {
         NetworkManifest::from_network_manifest_file(
             &mut network_manifest_file,
             networks,
+            use_mainnet_wallets,
             None,
             None,
         )
@@ -393,6 +398,7 @@ impl NetworkManifest {
     pub fn from_location(
         location: &FileLocation,
         networks: &(BitcoinNetwork, StacksNetwork),
+        use_mainnet_wallets: bool,
         cache_location: Option<&FileLocation>,
         devnet_override: Option<DevnetConfigFile>,
     ) -> Result<NetworkManifest, String> {
@@ -402,6 +408,7 @@ impl NetworkManifest {
         NetworkManifest::from_network_manifest_file(
             &mut network_manifest_file,
             networks,
+            use_mainnet_wallets,
             cache_location,
             devnet_override,
         )
@@ -410,6 +417,7 @@ impl NetworkManifest {
     pub fn from_network_manifest_file(
         network_manifest_file: &mut NetworkManifestFile,
         networks: &(BitcoinNetwork, StacksNetwork),
+        use_mainnet_wallets: bool,
         cache_location: Option<&FileLocation>,
         devnet_override: Option<DevnetConfigFile>,
     ) -> Result<NetworkManifest, String> {
@@ -467,8 +475,13 @@ impl NetworkManifest {
                         _ => DEFAULT_DERIVATION_PATH.to_string(),
                     };
 
+                    let addresses_network = if use_mainnet_wallets {
+                        (networks.0.clone(), StacksNetwork::Mainnet)
+                    } else {
+                        networks.clone()
+                    };
                     let (stx_address, btc_address, _) =
-                        compute_addresses(&mnemonic, &derivation, networks);
+                        compute_addresses(&mnemonic, &derivation, &addresses_network);
 
                     accounts.insert(
                         account_name.to_string(),
@@ -669,6 +682,10 @@ impl NetworkManifest {
 
                 if let Some(ref val) = devnet_override.epoch_3_1 {
                     devnet_config.epoch_3_1 = Some(*val);
+                }
+
+                if let Some(ref val) = devnet_override.epoch_3_2 {
+                    devnet_config.epoch_3_2 = Some(*val);
                 }
 
                 if let Some(val) = devnet_override.network_id {
@@ -926,6 +943,7 @@ impl NetworkManifest {
                 epoch_2_5: devnet_config.epoch_2_5.unwrap_or(DEFAULT_EPOCH_2_5),
                 epoch_3_0: devnet_config.epoch_3_0.unwrap_or(DEFAULT_EPOCH_3_0),
                 epoch_3_1: devnet_config.epoch_3_1.unwrap_or(DEFAULT_EPOCH_3_1),
+                epoch_3_2: devnet_config.epoch_3_2.unwrap_or(DEFAULT_EPOCH_3_2),
                 stacks_node_env_vars: devnet_config
                     .stacks_node_env_vars
                     .take()
@@ -1052,6 +1070,7 @@ impl Default for DevnetConfig {
             epoch_2_5: DEFAULT_EPOCH_2_5,
             epoch_3_0: DEFAULT_EPOCH_3_0,
             epoch_3_1: DEFAULT_EPOCH_3_1,
+            epoch_3_2: DEFAULT_EPOCH_3_2,
             use_docker_gateway_routing: false,
             docker_platform: None,
         }
@@ -1094,14 +1113,14 @@ pub fn compute_addresses(
 
     let pub_key = Secp256k1PublicKey::from_slice(&public_key.serialize_compressed()).unwrap();
     let version = if matches!(networks.1, StacksNetwork::Mainnet) {
-        clarity::address::C32_ADDRESS_VERSION_MAINNET_SINGLESIG
+        stacks_common::address::C32_ADDRESS_VERSION_MAINNET_SINGLESIG
     } else {
-        clarity::address::C32_ADDRESS_VERSION_TESTNET_SINGLESIG
+        stacks_common::address::C32_ADDRESS_VERSION_TESTNET_SINGLESIG
     };
 
     let stx_address = StacksAddress::from_public_keys(
         version,
-        &AddressHashMode::SerializeP2PKH,
+        &stacks_common::address::AddressHashMode::SerializeP2PKH,
         1,
         &vec![pub_key],
     )
@@ -1152,4 +1171,33 @@ pub fn is_in_reward_phase(
 #[cfg(target_arch = "wasm32")]
 fn compute_btc_address(_public_key: &PublicKey, _network: &BitcoinNetwork) -> String {
     "__not_implemented__".to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use clarity_repl::repl::DEFAULT_EPOCH;
+
+    use crate::{DEFAULT_STACKS_NODE_IMAGE, DEFAULT_STACKS_SIGNER_IMAGE};
+
+    #[test]
+    fn test_default_stacks_docker_images_version() {
+        let epoch = DEFAULT_EPOCH.to_string();
+
+        let default_node_version = DEFAULT_STACKS_NODE_IMAGE
+            .split(':')
+            .nth(1)
+            .expect("Default Stacks node image should contain a version tag");
+        assert!(
+            default_node_version.starts_with(epoch.as_str()),
+            "The default Stacks node image {DEFAULT_STACKS_NODE_IMAGE} does not start with {epoch}"
+        );
+
+        let default_signer_version = DEFAULT_STACKS_NODE_IMAGE
+            .split(':')
+            .nth(1)
+            .expect("Default Stacks signer image should contain a version tag");
+        assert!(default_signer_version.starts_with(epoch.as_str()),
+            "The default Stacks signer image {DEFAULT_STACKS_SIGNER_IMAGE} does not start with {epoch}"
+        );
+    }
 }
