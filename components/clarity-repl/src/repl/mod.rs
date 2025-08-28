@@ -2,6 +2,8 @@ pub mod boot;
 pub mod clarity_values;
 pub mod datastore;
 pub mod diagnostic;
+#[cfg(not(target_arch = "wasm32"))]
+mod docs;
 pub mod hooks;
 pub mod interpreter;
 pub mod remote_data;
@@ -24,7 +26,7 @@ pub use session::Session;
 pub use settings::{SessionSettings, Settings, SettingsFile};
 
 pub const DEFAULT_CLARITY_VERSION: ClarityVersion = ClarityVersion::Clarity3;
-pub const DEFAULT_EPOCH: StacksEpochId = StacksEpochId::Epoch31;
+pub const DEFAULT_EPOCH: StacksEpochId = StacksEpochId::Epoch32;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Epoch {

@@ -1,3 +1,49 @@
+# [3.5.0](https://github.com/hirosystems/clarinet/compare/v3.4.0...v3.5.0) (2025-08-08)
+
+##### New Features
+
+- Use latest explorer (#1954) (e6a624a5)
+- Custom boot contracts (#1915) (ae34a3dc)
+
+##### Chores
+
+- Make stacks_signer_keys significant for devnet diff (#1950) (017506eb)
+
+##### Other Changes
+
+- Add epoch tests (#1945) (9e78c066)
+
+##### Refactors
+
+- Rework session api reference (#1951) (b38a5ff2)
+
+# [3.4.0](https://github.com/hirosystems/clarinet/compare/v3.3.0...v3.4.0) (2025-07-31)
+
+##### New Features
+
+- Set epoch 3.2 height (#1944) (a6231c6f)
+- Add support for epoch 3.2 and remove clarity wasm (#1932) (69dd1846)
+- Allow mainnet dev wallets in mxs (#1942) (03b04e61)
+- Allow 'latest' as epoch and default on new contracts (#1927) (c176840b)
+- Return version at LSP initialization (#1914) (b77949c5)
+
+##### Chores
+
+- Improve vscode cargo fmt config (#1941) (529bcb8c)
+- Ugprade vscode npm dependencies (#1939) (9f305564)
+- Update lsp dependencies (#1933) (b447101d)
+- Fix some minor issues in comments (#1924) (459dbe00)
+- Upgrade npm dependencies (#1917) (40487645)
+
+##### Bug Fixes
+
+- Go to definition regression (#1938) (1426422f)
+- Better requirements error message (#1936) (17fa7b4f)
+
+##### Refactors
+
+- Remove subnet support (#1908) (915928ba)
+
 # [3.3.0](https://github.com/hirosystems/clarinet/compare/v3.2.0...v3.3.0) (2025-07-09)
 
 ##### New Features

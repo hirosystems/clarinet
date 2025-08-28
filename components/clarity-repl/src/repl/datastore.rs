@@ -9,13 +9,21 @@ use clarity::types::chainstate::{
 };
 use clarity::types::StacksEpochId;
 use clarity::util::hash::Sha512Trunc256Sum;
-use clarity::vm::analysis::AnalysisDatabase;
-use clarity::vm::database::{BurnStateDB, ClarityBackingStore, HeadersDB};
-use clarity::vm::errors::InterpreterResult as Result;
+use clarity::vm::analysis::{AnalysisDatabase, ContractAnalysis};
+use clarity::vm::ast::build_ast_with_rules;
+use clarity::vm::contexts::GlobalContext;
+use clarity::vm::contracts::Contract as ContractContextResponse;
+use clarity::vm::costs::LimitedCostTracker;
+use clarity::vm::database::clarity_db::ContractDataVarName;
+use clarity::vm::database::{
+    BurnStateDB, ClarityBackingStore, ClarityDatabase, HeadersDB, StoreType, NULL_BURN_STATE_DB,
+    NULL_HEADER_DB,
+};
+use clarity::vm::errors::{InterpreterError, InterpreterResult as Result};
 use clarity::vm::types::{
     PrincipalData, QualifiedContractIdentifier, StandardPrincipalData, TupleData,
 };
-use clarity::vm::StacksEpoch;
+use clarity::vm::{ContractContext, StacksEpoch};
 use pox_locking::handle_contract_call_special_cases;
 use sha2::{Digest, Sha512_256};
 
@@ -23,6 +31,7 @@ use super::interpreter::BLOCK_LIMIT_MAINNET;
 use super::remote_data::fs::{get_file_from_cache, write_file_to_cache};
 use super::remote_data::{epoch_for_height, Block, HttpClient, Sortition};
 use super::settings::RemoteNetworkInfo;
+use crate::repl::remote_data::context;
 
 const SECONDS_BETWEEN_BURN_BLOCKS: u64 = 600;
 const SECONDS_BETWEEN_STACKS_BLOCKS: u64 = 10;
@@ -40,6 +49,7 @@ fn epoch_to_peer_version(epoch: StacksEpochId) -> u8 {
         StacksEpochId::Epoch25 => PEER_VERSION_EPOCH_2_5,
         StacksEpochId::Epoch30 => PEER_VERSION_EPOCH_3_0,
         StacksEpochId::Epoch31 => PEER_VERSION_EPOCH_3_1,
+        StacksEpochId::Epoch32 => PEER_VERSION_EPOCH_3_2,
     }
 }
 
@@ -252,6 +262,10 @@ impl ClarityDatastore {
         AnalysisDatabase::new(self)
     }
 
+    fn as_clarity_db(&'_ mut self) -> ClarityDatabase<'_> {
+        ClarityDatabase::new(self, &NULL_HEADER_DB, &NULL_BURN_STATE_DB)
+    }
+
     /// begin, commit, rollback a save point identified by key
     ///    this is used to clean up any data from aborted blocks
     ///     (NOT aborted transactions that is handled by the clarity vm directly).
@@ -374,14 +388,77 @@ impl ClarityDatastore {
     }
 
     #[allow(clippy::result_large_err)]
+    fn fetch_and_parse_source(
+        &mut self,
+        contract_id: &QualifiedContractIdentifier,
+    ) -> Result<ContractContext> {
+        let network_id = self
+            .remote_network_info
+            .as_ref()
+            .map(|i| i.network_id)
+            .unwrap_or(1);
+
+        let contract = self.client.fetch_contract(contract_id).map_err(|e| {
+            InterpreterError::Expect(format!("Failed to fetch contract source: {e}"))
+        })?;
+
+        let analysis_str = self
+            .get_metadata(contract_id, AnalysisDatabase::storage_key())?
+            .ok_or(InterpreterError::Expect(format!(
+                "No analysis metadata found for contract: {contract_id}",
+            )))?;
+        let analysis = serde_json::from_str::<ContractAnalysis>(&analysis_str)
+            .map_err(|e| InterpreterError::Expect(format!("Failed to parse analysis: {e}")))?;
+
+        let contract_size_key_str = ClarityDatabase::make_metadata_key(
+            StoreType::Contract,
+            ContractDataVarName::ContractSize.as_str(),
+        );
+        let contract_size_str = self
+            .get_metadata(contract_id, &contract_size_key_str)?
+            .ok_or(InterpreterError::Expect(format!(
+                "No contract size metadata found for contract: {contract_id}",
+            )))?;
+        let contract_size: u64 = contract_size_str
+            .parse()
+            .map_err(|e| InterpreterError::Expect(format!("Failed to parse contract size: {e}")))?;
+
+        let contract_ast = build_ast_with_rules(
+            contract_id,
+            &contract.source,
+            &mut (),
+            analysis.clarity_version,
+            analysis.epoch,
+            clarity::vm::ast::ASTRules::Typical,
+        )?;
+
+        let cost_tracker = LimitedCostTracker::new_free();
+        let database = self.as_clarity_db();
+        let mut global_context =
+            GlobalContext::new(true, network_id, database, cost_tracker, analysis.epoch);
+        let mut contract_context =
+            ContractContext::new(contract_id.clone(), analysis.clarity_version);
+        contract_context.data_size = contract_size;
+
+        context::set_contract_context(
+            &contract_ast.expressions,
+            &mut contract_context,
+            &mut global_context,
+        )?;
+
+        Ok(contract_context)
+    }
+
+    #[allow(clippy::result_large_err)]
     fn fetch_clarity_metadata(
         &mut self,
-        contract: &QualifiedContractIdentifier,
+        contract_id: &QualifiedContractIdentifier,
         key: &str,
     ) -> Result<Option<String>> {
-        let addr = contract.issuer.to_string();
-        let contract = contract.name.to_string();
+        let addr = contract_id.issuer.to_string();
+        let contract = contract_id.name.to_string();
         let tip = self.get_remote_chaintip();
+
         let cache_file_path = PathBuf::from(format!(
             "{}_{}_{}_{}",
             addr,
@@ -395,10 +472,26 @@ impl ClarityDatastore {
             return Ok(Some(cached));
         }
 
-        let url = format!("/v2/clarity/metadata/{addr}/{contract}/{key}?tip={tip}");
-        let response = self.client.fetch_clarity_data(&url)?;
+        let contract_context_key = ClarityDatabase::make_metadata_key(
+            StoreType::Contract,
+            ContractDataVarName::Contract.as_str(),
+        );
+        let response = if key == contract_context_key {
+            // instead of directly fetching `vm-metadata::9::contract`,
+            // we fetch the source and build the context locally
+            // giving access to the expressions span that are only available with clarity-vm/developer-mode
+            let contract_context = self.fetch_and_parse_source(contract_id)?;
+            let contract_context_response = ContractContextResponse { contract_context };
+            Some(
+                serde_json::to_string(&contract_context_response).map_err(|e| {
+                    InterpreterError::Expect(format!("Failed to serialize contract context: {e}"))
+                })?,
+            )
+        } else {
+            let url = format!("/v2/clarity/metadata/{addr}/{contract}/{key}?tip={tip}");
+            self.client.fetch_clarity_data(&url)?
+        };
 
-        // Save response to cache if successful
         if let Some(content) = &response {
             write_file_to_cache(
                 &self.fs_cache_location,
@@ -564,7 +657,7 @@ impl ClarityBackingStore for ClarityDatastore {
         if self.remote_network_info.is_some() && !self.local_accounts.contains(&contract.issuer) {
             let data = self.fetch_clarity_metadata(contract, key);
             if let Ok(Some(value)) = &data {
-                let _ = self.insert_metadata(contract, key, value);
+                self.insert_metadata(contract, key, value)?;
             }
             return data;
         }
@@ -592,7 +685,7 @@ impl ClarityBackingStore for ClarityDatastore {
     }
 
     #[cfg(not(target_arch = "wasm32"))]
-    fn get_side_store(&mut self) -> &::clarity::rusqlite::Connection {
+    fn get_side_store(&mut self) -> &rusqlite::Connection {
         panic!("Datastore cannot get_side_store")
     }
 }
@@ -1120,9 +1213,9 @@ impl BurnStateDB for Datastore {
                     .get(&current_chain_tip)
                     .map(|block| block.burn_block_height)
             }
-            // preserve the 3.0 and 3.1 special behavior of burn-block-height
+            // preserve the 3.0 -> 3.2 special behavior of burn-block-height
             // https://github.com/stacks-network/stacks-core/pull/5524
-            Epoch30 | Epoch31 => Some(self.burn_chain_height),
+            Epoch30 | Epoch31 | Epoch32 => Some(self.burn_chain_height),
         }
     }
 

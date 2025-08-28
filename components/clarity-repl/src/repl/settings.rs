@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::convert::TryInto;
 use std::fmt;
 use std::path::PathBuf;
@@ -45,7 +46,6 @@ pub struct Account {
 
 #[derive(Clone, Debug, Default)]
 pub struct SessionSettings {
-    pub include_boot_contracts: Vec<String>,
     pub include_costs: bool,
     pub initial_accounts: Vec<Account>,
     pub initial_deployer: Option<Account>,
@@ -53,6 +53,7 @@ pub struct SessionSettings {
     pub repl_settings: Settings,
     pub cache_location: Option<PathBuf>,
     pub epoch_id: Option<StacksEpochId>,
+    pub override_boot_contracts_source: BTreeMap<String, String>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
@@ -82,8 +83,6 @@ pub struct Settings {
     pub analysis: analysis::Settings,
     pub remote_data: RemoteDataSettings,
     #[serde(skip_serializing, skip_deserializing)]
-    pub clarity_wasm_mode: bool,
-    #[serde(skip_serializing, skip_deserializing)]
     pub show_timings: bool,
 }
 
@@ -108,7 +107,6 @@ impl From<SettingsFile> for Settings {
         Self {
             analysis,
             remote_data,
-            clarity_wasm_mode: false,
             show_timings: false,
         }
     }
@@ -117,15 +115,23 @@ impl From<SettingsFile> for Settings {
 #[derive(Debug, Default, Clone, Deserialize, Serialize)]
 pub struct RemoteDataSettingsFile {
     enabled: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     api_url: Option<ApiUrl>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     initial_height: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    use_mainnet_wallets: Option<bool>,
 }
 
 #[derive(Debug, Default, Clone, Deserialize, Serialize)]
 pub struct RemoteDataSettings {
     pub enabled: bool,
+    #[serde(default)]
     pub api_url: ApiUrl,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub initial_height: Option<u32>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub use_mainnet_wallets: bool,
 }
 
 #[derive(Debug, Default, Clone, Deserialize, Serialize)]
@@ -143,6 +149,7 @@ impl From<RemoteDataSettingsFile> for RemoteDataSettings {
             enabled: file.enabled.unwrap_or_default(),
             api_url: file.api_url.unwrap_or_default(),
             initial_height: file.initial_height,
+            use_mainnet_wallets: file.use_mainnet_wallets.unwrap_or_default(),
         }
     }
 }
@@ -165,11 +172,16 @@ impl RemoteDataSettings {
             None => info.stacks_tip_height,
         };
 
+        let is_mainnet = info.network_id == 1;
+        if self.use_mainnet_wallets && !is_mainnet {
+            uprint!("Warning: `use_mainnet_wallets`, but the API url is not mainnet. This may lead to unexpected behavior.");
+        }
+
         Ok(RemoteNetworkInfo {
             api_url: self.api_url.clone(),
             initial_height,
             network_id: info.network_id,
-            is_mainnet: info.network_id == 1,
+            is_mainnet,
             cache_location,
         })
     }

@@ -29,19 +29,18 @@ use clarinet_files::{
     self, AccountConfig, DevnetConfig, NetworkManifest, PoxStackingOrder, ProjectManifest,
     StacksNetwork, DEFAULT_FIRST_BURN_HEADER_HEIGHT,
 };
-use clarity::address::AddressHashMode;
+use clarity::consts::CHAIN_ID_TESTNET;
 use clarity::types::PublicKey;
 use clarity::util::hash::{hex_bytes, Hash160};
 use clarity::vm::types::{BuffData, PrincipalData, SequenceData, TupleData};
 use clarity::vm::{ClarityName, Value as ClarityValue};
-use hiro_system_kit;
-use hiro_system_kit::{slog, yellow};
+use hiro_system_kit::{self, slog, yellow};
 use serde_json::json;
+use stacks_common::address::AddressHashMode;
+use stacks_common::types::chainstate::{StacksPrivateKey, StacksPublicKey};
 use stacks_rpc_client::rpc_client::PoxInfo;
 use stacks_rpc_client::StacksRpc;
 use stackslib::chainstate::stacks::address::PoxAddress;
-use stackslib::core::CHAIN_ID_TESTNET;
-use stackslib::types::chainstate::{StacksPrivateKey, StacksPublicKey};
 use stackslib::util_lib::signed_structured_data::pox4::{
     make_pox_4_signer_key_signature, Pox4SignatureTopic,
 };
@@ -129,6 +128,7 @@ impl DevnetEventObserverConfig {
             None => NetworkManifest::from_project_manifest_location(
                 &manifest.location,
                 &StacksNetwork::Devnet.get_networks(),
+                false,
                 Some(&manifest.project.cache_location),
                 None,
             )
@@ -925,7 +925,7 @@ pub async fn publish_stacking_orders(
         let duration = pox_stacking_order.duration;
 
         let signer_key =
-            devnet_config.stacks_signers_keys[i % devnet_config.stacks_signers_keys.len()];
+            devnet_config.stacks_signers_keys[i % devnet_config.stacks_signers_keys.len()].clone();
 
         let stacking_result =
             hiro_system_kit::thread_named("Stacking orders handler").spawn(move || {
@@ -1250,7 +1250,6 @@ fn get_stacking_tx_method_and_args(
         ])
         .unwrap(),
     );
-    let pox_addr = PoxAddress::try_from_pox_tuple(false, &pox_addr_tuple).unwrap();
 
     let burn_block_height: u128 = (bitcoin_block_height - 1).into();
 
@@ -1260,6 +1259,7 @@ fn get_stacking_tx_method_and_args(
         "stack-stx"
     };
 
+    let pox_addr = PoxAddress::try_from_pox_tuple(false, &pox_addr_tuple).unwrap();
     let mut arguments = if extend_stacking {
         vec![ClarityValue::UInt(duration.into()), pox_addr_tuple]
     } else {

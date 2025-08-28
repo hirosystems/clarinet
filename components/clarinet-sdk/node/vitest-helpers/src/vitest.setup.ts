@@ -36,7 +36,7 @@ afterEach(async () => {
     global.options.clarinet;
 
   if (initBeforeEach && (coverage || costs)) {
-    const report = simnet.collectReport(includeBootContracts, bootContractsPath || "");
+    const report = simnet.collectReport(includeBootContracts || false, bootContractsPath || "");
     if (coverage) coverageReports.push(report.coverage);
     if (costs) costsReports.push(report.costs);
   }
@@ -55,7 +55,7 @@ afterAll(() => {
     global.options.clarinet;
 
   if (!initBeforeEach && (coverage || costs)) {
-    const report = simnet.collectReport(includeBootContracts, bootContractsPath || "");
+    const report = simnet.collectReport(includeBootContracts || false, bootContractsPath || "");
     if (coverage) coverageReports.push(report.coverage);
     if (costs) costsReports.push(report.costs);
   }
