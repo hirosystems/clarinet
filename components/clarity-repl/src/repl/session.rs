@@ -439,24 +439,7 @@ impl Session {
         let cost_field_str = parts[1];
         let snippet = parts[2..].join(" ");
 
-        let Some(cost_field) = CostField::parse_from_str(cost_field_str) else {
-            let valid_fields = [
-                "runtime",
-                "read_length",
-                "read_count",
-                "write_length",
-                "write_count",
-            ];
-            let valid_fields_str = valid_fields.join(", ");
-            return output.push(
-                format!(
-                    "Invalid cost field '{}'. Valid fields: {}",
-                    cost_field_str, valid_fields_str
-                )
-                .red()
-                .to_string(),
-            );
-        };
+        let cost_field = CostField::from(cost_field_str);
 
         let mut perf = PerfHook::new(cost_field);
 

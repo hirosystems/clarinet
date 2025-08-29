@@ -16,18 +16,20 @@ pub enum CostField {
     WriteCount,
 }
 
-impl CostField {
-    pub fn parse_from_str(s: &str) -> Option<Self> {
+impl From<&str> for CostField {
+    fn from(s: &str) -> Self {
         match s.to_lowercase().as_str() {
-            "runtime" => Some(CostField::Runtime),
-            "read_length" | "readlength" => Some(CostField::ReadLength),
-            "read_count" | "readcount" => Some(CostField::ReadCount),
-            "write_length" | "writelength" => Some(CostField::WriteLength),
-            "write_count" | "writecount" => Some(CostField::WriteCount),
-            _ => None,
+            "runtime" => CostField::Runtime,
+            "read_length" | "readlength" => CostField::ReadLength,
+            "read_count" | "readcount" => CostField::ReadCount,
+            "write_length" | "writelength" => CostField::WriteLength,
+            "write_count" | "writecount" => CostField::WriteCount,
+            _ => CostField::Runtime,
         }
     }
+}
 
+impl CostField {
     pub fn get_value(&self, cost: &ExecutionCost) -> u64 {
         match self {
             CostField::Runtime => cost.runtime,

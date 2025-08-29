@@ -803,7 +803,7 @@ impl SDK {
                 let contract_id = if contract.starts_with('S') {
                     contract.to_string()
                 } else {
-                    format!("{}.{contract}", deployer)
+                    format!("{deployer}.{contract}")
                 };
                 self.costs_reports.push(CostsReport {
                     test_name,
@@ -817,7 +817,6 @@ impl SDK {
 
         let mut response = execution_result_to_transaction_res(&execution);
 
-        // Add performance data if available
         if let Some(perf_data) = performance_data {
             response.performance = Some(perf_data);
         }
@@ -1178,8 +1177,7 @@ impl SDK {
     #[wasm_bindgen(js_name=enablePerformance)]
     pub fn enable_performance(&mut self, cost_field: String) -> Result<(), String> {
         let session = self.get_session_mut();
-        let cost_field = CostField::parse_from_str(&cost_field)
-            .ok_or_else(|| format!("Invalid cost field '{}'", cost_field))?;
+        let cost_field = CostField::from(cost_field.as_str());
         session.enable_performance(cost_field);
         Ok(())
     }
