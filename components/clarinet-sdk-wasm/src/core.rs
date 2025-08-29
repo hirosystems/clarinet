@@ -1175,12 +1175,6 @@ impl SDK {
         Ok(SessionReport { coverage, costs })
     }
 
-    #[wasm_bindgen(js_name=collectPerformanceData)]
-    pub fn collect_performance_data(&self) -> Option<String> {
-        let session = self.get_session();
-        session.get_performance_data()
-    }
-
     #[wasm_bindgen(js_name=enablePerformance)]
     pub fn enable_performance(&mut self, cost_field: String) -> Result<(), String> {
         let session = self.get_session_mut();

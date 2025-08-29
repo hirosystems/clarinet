@@ -26,7 +26,6 @@ beforeEach(async () => {
     trackCosts: false,
     trackCoverage: false,
     trackPerformance: true,
-    performanceCostField: "runtime",
   });
 });
 
@@ -35,18 +34,22 @@ afterEach(() => {
 });
 
 describe("performance tracking", () => {
-  it("can track performance during simple operations", () => {
-    const result = simnet.execute("(+ 1 2)");
-    expect(Cl.prettyPrint(result.result)).toBe("3");
+  it("can track performance during contract calls", async () => {
+    await simnet.enablePerformance("runtime");
 
-    const perfData = simnet.collectPerformanceData();
-    expect(perfData).toBeDefined();
-    expect(perfData).not.toBeNull();
+    const result = simnet.callReadOnlyFn(
+      "counter",
+      "get-count",
+      [],
+      "ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5",
+    );
 
-    // The performance data should contain some information
-    if (perfData) {
-      expect(perfData).toContain(";");
-      expect(perfData.trim()).not.toBe("");
+    expect(result.performance).toBeDefined();
+    expect(result.performance).not.toBeNull();
+
+    if (result.performance) {
+      expect(result.performance).toContain(";");
+      expect(result.performance.trim()).not.toBe("");
     }
   });
 });
