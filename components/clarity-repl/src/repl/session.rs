@@ -245,27 +245,58 @@ impl Session {
     }
 
     #[cfg(not(target_arch = "wasm32"))]
+    fn contract_successfully_stored(
+        &mut self,
+        output: &mut Vec<String>,
+        contract: &ParsedContract,
+    ) {
+        // Handle the successful storage of the contract
+        let snippet = green!(
+            "→ {} contract successfully stored.",
+            contract.contract_identifier
+        );
+        output.push(snippet.to_string());
+        let public_functions: Vec<_> = contract.analysis.public_function_types.keys().collect();
+        let read_only_functions: Vec<_> =
+            contract.analysis.read_only_function_types.keys().collect();
+        if !(public_functions.is_empty() && read_only_functions.is_empty()) {
+            output.push(
+                "Use (contract-call? ...) for invoking the public and read-only functions:"
+                    .to_string(),
+            );
+        }
+
+        if !public_functions.is_empty() {
+            output.push("  Public functions:".to_string());
+            for func in &public_functions {
+                output.push(format!("    - {func}"));
+            }
+        }
+        if !read_only_functions.is_empty() {
+            output.push("  Read-only functions:".to_string());
+            for func in &read_only_functions {
+                output.push(format!("    - {func}"));
+            }
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
     fn run_snippet(
         &mut self,
         output: &mut Vec<String>,
         cost_track: bool,
         cmd: &str,
     ) -> Result<ExecutionResult, Vec<Diagnostic>> {
-        let (mut result, cost, execution_result) = match self.formatted_interpretation(
-            cmd.to_string(),
-            None,
-            cost_track,
-            None,
-        ) {
-            Ok((mut output, result)) => {
-                if let EvaluationResult::Contract(contract_result) = result.result.clone() {
-                    let snippet = green!("→ .{} contract successfully stored. Use (contract-call? ...) for invoking the public functions:", contract_result.contract.contract_identifier);
-                    output.push(snippet.to_string());
-                };
-                (output, result.cost.clone(), Ok(result))
-            }
-            Err((err_output, diagnostics)) => (err_output, None, Err(diagnostics)),
-        };
+        let (mut result, cost, execution_result) =
+            match self.formatted_interpretation(cmd.to_string(), None, cost_track, None) {
+                Ok((mut output, result)) => {
+                    if let EvaluationResult::Contract(contract_result) = result.result.clone() {
+                        self.contract_successfully_stored(&mut output, &contract_result.contract);
+                    };
+                    (output, result.cost.clone(), Ok(result))
+                }
+                Err((err_output, diagnostics)) => (err_output, None, Err(diagnostics)),
+            };
 
         if let Some(cost) = cost {
             let headers = [
@@ -386,8 +417,7 @@ impl Session {
         ) {
             Ok((mut output, result)) => {
                 if let EvaluationResult::Contract(contract_result) = result.result {
-                    let snippet = format!("→ .{} contract successfully stored. Use (contract-call? ...) for invoking the public functions:", contract_result.contract.contract_identifier);
-                    output.push(snippet.green().to_string());
+                    self.contract_successfully_stored(&mut output, &contract_result.contract);
                 };
                 output
             }
