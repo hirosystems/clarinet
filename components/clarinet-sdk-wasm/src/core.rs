@@ -218,6 +218,7 @@ pub struct TransactionRes {
     pub result: String,
     pub events: String,
     pub costs: String,
+    pub performance: Option<String>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -250,6 +251,7 @@ pub fn execution_result_to_transaction_res(execution: &ExecutionResult) -> Trans
         result,
         events: json!(events_as_strings).to_string(),
         costs: json!(execution.cost).to_string(),
+        performance: None,
     }
 }
 
@@ -269,34 +271,17 @@ pub struct SDKOptions {
     pub track_coverage: bool,
     #[wasm_bindgen(js_name = trackPerformance)]
     pub track_performance: bool,
-    performance_cost_field: String,
 }
 
 #[wasm_bindgen]
 impl SDKOptions {
     #[wasm_bindgen(constructor)]
-    pub fn new(
-        track_costs: bool,
-        track_coverage: bool,
-        track_performance: Option<bool>,
-        performance_cost_field: Option<String>,
-    ) -> Self {
+    pub fn new(track_costs: bool, track_coverage: bool, track_performance: Option<bool>) -> Self {
         Self {
             track_costs,
             track_coverage,
             track_performance: track_performance.unwrap_or(false),
-            performance_cost_field: performance_cost_field.unwrap_or_else(|| "runtime".to_string()),
         }
-    }
-
-    #[wasm_bindgen(getter, js_name = performanceCostField)]
-    pub fn performance_cost_field(&self) -> String {
-        self.performance_cost_field.clone()
-    }
-
-    #[wasm_bindgen(setter, js_name = performanceCostField)]
-    pub fn set_performance_cost_field(&mut self, field: String) {
-        self.performance_cost_field = field;
     }
 }
 
@@ -326,10 +311,6 @@ impl SDK {
         let track_coverage = options.as_ref().is_some_and(|o| o.track_coverage);
         let track_costs = options.as_ref().is_some_and(|o| o.track_costs);
         let track_performance = options.as_ref().is_some_and(|o| o.track_performance);
-        let performance_cost_field = options
-            .as_ref()
-            .map(|opts| opts.performance_cost_field.clone())
-            .unwrap_or_else(|| "runtime".to_string());
 
         Self {
             deployer: String::new(),
@@ -343,7 +324,6 @@ impl SDK {
                 track_coverage,
                 track_costs,
                 track_performance,
-                performance_cost_field,
             },
             current_test_name: String::new(),
             costs_reports: vec![],
@@ -494,11 +474,6 @@ impl SDK {
         let mut session = initiate_session_from_manifest(&manifest);
         if self.options.track_coverage {
             session.enable_coverage();
-        }
-        if self.options.track_performance {
-            let cost_field = CostField::parse_from_str(&self.options.performance_cost_field)
-                .unwrap_or(CostField::Runtime);
-            session.enable_performance(cost_field);
         }
         session.enable_logger_hook();
         let executed_contracts = update_session_with_deployment_plan(
@@ -776,7 +751,9 @@ impl SDK {
         allow_private: bool,
     ) -> Result<TransactionRes, String> {
         let test_name = self.current_test_name.clone();
-        let SDKOptions { track_costs, .. } = self.options;
+        let track_costs = self.options.track_costs;
+        let track_performance = self.options.track_performance;
+        let deployer = self.deployer.clone();
 
         if PrincipalData::parse_standard_principal(sender).is_err() {
             return Err(format!("Invalid sender address '{sender}'."));
@@ -811,12 +788,22 @@ impl SDK {
                 message
             })?;
 
+        // Collect performance data before accessing self.costs_reports
+        let performance_data = if track_performance {
+            session.get_performance_data()
+        } else {
+            None
+        };
+
+        // Release the session borrow before accessing self.costs_reports
+        let _ = session;
+
         if track_costs {
             if let Some(ref cost) = execution.cost {
                 let contract_id = if contract.starts_with('S') {
                     contract.to_string()
                 } else {
-                    format!("{}.{contract}", self.deployer)
+                    format!("{}.{contract}", deployer)
                 };
                 self.costs_reports.push(CostsReport {
                     test_name,
@@ -828,7 +815,14 @@ impl SDK {
             }
         }
 
-        Ok(execution_result_to_transaction_res(&execution))
+        let mut response = execution_result_to_transaction_res(&execution);
+
+        // Add performance data if available
+        if let Some(perf_data) = performance_data {
+            response.performance = Some(perf_data);
+        }
+
+        Ok(response)
     }
 
     #[wasm_bindgen(js_name=callReadOnlyFn)]
@@ -1185,5 +1179,14 @@ impl SDK {
     pub fn collect_performance_data(&self) -> Option<String> {
         let session = self.get_session();
         session.get_performance_data()
+    }
+
+    #[wasm_bindgen(js_name=enablePerformance)]
+    pub fn enable_performance(&mut self, cost_field: String) -> Result<(), String> {
+        let session = self.get_session_mut();
+        let cost_field = CostField::parse_from_str(&cost_field)
+            .ok_or_else(|| format!("Invalid cost field '{}'", cost_field))?;
+        session.enable_performance(cost_field);
+        Ok(())
     }
 }

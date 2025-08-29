@@ -1250,6 +1250,12 @@ impl Session {
             None
         }
     }
+
+    pub fn clear_performance_buffer(&mut self) {
+        if let Some(ref mut perf_hook) = self.perf_hook {
+            perf_hook.clear_buffer();
+        }
+    }
 }
 
 #[derive(Debug, PartialEq)]

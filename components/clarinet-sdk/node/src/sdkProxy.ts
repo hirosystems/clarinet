@@ -42,7 +42,9 @@ export type Simnet = {
                 ? GetDataVar
                 : K extends "getMapEntry"
                   ? GetMapEntry
-                  : SDK[K];
+                  : K extends "enablePerformance"
+                    ? (costField: string) => Promise<void>
+                    : SDK[K];
 };
 
 function parseTxResponse(response: TransactionRes): ParsedTransactionResult {
@@ -50,6 +52,7 @@ function parseTxResponse(response: TransactionRes): ParsedTransactionResult {
     result: Cl.deserialize(response.result),
     events: parseEvents(response.events),
     costs: parseCosts(response.costs),
+    performance: response.performance,
   };
 }
 
@@ -144,6 +147,17 @@ export function getSessionProxy() {
           return result;
         };
         return getMapEntry;
+      }
+
+      if (prop === "enablePerformance") {
+        const enablePerformance = async (costField: string) => {
+          try {
+            session.enablePerformance(costField);
+          } catch (error) {
+            throw new Error(error as string);
+          }
+        };
+        return enablePerformance;
       }
 
       return Reflect.get(session, prop, receiver);

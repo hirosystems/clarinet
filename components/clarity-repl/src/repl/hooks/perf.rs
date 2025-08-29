@@ -85,6 +85,11 @@ impl ReadableWriter {
     pub fn get_data(&self) -> Option<String> {
         String::from_utf8(self.buffer.clone()).ok()
     }
+
+    /// Clear the buffer
+    pub fn clear_buffer(&mut self) {
+        self.buffer.clear();
+    }
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -173,6 +178,15 @@ impl PerfHook {
             PerfWriter::Readable(writer) => writer.get_data(),
             #[cfg(not(target_arch = "wasm32"))]
             PerfWriter::File(_) => None,
+        }
+    }
+
+    /// Clear the performance data buffer (WASM mode only)
+    pub fn clear_buffer(&mut self) {
+        #[cfg(target_arch = "wasm32")]
+        {
+            let PerfWriter::Readable(ref mut writer) = &mut self.writer;
+            writer.clear_buffer();
         }
     }
 }

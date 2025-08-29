@@ -26,7 +26,6 @@ type Options = {
   trackCosts: boolean;
   trackCoverage: boolean;
   trackPerformance?: boolean;
-  performanceCostField?: string;
 };
 
 export async function getSDK(options?: Options): Promise<Simnet> {
@@ -35,7 +34,6 @@ export async function getSDK(options?: Options): Promise<Simnet> {
     !!options?.trackCosts,
     !!options?.trackCoverage,
     !!options?.trackPerformance,
-    options?.performanceCostField,
   );
 
   const simnet = new Proxy(new module.SDK(vfs, sdkOptions), getSessionProxy()) as unknown as Simnet;

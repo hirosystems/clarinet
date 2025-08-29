@@ -24,6 +24,7 @@ export type ParsedTransactionResult = {
   result: ClarityValue;
   events: ClarityEvent[];
   costs: ClarityCosts | null;
+  performance: string | undefined;
 };
 
 export type CallFn = (
