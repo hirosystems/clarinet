@@ -50,6 +50,7 @@ function parseTxResponse(response: TransactionRes): ParsedTransactionResult {
     result: Cl.deserialize(response.result),
     events: parseEvents(response.events),
     costs: parseCosts(response.costs),
+    performance: response.performance,
   };
 }
 
