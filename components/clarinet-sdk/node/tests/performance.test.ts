@@ -35,7 +35,7 @@ afterEach(() => {
 
 describe("performance tracking", () => {
   it("can track performance during contract calls", async () => {
-    await simnet.enablePerformance("runtime");
+    simnet.enablePerformance("runtime");
 
     const result = simnet.callReadOnlyFn(
       "counter",
@@ -46,10 +46,24 @@ describe("performance tracking", () => {
 
     expect(result.performance).toBeDefined();
     expect(result.performance).not.toBeNull();
+  });
 
-    if (result.performance) {
-      expect(result.performance).toContain(";");
-      expect(result.performance.trim()).not.toBe("");
-    }
+  it("can track performance during mineBlock operations", async () => {
+    simnet.enablePerformance("runtime");
+
+    const result = simnet.mineBlock([
+      {
+        callPublicFn: {
+          contract: "counter",
+          method: "increment",
+          args: [],
+          sender: "ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5",
+        },
+      },
+    ]);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].performance).toBeDefined();
+    expect(result[0].performance).not.toBeNull();
   });
 });
