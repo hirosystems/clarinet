@@ -56,7 +56,7 @@ describe("simnet remote interactions", async () => {
     expect(result).toStrictEqual(Cl.uint(0));
   });
 
-  it("can call a remote contract", async () => {
+  it("can call a remote contract at different height", async () => {
     await simnet.initEmptySession({
       enabled: true,
       api_url,
