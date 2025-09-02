@@ -69,13 +69,31 @@ impl ClarityFormatter {
     }
     /// formatting for files to ensure a newline at the end
     pub fn format_file(&self, source: &str) -> String {
-        let trimmed_source = source.trim_start_matches(['\n', '\r']);
-        let pse = clarity::vm::ast::parser::v2::parse(trimmed_source).unwrap();
-        let agg = Aggregator::new(&self.settings, &pse, Some(trimmed_source));
-        let result = agg.generate();
-
-        // make sure the file ends with a newline
-        format!("{}\n", result.trim_end_matches(['\n', '\r']))
+        let blocks = split_source_by_format_ignore(source);
+        let mut result = String::new();
+        for block in blocks {
+            match block {
+                SourceBlock::Unformatted(s) => {
+                    result.push_str(s);
+                    if !s.ends_with('\n') {
+                        result.push('\n');
+                    }
+                }
+                SourceBlock::Formatted(s) => {
+                    let trimmed = s.trim();
+                    if !trimmed.is_empty() {
+                        let pse = clarity::vm::ast::parser::v2::parse(trimmed).unwrap();
+                        let agg = Aggregator::new(&self.settings, &pse, Some(trimmed));
+                        let formatted = agg.generate();
+                        result.push_str(&formatted);
+                        if !formatted.ends_with('\n') {
+                            result.push('\n');
+                        }
+                    }
+                }
+            }
+        }
+        result
     }
     /// formatting an AST without a source file
     pub fn format_ast(&self, pse: &[PreSymbolicExpression]) -> String {
@@ -88,21 +106,50 @@ impl ClarityFormatter {
     }
     /// for range formatting within editors
     pub fn format_section(&self, source: &str) -> Result<String, String> {
-        let pse = clarity::vm::ast::parser::v2::parse(source).map_err(|e| e.to_string())?;
-
-        // range formatting specifies to the aggregator that we're
-        // starting mid-source and thus should pre-populate
-        // `previous_indentation` for format_source_exprs
-        let indentation_level = source.chars().take_while(|c| c.is_whitespace()).count();
-        let leading_spaces = &source[..indentation_level];
-        let agg = Aggregator::new(&self.settings, &pse, Some(source));
-
-        let result = agg.generate();
-        Ok(if leading_spaces.is_empty() {
-            result
+        // Check if there are any format-ignore comments
+        if source.contains("@format-ignore") {
+            let blocks = split_source_by_format_ignore(source);
+            let mut result = String::new();
+            for block in blocks {
+                match block {
+                    SourceBlock::Unformatted(s) => {
+                        result.push_str(s);
+                        // Don't add newline for unformatted blocks - preserve original structure
+                    }
+                    SourceBlock::Formatted(s) => {
+                        let trimmed = s.trim();
+                        if !trimmed.is_empty() {
+                            let pse = clarity::vm::ast::parser::v2::parse(trimmed)
+                                .map_err(|e| e.to_string())?;
+                            let agg = Aggregator::new(&self.settings, &pse, Some(trimmed));
+                            let formatted = agg.generate();
+                            result.push_str(&formatted);
+                            if !formatted.ends_with('\n') {
+                                result.push('\n');
+                            }
+                        }
+                    }
+                }
+            }
+            Ok(result)
         } else {
-            format!("{leading_spaces}{result}")
-        })
+            // Use the original AST-based approach for sources without format-ignore
+            let pse = clarity::vm::ast::parser::v2::parse(source).map_err(|e| e.to_string())?;
+
+            // range formatting specifies to the aggregator that we're
+            // starting mid-source and thus should pre-populate
+            // `previous_indentation` for format_source_exprs
+            let indentation_level = source.chars().take_while(|c| c.is_whitespace()).count();
+            let leading_spaces = &source[..indentation_level];
+            let agg = Aggregator::new(&self.settings, &pse, Some(source));
+
+            let result = agg.generate();
+            Ok(if leading_spaces.is_empty() {
+                result
+            } else {
+                format!("{leading_spaces}{result}")
+            })
+        }
     }
 }
 
@@ -191,12 +238,34 @@ impl<'a> Aggregator<'a> {
             let cur = self.display_pse(expr, previous_indentation);
             if cur.contains(FORMAT_IGNORE_SYNTAX) {
                 result.push_str(&cur);
-                if let Some(next) = iter.peek() {
-                    if let Some(block) = next.match_list() {
-                        iter.next();
-                        result.push('\n');
-                        result.push_str(&ignored_exprs(block, self.source.unwrap_or_default()));
+                // Collect all expressions until we find another format-ignore comment
+                let mut ignored_exprs_vec = Vec::new();
+                let source = self.source.unwrap_or_default();
+                let lines: Vec<&str> = source.lines().collect();
+
+                while let Some(next) = iter.peek() {
+                    let span = next.span();
+                    let start_line = span.start_line as usize - 1;
+                    let end_line = span.end_line as usize - 1;
+
+                    // Check if any line in the span contains format-ignore
+                    let has_format_ignore = (start_line..=end_line)
+                        .any(|i| i < lines.len() && lines[i].contains(FORMAT_IGNORE_SYNTAX));
+
+                    if has_format_ignore {
+                        // Found another format-ignore comment, stop here
+                        break;
                     }
+
+                    // Add this expression to our ignored list
+                    ignored_exprs_vec.push((*next).clone());
+                    iter.next();
+                }
+
+                // Process all collected expressions
+                if !ignored_exprs_vec.is_empty() {
+                    result.push('\n');
+                    result.push_str(&ignored_exprs(&ignored_exprs_vec, source));
                 }
                 continue;
             }
@@ -1381,6 +1450,112 @@ fn push_blank_lines(acc: &mut String, prev_end_line: Option<u32>, curr_start_lin
     }
 }
 
+// Helper for block splitting
+#[derive(Debug)]
+enum SourceBlock<'a> {
+    Unformatted(&'a str),
+    Formatted(&'a str),
+}
+
+fn split_source_by_format_ignore(source: &str) -> Vec<SourceBlock> {
+    let mut blocks = Vec::new();
+    let mut chars = source.char_indices().peekable();
+    let mut last = 0;
+    while let Some((i, _)) = chars.peek() {
+        // Look for a format-ignore comment at the start of a line
+        let line_start = *i;
+        let line_end = source[line_start..]
+            .find('\n')
+            .map(|n| line_start + n)
+            .unwrap_or(source.len());
+        let line = &source[line_start..line_end];
+        if line.trim_start().starts_with(";;") && line.contains("@format-ignore") {
+            // Push any previous block to be formatted
+            if last < line_start {
+                blocks.push(SourceBlock::Formatted(&source[last..line_start]));
+            }
+            // Find all expressions after the comment until the next format-ignore or end
+            let mut expr_start = line_end;
+            while expr_start < source.len() && source[expr_start..].starts_with('\n') {
+                expr_start += 1;
+            }
+            let mut expr_end = expr_start;
+            let mut depth = 0;
+            let mut in_expr = false;
+            let mut found_any = false;
+            let mut pos = expr_start;
+
+            // Scan through the rest of the source to find where the unformatted block ends
+            while pos < source.len() {
+                let c = source.chars().nth(pos).unwrap_or('\0');
+                match c {
+                    '(' => {
+                        depth += 1;
+                        in_expr = true;
+                        found_any = true;
+                    }
+                    ')' => {
+                        if depth > 0 {
+                            depth -= 1;
+                        }
+                    }
+                    '\n' => {
+                        // Check if the next line contains a format-ignore comment
+                        let next_line_start = pos + 1;
+                        let next_line_end = source[next_line_start..]
+                            .find('\n')
+                            .map(|n| next_line_start + n)
+                            .unwrap_or(source.len());
+                        let next_line = &source[next_line_start..next_line_end];
+                        if next_line.trim_start().starts_with(";;")
+                            && next_line.contains("@format-ignore")
+                        {
+                            // Found another format-ignore comment, stop here
+                            expr_end = pos + 1;
+                            break;
+                        }
+                        if depth == 0 && in_expr {
+                            // End of an expression
+                            expr_end = pos;
+                        }
+                    }
+                    _ => {}
+                }
+                pos += 1;
+            }
+
+            if pos >= source.len() {
+                expr_end = source.len();
+            }
+
+            if !found_any {
+                expr_end = expr_start;
+            }
+            // Include the comment and the following expression(s)
+            blocks.push(SourceBlock::Unformatted(&source[line_start..expr_end]));
+            last = expr_end;
+            // Move chars iterator forward
+            for (i, _) in chars.by_ref() {
+                if i >= expr_end {
+                    break;
+                }
+            }
+        } else {
+            // Move to next line
+            for (_, c) in chars.by_ref() {
+                if c == '\n' {
+                    break;
+                }
+            }
+        }
+    }
+    // Add any trailing block
+    if last < source.len() {
+        blocks.push(SourceBlock::Formatted(&source[last..]));
+    }
+    blocks
+}
+
 #[cfg(test)]
 mod tests_formatter {
     #[allow(unused_imports)]
@@ -1891,6 +2066,20 @@ mod tests_formatter {
         assert_eq!(src, result);
 
         let src = ";; @format-ignore\n(list\n  u64\n  u64 u64\n)";
+        let result = format_with(&String::from(src), Settings::new(Indentation::Space(4), 80));
+        assert_eq!(src, result);
+    }
+
+    #[test]
+    fn test_ignore_formatting_simple_expression() {
+        let src = ";; @format-ignore\n(+ u1 u1)\n(+ u1 u1)\n";
+        let result = format_with(&String::from(src), Settings::new(Indentation::Space(4), 80));
+        assert_eq!(src, result);
+    }
+
+    #[test]
+    fn test_ignore_formatting_multiple_comments() {
+        let src = ";; @format-ignore\n(+ u1 u1)\n;; @format-ignore\n(+ u1 u1)\n";
         let result = format_with(&String::from(src), Settings::new(Indentation::Space(4), 80));
         assert_eq!(src, result);
     }
