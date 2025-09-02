@@ -62,7 +62,7 @@ winapi = { version = "0.3.9", features = [
 ] }
 
 [dev-dependencies]
-tempfile = "3.0.0"
+tempfile = { workspace = true }
 indoc = { workspace = true }
 
 [package.metadata.winres]

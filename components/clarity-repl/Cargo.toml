@@ -66,7 +66,7 @@ web-sys = { workspace = true }
 test-case = "*"
 divan = "0.1"
 mockito = { workspace = true }
-tempfile = "3.19"
+tempfile = { workspace = true }
 clarinet-files = { path = "../clarinet-files" }
 clarinet-deployments = { path = "../clarinet-deployments" }
 
