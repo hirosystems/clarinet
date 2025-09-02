@@ -1,7 +1,7 @@
 use clarity::types::StacksEpochId;
 use clarity::vm::callables::{DefineType, DefinedFunction};
 use clarity::vm::costs::LimitedCostTracker;
-use clarity::vm::errors::{CheckErrors, InterpreterResult as Result};
+use clarity::vm::errors::{CheckErrors, InterpreterResult as Result, SyntaxBindingErrorType};
 use clarity::vm::functions::define::DefineFunctionsParsed;
 use clarity::vm::types::parse_name_type_pairs;
 use clarity::vm::{ClarityName, ContractContext, SymbolicExpression};
@@ -21,7 +21,12 @@ fn handle_function(
     let function_name = function_symbol
         .match_atom()
         .ok_or(CheckErrors::ExpectedName)?;
-    let arguments = parse_name_type_pairs(*epoch_id, arg_symbols, cost_tracker)?;
+    let arguments = parse_name_type_pairs::<_, CheckErrors>(
+        *epoch_id,
+        arg_symbols,
+        SyntaxBindingErrorType::Eval,
+        cost_tracker,
+    )?;
     Ok((
         function_name.clone(),
         DefinedFunction::new(arguments, body, define_type, function_name, context_name),
