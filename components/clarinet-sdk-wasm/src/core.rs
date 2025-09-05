@@ -25,6 +25,7 @@ use clarity_repl::clarity::{
     Address, ClarityVersion, EvaluationResult, ExecutionResult, StacksEpochId, SymbolicExpression,
 };
 use clarity_repl::repl::clarity_values::{uint8_to_string, uint8_to_value};
+use clarity_repl::repl::hooks::perf::CostField;
 use clarity_repl::repl::session::CostsReport;
 use clarity_repl::repl::settings::RemoteDataSettings;
 use clarity_repl::repl::{
@@ -217,6 +218,7 @@ pub struct TransactionRes {
     pub result: String,
     pub events: String,
     pub costs: String,
+    pub performance: Option<String>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -249,6 +251,7 @@ pub fn execution_result_to_transaction_res(execution: &ExecutionResult) -> Trans
         result,
         events: json!(events_as_strings).to_string(),
         costs: json!(execution.cost).to_string(),
+        performance: None,
     }
 }
 
@@ -266,15 +269,18 @@ pub struct SDKOptions {
     pub track_costs: bool,
     #[wasm_bindgen(js_name = trackCoverage)]
     pub track_coverage: bool,
+    #[wasm_bindgen(js_name = trackPerformance)]
+    pub track_performance: bool,
 }
 
 #[wasm_bindgen]
 impl SDKOptions {
     #[wasm_bindgen(constructor)]
-    pub fn new(track_costs: bool, track_coverage: bool) -> Self {
+    pub fn new(track_costs: bool, track_coverage: bool, track_performance: Option<bool>) -> Self {
         Self {
             track_costs,
             track_coverage,
+            track_performance: track_performance.unwrap_or(false),
         }
     }
 }
@@ -304,6 +310,7 @@ impl SDK {
 
         let track_coverage = options.as_ref().is_some_and(|o| o.track_coverage);
         let track_costs = options.as_ref().is_some_and(|o| o.track_costs);
+        let track_performance = options.as_ref().is_some_and(|o| o.track_performance);
 
         Self {
             deployer: String::new(),
@@ -316,6 +323,7 @@ impl SDK {
             options: SDKOptions {
                 track_coverage,
                 track_costs,
+                track_performance,
             },
             current_test_name: String::new(),
             costs_reports: vec![],
@@ -743,7 +751,9 @@ impl SDK {
         allow_private: bool,
     ) -> Result<TransactionRes, String> {
         let test_name = self.current_test_name.clone();
-        let SDKOptions { track_costs, .. } = self.options;
+        let track_costs = self.options.track_costs;
+        let track_performance = self.options.track_performance;
+        let deployer = self.deployer.clone();
 
         if PrincipalData::parse_standard_principal(sender).is_err() {
             return Err(format!("Invalid sender address '{sender}'."));
@@ -778,12 +788,22 @@ impl SDK {
                 message
             })?;
 
+        // Collect performance data before accessing self.costs_reports
+        let performance_data = if track_performance {
+            session.get_performance_data()
+        } else {
+            None
+        };
+
+        // Release the session borrow before accessing self.costs_reports
+        let _ = session;
+
         if track_costs {
             if let Some(ref cost) = execution.cost {
                 let contract_id = if contract.starts_with('S') {
                     contract.to_string()
                 } else {
-                    format!("{}.{contract}", self.deployer)
+                    format!("{deployer}.{contract}")
                 };
                 self.costs_reports.push(CostsReport {
                     test_name,
@@ -795,7 +815,13 @@ impl SDK {
             }
         }
 
-        Ok(execution_result_to_transaction_res(&execution))
+        let mut response = execution_result_to_transaction_res(&execution);
+
+        if let Some(perf_data) = performance_data {
+            response.performance = Some(perf_data);
+        }
+
+        Ok(response)
     }
 
     #[wasm_bindgen(js_name=callReadOnlyFn)]
@@ -1146,5 +1172,13 @@ impl SDK {
         self.costs_reports.clear();
 
         Ok(SessionReport { coverage, costs })
+    }
+
+    #[wasm_bindgen(js_name=enablePerformance)]
+    pub fn enable_performance(&mut self, cost_field: String) -> Result<(), String> {
+        let session = self.get_session_mut();
+        let cost_field = CostField::from(cost_field.as_str());
+        session.enable_performance(cost_field);
+        Ok(())
     }
 }
