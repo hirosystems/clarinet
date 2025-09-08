@@ -6,7 +6,7 @@ use clarity::types::StacksEpochId;
 use clarity::vm::ClarityVersion;
 use clarity_repl::repl;
 use clarity_repl::repl::boot::BOOT_CONTRACTS_NAMES;
-use clarity_repl::repl::{ClarityCodeSource, ClarityContract, ContractDeployer, DEFAULT_EPOCH};
+use clarity_repl::repl::{ClarityCodeSource, ClarityContract, ContractDeployer};
 use serde::ser::SerializeMap;
 use serde::{Deserializer, Serialize, Serializer};
 use serde_json::Value as JsonValue;
@@ -125,7 +125,7 @@ where
             name: contract_name.clone(),
             deployer,
             clarity_version,
-            epoch: clarity_repl::repl::Epoch::Specific(epoch),
+            epoch,
         };
 
         map.insert(contract_name, cc);
@@ -243,7 +243,7 @@ impl ProjectManifest {
             Err(e) => return Err(format!("unable to parse path {contract_path} ({e})")),
         };
 
-        let (parsed_epoch, parsed_clarity_version) =
+        let (epoch, parsed_clarity_version) =
             get_epoch_and_clarity_version(epoch, clarity_version)?;
 
         config_contracts.insert(
@@ -253,7 +253,7 @@ impl ProjectManifest {
                 deployer: deployer.clone(),
                 code_source,
                 clarity_version: parsed_clarity_version,
-                epoch: clarity_repl::repl::Epoch::Specific(parsed_epoch),
+                epoch: epoch.clone(),
             },
         );
 
@@ -265,7 +265,7 @@ impl ProjectManifest {
                 name: contract_name.to_string(),
                 deployer,
                 clarity_version: parsed_clarity_version,
-                epoch: parsed_epoch,
+                epoch: epoch.resolve(),
             },
         );
 
@@ -427,43 +427,46 @@ impl ProjectManifest {
 fn get_epoch_and_clarity_version(
     settings_epoch: Option<&str>,
     settings_clarity_version: Option<&str>,
-) -> Result<(StacksEpochId, ClarityVersion), String> {
+) -> Result<(clarity_repl::repl::Epoch, ClarityVersion), String> {
     // if neither epoch or version are specified in clarinet.toml use: epoch 2.05 and clarity 1
     // if epoch is specified but not version: use the default version for that epoch
 
     let epoch = match settings_epoch {
-        None => StacksEpochId::Epoch2_05, // Keep the existing default unchanged
+        None => clarity_repl::repl::Epoch::Specific(StacksEpochId::Epoch2_05), // Keep the existing default unchanged
         // The "latest" epoch means the current epoch that is running on mainnet
         // Which can differ from `StacksEpochId::latest()` if it hasn't been activated yet
-        Some("latest") => DEFAULT_EPOCH,
-        Some(epoch) => match epoch {
-            "2" | "2.0" => StacksEpochId::Epoch20,
-            "2.05" => StacksEpochId::Epoch2_05,
-            "2.1" => StacksEpochId::Epoch21,
-            "2.2" => StacksEpochId::Epoch22,
-            "2.3" => StacksEpochId::Epoch23,
-            "2.4" => StacksEpochId::Epoch24,
-            "2.5" => StacksEpochId::Epoch25,
-            "3" | "3.0" => StacksEpochId::Epoch30,
-            "3.1" => StacksEpochId::Epoch31,
-            "3.2" => StacksEpochId::Epoch32,
-            _ => return Err(
-                "epoch field invalid (value supported: 2.0, 2.05, 2.1, 2.2, 2.3, 2.4, 3.0, 3.1, 3.2, latest)"
-                    .into(),
-            ),
-        },
+        Some("latest") => clarity_repl::repl::Epoch::Latest,
+        Some(epoch) => {
+            let stacks_epoch = match epoch {
+                "2" | "2.0" => StacksEpochId::Epoch20,
+                "2.05" => StacksEpochId::Epoch2_05,
+                "2.1" => StacksEpochId::Epoch21,
+                "2.2" => StacksEpochId::Epoch22,
+                "2.3" => StacksEpochId::Epoch23,
+                "2.4" => StacksEpochId::Epoch24,
+                "2.5" => StacksEpochId::Epoch25,
+                "3" | "3.0" => StacksEpochId::Epoch30,
+                "3.1" => StacksEpochId::Epoch31,
+                "3.2" => StacksEpochId::Epoch32,
+                _ => return Err(
+                    "epoch field invalid (value supported: 2.0, 2.05, 2.1, 2.2, 2.3, 2.4, 3.0, 3.1, 3.2, latest)"
+                        .into(),
+                ),
+            };
+            clarity_repl::repl::Epoch::Specific(stacks_epoch)
+        }
     };
 
     let clarity_version = match settings_clarity_version {
         None => match settings_epoch {
             None => ClarityVersion::Clarity1,
-            Some(_) => ClarityVersion::default_for_epoch(epoch),
+            Some(_) => ClarityVersion::default_for_epoch(epoch.resolve()),
         },
         Some(version) => ClarityVersion::from_str(&format!("clarity{version}"))
             .map_err(|_| INVALID_CLARITY_VERSION)?,
     };
 
-    if clarity_version > ClarityVersion::default_for_epoch(epoch) {
+    if clarity_version > ClarityVersion::default_for_epoch(epoch.resolve()) {
         return Err(format!("{clarity_version} can not be used with {epoch}"));
     }
 
@@ -502,35 +505,36 @@ mod tests {
     fn test_get_epoch_and_clarity_version() {
         use clarity::types::StacksEpochId::*;
         use clarity::vm::ClarityVersion::*;
+        use clarity_repl::repl::Epoch::*;
 
         // no epoch, no version
         let result = get_epoch_and_clarity_version(None, None);
-        assert_eq!(result, Ok((Epoch2_05, Clarity1)));
+        assert_eq!(result, Ok((Specific(Epoch2_05), Clarity1)));
 
         // epoch 2.0, no version
         let result = get_epoch_and_clarity_version(Some("2.0"), None);
-        assert_eq!(result, Ok((Epoch20, Clarity1)));
+        assert_eq!(result, Ok((Specific(Epoch20), Clarity1)));
 
         // epoch 2.05, no version
         let result = get_epoch_and_clarity_version(Some("2.05"), None);
-        assert_eq!(result, Ok((Epoch2_05, Clarity1)));
+        assert_eq!(result, Ok((Specific(Epoch2_05), Clarity1)));
 
         // epoch 2.1, no version
         let result = get_epoch_and_clarity_version(Some("2.1"), None);
-        assert_eq!(result, Ok((Epoch21, Clarity2)));
+        assert_eq!(result, Ok((Specific(Epoch21), Clarity2)));
 
         // epoch 3.0, no version
         let result = get_epoch_and_clarity_version(Some("3.0"), None);
-        assert_eq!(result, Ok((Epoch30, Clarity3)));
+        assert_eq!(result, Ok((Specific(Epoch30), Clarity3)));
 
         // epoch 3.1, no version
         let result = get_epoch_and_clarity_version(Some("3.1"), None);
-        assert_eq!(result, Ok((Epoch31, Clarity3)));
+        assert_eq!(result, Ok((Specific(Epoch31), Clarity3)));
 
         // no epoch
         // no epoch, version 1
         let result = get_epoch_and_clarity_version(None, Some("1"));
-        assert_eq!(result, Ok((Epoch2_05, Clarity1)));
+        assert_eq!(result, Ok((Specific(Epoch2_05), Clarity1)));
 
         // no epoch, version 2 -> error, must specify epoch
         let result = get_epoch_and_clarity_version(None, Some("2"));
@@ -539,7 +543,7 @@ mod tests {
         // epoch and clarity version
         // no epoch 2.05, version 1
         let result = get_epoch_and_clarity_version(Some("2.05"), Some("1"));
-        assert_eq!(result, Ok((Epoch2_05, Clarity1)));
+        assert_eq!(result, Ok((Specific(Epoch2_05), Clarity1)));
 
         // no epoch 2.05, version 2 -> error
         let result = get_epoch_and_clarity_version(Some("2.05"), Some("2"));
@@ -547,23 +551,48 @@ mod tests {
 
         // no epoch 2.05, version 1
         let result = get_epoch_and_clarity_version(Some("2.1"), Some("1"));
-        assert_eq!(result, Ok((Epoch21, Clarity1)));
+        assert_eq!(result, Ok((Specific(Epoch21), Clarity1)));
 
         // no epoch 2.05, version 2 -> error
         let result = get_epoch_and_clarity_version(Some("2.1"), Some("2"));
-        assert_eq!(result, Ok((Epoch21, Clarity2)));
+        assert_eq!(result, Ok((Specific(Epoch21), Clarity2)));
     }
 
     #[test]
     fn test_latest_epoch_and_clarity_version() {
-        let latest_epoch = StacksEpochId::latest();
         let latest_clarity_version = ClarityVersion::latest();
         let result = get_epoch_and_clarity_version(
-            Some(&latest_epoch.to_string()),
+            Some("latest"),
             // Replace "Clarity N" to "N" for clarity version
             Some(&latest_clarity_version.to_string().replace("Clarity ", "")),
         );
-        assert_eq!(result, Ok((latest_epoch, latest_clarity_version)));
+        assert_eq!(
+            result,
+            Ok((clarity_repl::repl::Epoch::Latest, latest_clarity_version))
+        );
+    }
+
+    #[test]
+    fn test_epoch_latest_preservation() {
+        let manifest_toml = toml! {
+            [project]
+            name = "test-project"
+            telemetry = false
+            [contracts.test-contract]
+            path = "contracts/test.clar"
+            clarity_version = 2
+            epoch = "latest"
+        };
+
+        let manifest_file: ProjectManifestFile = manifest_toml.try_into().unwrap();
+        let location = FileLocation::from_path("/tmp/clarinet.toml".into());
+        let manifest =
+            ProjectManifest::from_project_manifest_file(manifest_file, &location, true).unwrap();
+        let contract = manifest.contracts.get("test-contract").unwrap();
+        assert!(matches!(contract.epoch, clarity_repl::repl::Epoch::Latest));
+        let toml_value = toml::Value::try_from(&manifest).unwrap();
+        let pretty_toml = toml::ser::to_string_pretty(&toml_value).unwrap();
+        assert!(pretty_toml.contains("epoch = 'latest'"));
     }
 
     #[test]
