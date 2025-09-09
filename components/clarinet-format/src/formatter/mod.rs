@@ -192,10 +192,15 @@ impl<'a> Aggregator<'a> {
             if cur.contains(FORMAT_IGNORE_SYNTAX) {
                 result.push_str(&cur);
                 if let Some(next) = iter.peek() {
-                    if let Some(block) = next.match_list() {
-                        iter.next();
+                    if next.match_list().is_some() {
+                        let next_expr = iter.next().unwrap();
                         result.push('\n');
-                        result.push_str(&ignored_exprs(block, self.source.unwrap_or_default()));
+                        result.push_str(&ignored_exprs(
+                            std::slice::from_ref(next_expr),
+                            self.source.unwrap_or_default(),
+                        ));
+                        result.push('\n');
+                        prev_end_line = next_expr.span().end_line;
                     }
                 }
                 continue;
@@ -1886,11 +1891,11 @@ mod tests_formatter {
     }
     #[test]
     fn test_ignore_formatting() {
-        let src = ";; @format-ignore\n(    begin ( ok true))";
+        let src = ";; @format-ignore\n(    begin ( ok true))\n";
         let result = format_with(&String::from(src), Settings::new(Indentation::Space(4), 80));
         assert_eq!(src, result);
 
-        let src = ";; @format-ignore\n(list\n  u64\n  u64 u64\n)";
+        let src = ";; @format-ignore\n(list\n  u64\n  u64 u64\n)\n";
         let result = format_with(&String::from(src), Settings::new(Indentation::Space(4), 80));
         assert_eq!(src, result);
     }
@@ -2238,6 +2243,19 @@ mod tests_formatter {
             ))"#
         );
         let result = format_with_default(src);
+        assert_eq!(src, result);
+    }
+
+    #[test]
+    fn test_format_ignore_multiple_expressions() {
+        let src = ";; @format-ignore\n(+ u1 u1)\n(+ u1 u1)";
+        let result = format_with_default(src);
+
+        assert_eq!(src, result);
+
+        let src = ";; @format-ignore\n(+ u1 u1)\n;; @format-ignore\n(+ u1 u1)\n";
+        let result = format_with_default(src);
+
         assert_eq!(src, result);
     }
 }

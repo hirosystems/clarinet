@@ -10,11 +10,10 @@ pub fn ignored_exprs(exprs: &[PreSymbolicExpression], source: &str) -> String {
     let mut result = String::new();
     let mut is_first = true;
 
-    // Look at lines including one before our span starts
     for (idx, line) in source
         .lines()
-        .skip(start_line - 1) // Start one line earlier
-        .take(end_line - (start_line - 1) + 1)
+        .skip(start_line - 1)
+        .take(end_line - start_line + 1)
         .enumerate()
     {
         if !is_first {
@@ -26,8 +25,8 @@ pub fn ignored_exprs(exprs: &[PreSymbolicExpression], source: &str) -> String {
             if let Some(paren_pos) = line.find('(') {
                 result.push_str(&line[paren_pos..]);
             }
-        } else if idx == end_line - (start_line - 1) {
-            // Last line - up to end column
+        } else if idx == end_line - start_line {
+            // Last line - up to and including end column
             let end_column = end.end_column as usize;
             if end_column <= line.len() {
                 result.push_str(&line[..end_column]);
