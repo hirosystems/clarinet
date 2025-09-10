@@ -32,6 +32,7 @@ use super::{
 use crate::analysis::coverage::CoverageHook;
 use crate::repl::boot::get_boot_contract_epoch_and_clarity_version;
 use crate::repl::clarity_values::value_to_string;
+use crate::repl::hooks::tracer::TracerHook;
 use crate::utils::serialize_event;
 
 #[derive(Clone, Debug, Serialize)]
@@ -84,7 +85,7 @@ impl Session {
         }
     }
 
-    pub fn enable_coverage(&mut self) {
+    pub fn enable_coverage_hook(&mut self) {
         self.coverage_hook = Some(CoverageHook::new());
     }
 
@@ -443,7 +444,7 @@ impl Session {
             return output.push("Usage: ::trace <expr>".red().to_string());
         };
 
-        let mut tracer = TracerHook::new(snippet.to_string());
+        let mut tracer = TracerHook::new();
 
         match self.eval_with_hooks(snippet.to_string(), Some(vec![&mut tracer]), false) {
             Ok(_) => (),
@@ -455,6 +456,9 @@ impl Session {
                 }
             }
         };
+
+        println!("{}  {}", snippet, black!("<console>"));
+        println!("{}", tracer.output.join("\n"));
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -624,7 +628,8 @@ impl Session {
 
         self.set_tx_sender(sender);
 
-        let mut hooks: Vec<&mut dyn EvalHook> = vec![];
+        let mut tracer_hook = TracerHook::new();
+        let mut hooks: Vec<&mut dyn EvalHook> = vec![&mut tracer_hook];
         if let Some(ref mut coverage_hook) = self.coverage_hook {
             hooks.push(coverage_hook);
         }
@@ -648,7 +653,12 @@ impl Session {
         ) {
             Ok(result) => result,
             Err(e) => {
+                ueprint!("{}", tracer_hook.output.join("\n"));
+                if let Some(traced_error) = tracer_hook.error {
+                    ueprint!("{}", traced_error);
+                }
                 self.set_tx_sender(&initial_tx_sender);
+                println!("error: {e}");
                 let user_friendly_message = match e {
                     ContractCallError::NoSuchContract(_) => {
                         format!("Contract '{contract_id_str}' does not exist")

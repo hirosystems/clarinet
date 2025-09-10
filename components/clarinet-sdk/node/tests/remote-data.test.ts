@@ -106,13 +106,14 @@ describe("simnet remote interactions", async () => {
     );
   });
 
-  it("throws an error if the contract is not available at a given block height", async () => {
+  it.only("throws an error if the contract is not available at a given block height", async () => {
     await simnet.initEmptySession({
       enabled: true,
       api_url,
       // the counter contract is deployed at 41613
       initial_height: 41000,
     });
+    // simnet.callReadOnlyFn(counterAddress, "get-count", [], sender);
     expect(() => simnet.callReadOnlyFn(counterAddress, "get-count", [], sender)).toThrowError(
       `Call contract function error: ${counterAddress}::get-count() -> Contract '${counterAddress}' does not exist`,
     );

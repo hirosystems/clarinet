@@ -473,7 +473,7 @@ impl SDK {
 
         let mut session = initiate_session_from_manifest(&manifest);
         if self.options.track_coverage {
-            session.enable_coverage();
+            session.enable_coverage_hook();
         }
         session.enable_logger_hook();
         let executed_contracts = update_session_with_deployment_plan(

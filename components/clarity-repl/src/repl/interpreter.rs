@@ -39,6 +39,18 @@ pub enum ContractCallError {
     Uncategorized(String),
 }
 
+impl From<String> for ContractCallError {
+    fn from(s: String) -> Self {
+        if s.contains("UndefinedFunction") || s.contains("NoSuchPublicFunction") {
+            ContractCallError::NoSuchFunction(s)
+        } else if s.contains("Failed to read non-consensus contract metadata") {
+            ContractCallError::NoSuchContract(s)
+        } else {
+            ContractCallError::Uncategorized(s)
+        }
+    }
+}
+
 impl std::fmt::Display for ContractCallError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -593,7 +605,7 @@ impl ClarityInterpreter {
 
         let mut global_context = self
             .get_global_context(epoch, track_costs)
-            .map_err(to_contract_call_error)?;
+            .map_err(ContractCallError::from)?;
 
         let mut hooks: Vec<&mut dyn EvalHook> = Vec::new();
         for hook in eval_hooks {
@@ -646,9 +658,9 @@ impl ClarityInterpreter {
             .collect::<Vec<_>>();
 
         let eval_result = match value {
-            Ok(value) => EvaluationResult::Snippet(SnippetEvaluationResult { result: value }),
+            Ok(result) => EvaluationResult::Snippet(SnippetEvaluationResult { result }),
             Err(e) => {
-                return Err(to_contract_call_error(e));
+                return Err(ContractCallError::from(e));
             }
         };
         global_context.commit().unwrap();
@@ -928,15 +940,6 @@ impl ClarityInterpreter {
     }
 }
 
-fn to_contract_call_error(error: String) -> ContractCallError {
-    if error.contains("UndefinedFunction") || error.contains("NoSuchPublicFunction") {
-        ContractCallError::NoSuchFunction(error)
-    } else if error.contains("Failed to read non-consensus contract metadata") {
-        ContractCallError::NoSuchContract(error)
-    } else {
-        ContractCallError::Uncategorized(error)
-    }
-}
 #[cfg(test)]
 mod tests {
     use clarity::types::chainstate::StacksAddress;
@@ -973,7 +976,7 @@ mod tests {
 
         let result = interpreter
             .execute(contract, &ast, analysis, false, None)
-            .map_err(to_contract_call_error);
+            .map_err(ContractCallError::from);
         assert!(result.is_ok());
         result
     }
@@ -1848,6 +1851,48 @@ mod tests {
         assert!(
             matches!(result, EvaluationResult::Snippet(SnippetEvaluationResult { result }) if result == Value::okay_true())
         );
+    }
+
+    #[test]
+    fn can_report_contract_call_errors() {
+        let mut interpreter = get_interpreter(None);
+
+        let contract = ClarityContractBuilder::default()
+            .code_source("(define-public (public-func) (ok true))".into())
+            .build();
+        let _ = deploy_contract(&mut interpreter, &contract);
+
+        let result = interpreter.call_contract_fn(
+            &contract
+                .expect_resolved_contract_identifier(Some(&StandardPrincipalData::transient())),
+            "undefined-function",
+            &[],
+            StacksEpochId::Epoch24,
+            ClarityVersion::Clarity2,
+            false,
+            false,
+            vec![],
+        );
+
+        assert!(result.is_err());
+        matches!(result.unwrap_err(), ContractCallError::NoSuchFunction(_));
+
+        let result = interpreter.call_contract_fn(
+            &QualifiedContractIdentifier {
+                issuer: StandardPrincipalData::transient(),
+                name: "unexisting".into(),
+            },
+            "undefined-function",
+            &[],
+            StacksEpochId::Epoch24,
+            ClarityVersion::Clarity2,
+            false,
+            false,
+            vec![],
+        );
+
+        assert!(result.is_err());
+        matches!(result.unwrap_err(), ContractCallError::NoSuchContract(_));
     }
 
     #[test]
