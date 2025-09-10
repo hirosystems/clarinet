@@ -43,7 +43,7 @@ describe("deployment plans test", async () => {
     expect(fs.existsSync(deploymentPlanPath)).toBe(true);
 
     // make sure the simnet is running
-    expect(simnet.blockHeight).toBe(1);
+    expect(simnet.blockHeight).toBe(3);
   });
 
   it("can use custom deployment plan", async () => {
@@ -53,7 +53,7 @@ describe("deployment plans test", async () => {
 
     // test that all 3 contracts are deployed
     const contracts = simnet.getContractsInterfaces();
-    expect(contracts.size).toBe(nbOfBootContracts + 4);
+    expect(contracts.size).toBe(nbOfBootContracts + 5);
 
     // the additional custom tx should have been applied
     const count = simnet.getDataVar("counter", "count");
