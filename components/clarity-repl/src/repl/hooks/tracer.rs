@@ -16,20 +16,17 @@ pub struct TracerErrorOutput {
     error: String,
 }
 
-// implement Display for TracerErrorOutput
 impl std::fmt::Display for TracerErrorOutput {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let header = format!(
             "Error occured in {}:{}:{}",
             self.contract_id.name, self.expr.span.start_line, self.expr.span.start_column
         );
+        let header_underline = "=".repeat(header.len());
         write!(
             f,
             "\n{}\n{}\nExpression:\n{}\nError: {}",
-            header,
-            "=".repeat(header.len()),
-            self.expr,
-            self.error
+            header, header_underline, self.expr, self.error
         )
     }
 }

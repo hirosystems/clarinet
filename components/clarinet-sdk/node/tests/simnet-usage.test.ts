@@ -484,7 +484,7 @@ describe("prints logs", () => {
     const { result } = simnet.callPublicFn("test-contract", "always-fail", [], address1);
     expect(result).toStrictEqual(Cl.error(Cl.uint(1)));
 
-    // expect(consoleSpy).toHaveBeenCalledTimes(1);
+    expect(consoleSpy).toHaveBeenCalledTimes(1);
     expect(consoleSpy).toHaveBeenCalledWith('"hello" (test-contract:1)');
     consoleSpy.mockRestore();
   });

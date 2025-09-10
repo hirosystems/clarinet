@@ -658,7 +658,6 @@ impl Session {
                     ueprint!("{}", traced_error);
                 }
                 self.set_tx_sender(&initial_tx_sender);
-                println!("error: {e}");
                 let user_friendly_message = match e {
                     ContractCallError::NoSuchContract(_) => {
                         format!("Contract '{contract_id_str}' does not exist")

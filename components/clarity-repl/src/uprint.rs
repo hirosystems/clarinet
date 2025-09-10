@@ -12,7 +12,7 @@ macro_rules! uprint {
 #[macro_export]
 macro_rules! uprint {
     ( $( $t:tt )* ) => {
-        web_sys::console::log_1(&format!( $( $t )* ).into());
+        web_sys::console::log_1(&format!( $( $t )* ).into())
     }
 }
 #[macro_export]
@@ -27,6 +27,6 @@ macro_rules! ueprint {
 #[macro_export]
 macro_rules! ueprint {
     ( $( $t:tt )* ) => {
-        web_sys::console::error_1(&format!( $( $t )* ).into());
+        web_sys::console::error_1(&format!( $( $t )* ).into())
     }
 }
