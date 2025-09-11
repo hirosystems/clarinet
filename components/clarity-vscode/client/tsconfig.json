@@ -6,7 +6,8 @@
     "rootDir": "src",
     "sourceMap": true,
     "noImplicitAny": true,
-    "strict": true
+    "strict": true,
+    "types": ["mocha"]
   },
   "include": ["src", "tests"],
   "exclude": ["node_modules", ".vscode-test-web", "tests"]
