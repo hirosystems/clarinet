@@ -2,7 +2,7 @@ import * as path from "path";
 
 import { BrowserType, runTests } from "@vscode/test-web";
 
-function getArgv(name) {
+function getArgv(name: string) {
   const arg = process.argv.find((a) => a.startsWith(`--${name}=`));
   if (!arg) return undefined;
   return arg.split("=")[1];

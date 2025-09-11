@@ -1,3 +1,22 @@
+# [3.6.0](https://github.com/hirosystems/clarinet/compare/v3.5.0...v3.6.0) (2025-09-11)
+
+##### New Features
+
+- Show stack trace when a contract call fails (#1974) (47d41a67)
+- Add perf hook to generate cost flame graphs (#1940) (f877b908)
+- Parse contracts locally in mxs (#1947) (742e884b)
+
+##### Documentation Changes
+
+- Update readme contributing section (#1971) (812539ef)
+
+##### Bug Fixes
+
+- Format-ignore handling (#1973) (48fef8b0)
+- 'latest' serialization (#1972) (01df4834)
+- Contract name printed in console (#1962) (195fbe8a)
+- Custom boot contracts LSP (#1958) (06d0c99b)
+
 # [3.5.0](https://github.com/hirosystems/clarinet/compare/v3.4.0...v3.5.0) (2025-08-08)
 
 ##### New Features
