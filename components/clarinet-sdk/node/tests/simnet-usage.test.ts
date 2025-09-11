@@ -303,9 +303,9 @@ describe("simnet can call contracts function", () => {
 
     expect(consoleSpy).toHaveBeenCalledTimes(2);
     expect(consoleSpy).toHaveBeenCalledWith(`├── ( sub-a n m )  stacks-trace-test:17:3
-│ ↳ args: u3 u4
-├── ( sub-b n m )  stacks-trace-test:11:3
 │   │ ↳ args: u3 u4
+│   ├── ( sub-b n m )  stacks-trace-test:11:3
+│   │   │ ↳ args: u3 u4
 Error: Runtime error while interpreting ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.stacks-trace-test`);
 
     expect(consoleSpy).toHaveBeenCalledWith(`\nError occured in stacks-trace-test:5:7

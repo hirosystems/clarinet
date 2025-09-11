@@ -31,7 +31,6 @@ impl std::fmt::Display for TracerErrorOutput {
     }
 }
 
-#[derive(Default)]
 pub struct TracerHook {
     pub output: Vec<String>,
     pub error: Option<TracerErrorOutput>,
@@ -39,6 +38,19 @@ pub struct TracerHook {
     pending_call_string: Vec<String>,
     pending_args: Vec<Vec<u64>>,
     nb_of_emitted_events: usize,
+}
+
+impl Default for TracerHook {
+    fn default() -> Self {
+        Self {
+            output: Vec::new(),
+            error: None,
+            stack: vec![u64::MAX],
+            pending_call_string: Vec::new(),
+            pending_args: Vec::new(),
+            nb_of_emitted_events: 0,
+        }
+    }
 }
 
 impl TracerHook {
@@ -97,8 +109,11 @@ impl EvalHook for TracerHook {
                                 };
                                 lines.push(format!(
                                     "{}│ {}",
-                                    "│   "
-                                        .repeat(self.stack.len() - self.pending_call_string.len()),
+                                    "│   ".repeat(
+                                        self.stack
+                                            .len()
+                                            .saturating_sub(self.pending_call_string.len())
+                                    ),
                                     purple!("↳ callee: {callee}"),
                                 ));
                             }
@@ -120,8 +135,11 @@ impl EvalHook for TracerHook {
                             } else {
                                 self.add_to_output(format!(
                                     "{}{}",
-                                    "│   "
-                                        .repeat(self.stack.len() - self.pending_call_string.len()),
+                                    "│   ".repeat(
+                                        self.stack
+                                            .len()
+                                            .saturating_sub(self.pending_call_string.len())
+                                    ),
                                     call
                                 ));
                             }
@@ -133,11 +151,10 @@ impl EvalHook for TracerHook {
                     let mut call = format!(
                         "{}├── {}  {}\n",
                         "│   ".repeat(
-                            (self
-                                .stack
+                            self.stack
                                 .len()
-                                .saturating_sub(self.pending_call_string.len()))
-                            .saturating_sub(1)
+                                .saturating_sub(self.pending_call_string.len())
+                                .saturating_sub(1)
                         ),
                         expr,
                         black!(
@@ -166,7 +183,11 @@ impl EvalHook for TracerHook {
                     } else {
                         self.add_to_output(format!(
                             "{}{}",
-                            "│   ".repeat(self.stack.len() - self.pending_call_string.len()),
+                            "│   ".repeat(
+                                self.stack
+                                    .len()
+                                    .saturating_sub(self.pending_call_string.len())
+                            ),
                             call
                         ));
                     }
@@ -206,7 +227,10 @@ impl EvalHook for TracerHook {
                 self.add_to_output(format!(
                     "{}│ {}",
                     "│   ".repeat(
-                        (self.stack.len() - self.pending_call_string.len()).saturating_sub(1),
+                        self.stack
+                            .len()
+                            .saturating_sub(self.pending_call_string.len())
+                            .saturating_sub(1),
                     ),
                     black!("✸ {event_message}"),
                 ));
@@ -220,7 +244,10 @@ impl EvalHook for TracerHook {
                     self.add_to_output(format!(
                         "{}└── {}",
                         "│   ".repeat(
-                            (self.stack.len() - self.pending_call_string.len()).saturating_sub(1)
+                            self.stack
+                                .len()
+                                .saturating_sub(self.pending_call_string.len())
+                                .saturating_sub(1)
                         ),
                         blue!("{value}")
                     ));
