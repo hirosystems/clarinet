@@ -1,3 +1,9 @@
+# [3.6.1](https://github.com/hirosystems/clarinet/compare/v3.6.0...v3.6.1) (2025-09-11)
+
+##### Bug Fixes
+
+- Tracer stack handling (#1979) (e97c1c1b)
+
 # [3.6.0](https://github.com/hirosystems/clarinet/compare/v3.5.0...v3.6.0) (2025-09-11)
 
 ##### New Features
