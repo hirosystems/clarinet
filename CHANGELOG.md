@@ -1,3 +1,31 @@
+#### 2025-09-10
+
+##### Chores
+
+* **deps:**
+*  update clarity-vm (#1961) (9ff881ad)
+
+##### Documentation Changes
+
+*  update readme contributing section (#1971) (812539ef)
+
+##### New Features
+
+*  show stack trace when a contract call fails (#1974) (47d41a67)
+*  perf hook (#1940) (f877b908)
+
+##### Bug Fixes
+
+*  format-ignore handling (#1973) (48fef8b0)
+*  'latest' serialization (#1972) (01df4834)
+*  contract name printed in console (#1962) (195fbe8a)
+*  update docker help docs link (#1959) (83f06fb7)
+*  custom boot contracts LSP (#1958) (06d0c99b)
+
+##### Other Changes
+
+*  parse contracts locally in mxs  (#1947) (742e884b)
+
 # [3.5.0](https://github.com/hirosystems/clarinet/compare/v3.4.0...v3.5.0) (2025-08-08)
 
 ##### New Features
