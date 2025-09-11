@@ -1,0 +1,45 @@
+[package]
+name = "chainhook-sdk"
+version = "0.12.12"
+description = "Stateless Transaction Indexing Engine for Stacks and Bitcoin"
+license = "GPL-3.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+serde = { workspace = true, features = ["rc"] }
+serde_json = { workspace = true, features = ["arbitrary_precision"] }
+serde_derive = { workspace = true }
+clarity = { workspace = true, default-features = false, features = ["slog_json"] }
+rocket = { version = "=0.5.0", features = ["json"] }
+bitcoincore-rpc = "0.18.0"
+bitcoincore-rpc-json = "0.18.0"
+base64 = "0.21.5"
+reqwest = { workspace = true, default-features = false, features = [
+    "blocking",
+    "json",
+    "rustls-tls",
+] }
+base58 = "0.2.0"
+crossbeam-channel = "0.5.6"
+hyper = { version = "=0.14.27", features = ["http1", "client"] }
+hex = "0.4.3"
+lazy_static = "1.4.0"
+regex = "1.9.3"
+miniscript = "11.0.0"
+prometheus = { version = "0.13.3", default-features = false }
+
+hiro-system-kit = { path = "../hiro-system-kit", optional = true }
+chainhook-types = { path = "../chainhook-types-rs" }
+stacks-codec = { path = "../stacks-codec" }
+
+[dev-dependencies]
+assert-json-diff = "2.0.2"
+test-case = "3.1.0"
+
+[features]
+default = ["hiro-system-kit/log", "stacks-signers"]
+stacks-signers = []
+debug = ["hiro-system-kit/debug"]
+release = ["hiro-system-kit/release_debug", "hiro-system-kit/full_log_level_prefix"]
