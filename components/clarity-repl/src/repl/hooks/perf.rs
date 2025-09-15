@@ -24,7 +24,10 @@ impl From<&str> for CostField {
             "read_count" | "readcount" => CostField::ReadCount,
             "write_length" | "writelength" => CostField::WriteLength,
             "write_count" | "writecount" => CostField::WriteCount,
-            _ => CostField::Runtime,
+            _ => {
+                eprintln!("Using 'runtime' cost field. {} is not one of runtime, read_length, read_count, write_length, write_count", s);
+                CostField::Runtime
+            }
         }
     }
 }
