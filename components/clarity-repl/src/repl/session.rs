@@ -51,6 +51,7 @@ pub struct Session {
     pub interpreter: ClarityInterpreter,
     pub show_costs: bool,
     pub executed: Vec<String>,
+    pub last_contract_call_trace: Option<String>,
 
     coverage_hook: Option<CoverageHook>,
     logger_hook: Option<LoggerHook>,
@@ -78,6 +79,7 @@ impl Session {
             show_costs: false,
             settings,
             executed: Vec::new(),
+            last_contract_call_trace: None,
 
             coverage_hook: None,
             logger_hook: None,
@@ -641,7 +643,7 @@ impl Session {
         }
 
         let current_epoch = self.interpreter.datastore.get_current_epoch();
-        let execution = match self.interpreter.call_contract_fn(
+        let contract_call_result = self.interpreter.call_contract_fn(
             &QualifiedContractIdentifier::parse(&contract_id_str).unwrap(),
             method,
             args,
@@ -650,36 +652,33 @@ impl Session {
             track_costs,
             allow_private,
             hooks,
-        ) {
-            Ok(result) => result,
-            Err(e) => {
-                ueprint!("{}", tracer_hook.output.join("\n"));
-                if let Some(traced_error) = tracer_hook.error {
-                    ueprint!("{}", traced_error);
-                }
-                self.set_tx_sender(&initial_tx_sender);
-                let user_friendly_message = match e {
-                    ContractCallError::NoSuchContract(_) => {
-                        format!("Contract '{contract_id_str}' does not exist")
-                    }
-                    ContractCallError::NoSuchFunction(_) => {
-                        format!("Method '{method}' does not exist on contract '{contract_id_str}'")
-                    }
-                    ContractCallError::Uncategorized(message) => {
-                        format!("Error calling contract function '{method}': {message}")
-                    }
-                };
-                return Err(vec![Diagnostic {
-                    level: Level::Error,
-                    message: user_friendly_message,
-                    spans: vec![],
-                    suggestion: None,
-                }]);
-            }
-        };
+        );
         self.set_tx_sender(&initial_tx_sender);
+        self.last_contract_call_trace = Some(tracer_hook.output.join("\n"));
 
-        Ok(execution)
+        contract_call_result.map_err(|e| {
+            ueprint!("{}", tracer_hook.output.join("\n"));
+            if let Some(traced_error) = tracer_hook.error {
+                ueprint!("{}", traced_error);
+            }
+            let user_friendly_message = match e {
+                ContractCallError::NoSuchContract(_) => {
+                    format!("Contract '{contract_id_str}' does not exist")
+                }
+                ContractCallError::NoSuchFunction(_) => {
+                    format!("Method '{method}' does not exist on contract '{contract_id_str}'")
+                }
+                ContractCallError::Uncategorized(message) => {
+                    format!("Error calling contract function '{method}': {message}")
+                }
+            };
+            vec![Diagnostic {
+                level: Level::Error,
+                message: user_friendly_message,
+                spans: vec![],
+                suggestion: None,
+            }]
+        })
     }
 
     /// Run a snippet as a contract deployment

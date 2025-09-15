@@ -1087,6 +1087,13 @@ impl SDK {
         session.handle_command(&snippet)
     }
 
+    #[wasm_bindgen(js_name=getLastContractCallTrace)]
+    /// Returns the last contract call trace as a string, if available.
+    pub fn get_last_contract_call_trace(&self) -> Option<String> {
+        let session = self.get_session();
+        session.last_contract_call_trace.clone()
+    }
+
     #[wasm_bindgen(js_name=setLocalAccounts)]
     pub fn set_local_accounts(&mut self, addresses: Vec<String>) {
         let principals = addresses
