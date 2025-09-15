@@ -176,14 +176,7 @@ impl Session {
     }
 
     #[cfg(not(target_arch = "wasm32"))]
-    pub fn process_console_input(
-        &mut self,
-        command: &str,
-    ) -> (
-        bool,
-        Vec<String>,
-        Option<Result<ExecutionResult, Vec<Diagnostic>>>,
-    ) {
+    pub fn process_console_input(&mut self, command: &str) -> (bool, Vec<String>) {
         let mut output = Vec::<String>::new();
 
         let mut reload = false;
@@ -206,12 +199,12 @@ impl Session {
             }
 
             snippet => {
-                let execution_result = self.run_snippet(&mut output, self.show_costs, snippet);
-                return (false, output, Some(execution_result));
+                let _ = self.run_snippet(&mut output, self.show_costs, snippet);
+                return (false, output);
             }
         }
 
-        (reload, output, None)
+        (reload, output)
     }
 
     pub fn handle_command(&mut self, command: &str) -> String {
