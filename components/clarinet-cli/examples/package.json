@@ -6,7 +6,6 @@
   "license": "GPL-3.0",
   "workspaces": [
     "./billboard",
-    "./cbtc",
     "./counter",
     "./simple-nft",
     "./swappool"
