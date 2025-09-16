@@ -127,16 +127,6 @@ impl ClarityInterpreter {
     pub fn run(
         &mut self,
         contract: &ClarityContract,
-        ast: Option<&ContractAST>,
-        cost_track: bool,
-        eval_hooks: Option<Vec<&mut dyn EvalHook>>,
-    ) -> Result<ExecutionResult, Vec<Diagnostic>> {
-        self.run_interpreter(contract, ast, cost_track, eval_hooks)
-    }
-
-    fn run_interpreter(
-        &mut self,
-        contract: &ClarityContract,
         cached_ast: Option<&ContractAST>,
         cost_track: bool,
         eval_hooks: Option<Vec<&mut dyn EvalHook>>,

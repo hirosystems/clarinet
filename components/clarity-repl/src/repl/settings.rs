@@ -56,6 +56,17 @@ pub struct SessionSettings {
     pub override_boot_contracts_source: BTreeMap<String, String>,
 }
 
+impl SessionSettings {
+    pub fn get_default_sender(&self) -> StandardPrincipalData {
+        let address = match self.initial_deployer {
+            Some(ref entry) => entry.address.clone(),
+            None => format!("{}", StacksAddress::burn_address(false)),
+        };
+        PrincipalData::parse_standard_principal(&address)
+            .expect("Unable to parse deployer's address")
+    }
+}
+
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
 pub struct ApiUrl(pub String);
 impl Default for ApiUrl {

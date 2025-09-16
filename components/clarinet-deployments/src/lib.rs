@@ -27,7 +27,8 @@ use clarity_repl::repl::boot::{
 };
 use clarity_repl::repl::session::ExecutionResultMap;
 use clarity_repl::repl::{
-    ClarityCodeSource, ClarityContract, ContractDeployer, Session, SessionSettings, DEFAULT_EPOCH,
+    ClarityCodeSource, ClarityContract, ClarityInterpreter, ContractDeployer, Session,
+    SessionSettings, DEFAULT_EPOCH,
 };
 use types::{
     ContractPublishSpecification, DeploymentGenerationArtifacts, EmulatedContractCallSpecification,
@@ -383,7 +384,6 @@ pub async fn generate_default_deployment(
         override_boot_contracts_source,
         ..Default::default()
     };
-    let session = Session::new(settings.clone());
 
     let simnet_remote_data =
         matches!(network, StacksNetwork::Simnet) && manifest.repl_settings.remote_data.enabled;
@@ -406,13 +406,19 @@ pub async fn generate_default_deployment(
         requirements_data.append(&mut boot_contracts_asts);
     }
 
+    // this ephemeral interpreter is used to parse code and build ASTs
+    let interpreter = ClarityInterpreter::new(
+        settings.get_default_sender(),
+        settings.repl_settings.clone(),
+        settings.cache_location.clone(),
+    );
+
     // Initialize diagnostics collection and success tracking early
     let mut contract_diags: HashMap<QualifiedContractIdentifier, Vec<Diagnostic>> = HashMap::new();
     let mut asts_success = true;
 
     // Validate custom boot contracts from override_boot_contracts_source
     if !settings.override_boot_contracts_source.is_empty() && !simnet_remote_data {
-        let mut session = Session::new(settings.clone());
         for (contract_name, file_path) in &settings.override_boot_contracts_source {
             // Only validate existing boot contracts that are being overridden
             if !clarity_repl::repl::boot::BOOT_CONTRACTS_NAMES.contains(&contract_name.as_str()) {
@@ -445,8 +451,6 @@ pub async fn generate_default_deployment(
             let (epoch, clarity_version) =
                 get_boot_contract_epoch_and_clarity_version(contract_name.as_str());
 
-            // Set the session to the correct epoch for validation
-            session.update_epoch(epoch);
             let temp_contract = ClarityContract {
                 code_source: ClarityCodeSource::ContractInMemory(custom_source),
                 deployer: ContractDeployer::Address(default_deployer_address.to_address()),
@@ -455,7 +459,7 @@ pub async fn generate_default_deployment(
                 epoch: clarity_repl::repl::Epoch::Specific(epoch),
             };
 
-            let (_, diagnostics, ast_success) = session.interpreter.build_ast(&temp_contract);
+            let (_, diagnostics, ast_success) = interpreter.build_ast(&temp_contract);
 
             if !ast_success {
                 contract_diags.insert(
@@ -599,7 +603,7 @@ pub async fn generate_default_deployment(
                         clarity_version,
                         epoch: clarity_repl::repl::Epoch::Specific(epoch),
                     };
-                    let (ast, _, _) = session.interpreter.build_ast(&contract);
+                    let (ast, _, _) = interpreter.build_ast(&contract);
                     (clarity_version, ast)
                 }
             };

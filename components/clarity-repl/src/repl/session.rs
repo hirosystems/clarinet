@@ -4,7 +4,6 @@ use std::fmt::Write as _;
 use std::num::ParseIntError;
 
 use clarity::codec::StacksMessageCodec;
-use clarity::types::chainstate::StacksAddress;
 use clarity::types::StacksEpochId;
 use clarity::vm::ast::ContractAST;
 use clarity::vm::diagnostic::{Diagnostic, Level};
@@ -77,6 +76,11 @@ fn deploy_boot_contracts(
             for e in errs {
                 ueprint!("Error deploying boot contract {contract_id}: {}", e.message);
             }
+        } else {
+            println!(
+                "{}",
+                format!("Boot contract {contract_id} deployed").green()
+            );
         }
         boot_contracts.insert(contract_id, result);
     }
@@ -99,17 +103,8 @@ pub struct Session {
 
 impl Session {
     pub fn new(settings: SessionSettings) -> Self {
-        let tx_sender = {
-            let address = match settings.initial_deployer {
-                Some(ref entry) => entry.address.clone(),
-                None => format!("{}", StacksAddress::burn_address(false)),
-            };
-            PrincipalData::parse_standard_principal(&address)
-                .expect("Unable to parse deployer's address")
-        };
-
         let mut interpreter = ClarityInterpreter::new(
-            tx_sender,
+            settings.get_default_sender(),
             settings.repl_settings.clone(),
             settings.cache_location.clone(),
         );

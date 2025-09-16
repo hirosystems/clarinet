@@ -42,13 +42,6 @@ fn main() {
     match code {
         Some(code_str) => {
             let mut session = Session::new(settings);
-            match session.start() {
-                Ok(_) => {}
-                Err(e) => {
-                    println!("{e}");
-                    std::process::exit(1);
-                }
-            };
 
             let (_, output) = session.process_console_input(&code_str);
             for line in output {
