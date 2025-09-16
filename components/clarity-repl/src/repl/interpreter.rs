@@ -1171,7 +1171,7 @@ mod tests {
     fn test_run_valid_contract() {
         let mut interpreter = get_interpreter(None);
         let contract = ClarityContract::fixture();
-        let result = interpreter.run_interpreter(&contract, None, false, None);
+        let result = interpreter.run(&contract, None, false, None);
         assert!(result.is_ok());
         assert!(result.unwrap().diagnostics.is_empty());
     }
@@ -1185,7 +1185,7 @@ mod tests {
         let contract = ClarityContractBuilder::default()
             .code_source(snippet.into())
             .build();
-        let result = interpreter.run_interpreter(&contract, None, false, None);
+        let result = interpreter.run(&contract, None, false, None);
         assert!(result.is_err());
         let diagnostics = result.unwrap_err();
         assert_eq!(diagnostics.len(), 1);
@@ -1199,7 +1199,7 @@ mod tests {
         let contract = ClarityContractBuilder::default()
             .code_source(snippet.into())
             .build();
-        let result = interpreter.run_interpreter(&contract, None, false, None);
+        let result = interpreter.run(&contract, None, false, None);
         assert!(result.is_err());
 
         let diagnostics = result.unwrap_err();
