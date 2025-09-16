@@ -4,7 +4,7 @@ use std::vec;
 
 use clarinet_deployments::{
     generate_default_deployment, initiate_session_from_manifest,
-    update_session_with_deployment_plan, UpdateSessionExecutionResult,
+    update_session_with_deployment_plan,
 };
 use clarinet_files::{FileAccessor, FileLocation, ProjectManifest, StacksNetwork};
 use clarity_repl::analysis::ast_dependency_detector::DependencySet;
@@ -653,7 +653,7 @@ pub async fn build_state(
     .await?;
 
     let mut session = initiate_session_from_manifest(&manifest);
-    let UpdateSessionExecutionResult { contracts, .. } = update_session_with_deployment_plan(
+    let contracts = update_session_with_deployment_plan(
         &mut session,
         &deployment,
         Some(&artifacts.asts),

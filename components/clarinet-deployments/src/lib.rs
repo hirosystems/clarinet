@@ -25,6 +25,7 @@ use clarity_repl::repl::boot::{
     get_boot_contract_epoch_and_clarity_version, BOOT_CONTRACTS_DATA, SBTC_DEPOSIT_MAINNET_ADDRESS,
     SBTC_MAINNET_ADDRESS, SBTC_TESTNET_ADDRESS_PRINCIPAL, SBTC_TOKEN_MAINNET_ADDRESS,
 };
+use clarity_repl::repl::session::ExecutionResultMap;
 use clarity_repl::repl::{
     ClarityCodeSource, ClarityContract, ContractDeployer, Session, SessionSettings, DEFAULT_EPOCH,
 };
@@ -38,21 +39,13 @@ use self::types::{
     TransactionPlanSpecification, TransactionsBatchSpecification, WalletSpecification,
 };
 
-pub type ExecutionResultMap =
-    BTreeMap<QualifiedContractIdentifier, Result<ExecutionResult, Vec<Diagnostic>>>;
-
-pub struct UpdateSessionExecutionResult {
-    pub boot_contracts: ExecutionResultMap,
-    pub contracts: ExecutionResultMap,
-}
-
 pub fn setup_session_with_deployment(
     manifest: &ProjectManifest,
     deployment: &DeploymentSpecification,
     contracts_asts: Option<&BTreeMap<QualifiedContractIdentifier, ContractAST>>,
 ) -> DeploymentGenerationArtifacts {
     let mut session = initiate_session_from_manifest(manifest);
-    let UpdateSessionExecutionResult { contracts, .. } =
+    let contracts =
         update_session_with_deployment_plan(&mut session, deployment, contracts_asts, None);
 
     let deps = BTreeMap::new();
@@ -173,27 +166,10 @@ pub fn update_session_with_deployment_plan(
     deployment: &DeploymentSpecification,
     contracts_asts: Option<&BTreeMap<QualifiedContractIdentifier, ContractAST>>,
     forced_min_epoch: Option<StacksEpochId>,
-) -> UpdateSessionExecutionResult {
+) -> ExecutionResultMap {
     update_session_with_genesis_accounts(session, deployment);
 
     let mut should_mint_sbtc = false;
-
-    let mut boot_contracts = BTreeMap::new();
-    if !session.settings.repl_settings.remote_data.enabled {
-        // Load boot contracts (with custom overrides if specified)
-        let boot_contracts_data = if session.settings.override_boot_contracts_source.is_empty() {
-            BOOT_CONTRACTS_DATA.clone()
-        } else {
-            clarity_repl::repl::boot::get_boot_contracts_data_with_overrides(
-                &session.settings.override_boot_contracts_source,
-            )
-        };
-
-        for (contract_id, (contract, ast)) in boot_contracts_data {
-            let result = session.interpreter.run(&contract, Some(&ast), false, None);
-            boot_contracts.insert(contract_id, result);
-        }
-    }
 
     let mut contracts = BTreeMap::new();
     for batch in deployment.plan.batches.iter() {
@@ -238,10 +214,7 @@ pub fn update_session_with_deployment_plan(
         fund_genesis_account_with_sbtc(session, deployment);
     }
 
-    UpdateSessionExecutionResult {
-        boot_contracts,
-        contracts,
-    }
+    contracts
 }
 
 fn handle_stx_transfer(session: &mut Session, tx: &StxTransferSpecification) {

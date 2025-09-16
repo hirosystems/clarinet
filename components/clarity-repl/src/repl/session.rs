@@ -6,8 +6,6 @@ use std::num::ParseIntError;
 use clarity::codec::StacksMessageCodec;
 use clarity::types::chainstate::StacksAddress;
 use clarity::types::StacksEpochId;
-#[cfg(not(target_arch = "wasm32"))]
-use clarity::vm::analysis::ContractAnalysis;
 use clarity::vm::ast::ContractAST;
 use clarity::vm::diagnostic::{Diagnostic, Level};
 use clarity::vm::types::{PrincipalData, QualifiedContractIdentifier, Value};
@@ -18,9 +16,6 @@ use clarity::vm::{
 use colored::Colorize;
 use comfy_table::Table;
 
-use super::boot::{
-    BOOT_CODE_MAINNET, BOOT_CODE_TESTNET, BOOT_MAINNET_PRINCIPAL, BOOT_TESTNET_PRINCIPAL,
-};
 use super::diagnostic::output_diagnostic;
 use super::hooks::logger::LoggerHook;
 use super::hooks::perf::{CostField, PerfHook};
@@ -30,10 +25,14 @@ use super::{
     SessionSettings,
 };
 use crate::analysis::coverage::CoverageHook;
-use crate::repl::boot::get_boot_contract_epoch_and_clarity_version;
+use crate::repl::boot;
 use crate::repl::clarity_values::value_to_string;
 use crate::repl::hooks::tracer::TracerHook;
+use crate::repl::settings::Account;
 use crate::utils::serialize_event;
+
+pub type ExecutionResultMap =
+    BTreeMap<QualifiedContractIdentifier, Result<ExecutionResult, Vec<Diagnostic>>>;
 
 #[derive(Clone, Debug, Serialize)]
 pub struct CostsReport {
@@ -44,13 +43,53 @@ pub struct CostsReport {
     pub cost_result: CostSynthesis,
 }
 
+fn set_up_accounts(accounts: &[Account], interpreter: &mut ClarityInterpreter) {
+    for account in accounts {
+        let Ok(recipient) = PrincipalData::parse(&account.address) else {
+            println!("{}", "Unable to parse address to credit".red());
+            continue;
+        };
+        let _ = interpreter
+            .mint_stx_balance(recipient, account.balance)
+            .inspect_err(|e| println!("{}", e.red()));
+    }
+}
+
+fn deploy_boot_contracts(
+    settings: &SessionSettings,
+    interpreter: &mut ClarityInterpreter,
+) -> ExecutionResultMap {
+    if settings.repl_settings.remote_data.enabled {
+        return BTreeMap::new();
+    }
+    let mut boot_contracts = BTreeMap::new();
+
+    // Load boot contracts (with custom overrides if specified)
+    let boot_contracts_data = if settings.override_boot_contracts_source.is_empty() {
+        boot::BOOT_CONTRACTS_DATA.clone()
+    } else {
+        boot::get_boot_contracts_data_with_overrides(&settings.override_boot_contracts_source)
+    };
+
+    for (contract_id, (contract, ast)) in boot_contracts_data {
+        let result = interpreter.run(&contract, Some(&ast), false, None);
+        if let Err(errs) = &result {
+            for e in errs {
+                ueprint!("Error deploying boot contract {contract_id}: {}", e.message);
+            }
+        }
+        boot_contracts.insert(contract_id, result);
+    }
+    boot_contracts
+}
+
 #[derive(Clone)]
 pub struct Session {
     pub settings: SessionSettings,
+    pub boot_contracts: ExecutionResultMap,
     pub contracts: BTreeMap<QualifiedContractIdentifier, ParsedContract>,
     pub interpreter: ClarityInterpreter,
     pub show_costs: bool,
-    pub executed: Vec<String>,
     pub last_contract_call_trace: Option<String>,
 
     coverage_hook: Option<CoverageHook>,
@@ -69,16 +108,21 @@ impl Session {
                 .expect("Unable to parse deployer's address")
         };
 
+        let mut interpreter = ClarityInterpreter::new(
+            tx_sender,
+            settings.repl_settings.clone(),
+            settings.cache_location.clone(),
+        );
+
+        set_up_accounts(&settings.initial_accounts, &mut interpreter);
+        let boot_contracts = deploy_boot_contracts(&settings, &mut interpreter);
+
         Self {
-            interpreter: ClarityInterpreter::new(
-                tx_sender,
-                settings.repl_settings.clone(),
-                settings.cache_location.clone(),
-            ),
+            interpreter,
+            boot_contracts,
             contracts: BTreeMap::new(),
             show_costs: false,
             settings,
-            executed: Vec::new(),
             last_contract_call_trace: None,
 
             coverage_hook: None,
@@ -115,63 +159,6 @@ impl Session {
             coverage_hook.collect_lcov_content(asts, contract_paths)
         } else {
             "".to_string()
-        }
-    }
-
-    pub fn load_boot_contracts(&mut self) {
-        let default_tx_sender = self.interpreter.get_tx_sender();
-
-        let boot_testnet_deployer = BOOT_TESTNET_PRINCIPAL.clone();
-        self.interpreter.set_tx_sender(boot_testnet_deployer);
-        self.deploy_boot_contracts(false);
-
-        let boot_mainnet_deployer = BOOT_MAINNET_PRINCIPAL.clone();
-        self.interpreter.set_tx_sender(boot_mainnet_deployer);
-        self.deploy_boot_contracts(true);
-
-        self.interpreter.set_tx_sender(default_tx_sender);
-    }
-
-    fn deploy_boot_contracts(&mut self, mainnet: bool) {
-        let boot_code = if mainnet {
-            *BOOT_CODE_MAINNET
-        } else {
-            *BOOT_CODE_TESTNET
-        };
-
-        let tx_sender = self.interpreter.get_tx_sender();
-        let deployer = ContractDeployer::Address(tx_sender.to_address());
-
-        // Deploy standard boot contracts (with possible overrides)
-        // Always deploy all boot contracts
-        for (name, code) in boot_code.iter() {
-            // Check if there's a custom override for this boot contract
-            let contract_source = if let Some(custom_path) =
-                self.settings.override_boot_contracts_source.get(*name)
-            {
-                match crate::repl::boot::load_custom_boot_contract(custom_path) {
-                    Ok(source) => source,
-                    Err(e) => {
-                        eprintln!("Warning: Failed to load custom boot contract {name}: {e}");
-                        code.to_string()
-                    }
-                }
-            } else {
-                code.to_string()
-            };
-
-            let (epoch, clarity_version) = get_boot_contract_epoch_and_clarity_version(name);
-
-            let contract = ClarityContract {
-                code_source: ClarityCodeSource::ContractInMemory(contract_source),
-                name: name.to_string(),
-                deployer: deployer.clone(),
-                clarity_version,
-                epoch: Epoch::Specific(epoch),
-            };
-
-            // Result ignored, boot contracts are trusted to be valid
-            let _ = self.deploy_contract(&contract, false, None);
         }
     }
 
@@ -491,32 +478,6 @@ impl Session {
                 }
             }
         };
-    }
-
-    #[cfg(not(target_arch = "wasm32"))]
-    pub fn start(&mut self) -> Result<(String, Vec<(ContractAnalysis, String, String)>), String> {
-        let mut output_err = Vec::<String>::new();
-        let output = Vec::<String>::new();
-        let contracts = vec![]; // This is never modified, remove?
-
-        self.load_boot_contracts();
-
-        for account in &self.settings.initial_accounts {
-            let Ok(recipient) = PrincipalData::parse(&account.address) else {
-                output_err.push("Unable to parse address to credit".red().to_string());
-                continue;
-            };
-
-            _ = self
-                .interpreter
-                .mint_stx_balance(recipient, account.balance)
-                .inspect_err(|e| output_err.push(e.red().to_string()));
-        }
-
-        match output_err.len() {
-            0 => Ok((output.join("\n"), contracts)),
-            _ => Err(output_err.join("\n")),
-        }
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -1150,19 +1111,17 @@ impl Session {
     pub fn get_contracts(&self) -> Option<String> {
         use super::boot::{BOOT_MAINNET_ADDRESS, BOOT_TESTNET_ADDRESS, SBTC_MAINNET_ADDRESS};
 
-        if self.contracts.is_empty() {
-            return None;
-        }
-
-        let mut table = Table::new();
-        table.add_row(["Contract identifier", "Public functions"]);
-        let contracts = self.contracts.clone();
-        for (contract_id, contract) in contracts.iter() {
-            let contract_id_str = contract_id.to_string();
-            if !contract_id_str.starts_with(BOOT_TESTNET_ADDRESS)
-                && !contract_id_str.starts_with(BOOT_MAINNET_ADDRESS)
-                && !contract_id_str.starts_with(SBTC_MAINNET_ADDRESS)
-            {
+        let contracts: Vec<_> = self
+            .contracts
+            .iter()
+            .filter(|(contract_id, _)| {
+                let contract_id_str = contract_id.to_string();
+                !contract_id_str.starts_with(BOOT_TESTNET_ADDRESS)
+                    && !contract_id_str.starts_with(BOOT_MAINNET_ADDRESS)
+                    && !contract_id_str.starts_with(SBTC_MAINNET_ADDRESS)
+            })
+            .map(|(contract_id, contract)| {
+                let contract_id_str = contract_id.to_string();
                 let mut formatted_methods = vec![];
                 for (method_name, method_args) in contract.function_args.iter() {
                     let formatted_args = if method_args.is_empty() {
@@ -1175,9 +1134,18 @@ impl Session {
                     formatted_methods.push(format!("({method_name}{formatted_args})"));
                 }
                 let formatted_spec = formatted_methods.join("\n").to_string();
-                table.add_row(vec![&contract_id_str, &formatted_spec]);
-            }
+
+                [contract_id_str, formatted_spec]
+            })
+            .collect();
+
+        if contracts.is_empty() {
+            return None;
         }
+
+        let mut table = Table::new();
+        table.add_row(["Contract identifier", "Public functions"]);
+        table.add_rows(contracts);
         Some(table.to_string())
     }
 
@@ -1352,7 +1320,7 @@ mod tests {
     #[test]
     fn initial_accounts() {
         let address = "ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5";
-        let mut session = Session::new(SessionSettings {
+        let session = Session::new(SessionSettings {
             initial_accounts: vec![Account {
                 address: address.to_owned(),
                 balance: 1000000,
@@ -1360,7 +1328,7 @@ mod tests {
             }],
             ..Default::default()
         });
-        let _ = session.start();
+
         let balance = session.interpreter.get_balance_for_account(address, "STX");
         assert_eq!(balance, 1000000);
     }
@@ -1620,7 +1588,6 @@ mod tests {
         let settings = SessionSettings::default();
 
         let mut session = Session::new(settings);
-        session.start().expect("session could not start");
 
         session.handle_command("::set_epoch 2.5");
 
@@ -1705,7 +1672,6 @@ mod tests {
     fn can_deploy_a_contract() {
         let settings = SessionSettings::default();
         let mut session = Session::new(settings);
-        session.start().expect("session could not start");
         session.update_epoch(DEFAULT_EPOCH);
 
         // deploy default contract
@@ -1719,7 +1685,6 @@ mod tests {
         let settings = SessionSettings::default();
         let mut session = Session::new(settings);
         session.update_epoch(StacksEpochId::Epoch25);
-        session.load_boot_contracts();
 
         // call pox4 get-info
         let result = session.call_contract_fn(
@@ -1751,7 +1716,7 @@ mod tests {
     fn can_call_public_contract_fn() {
         let settings = SessionSettings::default();
         let mut session = Session::new(settings);
-        session.start().expect("session could not start");
+
         session.update_epoch(DEFAULT_EPOCH);
 
         // deploy default contract
@@ -1783,7 +1748,7 @@ mod tests {
     fn current_block_info_is_none() {
         let settings = SessionSettings::default();
         let mut session = Session::new(settings);
-        session.start().expect("session could not start");
+
         session.update_epoch(StacksEpochId::Epoch25);
 
         session.advance_chain_tip(5);
@@ -1795,7 +1760,6 @@ mod tests {
     fn block_time_is_realistic_in_epoch_2_5() {
         let settings = SessionSettings::default();
         let mut session = Session::new(settings);
-        session.start().expect("session could not start");
         session.update_epoch(StacksEpochId::Epoch25);
 
         session.advance_chain_tip(4);
@@ -1817,7 +1781,6 @@ mod tests {
     fn burn_block_height_behavior_epoch2_5() {
         let settings = SessionSettings::default();
         let mut session = Session::new(settings);
-        session.start().expect("session could not start");
         session.update_epoch(StacksEpochId::Epoch25);
 
         let snippet = [
@@ -1851,7 +1814,6 @@ mod tests {
     fn get_burn_block_info_past() {
         let settings = SessionSettings::default();
         let mut session = Session::new(settings);
-        session.start().expect("session could not start");
         session.update_epoch(StacksEpochId::Epoch30);
 
         session.advance_burn_chain_tip(10);
@@ -1878,7 +1840,6 @@ mod tests {
         // https://github.com/stacks-network/stacks-core/pull/5524
         let settings = SessionSettings::default();
         let mut session = Session::new(settings);
-        session.start().expect("session could not start");
         session.update_epoch(StacksEpochId::Epoch30);
 
         let snippet = [
@@ -1912,7 +1873,6 @@ mod tests {
     fn burn_block_height_behavior_epoch3_0_contract_in_2_5() {
         let settings = SessionSettings::default();
         let mut session = Session::new(settings);
-        session.start().expect("session could not start");
         session.update_epoch(StacksEpochId::Epoch25);
 
         let snippet = [
@@ -1959,8 +1919,6 @@ mod tests {
         let settings = SessionSettings::default();
         let mut session = Session::new(settings);
         let sender = "ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5";
-        session.start().expect("session could not start");
-
         let result = session.process_console_input(&format!("::set_tx_sender    {sender}"));
         assert!(result.1[0].contains(sender));
 
@@ -1972,7 +1930,6 @@ mod tests {
     fn test_call_contract_fn_undefined_function() {
         let settings = SessionSettings::default();
         let mut session = Session::new(settings);
-        session.start().expect("session could not start");
         session.update_epoch(DEFAULT_EPOCH);
 
         // deploy a simple contract

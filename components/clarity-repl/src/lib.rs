@@ -24,6 +24,3 @@ pub mod test_fixtures;
 
 #[cfg(not(target_arch = "wasm32"))]
 pub mod frontend;
-
-#[cfg(not(target_arch = "wasm32"))]
-pub use frontend::Terminal;

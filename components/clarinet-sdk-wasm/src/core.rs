@@ -494,10 +494,12 @@ impl SDK {
         }
 
         let mut contracts_interfaces = HashMap::new();
-        for (contract_id, result) in executed_contracts
+
+        for (contract_id, result) in session
             .boot_contracts
+            .clone()
             .into_iter()
-            .chain(executed_contracts.contracts.into_iter())
+            .chain(executed_contracts.into_iter())
         {
             match result {
                 Ok(execution_result) => {
