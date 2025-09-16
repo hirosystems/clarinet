@@ -1711,7 +1711,6 @@ mod tests {
     fn can_call_public_contract_fn() {
         let settings = SessionSettings::default();
         let mut session = Session::new(settings);
-
         session.update_epoch(DEFAULT_EPOCH);
 
         // deploy default contract
@@ -1743,9 +1742,7 @@ mod tests {
     fn current_block_info_is_none() {
         let settings = SessionSettings::default();
         let mut session = Session::new(settings);
-
         session.update_epoch(StacksEpochId::Epoch25);
-
         session.advance_chain_tip(5);
         let result = run_session_snippet(&mut session, "(get-block-info? time block-height)");
         assert_eq!(result, Value::none());
