@@ -76,11 +76,6 @@ fn deploy_boot_contracts(
             for e in errs {
                 ueprint!("Error deploying boot contract {contract_id}: {}", e.message);
             }
-        } else {
-            println!(
-                "{}",
-                format!("Boot contract {contract_id} deployed").green()
-            );
         }
         boot_contracts.insert(contract_id, result);
     }
