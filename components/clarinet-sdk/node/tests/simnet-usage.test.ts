@@ -289,6 +289,33 @@ describe("simnet can call contracts function", () => {
     expect(result).toStrictEqual(Cl.ok(Cl.uint(4)));
   });
 
+  it("can call boot contracts with testnet address", () => {
+    simnet.setEpoch("3.2");
+    simnet.mineEmptyBurnBlocks(2016); // one full pox cycle
+
+    const { result } = simnet.callReadOnlyFn(
+      "ST000000000000000000002AMW42H.pox-4",
+      "current-pox-reward-cycle",
+      [],
+      address1,
+    );
+    expect(result).toStrictEqual(Cl.uint(1));
+  });
+
+  it("can call boot contracts with mainnet address", () => {
+    simnet.setEpoch("3.2");
+    console.log("epoch :", simnet.currentEpoch);
+    simnet.mineEmptyBurnBlocks(2016); // one full pox cycle
+
+    const { result } = simnet.callReadOnlyFn(
+      "SP000000000000000000002Q6VF78.pox-4",
+      "current-pox-reward-cycle",
+      [],
+      address1,
+    );
+    expect(result).toStrictEqual(Cl.uint(1));
+  });
+
   it("can report stacks trace", () => {
     const consoleSpy = vi.spyOn(console, "error");
 
