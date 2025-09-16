@@ -1323,7 +1323,6 @@ mod tests {
             }],
             ..Default::default()
         });
-
         let balance = session.interpreter.get_balance_for_account(address, "STX");
         assert_eq!(balance, 1000000);
     }
