@@ -1066,7 +1066,7 @@ pub fn main() {
                             std::process::exit(1);
                         }
 
-                        Terminal::load(artifacts.session, None)
+                        Terminal::load(artifacts.session)
                     }
                     None => {
                         let remote_data_settings = RemoteDataSettings {
@@ -1077,7 +1077,7 @@ pub fn main() {
                         };
                         let mut settings = repl::SessionSettings::default();
                         settings.repl_settings.remote_data = remote_data_settings.clone();
-                        Terminal::new(settings, None)
+                        Terminal::new(settings)
                     }
                 };
                 let reload = terminal.start();

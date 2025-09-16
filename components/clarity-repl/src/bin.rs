@@ -50,13 +50,13 @@ fn main() {
                 }
             };
 
-            let (_, output, _) = session.process_console_input(&code_str);
+            let (_, output) = session.process_console_input(&code_str);
             for line in output {
                 println!("{line}");
             }
         }
         None => loop {
-            let mut terminal = Terminal::new(settings.clone(), None);
+            let mut terminal = Terminal::new(settings.clone());
             if !terminal.start() {
                 break;
             }
