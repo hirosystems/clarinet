@@ -425,22 +425,34 @@ pub async fn generate_default_deployment(
                 continue;
             }
 
+            // Resolve the relative path to the project root
+            let project_root = manifest
+                .location
+                .get_parent_location()
+                .map_err(|e| format!("Failed to get project root: {e}"))?;
+            let mut resolved_path = project_root.clone();
+            resolved_path
+                .append_path(file_path)
+                .map_err(|e| format!("Failed to resolve boot contract path {file_path}: {e}"))?;
+            let resolved_path_string = resolved_path.to_string();
+
             // Load and validate the custom boot contract
             let custom_source = match file_accessor {
                 None => {
                     // Fallback to file system when no file_accessor is provided
-                    std::fs::read_to_string(file_path)
-                        .map_err(|e| format!("Failed to read boot contract file {file_path}: {e}"))
+                    std::fs::read_to_string(&resolved_path_string).map_err(|e| {
+                        format!("Failed to read boot contract file {resolved_path_string}: {e}")
+                    })
                 }
                 Some(file_accessor) => {
                     let sources = file_accessor
-                        .read_files(vec![file_path.to_string()])
+                        .read_files(vec![resolved_path_string.clone()])
                         .await
                         .map_err(|e| {
-                            format!("Failed to read boot contract file {file_path}: {e}")
+                            format!("Failed to read boot contract file {resolved_path_string}: {e}")
                         })?;
                     sources
-                        .get(file_path)
+                        .get(&resolved_path_string)
                         .ok_or_else(|| {
                             format!("Unable to read custom boot contract: {contract_name}")
                         })

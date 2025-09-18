@@ -164,26 +164,34 @@ pub async fn process_notification(
                         {
                             contract_metadata.clarity_version
                         } else {
-                            // Check if custom boot contract
-                            let contract_name = contract_location
-                                .to_path_buf()
-                                .file_stem()
-                                .and_then(|s| s.to_str())
-                                .unwrap_or_default()
-                                .to_string();
+                            // boot contracts path checking
+                            let contract_location_string = contract_location.to_string();
+                            let mut found_boot_contract = None;
 
-                            if manifest
-                                .project
-                                .override_boot_contracts_source
-                                .contains_key(&contract_name)
+                            for (contract_name, contract_path) in
+                                &manifest.project.override_boot_contracts_source
                             {
+                                let project_root = manifest
+                                    .location
+                                    .get_parent_location()
+                                    .map_err(|e| format!("Failed to get project root: {e}"))?;
+                                let mut resolved_path = project_root.clone();
+                                if resolved_path.append_path(contract_path).is_ok()
+                                    && resolved_path.to_string() == contract_location_string
+                                {
+                                    found_boot_contract = Some(contract_name);
+                                    break;
+                                }
+                            }
+
+                            if let Some(contract_name) = found_boot_contract {
                                 let (_, version) =
-                                    get_boot_contract_epoch_and_clarity_version(&contract_name);
+                                    get_boot_contract_epoch_and_clarity_version(contract_name);
                                 version
                             } else {
                                 return Err(format!(
                                     "No Clarinet.toml is associated to the contract {}",
-                                    contract_name
+                                    contract_location_string
                                 ));
                             }
                         }

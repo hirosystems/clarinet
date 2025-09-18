@@ -5,7 +5,7 @@ use std::str::FromStr;
 use clarity::types::StacksEpochId;
 use clarity::vm::ClarityVersion;
 use clarity_repl::repl;
-use clarity_repl::repl::boot::{get_boot_contract_epoch_and_clarity_version, BOOT_CONTRACTS_NAMES};
+use clarity_repl::repl::boot::BOOT_CONTRACTS_NAMES;
 use clarity_repl::repl::{ClarityCodeSource, ClarityContract, ContractDeployer};
 use serde::ser::SerializeMap;
 use serde::{Deserializer, Serialize, Serializer};
@@ -413,28 +413,6 @@ impl ProjectManifest {
                 }
             }
         };
-
-        // Register custom boot contracts so LSP can find them
-        for (contract_name, contract_path) in config.project.override_boot_contracts_source.iter() {
-            let (epoch, clarity_version) =
-                get_boot_contract_epoch_and_clarity_version(contract_name.as_str());
-            ProjectManifest::register_contract(
-                contract_name,
-                contract_path,
-                ContractDeployer::DefaultDeployer,
-                Some(epoch.to_string().as_str()),
-                Some(
-                    clarity_version
-                        .to_string()
-                        .as_str()
-                        .strip_prefix("Clarity ")
-                        .unwrap(),
-                ),
-                &project_root_location,
-                &mut config_contracts,
-                &mut contracts_settings,
-            )?;
-        }
 
         config.contracts = config_contracts;
         config.contracts_settings = contracts_settings;

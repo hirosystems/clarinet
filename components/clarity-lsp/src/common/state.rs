@@ -666,6 +666,25 @@ pub async fn build_state(
         locations.insert(contract_id.clone(), contract_location.clone());
         if let Some(contract_metadata) = manifest.contracts_settings.get(contract_location) {
             clarity_versions.insert(contract_id.clone(), contract_metadata.clarity_version);
+        } else {
+            let contract_name = contract_location
+                .to_path_buf()
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or_default()
+                .to_string();
+
+            if manifest
+                .project
+                .override_boot_contracts_source
+                .contains_key(&contract_name)
+            {
+                let (_, version) =
+                    clarity_repl::repl::boot::get_boot_contract_epoch_and_clarity_version(
+                        &contract_name,
+                    );
+                clarity_versions.insert(contract_id.clone(), version);
+            }
         }
 
         match result {
