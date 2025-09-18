@@ -330,7 +330,7 @@ impl ClarityDatastore {
 
     fn fetch_block(&mut self, url: &str) -> Block {
         let block = self.client.fetch_block(url);
-        println!("> block  {:?}", block);
+        println!("> block  {:#?}", block);
         self.remote_block_info_cache
             .borrow_mut()
             .insert(block.index_block_hash, block.clone());
@@ -1169,9 +1169,15 @@ impl HeadersDB for Datastore {
             return Some(height);
         }
 
-        // if epoch < 3.0
-        return Some(tenure_height);
+        // if epoch < 3.0 (&& not testnet ??)
+        // return Some(tenure_height);
+        let v = self
+            .stacks_height_at_tenure_height
+            .get(&tenure_height)
+            .copied();
+        println!("> v: {:#?}", v);
 
+        // self.consensus_hash_lookup
         // println!("> self.epoch: {}", self.get_stacks_epoch())
         // let _found_block = self.remote_block_info_cache.borrow().get(id_bhh).cloned();
         // println!("> found_block: {:#?}", self.remote_block_info_cache);

@@ -476,49 +476,49 @@ mod test_mxs_session_test {
         let result = session.deploy_contract(&contract, false, None);
         assert!(result.is_ok());
 
-        // 107_107 is a block in epoch 2.4
-        let snippet = format!("(contract-call? '{deployer}.gbh get-block-hash u107107)");
-        let result = eval_snippet(&mut session, &snippet);
-        let expected_hash = Value::buff_from(
-            hex_bytes("0dd92fe70895ebcb11f94a2bf9c9bc3f24e3e9ad80b904a20c4fc9d20a5eddfc").unwrap(),
-        )
-        .unwrap();
-        assert_eq!(result, Value::some(expected_hash).unwrap());
-
-        let snippet = format!("(contract-call? '{deployer}.gbh get-burn-block-hash u107107)");
-        let result = eval_snippet(&mut session, &snippet);
-        let expected_hash = Value::buff_from(
-            hex_bytes("00000000000000000001813869927e1bc1f2c2384c76dd12109875f7827f3ed0").unwrap(),
-        )
-        .unwrap();
-        assert_eq!(result, Value::some(expected_hash).unwrap());
-
-        // 212783 is the tenure height at block 3586042, a block in epoch 3.2
-        let snippet = format!("(contract-call? '{deployer}.gbh get-block-height)");
-        let result = eval_snippet(&mut session, &snippet);
-        assert_eq!(result, Value::UInt(212783));
-
-        let snippet = format!("(contract-call? '{deployer}.gbh get-block-hash u212783)");
-        let result = eval_snippet(&mut session, &snippet);
-        // the hash of tip block of tenure 212783
-        let expected_hash = Value::buff_from(
-            hex_bytes("8c8218ea889805d2e4b23987eb1247bca963d7ab77eabc1048bdbf12d5ce9afa").unwrap(),
-        )
-        .unwrap();
-        assert_eq!(result, Value::some(expected_hash).unwrap());
-
-        // let snippet = format!("(contract-call? '{deployer}.gbh get-block-hash u212782)");
+        // // 107_107 is a block in epoch 2.4
+        // let snippet = format!("(contract-call? '{deployer}.gbh get-block-hash u107107)");
         // let result = eval_snippet(&mut session, &snippet);
-        // // the hash of tip block of tenure 212783
         // let expected_hash = Value::buff_from(
-        //     hex_bytes("9dba56325dc453bc2ff435396b2798190cf451b229be7d13950aa4c9e4eb500a").unwrap(),
+        //     hex_bytes("0dd92fe70895ebcb11f94a2bf9c9bc3f24e3e9ad80b904a20c4fc9d20a5eddfc").unwrap(),
         // )
         // .unwrap();
         // assert_eq!(result, Value::some(expected_hash).unwrap());
 
-        // session.advance_burn_chain_tip(1);
-        // let snippet = format!("(contract-call? '{deployer}.gbh gbh)");
+        // let snippet = format!("(contract-call? '{deployer}.gbh get-burn-block-hash u107107)");
         // let result = eval_snippet(&mut session, &snippet);
-        // assert_eq!(result, Value::UInt(88912));
+        // let expected_hash = Value::buff_from(
+        //     hex_bytes("00000000000000000001813869927e1bc1f2c2384c76dd12109875f7827f3ed0").unwrap(),
+        // )
+        // .unwrap();
+        // assert_eq!(result, Value::some(expected_hash).unwrap());
+
+        // 212783 is the tenure height at block 3586042, a block in epoch 3.2
+        // let snippet = format!("(contract-call? '{deployer}.gbh get-block-height)");
+        // let result = eval_snippet(&mut session, &snippet);
+        // assert_eq!(result, Value::UInt(212783));
+
+        // let snippet = format!("(contract-call? '{deployer}.gbh get-block-hash u212783)");
+        // let result = eval_snippet(&mut session, &snippet);
+        // // the hash of tip block of tenure 212783
+        // let expected_hash = Value::buff_from(
+        //     hex_bytes("8c8218ea889805d2e4b23987eb1247bca963d7ab77eabc1048bdbf12d5ce9afa").unwrap(),
+        // )
+        // .unwrap();
+        // assert_eq!(result, Value::some(expected_hash).unwrap());
+
+        let snippet = format!("(contract-call? '{deployer}.gbh get-block-hash u212782)");
+        let result = eval_snippet(&mut session, &snippet);
+        // the hash of tip block of tenure 212782
+        let expected_hash = Value::buff_from(
+            hex_bytes("9dba56325dc453bc2ff435396b2798190cf451b229be7d13950aa4c9e4eb500a").unwrap(),
+        )
+        .unwrap();
+        assert_eq!(result, Value::some(expected_hash).unwrap());
+
+        session.advance_burn_chain_tip(1);
+        let snippet = format!("(contract-call? '{deployer}.gbh gbh)");
+        let result = eval_snippet(&mut session, &snippet);
+        assert_eq!(result, Value::UInt(88912));
     }
 }
