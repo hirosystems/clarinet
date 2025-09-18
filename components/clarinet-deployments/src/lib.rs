@@ -25,8 +25,10 @@ use clarity_repl::repl::boot::{
     get_boot_contract_epoch_and_clarity_version, BOOT_CONTRACTS_DATA, SBTC_DEPOSIT_MAINNET_ADDRESS,
     SBTC_MAINNET_ADDRESS, SBTC_TESTNET_ADDRESS_PRINCIPAL, SBTC_TOKEN_MAINNET_ADDRESS,
 };
+use clarity_repl::repl::session::ExecutionResultMap;
 use clarity_repl::repl::{
-    ClarityCodeSource, ClarityContract, ContractDeployer, Session, SessionSettings, DEFAULT_EPOCH,
+    ClarityCodeSource, ClarityContract, ClarityInterpreter, ContractDeployer, Session,
+    SessionSettings, DEFAULT_EPOCH,
 };
 use types::{
     ContractPublishSpecification, DeploymentGenerationArtifacts, EmulatedContractCallSpecification,
@@ -38,21 +40,13 @@ use self::types::{
     TransactionPlanSpecification, TransactionsBatchSpecification, WalletSpecification,
 };
 
-pub type ExecutionResultMap =
-    BTreeMap<QualifiedContractIdentifier, Result<ExecutionResult, Vec<Diagnostic>>>;
-
-pub struct UpdateSessionExecutionResult {
-    pub boot_contracts: ExecutionResultMap,
-    pub contracts: ExecutionResultMap,
-}
-
 pub fn setup_session_with_deployment(
     manifest: &ProjectManifest,
     deployment: &DeploymentSpecification,
     contracts_asts: Option<&BTreeMap<QualifiedContractIdentifier, ContractAST>>,
 ) -> DeploymentGenerationArtifacts {
     let mut session = initiate_session_from_manifest(manifest);
-    let UpdateSessionExecutionResult { contracts, .. } =
+    let contracts =
         update_session_with_deployment_plan(&mut session, deployment, contracts_asts, None);
 
     let deps = BTreeMap::new();
@@ -173,27 +167,10 @@ pub fn update_session_with_deployment_plan(
     deployment: &DeploymentSpecification,
     contracts_asts: Option<&BTreeMap<QualifiedContractIdentifier, ContractAST>>,
     forced_min_epoch: Option<StacksEpochId>,
-) -> UpdateSessionExecutionResult {
+) -> ExecutionResultMap {
     update_session_with_genesis_accounts(session, deployment);
 
     let mut should_mint_sbtc = false;
-
-    let mut boot_contracts = BTreeMap::new();
-    if !session.settings.repl_settings.remote_data.enabled {
-        // Load boot contracts (with custom overrides if specified)
-        let boot_contracts_data = if session.settings.override_boot_contracts_source.is_empty() {
-            BOOT_CONTRACTS_DATA.clone()
-        } else {
-            clarity_repl::repl::boot::get_boot_contracts_data_with_overrides(
-                &session.settings.override_boot_contracts_source,
-            )
-        };
-
-        for (contract_id, (contract, ast)) in boot_contracts_data {
-            let result = session.interpreter.run(&contract, Some(&ast), false, None);
-            boot_contracts.insert(contract_id, result);
-        }
-    }
 
     let mut contracts = BTreeMap::new();
     for batch in deployment.plan.batches.iter() {
@@ -238,10 +215,7 @@ pub fn update_session_with_deployment_plan(
         fund_genesis_account_with_sbtc(session, deployment);
     }
 
-    UpdateSessionExecutionResult {
-        boot_contracts,
-        contracts,
-    }
+    contracts
 }
 
 fn handle_stx_transfer(session: &mut Session, tx: &StxTransferSpecification) {
@@ -410,7 +384,6 @@ pub async fn generate_default_deployment(
         override_boot_contracts_source,
         ..Default::default()
     };
-    let session = Session::new(settings.clone());
 
     let simnet_remote_data =
         matches!(network, StacksNetwork::Simnet) && manifest.repl_settings.remote_data.enabled;
@@ -433,35 +406,53 @@ pub async fn generate_default_deployment(
         requirements_data.append(&mut boot_contracts_asts);
     }
 
+    // this ephemeral interpreter is used to parse code and build ASTs
+    let interpreter = ClarityInterpreter::new(
+        settings.get_default_sender(),
+        settings.repl_settings.clone(),
+        settings.cache_location.clone(),
+    );
+
     // Initialize diagnostics collection and success tracking early
     let mut contract_diags: HashMap<QualifiedContractIdentifier, Vec<Diagnostic>> = HashMap::new();
     let mut asts_success = true;
 
     // Validate custom boot contracts from override_boot_contracts_source
     if !settings.override_boot_contracts_source.is_empty() && !simnet_remote_data {
-        let mut session = Session::new(settings.clone());
         for (contract_name, file_path) in &settings.override_boot_contracts_source {
             // Only validate existing boot contracts that are being overridden
             if !clarity_repl::repl::boot::BOOT_CONTRACTS_NAMES.contains(&contract_name.as_str()) {
                 continue;
             }
 
+            // Resolve the relative path to the project root
+            let project_root = manifest
+                .location
+                .get_parent_location()
+                .map_err(|e| format!("Failed to get project root: {e}"))?;
+            let mut resolved_path = project_root.clone();
+            resolved_path
+                .append_path(file_path)
+                .map_err(|e| format!("Failed to resolve boot contract path {file_path}: {e}"))?;
+            let resolved_path_string = resolved_path.to_string();
+
             // Load and validate the custom boot contract
             let custom_source = match file_accessor {
                 None => {
                     // Fallback to file system when no file_accessor is provided
-                    std::fs::read_to_string(file_path)
-                        .map_err(|e| format!("Failed to read boot contract file {file_path}: {e}"))
+                    std::fs::read_to_string(&resolved_path_string).map_err(|e| {
+                        format!("Failed to read boot contract file {resolved_path_string}: {e}")
+                    })
                 }
                 Some(file_accessor) => {
                     let sources = file_accessor
-                        .read_files(vec![file_path.to_string()])
+                        .read_files(vec![resolved_path_string.clone()])
                         .await
                         .map_err(|e| {
-                            format!("Failed to read boot contract file {file_path}: {e}")
+                            format!("Failed to read boot contract file {resolved_path_string}: {e}")
                         })?;
                     sources
-                        .get(file_path)
+                        .get(&resolved_path_string)
                         .ok_or_else(|| {
                             format!("Unable to read custom boot contract: {contract_name}")
                         })
@@ -472,8 +463,6 @@ pub async fn generate_default_deployment(
             let (epoch, clarity_version) =
                 get_boot_contract_epoch_and_clarity_version(contract_name.as_str());
 
-            // Set the session to the correct epoch for validation
-            session.update_epoch(epoch);
             let temp_contract = ClarityContract {
                 code_source: ClarityCodeSource::ContractInMemory(custom_source),
                 deployer: ContractDeployer::Address(default_deployer_address.to_address()),
@@ -482,7 +471,7 @@ pub async fn generate_default_deployment(
                 epoch: clarity_repl::repl::Epoch::Specific(epoch),
             };
 
-            let (_, diagnostics, ast_success) = session.interpreter.build_ast(&temp_contract);
+            let (_, diagnostics, ast_success) = interpreter.build_ast(&temp_contract);
 
             if !ast_success {
                 contract_diags.insert(
@@ -626,7 +615,7 @@ pub async fn generate_default_deployment(
                         clarity_version,
                         epoch: clarity_repl::repl::Epoch::Specific(epoch),
                     };
-                    let (ast, _, _) = session.interpreter.build_ast(&contract);
+                    let (ast, _, _) = interpreter.build_ast(&contract);
                     (clarity_version, ast)
                 }
             };

@@ -78,17 +78,22 @@ fn complete_input(str: &str) -> Result<Input, (char, char)> {
 
 pub struct Terminal {
     pub session: Session,
+    pub executed: Vec<String>,
 }
 
 impl Terminal {
     pub fn new(session_settings: SessionSettings) -> Terminal {
-        let session = Session::new(session_settings);
-
-        Terminal { session }
+        Terminal {
+            session: Session::new(session_settings),
+            executed: vec![],
+        }
     }
 
     pub fn load(session: Session) -> Terminal {
-        Terminal { session }
+        Terminal {
+            session,
+            executed: vec![],
+        }
     }
 
     pub fn start(&mut self) -> bool {
@@ -126,7 +131,7 @@ impl Terminal {
                                 println!("{line}");
                             }
                             prompt = String::from(">> ");
-                            self.session.executed.push(input.to_string());
+                            self.executed.push(input.to_string());
                             let _ = editor.add_history_entry(input);
                             input_buffer.clear();
                             if reload {

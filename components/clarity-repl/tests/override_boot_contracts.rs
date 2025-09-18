@@ -39,7 +39,6 @@ pox-4 = "{}"
         ProjectManifest::from_location(&file_location, false).expect("Failed to load manifest");
     let mut session = initiate_session_from_manifest(&manifest);
     session.update_epoch(clarity::types::StacksEpochId::Epoch25);
-    session.load_boot_contracts();
 
     let expr = "(contract-call? 'SP000000000000000000002Q6VF78.pox-4 print-something)";
     let result = session.eval(expr.to_string(), false);

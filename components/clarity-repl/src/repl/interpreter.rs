@@ -127,16 +127,6 @@ impl ClarityInterpreter {
     pub fn run(
         &mut self,
         contract: &ClarityContract,
-        ast: Option<&ContractAST>,
-        cost_track: bool,
-        eval_hooks: Option<Vec<&mut dyn EvalHook>>,
-    ) -> Result<ExecutionResult, Vec<Diagnostic>> {
-        self.run_interpreter(contract, ast, cost_track, eval_hooks)
-    }
-
-    fn run_interpreter(
-        &mut self,
-        contract: &ClarityContract,
         cached_ast: Option<&ContractAST>,
         cost_track: bool,
         eval_hooks: Option<Vec<&mut dyn EvalHook>>,
@@ -1181,7 +1171,7 @@ mod tests {
     fn test_run_valid_contract() {
         let mut interpreter = get_interpreter(None);
         let contract = ClarityContract::fixture();
-        let result = interpreter.run_interpreter(&contract, None, false, None);
+        let result = interpreter.run(&contract, None, false, None);
         assert!(result.is_ok());
         assert!(result.unwrap().diagnostics.is_empty());
     }
@@ -1195,7 +1185,7 @@ mod tests {
         let contract = ClarityContractBuilder::default()
             .code_source(snippet.into())
             .build();
-        let result = interpreter.run_interpreter(&contract, None, false, None);
+        let result = interpreter.run(&contract, None, false, None);
         assert!(result.is_err());
         let diagnostics = result.unwrap_err();
         assert_eq!(diagnostics.len(), 1);
@@ -1209,7 +1199,7 @@ mod tests {
         let contract = ClarityContractBuilder::default()
             .code_source(snippet.into())
             .build();
-        let result = interpreter.run_interpreter(&contract, None, false, None);
+        let result = interpreter.run(&contract, None, false, None);
         assert!(result.is_err());
 
         let diagnostics = result.unwrap_err();

@@ -413,6 +413,7 @@ impl ProjectManifest {
                 }
             }
         };
+
         config.contracts = config_contracts;
         config.contracts_settings = contracts_settings;
         config.project.requirements = Some(config_requirements);
