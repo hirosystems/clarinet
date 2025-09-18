@@ -848,7 +848,7 @@ impl Datastore {
         self.burn_chain_height
     }
 
-    pub fn get_tenure_for_burn_block_height(&self, height: u32) -> u32 {
+    fn get_tenure_for_burn_block_height(&self, height: u32) -> u32 {
         *self
             .tenure_height_at_burn_block_height
             .get(&height)
@@ -1159,29 +1159,33 @@ impl HeadersDB for Datastore {
             "get_stacks_height_for_tenure_height({}, {})",
             id_bhh, tenure_height
         );
-        // if let Some(height) = self
-        //     .stacks_height_lookup_by_tenure_height
-        //     .get(&tenure_height)
-        //     .copied()
-        // {
-        //     println!("> found height: {}", height);
-        //     return Some(height);
-        // }
+
+        if let Some(height) = self
+            .stacks_height_at_tenure_height
+            .get(&tenure_height)
+            .copied()
+        {
+            println!("> found height: {}", height);
+            return Some(height);
+        }
+
+        // if epoch < 3.0
+        return Some(tenure_height);
 
         // println!("> self.epoch: {}", self.get_stacks_epoch())
-        let _found_block = self.remote_block_info_cache.borrow().get(id_bhh).cloned();
-        println!("> found_block: {:#?}", self.remote_block_info_cache);
-        self.remote_block_info_cache
-            .borrow()
-            .get(id_bhh)
-            .map(|block| {
-                println!("> block.tenure_height: {}", block.tenure_height);
-                block.height
-            })
+        // let _found_block = self.remote_block_info_cache.borrow().get(id_bhh).cloned();
+        // println!("> found_block: {:#?}", self.remote_block_info_cache);
+        // self.remote_block_info_cache
+        //     .borrow()
+        //     .get(id_bhh)
+        //     .map(|block| {
+        //         println!("> block.tenure_height: {}", block.tenure_height);
+        //         block.height
+        //     })
         // if self.remote_network_info.is_some() {
         //     return Some(tenure_height);
         // }
-        // None
+        None
     }
 
     fn get_miner_address(
