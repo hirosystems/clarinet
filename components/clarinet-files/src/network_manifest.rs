@@ -177,28 +177,11 @@ pub struct DevnetConfigFile {
     pub docker_platform: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct PoxStackingOrderFile {
-    pub start_at_cycle: u32,
-    pub end_at_cycle: u32,
-    pub amount_locked: u32,
-    pub wallet_label: String,
-    pub bitcoin_address: String,
-}
-
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ExecuteScript {
     pub script: String,
     pub allow_wallets: bool,
     pub allow_write: bool,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct AccountConfigFile {
-    mnemonic: Option<String>,
-    derivation: Option<String>,
-    balance: Option<u64>,
-    is_mainnet: Option<bool>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

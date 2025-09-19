@@ -351,7 +351,7 @@ impl<const MAX_SIZE: u16> StacksMessageCodec for BitVec<MAX_SIZE> {
 impl<const MAX_SIZE: u16> BitVec<MAX_SIZE> {
     /// Return the number of bytes needed to store `len` bits.
     fn data_len(len: u16) -> u16 {
-        len / 8 + if len % 8 == 0 { 0 } else { 1 }
+        len / 8 + if len.is_multiple_of(8) { 0 } else { 1 }
     }
 }
 
