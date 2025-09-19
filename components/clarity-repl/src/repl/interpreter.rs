@@ -851,15 +851,17 @@ impl ClarityInterpreter {
     }
 
     pub fn set_tenure_height(&mut self) {
-        let burn_block_height = self.get_burn_block_height();
         let mut conn = ClarityDatabase::new(
             &mut self.clarity_datastore,
             &self.datastore,
             &self.datastore,
         );
         conn.begin();
-        conn.put_data("_stx-data::tenure_height", &burn_block_height)
-            .expect("failed set tenure height");
+        conn.put_data(
+            "_stx-data::tenure_height",
+            &self.datastore.get_current_tenure(),
+        )
+        .expect("failed set tenure height");
         conn.commit().expect("failed to commit");
     }
 

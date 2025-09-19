@@ -769,6 +769,7 @@ dependencies = [
  "futures",
  "hiro-system-kit",
  "httparse",
+ "indoc",
  "js-sys",
  "log",
  "memchr",
