@@ -16,7 +16,8 @@ categories = [
 
 [dependencies]
 clarity-repl = { path = "../clarity-repl" }
-regex = "1.7"
+dirs = { workspace = true }
+regex = { workspace = true }
 sha2 = "0.8.1"
 sha3 = "0.8.2"
 ripemd160 = "0.8.0"
@@ -27,5 +28,4 @@ uuid = { version = "1.0.0", features = ["v4"] }
 hmac = { version = "0.7.1" }
 hex = { version = "0.3.2" }
 colored = { workspace = true }
-dirs = { version = "6.0.0" }
 chrono = { workspace = true}

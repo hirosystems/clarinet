@@ -1258,7 +1258,7 @@ fn decode_hex(byte_string: &str) -> Result<Vec<u8>, DecodeHexError> {
         .chars()
         .filter(|c| !c.is_whitespace())
         .collect();
-    if byte_string_filtered.len() % 2 != 0 {
+    if !byte_string_filtered.len().is_multiple_of(2) {
         return Err(DecodeHexError::OddLength);
     }
     let result: Result<Vec<u8>, ParseIntError> = (0..byte_string_filtered.len())
