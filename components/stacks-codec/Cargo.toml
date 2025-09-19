@@ -9,4 +9,4 @@ description = "Stack wire format implementation"
 clarity = { workspace = true, default-features = false, features = ["developer-mode"] }
 stacks-common = { workspace = true, default-features = false }
 
-serde = { version = "1", features = ["derive"] }
+serde = { workspace = true, features = ["derive"] }

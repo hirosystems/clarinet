@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 bip39 = "2.2.0"
 bip32 = "0.5.3"
-libsecp256k1 = "0.7.0"
+libsecp256k1 = { workspace = true }
 rand.workspace = true
 
 [lib]

@@ -9,7 +9,7 @@ exclude = ["index.node"]
 crate-type = ["cdylib"]
 
 [dependencies]
-serde = "1"
+serde = { workspace = true }
 error-chain = "0.12"
 clarinet-files = { path = "../clarinet-files" }
 clarinet-deployments = { path = "../clarinet-deployments" }
