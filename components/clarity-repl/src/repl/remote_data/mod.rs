@@ -207,6 +207,7 @@ impl HttpClient {
 
     fn get<T: DeserializeOwned>(&self, path: &str) -> Result<T, String> {
         let url = format!("{}{}", self.url, path);
+        println!("Fetching URL: {}", url);
         http_request::http_request(url.as_str())
     }
 

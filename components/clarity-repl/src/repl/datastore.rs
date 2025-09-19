@@ -330,7 +330,7 @@ impl ClarityDatastore {
 
     fn fetch_block(&mut self, url: &str) -> Block {
         let block = self.client.fetch_block(url);
-        println!("> block  {:?}", block);
+        println!("> block  {:#?}", block);
         self.remote_block_info_cache
             .borrow_mut()
             .insert(block.index_block_hash, block.clone());
@@ -378,6 +378,7 @@ impl ClarityDatastore {
     #[allow(clippy::result_large_err)]
     fn fetch_clarity_marf_value(&mut self, key: &str) -> Result<Option<String>> {
         let key_hash = TrieHash::from_key(key);
+        println!("> fetch_clarity_marf_value({key}) -> {key_hash}");
         let tip = self.get_remote_chaintip();
         let url = format!("/v2/clarity/marf/{key_hash}?tip={tip}&proof=false");
         self.client.fetch_clarity_data(&url)
@@ -530,6 +531,12 @@ impl ClarityBackingStore for ClarityDatastore {
                     return Ok(Some(value.clone()));
                 }
             }
+
+            println!("____________");
+            let tk = "nakamoto::tenures::ongoing_tenure_coinbase_height::180000";
+            let test = self.fetch_clarity_marf_value(tk);
+            println!("> fetch_clarity_marf_value({tk}) -> {:#?}", test);
+            println!("____________");
 
             let data = self.fetch_clarity_marf_value(key);
             if let Ok(Some(value)) = &data {
@@ -1155,6 +1162,7 @@ impl HeadersDB for Datastore {
         id_bhh: &StacksBlockId,
         tenure_height: u32,
     ) -> Option<u32> {
+        println!("------------");
         println!(
             "get_stacks_height_for_tenure_height({}, {})",
             id_bhh, tenure_height
@@ -1169,9 +1177,28 @@ impl HeadersDB for Datastore {
             return Some(height);
         }
 
-        // if epoch < 3.0
-        return Some(tenure_height);
+        // if epoch < 3.0 (&& not testnet ??)
+        // return Some(tenure_height);
+        println!("> self.sortition_lookup: {:#?}", self.sortition_lookup);
+        println!("> self.blocks: {:#?}", self.stacks_blocks);
+        println!("> self.burn_blocks: {:#?}", self.burn_blocks);
 
+        let key = format!("nakamoto::tenures::ongoing_tenure_coinbase_height::{tenure_height}");
+        let key_hash = TrieHash::from_key(&key);
+        let url = format!("/v2/clarity/marf/{key_hash}&proof=false");
+        println!("> key: {key} -> {key_hash}");
+        println!("> url: {url}");
+        // let data = self.client.fetch_clarity_data(&url);
+        // println!("> data: {:#?}", data);
+        // self.client.fetch_clarity_data(
+        //     &format!(
+        //         "/v2/tenures/height/{}?tip={}",
+        //         tenure_height,
+        //         id_bhh.to_string()
+        //     ),
+        // ).ok().and_then(|s| s.and_then(|s| s.parse::<u32>().ok()))
+
+        // self.consensus_hash_lookup
         // println!("> self.epoch: {}", self.get_stacks_epoch())
         // let _found_block = self.remote_block_info_cache.borrow().get(id_bhh).cloned();
         // println!("> found_block: {:#?}", self.remote_block_info_cache);
