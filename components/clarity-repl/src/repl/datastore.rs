@@ -148,7 +148,7 @@ pub struct Datastore {
     stacks_chain_height: u32,
     stacks_blocks: HashMap<StacksBlockId, StacksBlockInfo>,
     sortition_lookup: HashMap<SortitionId, BurnchainHeaderHash>,
-    tenure_height_at_burn_block_height: HashMap<u32, u32>,
+    tenure_height_at_stacks_height: HashMap<u32, u32>,
     stacks_height_at_tenure_height: HashMap<u32, u32>,
     consensus_hash_lookup: HashMap<ConsensusHash, SortitionId>,
     current_epoch: StacksEpochId,
@@ -297,7 +297,7 @@ impl ClarityDatastore {
     }
 
     pub fn commit_to(&mut self, _final_bhh: &StacksBlockId) {
-        // println!("> commit_to({})", final_bhh);
+        // println!("commit_to({})", final_bhh);
         // self.side_store.commit_metadata_to(&self.chain_tip, final_bhh);
         // self.side_store.commit(&self.chain_tip);
         // self.marf.commit_to(final_bhh)
@@ -330,7 +330,6 @@ impl ClarityDatastore {
 
     fn fetch_block(&mut self, url: &str) -> Block {
         let block = self.client.fetch_block(url);
-        println!("> block  {:?}", block);
         self.remote_block_info_cache
             .borrow_mut()
             .insert(block.index_block_hash, block.clone());
@@ -583,7 +582,6 @@ impl ClarityBackingStore for ClarityDatastore {
     }
 
     fn get_block_at_height(&mut self, height: u32) -> Option<StacksBlockId> {
-        println!("> get_block_at_height({})", height);
         if let Some(remote_network_info) = &self.remote_network_info {
             if height <= remote_network_info.initial_height {
                 let block_info = self.get_remote_block_info_from_height(height);
@@ -721,7 +719,7 @@ impl Datastore {
         let sortition_lookup = HashMap::from([(burn_block.sortition_id, burn_block_header_hash)]);
         let consensus_hash_lookup =
             HashMap::from([(burn_block.consensus_hash, burn_block.sortition_id)]);
-        let tenure_height_at_burn_block_height = HashMap::from([(0, 0)]);
+        let tenure_height_at_stacks_height = HashMap::from([(0, 0)]);
         let stacks_height_at_tenure_height = HashMap::from([(0, 0)]);
         let burn_blocks = HashMap::from([(burn_block_header_hash, burn_block)]);
         let stacks_blocks = HashMap::from([(id, stacks_block)]);
@@ -739,7 +737,7 @@ impl Datastore {
             stacks_blocks,
             sortition_lookup,
             consensus_hash_lookup,
-            tenure_height_at_burn_block_height,
+            tenure_height_at_stacks_height,
             stacks_height_at_tenure_height,
             current_epoch: StacksEpochId::Epoch2_05,
             current_epoch_start_height: stacks_chain_height,
@@ -805,8 +803,8 @@ impl Datastore {
 
         let sortition_lookup = HashMap::from([(sortition_id, burn_block_header_hash)]);
         let consensus_hash_lookup = HashMap::from([(burn_block.consensus_hash, sortition_id)]);
-        let tenure_height_at_burn_block_height =
-            HashMap::from([(burn_chain_height, block.tenure_height)]);
+        let tenure_height_at_stacks_height =
+            HashMap::from([(*stacks_chain_height, block.tenure_height)]);
         let stacks_height_at_tenure_height =
             HashMap::from([(block.tenure_height, *stacks_chain_height)]);
         let burn_blocks = HashMap::from([(burn_block_header_hash, burn_block)]);
@@ -825,7 +823,7 @@ impl Datastore {
             stacks_blocks,
             sortition_lookup,
             consensus_hash_lookup,
-            tenure_height_at_burn_block_height,
+            tenure_height_at_stacks_height,
             stacks_height_at_tenure_height,
             current_epoch: epoch_for_height(is_mainnet, *stacks_chain_height),
             current_epoch_start_height: *stacks_chain_height,
@@ -850,13 +848,13 @@ impl Datastore {
 
     fn get_tenure_for_burn_block_height(&self, height: u32) -> u32 {
         *self
-            .tenure_height_at_burn_block_height
+            .tenure_height_at_stacks_height
             .get(&height)
             .unwrap_or(&0)
     }
 
     pub fn get_current_tenure(&self) -> u32 {
-        self.get_tenure_for_burn_block_height(self.burn_chain_height)
+        self.get_tenure_for_burn_block_height(self.stacks_chain_height)
     }
 
     fn build_next_stacks_block(&self, clarity_datastore: &ClarityDatastore) -> StacksBlockInfo {
@@ -950,8 +948,6 @@ impl Datastore {
 
             self.stacks_height_at_tenure_height
                 .insert(self.tenure_height, self.stacks_chain_height);
-            self.tenure_height_at_burn_block_height
-                .insert(self.burn_chain_height, self.tenure_height);
         }
 
         self.burn_chain_height
@@ -968,6 +964,8 @@ impl Datastore {
             let id = StacksBlockId(bytes);
             let block_info = self.build_next_stacks_block(clarity_datastore);
             self.stacks_blocks.insert(id, block_info);
+            self.tenure_height_at_stacks_height
+                .insert(self.stacks_chain_height, self.tenure_height);
             clarity_datastore
                 .height_at_chain_tip
                 .entry(id)
@@ -1008,10 +1006,6 @@ impl HeadersDB for Datastore {
         id_bhh: &StacksBlockId,
         _epoch_id: &StacksEpochId,
     ) -> Option<BlockHeaderHash> {
-        println!(
-            "get_stacks_block_header_hash_for_block({}, {:?})",
-            id_bhh, _epoch_id
-        );
         if let Some(hash) = self
             .stacks_blocks
             .get(id_bhh)
@@ -1030,7 +1024,6 @@ impl HeadersDB for Datastore {
         &self,
         id_bhh: &StacksBlockId,
     ) -> Option<BurnchainHeaderHash> {
-        println!("> get_burn_header_hash_for_block({})", id_bhh);
         if let Some(hash) = self
             .stacks_blocks
             .get(id_bhh)
@@ -1055,10 +1048,6 @@ impl HeadersDB for Datastore {
         id_bhh: &StacksBlockId,
         _epoch_id: &StacksEpochId,
     ) -> Option<ConsensusHash> {
-        println!(
-            "> get_consensus_hash_for_block({}, {:?})",
-            id_bhh, _epoch_id
-        );
         let bbh = self.get_burn_header_hash_for_block(id_bhh)?;
         if let Some(consensus_hash) = self.burn_blocks.get(&bbh).map(|b| b.consensus_hash) {
             return Some(consensus_hash);
@@ -1078,7 +1067,6 @@ impl HeadersDB for Datastore {
         id_bhh: &StacksBlockId,
         _epoch_id: &StacksEpochId,
     ) -> Option<VRFSeed> {
-        println!("> get_vrf_seed_for_block({}, {:?})", id_bhh, _epoch_id);
         let bbh = self.get_burn_header_hash_for_block(id_bhh)?;
         if let Some(vrf_seed) = self.burn_blocks.get(&bbh).map(|b| b.vrf_seed) {
             return Some(vrf_seed);
@@ -1094,7 +1082,6 @@ impl HeadersDB for Datastore {
     }
 
     fn get_stacks_block_time_for_block(&self, id_bhh: &StacksBlockId) -> Option<u64> {
-        println!("> get_stacks_block_time_for_block({})", id_bhh);
         if let Some(time) = self
             .stacks_blocks
             .get(id_bhh)
@@ -1114,7 +1101,6 @@ impl HeadersDB for Datastore {
         id_bhh: &StacksBlockId,
         _epoch_id: Option<&StacksEpochId>,
     ) -> Option<u64> {
-        println!("> get_burn_block_time_for_block({})", id_bhh);
         if let Some(hash) = self
             .get_burn_header_hash_for_block(id_bhh)
             .and_then(|hash| self.burn_blocks.get(&hash))
@@ -1135,7 +1121,6 @@ impl HeadersDB for Datastore {
     }
 
     fn get_burn_block_height_for_block(&self, id_bhh: &StacksBlockId) -> Option<u32> {
-        println!("> get_burn_block_height_for_block({})", id_bhh);
         if let Some(height) = self
             .get_burn_header_hash_for_block(id_bhh)
             .and_then(|hash| self.burn_blocks.get(&hash))
@@ -1152,40 +1137,19 @@ impl HeadersDB for Datastore {
 
     fn get_stacks_height_for_tenure_height(
         &self,
-        id_bhh: &StacksBlockId,
+        _id_bhh: &StacksBlockId,
         tenure_height: u32,
     ) -> Option<u32> {
-        println!(
-            "get_stacks_height_for_tenure_height({}, {})",
-            id_bhh, tenure_height
-        );
-
         if let Some(height) = self
             .stacks_height_at_tenure_height
             .get(&tenure_height)
             .copied()
         {
-            println!("> found height: {}", height);
             return Some(height);
         }
 
-        // if epoch < 3.0
-        return Some(tenure_height);
-
-        // println!("> self.epoch: {}", self.get_stacks_epoch())
-        // let _found_block = self.remote_block_info_cache.borrow().get(id_bhh).cloned();
-        // println!("> found_block: {:#?}", self.remote_block_info_cache);
-        // self.remote_block_info_cache
-        //     .borrow()
-        //     .get(id_bhh)
-        //     .map(|block| {
-        //         println!("> block.tenure_height: {}", block.tenure_height);
-        //         block.height
-        //     })
-        // if self.remote_network_info.is_some() {
-        //     return Some(tenure_height);
-        // }
-        None
+        // todo: if epoch < 3.0
+        Some(tenure_height)
     }
 
     fn get_miner_address(
@@ -1261,7 +1225,6 @@ impl BurnStateDB for Datastore {
     }
 
     fn get_tip_burn_block_height(&self) -> Option<u32> {
-        println!("> get_tip_burn_block_height()");
         use StacksEpochId::*;
         match self.current_epoch {
             Epoch10 | Epoch20 | Epoch2_05 | Epoch21 | Epoch22 | Epoch23 | Epoch24 | Epoch25 => {
@@ -1290,7 +1253,6 @@ impl BurnStateDB for Datastore {
 
     /// Returns the *burnchain block height* for the `sortition_id` is associated with.
     fn get_burn_block_height(&self, sortition_id: &SortitionId) -> Option<u32> {
-        println!("> get_burn_block_height({})", sortition_id);
         self.sortition_lookup
             .get(sortition_id)
             .and_then(|hash| self.burn_blocks.get(hash))
@@ -1322,7 +1284,6 @@ impl BurnStateDB for Datastore {
         burn_height: u32,
         _sortition_id: &SortitionId,
     ) -> Option<BurnchainHeaderHash> {
-        println!("> get_burn_header_hash({}, {})", burn_height, _sortition_id);
         if burn_height > self.burn_chain_height {
             return None;
         }
@@ -1344,9 +1305,6 @@ impl BurnStateDB for Datastore {
         &self,
         consensus_hash: &ConsensusHash,
     ) -> Option<SortitionId> {
-        println!("> get_sortition_id_from_consensus_hash({})", consensus_hash);
-        let lookup = self.consensus_hash_lookup.get(consensus_hash);
-        println!(">   -> {:?}", lookup);
         self.consensus_hash_lookup.get(consensus_hash).copied()
     }
 
