@@ -22,8 +22,8 @@ fn run_console_command(args: &[&str], commands: &[&str]) -> Vec<String> {
     }
 
     let output = child.wait_with_output().expect("Failed to read stdout");
-
     assert!(output.status.success(), "Console command failed");
+
     let stdout_str = String::from_utf8_lossy(&output.stdout);
     // always skip the first 3 lines (console instructions)
     stdout_str.lines().skip(3).map(|s| s.to_string()).collect()
