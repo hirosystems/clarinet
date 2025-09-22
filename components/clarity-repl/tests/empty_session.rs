@@ -18,7 +18,7 @@ fn init_session_epoch_24() -> Session {
     let mut session = Session::new(SessionSettings::default());
 
     // move through certain epochs to populate the datastore
-    let epochs = [Epoch24];
+    let epochs = [Epoch21, Epoch24];
     epochs.iter().for_each(|epoch| {
         session.update_epoch(*epoch);
         session.advance_burn_chain_tip(10);
@@ -103,7 +103,7 @@ fn it_handles_clarity2_get_block_info_in_epoch2() {
     assert_eq!(epoch, "Current epoch: 2.4");
     let block_height = eval_snippet(&mut session, "block-height");
     println!("block-height: {block_height:?}");
-    assert!(block_height == Value::UInt(10));
+    assert!(block_height == Value::UInt(20));
 
     let deployer = "ST23YMXQ25679FCF71F8FRGYPQBZQJFJWA4GFT84T";
 
