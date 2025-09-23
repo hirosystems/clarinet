@@ -151,7 +151,7 @@ pub struct PerfHook {
     collected_data: Vec<(String, u64)>,
 }
 
-static OVERHEAD_HEADER: &str = "contract-overhead";
+static OVERHEAD_HEADER: &str = "contract-loading-cost";
 
 impl Clone for PerfHook {
     fn clone(&self) -> Self {
@@ -331,73 +331,53 @@ impl EvalHook for PerfHook {
                 let expression_runtime = self.total_expression_costs.runtime;
                 let overhead_runtime = total_runtime.saturating_sub(expression_runtime);
 
-                // we clear and rewrite in WASM. In non-WASM, we need to work with the file
+                // Prepare writer based on target architecture
                 #[cfg(target_arch = "wasm32")]
                 {
                     self.clear_buffer();
-
-                    if overhead_runtime > 0 {
-                        if let Some(ref contract) = self.contract_identifier {
-                            writeln!(
-                                self.writer,
-                                "{}:{} {}",
-                                contract, OVERHEAD_HEADER, overhead_runtime
-                            )
-                            .expect("Failed to write overhead to perf output");
-
-                            for (call_stack, cost) in &self.collected_data {
-                                let final_call_stack = format!("{};{}", contract, call_stack);
-                                writeln!(self.writer, "{} {}", final_call_stack, cost)
-                                    .expect("Failed to write to perf output");
-                            }
-                        } else {
-                            for (call_stack, cost) in &self.collected_data {
-                                writeln!(self.writer, "{} {}", call_stack, cost)
-                                    .expect("Failed to write to perf output");
-                            }
-                        }
-                    } else {
-                        for (call_stack, cost) in &self.collected_data {
-                            writeln!(self.writer, "{} {}", call_stack, cost)
-                                .expect("Failed to write to perf output");
-                        }
-                    }
                 }
 
                 #[cfg(not(target_arch = "wasm32"))]
-                {
-                    if let Some(ref contract) = self.contract_identifier {
-                        let mut file = std::fs::File::create("perf.data")
-                            .expect("Failed to create perf output file");
+                let mut file =
+                    std::fs::File::create("perf.data").expect("Failed to create perf output file");
 
-                        if overhead_runtime > 0 {
-                            writeln!(
-                                &mut file,
-                                "{}:{} {}",
-                                contract, OVERHEAD_HEADER, overhead_runtime
-                            )
-                            .expect("Failed to write overhead to perf output");
-
-                            for (call_stack, cost) in &self.collected_data {
-                                let final_call_stack = format!("{};{}", contract, call_stack);
-                                writeln!(&mut file, "{} {}", final_call_stack, cost)
-                                    .expect("Failed to write to perf output");
-                            }
-                        } else {
-                            for (call_stack, cost) in &self.collected_data {
-                                writeln!(&mut file, "{} {}", call_stack, cost)
-                                    .expect("Failed to write to perf output");
-                            }
-                        }
-                    } else {
-                        // overhead failed for some reason, write the collected data
-                        let mut file = std::fs::File::create("perf.data")
-                            .expect("Failed to create perf output file");
-                        for (call_stack, cost) in &self.collected_data {
-                            writeln!(&mut file, "{} {}", call_stack, cost)
-                                .expect("Failed to write to perf output");
-                        }
+                // Get a mutable reference to the appropriate writer
+                let writer = {
+                    #[cfg(target_arch = "wasm32")]
+                    {
+                        &mut self.writer
                     }
+                    #[cfg(not(target_arch = "wasm32"))]
+                    {
+                        &mut file
+                    }
+                };
+
+                // Write performance data (target-agnostic)
+                if overhead_runtime > 0 {
+                    if let Some(ref contract) = self.contract_identifier {
+                        writeln!(
+                            writer,
+                            "{}:{} {}",
+                            contract, OVERHEAD_HEADER, overhead_runtime
+                        )
+                        .expect("Failed to write overhead to perf output");
+                    }
+                }
+
+                for (call_stack, cost) in &self.collected_data {
+                    let final_call_stack =
+                        if overhead_runtime > 0 && self.contract_identifier.is_some() {
+                            format!(
+                                "{};{}",
+                                self.contract_identifier.as_ref().unwrap(),
+                                call_stack
+                            )
+                        } else {
+                            call_stack.clone()
+                        };
+                    writeln!(writer, "{} {}", final_call_stack, cost)
+                        .expect("Failed to write to perf output");
                 }
             }
         }
