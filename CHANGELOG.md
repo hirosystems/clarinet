@@ -1,3 +1,27 @@
+# [3.7.0](https://github.com/hirosystems/clarinet/compare/v3.6.1...v3.7.0) (2025-09-23)
+
+##### New Features
+
+- Show stacks trace on test fail (#1982) (521dd0ed)
+- Warn if falling back to runtime cost perf (#1986) (807bc12b)
+
+##### Bug Fixes
+
+- Add contract-loading-costs to perf.data to match get_costs (#1998) (8b049844)
+- Better rate limiting handling and run all tests on stg (#2001) (988f0569)
+- Clarity2 block-height in info in epoch 3.2 (#1996) (baa15062)
+- Boot contracts deployment (#1990) (3422554b)
+
+##### Refactors
+
+- Remove dead code related to clarity-wasm (#1984) (5fab8df8)
+
+##### Chores
+
+- Update cargo dependencies (#1997) (22f13d02)
+- Remove cbtc example (#1987) (34a8e113)
+- Update new project package.json (#1983) (01ecf788)
+
 # [3.6.1](https://github.com/hirosystems/clarinet/compare/v3.6.0...v3.6.1) (2025-09-11)
 
 ##### Bug Fixes
