@@ -6,6 +6,7 @@ pub mod check_checker;
 pub mod coverage;
 #[cfg(test)]
 mod coverage_tests;
+pub mod native_func_noop;
 
 use clarity::vm::analysis::analysis_db::AnalysisDatabase;
 use clarity::vm::analysis::types::ContractAnalysis;
@@ -14,6 +15,7 @@ use serde::Serialize;
 
 use self::call_checker::CallChecker;
 use self::check_checker::CheckChecker;
+use self::native_func_noop::NoopChecker;
 use crate::analysis::annotation::Annotation;
 
 pub type AnalysisResult = Result<Vec<Diagnostic>, Vec<Diagnostic>>;
@@ -22,7 +24,9 @@ pub type AnalysisResult = Result<Vec<Diagnostic>, Vec<Diagnostic>>;
 #[serde(rename_all = "snake_case")]
 pub enum Pass {
     All,
+    CallChecker,
     CheckChecker,
+    NoopChecker,
 }
 
 #[derive(Debug, Default, Clone, Deserialize, Serialize)]
@@ -65,7 +69,7 @@ pub struct SettingsFile {
 }
 
 // Each new pass should be included in this list
-static ALL_PASSES: [Pass; 1] = [Pass::CheckChecker];
+static ALL_PASSES: [Pass; 3] = [Pass::CheckChecker, Pass::CallChecker, Pass::NoopChecker];
 
 impl From<SettingsFile> for Settings {
     fn from(from_file: SettingsFile) -> Self {
@@ -125,10 +129,12 @@ pub fn run_analysis(
             &Vec<Annotation>,
             settings: &Settings,
         ) -> AnalysisResult,
-    > = vec![CallChecker::run_pass];
+    > = vec![];
     for pass in &settings.passes {
         match pass {
             Pass::CheckChecker => passes.push(CheckChecker::run_pass),
+            Pass::CallChecker => passes.push(CallChecker::run_pass),
+            Pass::NoopChecker => passes.push(NoopChecker::run_pass),
             Pass::All => panic!("unexpected All in list of passes"),
         }
     }
