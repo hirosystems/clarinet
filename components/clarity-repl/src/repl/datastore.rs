@@ -140,6 +140,7 @@ pub struct Datastore {
     genesis_id: StacksBlockId,
     burn_chain_tip: BurnchainHeaderHash,
     burn_chain_height: u32,
+    tenure_height: u32,
     current_chain_tip: Rc<RefCell<StacksBlockId>>,
     remote_block_info_cache: Rc<RefCell<HashMap<StacksBlockId, Block>>>,
     remote_sortition_cache: Rc<RefCell<HashMap<BurnchainHeaderHash, Sortition>>>,
@@ -147,7 +148,8 @@ pub struct Datastore {
     stacks_chain_height: u32,
     stacks_blocks: HashMap<StacksBlockId, StacksBlockInfo>,
     sortition_lookup: HashMap<SortitionId, BurnchainHeaderHash>,
-    tenure_blocks_height: HashMap<u32, u32>,
+    tenure_height_at_stacks_height: HashMap<u32, u32>,
+    stacks_height_at_tenure_height: HashMap<u32, u32>,
     consensus_hash_lookup: HashMap<ConsensusHash, SortitionId>,
     current_epoch: StacksEpochId,
     current_epoch_start_height: u32,
@@ -717,7 +719,8 @@ impl Datastore {
         let sortition_lookup = HashMap::from([(burn_block.sortition_id, burn_block_header_hash)]);
         let consensus_hash_lookup =
             HashMap::from([(burn_block.consensus_hash, burn_block.sortition_id)]);
-        let tenure_blocks_height = HashMap::from([(0, 0)]);
+        let tenure_height_at_stacks_height = HashMap::from([(0, 0)]);
+        let stacks_height_at_tenure_height = HashMap::from([(0, 0)]);
         let burn_blocks = HashMap::from([(burn_block_header_hash, burn_block)]);
         let stacks_blocks = HashMap::from([(id, stacks_block)]);
 
@@ -725,6 +728,7 @@ impl Datastore {
             genesis_id: id,
             burn_chain_tip: burn_block_header_hash,
             burn_chain_height,
+            tenure_height: 0,
             current_chain_tip: Rc::clone(&clarity_datastore.current_chain_tip),
             remote_block_info_cache: Rc::clone(&clarity_datastore.remote_block_info_cache),
             remote_sortition_cache: Rc::clone(&clarity_datastore.remote_sortition_cache),
@@ -733,7 +737,8 @@ impl Datastore {
             stacks_blocks,
             sortition_lookup,
             consensus_hash_lookup,
-            tenure_blocks_height,
+            tenure_height_at_stacks_height,
+            stacks_height_at_tenure_height,
             current_epoch: StacksEpochId::Epoch2_05,
             current_epoch_start_height: stacks_chain_height,
             constants,
@@ -798,7 +803,10 @@ impl Datastore {
 
         let sortition_lookup = HashMap::from([(sortition_id, burn_block_header_hash)]);
         let consensus_hash_lookup = HashMap::from([(burn_block.consensus_hash, sortition_id)]);
-        let tenure_blocks_height = HashMap::from([(burn_chain_height, block.tenure_height)]);
+        let tenure_height_at_stacks_height =
+            HashMap::from([(*stacks_chain_height, block.tenure_height)]);
+        let stacks_height_at_tenure_height =
+            HashMap::from([(block.tenure_height, *stacks_chain_height)]);
         let burn_blocks = HashMap::from([(burn_block_header_hash, burn_block)]);
         let stacks_blocks = HashMap::from([(id, stacks_block)]);
 
@@ -806,6 +814,7 @@ impl Datastore {
             genesis_id: id,
             burn_chain_tip: burn_block_header_hash,
             burn_chain_height,
+            tenure_height: block.tenure_height,
             current_chain_tip: Rc::clone(&clarity_datastore.current_chain_tip),
             remote_block_info_cache: Rc::clone(&clarity_datastore.remote_block_info_cache),
             remote_sortition_cache: Rc::clone(&clarity_datastore.remote_sortition_cache),
@@ -814,7 +823,8 @@ impl Datastore {
             stacks_blocks,
             sortition_lookup,
             consensus_hash_lookup,
-            tenure_blocks_height,
+            tenure_height_at_stacks_height,
+            stacks_height_at_tenure_height,
             current_epoch: epoch_for_height(is_mainnet, *stacks_chain_height),
             current_epoch_start_height: *stacks_chain_height,
             constants,
@@ -834,6 +844,17 @@ impl Datastore {
 
     pub fn get_current_burn_block_height(&self) -> u32 {
         self.burn_chain_height
+    }
+
+    fn get_tenure_for_burn_block_height(&self, height: u32) -> u32 {
+        *self
+            .tenure_height_at_stacks_height
+            .get(&height)
+            .unwrap_or(&0)
+    }
+
+    pub fn get_current_tenure(&self) -> u32 {
+        self.get_tenure_for_burn_block_height(self.stacks_chain_height)
     }
 
     fn build_next_stacks_block(&self, clarity_datastore: &ClarityDatastore) -> StacksBlockInfo {
@@ -902,8 +923,9 @@ impl Datastore {
                 next_burn_block_time
             };
 
-            let height = self.burn_chain_height + 1;
-            let burn_block_hashes = BurnBlockHashes::from_height(height);
+            let previous_height = self.burn_chain_height;
+            let next_height = previous_height + 1;
+            let burn_block_hashes = BurnBlockHashes::from_height(next_height);
             let burn_block_header_hash = burn_block_hashes.header_hash;
 
             let burn_block = BurnBlockInfo {
@@ -911,7 +933,7 @@ impl Datastore {
                 vrf_seed: burn_block_hashes.vrf_seed,
                 sortition_id: burn_block_hashes.sortition_id,
                 burn_block_time: next_burn_block_time,
-                burn_chain_height: height,
+                burn_chain_height: next_height,
             };
 
             self.consensus_hash_lookup
@@ -920,11 +942,12 @@ impl Datastore {
                 .insert(burn_block.sortition_id, burn_block_header_hash);
             self.burn_chain_tip = burn_block_header_hash;
             self.burn_blocks.insert(burn_block_header_hash, burn_block);
-            self.burn_chain_height = height;
+            self.burn_chain_height = next_height;
+            self.tenure_height += 1;
             self.advance_stacks_chain_tip(clarity_datastore, 1);
 
-            self.tenure_blocks_height
-                .insert(self.burn_chain_height, self.stacks_chain_height);
+            self.stacks_height_at_tenure_height
+                .insert(self.tenure_height, self.stacks_chain_height);
         }
 
         self.burn_chain_height
@@ -941,6 +964,8 @@ impl Datastore {
             let id = StacksBlockId(bytes);
             let block_info = self.build_next_stacks_block(clarity_datastore);
             self.stacks_blocks.insert(id, block_info);
+            self.tenure_height_at_stacks_height
+                .insert(self.stacks_chain_height, self.tenure_height);
             clarity_datastore
                 .height_at_chain_tip
                 .entry(id)
@@ -1115,7 +1140,16 @@ impl HeadersDB for Datastore {
         _id_bhh: &StacksBlockId,
         tenure_height: u32,
     ) -> Option<u32> {
-        self.tenure_blocks_height.get(&tenure_height).copied()
+        if let Some(height) = self
+            .stacks_height_at_tenure_height
+            .get(&tenure_height)
+            .copied()
+        {
+            return Some(height);
+        }
+
+        // todo: if epoch < 3.0
+        Some(tenure_height)
     }
 
     fn get_miner_address(

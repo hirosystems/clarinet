@@ -69,6 +69,7 @@ mockito = { workspace = true }
 tempfile = { workspace = true }
 clarinet-files = { path = "../clarinet-files" }
 clarinet-deployments = { path = "../clarinet-deployments" }
+indoc = { workspace = true }
 
 [lib]
 name = "clarity_repl"
