@@ -143,7 +143,15 @@ pub struct PerfHook {
     expr_stack: Vec<StackEntry>,
     /// Specific cost field to track
     cost_field: CostField,
+    /// Sum of all expression costs tracked
+    total_expression_costs: ExecutionCost,
+    /// Contract identifier for overhead tracking
+    contract_identifier: Option<QualifiedContractIdentifier>,
+    /// Collected performance data to rewrite with overhead
+    collected_data: Vec<(String, u64)>,
 }
+
+static OVERHEAD_HEADER: &str = "contract-loading-cost";
 
 impl Clone for PerfHook {
     fn clone(&self) -> Self {
@@ -173,6 +181,9 @@ impl PerfHook {
             writer,
             expr_stack: Vec::new(),
             cost_field,
+            total_expression_costs: ExecutionCost::ZERO,
+            contract_identifier: None,
+            collected_data: Vec::new(),
         }
     }
 
@@ -210,6 +221,11 @@ impl EvalHook for PerfHook {
         expr: &SymbolicExpression,
     ) {
         let contract = &env.contract_context.contract_identifier;
+
+        // Store contract identifier for overhead tracking
+        if self.contract_identifier.is_none() {
+            self.contract_identifier = Some(contract.clone());
+        }
 
         // Find the current function name in the call stack
         let call_stack = env.call_stack.make_stack_trace();
@@ -277,26 +293,22 @@ impl EvalHook for PerfHook {
             entry.expr_id, expr.id
         );
 
-        // Get the current cost
+        // Get the current cost so we can compute the overhead
         let mut cost = env.global_context.cost_track.get_total();
 
-        // Subtract the cost before evaluation and the cost of descendents to
-        // get the cost of this expression
+        // Subtract the cost before evaluation and the cost of descendents
         cost.sub(&entry.cost_before)
             .expect("cost diff calculation failed");
         cost.sub(&entry.cost_descendents)
             .expect("cost diff calculation failed");
 
-        // Write the performance data to the output
-        writeln!(
-            self.writer,
-            "{call_stack} {}",
-            self.cost_field.get_value(&cost)
-        )
-        .expect("Failed to write to perf output");
+        self.total_expression_costs
+            .add(&cost)
+            .expect("cost addition failed");
 
-        // Add the cost of this expression and its descendents to the parent
-        // expression's cost so that it is not double-counted.
+        let cost_value = self.cost_field.get_value(&cost);
+        self.collected_data.push((call_stack, cost_value));
+
         if let Some(parent) = self.expr_stack.last_mut() {
             parent
                 .cost_descendents
@@ -311,8 +323,63 @@ impl EvalHook for PerfHook {
 
     fn did_complete(
         &mut self,
-        _result: core::result::Result<&mut clarity::vm::ExecutionResult, String>,
+        result: core::result::Result<&mut clarity::vm::ExecutionResult, String>,
     ) {
-        // No action needed after evaluation completion
+        if let Ok(execution_result) = result {
+            if let Some(total_cost) = &execution_result.cost {
+                let total_runtime = total_cost.total.runtime;
+                let expression_runtime = self.total_expression_costs.runtime;
+                let overhead_runtime = total_runtime.saturating_sub(expression_runtime);
+
+                // Prepare writer based on target architecture
+                #[cfg(target_arch = "wasm32")]
+                {
+                    self.clear_buffer();
+                }
+
+                #[cfg(not(target_arch = "wasm32"))]
+                let mut file =
+                    std::fs::File::create("perf.data").expect("Failed to create perf output file");
+
+                // Get a mutable reference to the appropriate writer
+                let writer = {
+                    #[cfg(target_arch = "wasm32")]
+                    {
+                        &mut self.writer
+                    }
+                    #[cfg(not(target_arch = "wasm32"))]
+                    {
+                        &mut file
+                    }
+                };
+
+                // Write performance data (target-agnostic)
+                if overhead_runtime > 0 {
+                    if let Some(ref contract) = self.contract_identifier {
+                        writeln!(
+                            writer,
+                            "{}:{} {}",
+                            contract, OVERHEAD_HEADER, overhead_runtime
+                        )
+                        .expect("Failed to write overhead to perf output");
+                    }
+                }
+
+                for (call_stack, cost) in &self.collected_data {
+                    let final_call_stack =
+                        if overhead_runtime > 0 && self.contract_identifier.is_some() {
+                            format!(
+                                "{};{}",
+                                self.contract_identifier.as_ref().unwrap(),
+                                call_stack
+                            )
+                        } else {
+                            call_stack.clone()
+                        };
+                    writeln!(writer, "{} {}", final_call_stack, cost)
+                        .expect("Failed to write to perf output");
+                }
+            }
+        }
     }
 }
