@@ -25,6 +25,8 @@ crossterm = { workspace = true }
 ratatui = { workspace = true }
 similar = "2.1.0"
 crossbeam-channel = "0.5.6"
+signal-hook = "0.3"
+libc = "0.2"
 
 clarity-repl = { package = "clarity-repl", path = "../clarity-repl" }
 clarinet-files = { path = "../clarinet-files" }
