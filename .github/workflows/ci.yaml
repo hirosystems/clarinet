@@ -512,7 +512,6 @@ jobs:
       - get_release_info
       - sanity_check
       - cargo_test
-      - dist_stacks_devnet_js
       - dist_clarity_repl
       - docker_images
     permissions:
