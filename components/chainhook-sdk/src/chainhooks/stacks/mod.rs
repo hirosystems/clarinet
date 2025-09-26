@@ -532,7 +532,7 @@ impl StacksChainhookOccurrencePayload {
     }
 }
 pub enum StacksChainhookOccurrence {
-    Http(RequestBuilder, StacksChainhookOccurrencePayload),
+    Http(Box<RequestBuilder>, StacksChainhookOccurrencePayload),
     File(String, Vec<u8>),
     Data(StacksChainhookOccurrencePayload),
 }
@@ -1450,11 +1450,13 @@ pub fn handle_stacks_hook_action<'a>(
             ))
             .map_err(|e| format!("unable to serialize payload {}", e))?;
             Ok(StacksChainhookOccurrence::Http(
-                client
-                    .request(method, &host)
-                    .header("Content-Type", "application/json")
-                    .header("Authorization", http.authorization_header.clone())
-                    .body(body),
+                Box::new(
+                    client
+                        .request(method, &host)
+                        .header("Content-Type", "application/json")
+                        .header("Authorization", http.authorization_header.clone())
+                        .body(body),
+                ),
                 StacksChainhookOccurrencePayload::from_trigger(trigger),
             ))
         }

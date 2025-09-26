@@ -1115,7 +1115,7 @@ fn test_bitcoin_chainhook_through_reorg() {
                     inscription_number.jubilee += 1;
                     tx.metadata
                         .ordinal_operations
-                        .push(OrdinalOperation::InscriptionRevealed(
+                        .push(OrdinalOperation::InscriptionRevealed(Box::new(
                             OrdinalInscriptionRevealData {
                                 content_bytes: format!("{cursor}"),
                                 content_type: "".to_string(),
@@ -1140,7 +1140,7 @@ fn test_bitcoin_chainhook_through_reorg() {
                                 curse_type: None,
                                 charms: OrdinalInscriptionCharms::none(),
                             },
-                        ))
+                        )))
                 }
             }
             let _ = block_pre_processor_out_tx.send(blocks);

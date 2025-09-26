@@ -3,7 +3,7 @@ use serde_json::Value;
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum OrdinalOperation {
-    InscriptionRevealed(OrdinalInscriptionRevealData),
+    InscriptionRevealed(Box<OrdinalInscriptionRevealData>),
     InscriptionTransferred(OrdinalInscriptionTransferData),
 }
 

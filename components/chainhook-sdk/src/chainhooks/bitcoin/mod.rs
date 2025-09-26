@@ -530,7 +530,7 @@ impl BitcoinChainhookOccurrencePayload {
 }
 
 pub enum BitcoinChainhookOccurrence {
-    Http(RequestBuilder, BitcoinChainhookOccurrencePayload),
+    Http(Box<RequestBuilder>, BitcoinChainhookOccurrencePayload),
     File(String, Vec<u8>),
     Data(BitcoinChainhookOccurrencePayload),
 }
@@ -772,7 +772,7 @@ pub fn handle_bitcoin_hook_action<'a>(
                 .body(body);
 
             let data = BitcoinChainhookOccurrencePayload::from_trigger(trigger);
-            Ok(BitcoinChainhookOccurrence::Http(request, data))
+            Ok(BitcoinChainhookOccurrence::Http(Box::new(request), data))
         }
         HookAction::FileAppend(disk) => {
             let bytes = serde_json::to_vec(&serialize_bitcoin_payload_to_json(&trigger, proofs))

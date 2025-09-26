@@ -1,7 +1,9 @@
-use super::BlockEvent;
 use chainhook_types::{
-    BlockIdentifier, StacksBlockData, StacksBlockMetadata, StacksBlockMetadataRewardSet, StacksBlockMetadataRewardSetSigner, StacksTransactionData
+    BlockIdentifier, StacksBlockData, StacksBlockMetadata, StacksBlockMetadataRewardSet,
+    StacksBlockMetadataRewardSetSigner, StacksTransactionData,
 };
+
+use super::BlockEvent;
 
 pub fn generate_test_stacks_block(
     fork_id: u8,
@@ -54,7 +56,7 @@ pub fn generate_test_stacks_block(
         }
     };
     hash.append(&mut block_height.to_be_bytes().to_vec());
-    BlockEvent::Block(StacksBlockData {
+    BlockEvent::Block(Box::new(StacksBlockData {
         block_identifier: BlockIdentifier {
             index: block_height,
             hash: hex::encode(&hash[..]),
@@ -95,7 +97,7 @@ pub fn generate_test_stacks_block(
                 ]),
             }),
         },
-    })
+    }))
 }
 
 pub fn A1(parent: Option<BlockEvent>) -> BlockEvent {

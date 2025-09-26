@@ -12,14 +12,14 @@ pub mod stacks_shapes;
 pub mod transactions;
 
 pub enum BlockEvent {
-    Block(StacksBlockData),
+    Block(Box<StacksBlockData>),
     Microblock(StacksMicroblockData),
 }
 
 impl BlockEvent {
     pub fn expect_block(self) -> StacksBlockData {
         match self {
-            BlockEvent::Block(block_data) => block_data,
+            BlockEvent::Block(block_data) => *block_data,
             _ => panic!("expected block"),
         }
     }

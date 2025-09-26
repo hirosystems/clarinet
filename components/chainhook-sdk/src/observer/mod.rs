@@ -1565,7 +1565,7 @@ pub async fn start_observer_commands_handler(
                 }
 
                 for (request, data) in requests.into_iter() {
-                    match send_request(request, 3, 1, &ctx).await {
+                    match send_request(*request, 3, 1, &ctx).await {
                         Ok(_) => {
                             if let Some(ref tx) = observer_events_tx {
                                 let _ = tx.send(ObserverEvent::BitcoinPredicateTriggered(data));
@@ -1763,7 +1763,7 @@ pub async fn start_observer_commands_handler(
                             request
                         )
                     });
-                    match send_request(request, 3, 1, &ctx).await {
+                    match send_request(*request, 3, 1, &ctx).await {
                         Ok(_) => {
                             if let Some(ref tx) = observer_events_tx {
                                 let _ = tx.send(ObserverEvent::StacksPredicateTriggered(data));
