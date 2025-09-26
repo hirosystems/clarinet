@@ -28,6 +28,7 @@ stacks-common = { git = "https://github.com/stacks-network/stacks-core.git", bra
 pox-locking = { git = "https://github.com/stacks-network/stacks-core.git", branch="develop", package = "pox-locking", default-features = false }
 stackslib = { git = "https://github.com/stacks-network/stacks-core.git", branch="develop", package = "stackslib", default-features = false}
 
+base64 = "0.22.1"
 clap = "4.5.47"
 colored = "3"
 chrono = "0.4.42"
