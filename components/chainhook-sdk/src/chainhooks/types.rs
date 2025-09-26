@@ -1,7 +1,6 @@
 use std::str::FromStr;
 
 use chainhook_types::{BitcoinNetwork, StacksNetwork};
-use schemars::JsonSchema;
 use serde::ser::{SerializeSeq, Serializer};
 use serde::{Deserialize, Serialize};
 
@@ -200,7 +199,7 @@ impl ChainhookInstance {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case", tag = "chain")]
 pub enum ChainhookSpecificationNetworkMap {
     Bitcoin(BitcoinChainhookSpecificationNetworkMap),
@@ -265,7 +264,7 @@ impl ChainhookSpecificationNetworkMap {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum HookAction {
     HttpPost(HttpHook),
@@ -288,7 +287,7 @@ impl HookAction {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub struct HttpHook {
     pub url: String,
@@ -313,18 +312,18 @@ impl HttpHook {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub struct FileHook {
     pub path: String,
 }
 // todo: can we remove this struct?
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct ScriptTemplate {
     pub instructions: Vec<ScriptInstruction>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum ScriptInstruction {
     Opcode(u8),
@@ -363,7 +362,7 @@ impl ScriptTemplate {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, JsonSchema)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct PoxConfig {
     pub first_burnchain_block_height: u64,
     pub prepare_phase_len: u64,
@@ -460,7 +459,7 @@ impl TryFrom<u8> for StacksOpcodes {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub struct TxinPredicate {
     pub txid: String,
@@ -476,7 +475,7 @@ impl TxinPredicate {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum BlockIdentifierIndexRule {
     Equals(u64),
@@ -505,14 +504,14 @@ impl BlockIdentifierIndexRule {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum Scope {
     Inputs,
     Outputs,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum MatchingRule {
     Equals(String),
@@ -520,13 +519,13 @@ pub enum MatchingRule {
     EndsWith(String),
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum ExactMatchingRule {
     Equals(String),
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum BlockIdentifierHashRule {
     Equals(String),

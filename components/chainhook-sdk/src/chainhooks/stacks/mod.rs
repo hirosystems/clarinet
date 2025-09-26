@@ -15,7 +15,6 @@ use clarity::vm::ClarityName;
 use hiro_system_kit::slog;
 use regex::Regex;
 use reqwest::{Client, Method, RequestBuilder};
-use schemars::JsonSchema;
 use serde_json::Value as JsonValue;
 
 use super::types::{
@@ -25,7 +24,7 @@ use super::types::{
 use crate::observer::EventObserverConfig;
 use crate::utils::{AbstractStacksBlock, Context, MAX_BLOCK_HEIGHTS_ENTRIES};
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct StacksChainhookSpecification {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub blocks: Option<Vec<u64>>,
@@ -164,7 +163,7 @@ impl StacksChainhookSpecification {
 /// }
 ///
 /// ```
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct StacksChainhookSpecificationNetworkMap {
     pub uuid: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -242,7 +241,7 @@ impl StacksChainhookInstance {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 #[serde(tag = "scope")]
 pub enum StacksPredicate {
@@ -315,7 +314,7 @@ impl StacksPredicate {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum StacksSignerMessagePredicate {
     AfterTimestamp(u64),
@@ -326,7 +325,7 @@ impl StacksSignerMessagePredicate {
     // TODO(rafaelcr): Write validators
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub struct StacksContractCallBasedPredicate {
     pub contract_identifier: String,
@@ -359,7 +358,7 @@ impl StacksContractCallBasedPredicate {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum StacksContractDeploymentPredicate {
     Deployer(String),
@@ -385,7 +384,7 @@ impl StacksContractDeploymentPredicate {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum StacksTrait {
     Sip09,
@@ -394,7 +393,7 @@ pub enum StacksTrait {
     Any,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 #[serde(untagged)]
 pub enum StacksPrintEventBasedPredicate {
@@ -446,21 +445,21 @@ impl StacksPrintEventBasedPredicate {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub struct StacksFtEventBasedPredicate {
     pub asset_identifier: String,
     pub actions: Vec<String>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub struct StacksNftEventBasedPredicate {
     pub asset_identifier: String,
     pub actions: Vec<String>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub struct StacksStxEventBasedPredicate {
     pub actions: Vec<String>,

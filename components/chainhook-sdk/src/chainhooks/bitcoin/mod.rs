@@ -13,7 +13,6 @@ use hiro_system_kit::slog;
 use miniscript::bitcoin::secp256k1::Secp256k1;
 use miniscript::Descriptor;
 use reqwest::{Client, Method, RequestBuilder};
-use schemars::JsonSchema;
 use serde::{de, Deserialize, Deserializer};
 use serde_json::Value as JsonValue;
 
@@ -24,7 +23,7 @@ use super::types::{
 use crate::observer::EventObserverConfig;
 use crate::utils::{Context, MAX_BLOCK_HEIGHTS_ENTRIES};
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct BitcoinChainhookSpecification {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub blocks: Option<Vec<u64>>,
@@ -171,7 +170,7 @@ impl BitcoinChainhookSpecification {
 /// }
 ///
 /// ```
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct BitcoinChainhookSpecificationNetworkMap {
     pub uuid: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -244,7 +243,7 @@ impl BitcoinChainhookInstance {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub struct BitcoinTransactionFilterPredicate {
     pub predicate: BitcoinPredicateType,
@@ -256,7 +255,7 @@ impl BitcoinTransactionFilterPredicate {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case", tag = "scope")]
 pub enum BitcoinPredicateType {
     Block,
@@ -319,7 +318,7 @@ pub struct BitcoinChainhookPayload {
     pub uuid: String,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum InputPredicate {
     Txid(TxinPredicate),
@@ -335,7 +334,7 @@ impl InputPredicate {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum OutputPredicate {
     OpReturn(MatchingRule),
@@ -360,7 +359,7 @@ impl OutputPredicate {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case", tag = "operation")]
 pub enum StacksOperations {
     StackerRewarded,
@@ -370,7 +369,7 @@ pub enum StacksOperations {
     StxLocked,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, Hash, PartialEq, Eq, JsonSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, Hash, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
 pub enum OrdinalsMetaProtocol {
     All,
@@ -378,13 +377,13 @@ pub enum OrdinalsMetaProtocol {
     Brc20,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct InscriptionFeedData {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub meta_protocols: Option<HashSet<OrdinalsMetaProtocol>>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case", tag = "operation")]
 pub enum OrdinalOperations {
     InscriptionFeed(InscriptionFeedData),
@@ -433,7 +432,7 @@ impl TryFrom<u8> for StacksOpcodes {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub struct DescriptorMatchingRule {
     // expression defines the bitcoin descriptor.

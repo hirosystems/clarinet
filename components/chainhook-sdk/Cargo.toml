@@ -22,7 +22,6 @@ reqwest = { workspace = true, default-features = false, features = [
     "rustls-tls",
 ] }
 base58 = "0.2.0"
-schemars = { version = "0.8.16", git = "https://github.com/hirosystems/schemars.git", branch = "feat-chainhook-fixes" }
 crossbeam-channel = "0.5.6"
 hyper = { version = "=0.14.27", features = ["http1", "client"] }
 hex = "0.4.3"
