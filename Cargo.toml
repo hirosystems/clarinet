@@ -1,6 +1,8 @@
 [workspace]
 resolver = "2"
 members = [
+    "components/chainhook-sdk",
+    "components/chainhook-types-rs",
     "components/clarinet-cli",
     "components/clarinet-deployments",
     "components/clarinet-files",
@@ -58,14 +60,6 @@ indoc = "2.0.3"
 
 # dev dependencies
 mockito = { version = "1.6", default-features = false }
-
-[patch.crates-io]
-stacks-codec = { path = "./components/stacks-codec" }
-hiro-system-kit = { path = "./components/hiro-system-kit" }
-chainhook-sdk = { git = "https://github.com/hirosystems/chainhook.git", branch = "chore/update-clarinet-and-clarity" }
-chainhook-types = { git = "https://github.com/hirosystems/chainhook.git", branch = "chore/update-clarinet-and-clarity" }
-# chainhook-sdk = { path = "../chainhook/components/chainhook-sdk" }
-# chainhook-types = { path = "../chainhook/components/chainhook-types-rs" }
 
 # [patch.'https://github.com/stacks-network/stacks-core.git']
 # clarity = { path = "../stacks-core/clarity" }

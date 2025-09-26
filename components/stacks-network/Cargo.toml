@@ -36,9 +36,9 @@ indoc = { workspace = true }
 clarity = { workspace = true, default-features = false }
 stacks-common = { workspace = true, default-features = false }
 stackslib = { workspace = true }
-chainhook-sdk = { version = "0.12" }
-chainhook-types = { version = "1.3.7" }
 
+chainhook-sdk = { path = "../chainhook-sdk" }
+chainhook-types = { path = "../chainhook-types-rs" }
 stacks-rpc-client = { path = "../stacks-rpc-client" }
 clarinet-files = { path = "../clarinet-files" }
 clarinet-deployments = { path = "../clarinet-deployments" }
