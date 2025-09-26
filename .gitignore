@@ -13,8 +13,6 @@ npm-debug.log*
 **/.requirements
 **/.cache
 **/.build
-components/stacks-devnet-js/dist
-components/stacks-devnet-js/build
 *.tar.gz
 !components/stacks-network/data/devnet_default_snapshot.tar.gz
 *.zip
