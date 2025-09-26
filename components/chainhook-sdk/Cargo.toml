@@ -26,7 +26,6 @@ schemars = { version = "0.8.16", git = "https://github.com/hirosystems/schemars.
 crossbeam-channel = "0.5.6"
 hyper = { version = "=0.14.27", features = ["http1", "client"] }
 hex = "0.4.3"
-zmq = { version = "0.10.0", optional = true }
 lazy_static = "1.4.0"
 regex = "1.9.3"
 miniscript = "11.0.0"
@@ -42,7 +41,4 @@ test-case = "3.1.0"
 
 [features]
 default = ["hiro-system-kit/log", "stacks-signers"]
-zeromq = ["zmq"]
 stacks-signers = []
-debug = ["hiro-system-kit/debug"]
-release = ["hiro-system-kit/release_debug", "hiro-system-kit/full_log_level_prefix"]

@@ -1,6 +1,4 @@
 mod http;
-#[cfg(feature = "zeromq")]
-mod zmq;
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::error::Error;
@@ -894,16 +892,6 @@ pub async fn start_bitcoin_event_observer(
     ctx: Context,
 ) -> Result<(), Box<dyn Error>> {
     let chainhook_store = config.registered_chainhooks.clone();
-    #[cfg(feature = "zeromq")]
-    {
-        let ctx_moved = ctx.clone();
-        let config_moved = config.clone();
-        let _ = hiro_system_kit::thread_named("ZMQ handler").spawn(move || {
-            let future =
-                zmq::start_zeromq_runloop(&config_moved, _observer_commands_tx, &ctx_moved);
-            hiro_system_kit::nestable_block_on(future);
-        });
-    }
 
     let prometheus_monitoring = PrometheusMonitoring::new();
     prometheus_monitoring.initialize(

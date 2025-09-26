@@ -119,6 +119,7 @@ pub struct ContractInterfaceNonFungibleTokens {
 pub enum ClarityVersion {
     Clarity1,
     Clarity2,
+    Clarity3,
 }
 
 impl fmt::Display for ClarityVersion {
@@ -126,6 +127,7 @@ impl fmt::Display for ClarityVersion {
         match self {
             ClarityVersion::Clarity1 => write!(f, "Clarity 1"),
             ClarityVersion::Clarity2 => write!(f, "Clarity 2"),
+            ClarityVersion::Clarity3 => write!(f, "Clarity 3"),
         }
     }
 }
@@ -138,6 +140,8 @@ impl FromStr for ClarityVersion {
             Ok(ClarityVersion::Clarity1)
         } else if s == "clarity2" {
             Ok(ClarityVersion::Clarity2)
+        } else if s == "clarity3" {
+            Ok(ClarityVersion::Clarity3)
         } else {
             Err("Invalid clarity version. Valid versions are: Clarity1, Clarity2.".to_string())
         }
@@ -153,6 +157,10 @@ pub enum StacksEpochId {
     Epoch22 = 0x0200f,
     Epoch23 = 0x02014,
     Epoch24 = 0x02019,
+    Epoch25 = 0x0201a,
+    Epoch30 = 0x03000,
+    Epoch31 = 0x03001,
+    Epoch32 = 0x03002,
 }
 
 impl std::fmt::Display for StacksEpochId {
@@ -165,6 +173,10 @@ impl std::fmt::Display for StacksEpochId {
             StacksEpochId::Epoch22 => write!(f, "2.2"),
             StacksEpochId::Epoch23 => write!(f, "2.3"),
             StacksEpochId::Epoch24 => write!(f, "2.4"),
+            StacksEpochId::Epoch25 => write!(f, "2.5"),
+            StacksEpochId::Epoch30 => write!(f, "3.0"),
+            StacksEpochId::Epoch31 => write!(f, "3.1"),
+            StacksEpochId::Epoch32 => write!(f, "3.2"),
         }
     }
 }
