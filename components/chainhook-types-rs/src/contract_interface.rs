@@ -2,7 +2,8 @@
 // `clarity-vm` repository's [ContractInterface](https://github.com/stacks-network/stacks-blockchain/blob/eca1cfe81f0c0989ebd3e53c32e3e5d70ed83757/clarity/src/vm/analysis/contract_interface_builder/mod.rs#L368) type.
 // We've copied it here rather than using `clarity-vm` as a dependency to avoid circular dependencies.
 
-use std::{fmt, str::FromStr};
+use std::fmt;
+use std::str::FromStr;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ContractInterface {
@@ -138,9 +139,7 @@ impl FromStr for ClarityVersion {
         } else if s == "clarity2" {
             Ok(ClarityVersion::Clarity2)
         } else {
-            Err(format!(
-                "Invalid clarity version. Valid versions are: Clarity1, Clarity2."
-            ))
+            Err("Invalid clarity version. Valid versions are: Clarity1, Clarity2.".to_string())
         }
     }
 }

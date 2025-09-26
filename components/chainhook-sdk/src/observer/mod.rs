@@ -2,26 +2,13 @@ mod http;
 #[cfg(feature = "zeromq")]
 mod zmq;
 
-use crate::chainhooks::bitcoin::{
-    evaluate_bitcoin_chainhooks_on_chain_event, handle_bitcoin_hook_action,
-    BitcoinChainhookInstance, BitcoinChainhookOccurrence, BitcoinChainhookOccurrencePayload,
-    BitcoinTriggerChainhook,
-};
-use crate::chainhooks::stacks::{
-    evaluate_stacks_chainhooks_on_chain_event, handle_stacks_hook_action, StacksChainhookInstance,
-    StacksChainhookOccurrence, StacksChainhookOccurrencePayload,
-};
-use crate::chainhooks::types::{
-    ChainhookInstance, ChainhookSpecificationNetworkMap, ChainhookStore,
-};
-
-use crate::indexer::bitcoin::{
-    build_http_client, download_and_parse_block_with_retry, standardize_bitcoin_block,
-    BitcoinBlockFullBreakdown,
-};
-use crate::indexer::{Indexer, IndexerConfig};
-use crate::monitoring::{start_serving_prometheus_metrics, PrometheusMonitoring};
-use crate::utils::{send_request, Context};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::error::Error;
+use std::net::{IpAddr, Ipv4Addr};
+use std::str;
+use std::str::FromStr;
+use std::sync::mpsc::{Receiver, Sender};
+use std::sync::{Arc, Mutex, RwLock};
 
 use bitcoincore_rpc::bitcoin::{BlockHash, Txid};
 use bitcoincore_rpc::{Auth, Client, RpcApi};
@@ -37,13 +24,26 @@ use rocket::config::{self, Config, LogLevel};
 use rocket::data::{Limits, ToByteUnit};
 use rocket::serde::Deserialize;
 use rocket::Shutdown;
-use std::collections::{BTreeMap, BTreeSet, HashMap};
-use std::error::Error;
-use std::net::{IpAddr, Ipv4Addr};
-use std::str;
-use std::str::FromStr;
-use std::sync::mpsc::{Receiver, Sender};
-use std::sync::{Arc, Mutex, RwLock};
+
+use crate::chainhooks::bitcoin::{
+    evaluate_bitcoin_chainhooks_on_chain_event, handle_bitcoin_hook_action,
+    BitcoinChainhookInstance, BitcoinChainhookOccurrence, BitcoinChainhookOccurrencePayload,
+    BitcoinTriggerChainhook,
+};
+use crate::chainhooks::stacks::{
+    evaluate_stacks_chainhooks_on_chain_event, handle_stacks_hook_action, StacksChainhookInstance,
+    StacksChainhookOccurrence, StacksChainhookOccurrencePayload,
+};
+use crate::chainhooks::types::{
+    ChainhookInstance, ChainhookSpecificationNetworkMap, ChainhookStore,
+};
+use crate::indexer::bitcoin::{
+    build_http_client, download_and_parse_block_with_retry, standardize_bitcoin_block,
+    BitcoinBlockFullBreakdown,
+};
+use crate::indexer::{Indexer, IndexerConfig};
+use crate::monitoring::{start_serving_prometheus_metrics, PrometheusMonitoring};
+use crate::utils::{send_request, Context};
 
 pub const DEFAULT_INGESTION_PORT: u16 = 20445;
 
@@ -304,7 +304,7 @@ impl BitcoinEventObserverConfigBuilder {
     /// This function will return an error if the `bitcoin_network` string is set and is not a valid [BitcoinNetwork].
     pub fn finish(&self) -> Result<EventObserverConfig, String> {
         let bitcoin_network = if let Some(network) = self.bitcoin_network.as_ref() {
-            BitcoinNetwork::from_str(network)?
+            BitcoinNetwork::try_from(network.as_str())?
         } else {
             BitcoinNetwork::Regtest
         };
@@ -339,9 +339,9 @@ impl BitcoinEventObserverConfigBuilder {
     }
 }
 
-impl EventObserverConfig {
-    pub fn default() -> Self {
-        EventObserverConfig {
+impl Default for EventObserverConfig {
+    fn default() -> Self {
+        Self {
             registered_chainhooks: ChainhookStore::new(),
             predicates_config: PredicatesConfig {
                 payload_http_request_timeout_ms: None,
@@ -360,7 +360,9 @@ impl EventObserverConfig {
             prometheus_monitoring_port: None,
         }
     }
+}
 
+impl EventObserverConfig {
     /// Adds a [ChainhookInstance] to config's the registered chainhook store, returning the updated config.
     pub fn register_chainhook_instance(
         &mut self,
@@ -413,14 +415,14 @@ impl EventObserverConfig {
     ) -> Result<EventObserverConfig, String> {
         let bitcoin_network =
             if let Some(network) = overrides.and_then(|c| c.bitcoin_network.as_ref()) {
-                BitcoinNetwork::from_str(network)?
+                BitcoinNetwork::try_from(network.as_str())?
             } else {
                 BitcoinNetwork::Regtest
             };
 
         let stacks_network =
             if let Some(network) = overrides.and_then(|c| c.stacks_network.as_ref()) {
-                StacksNetwork::from_str(network)?
+                StacksNetwork::try_from(network.as_str())?
             } else {
                 StacksNetwork::Devnet
             };
@@ -994,10 +996,12 @@ pub async fn start_stacks_event_observer(
     }
 
     let limits = Limits::default().limit("json", 500.megabytes());
-    let mut shutdown_config = config::Shutdown::default();
-    shutdown_config.ctrlc = false;
-    shutdown_config.grace = 0;
-    shutdown_config.mercy = 0;
+    let shutdown_config = config::Shutdown {
+        ctrlc: false,
+        grace: 0,
+        mercy: 0,
+        ..Default::default()
+    };
 
     let ingestion_config = Config {
         port: ingestion_port,
@@ -1665,7 +1669,7 @@ pub async fn start_observer_commands_handler(
                         .iter()
                         .map(|e| &e.received_at_block)
                         .collect::<Vec<&BlockIdentifier>>();
-                    if event_block_ids.len() > 0 {
+                    if !event_block_ids.is_empty() {
                         block_ids.append(&mut event_block_ids);
                     }
                     report.track_trigger(&entry.chainhook.uuid, &block_ids);

@@ -2,10 +2,7 @@ pub mod bitcoin;
 pub mod fork_scratch_pad;
 pub mod stacks;
 
-use crate::{
-    chainhooks::types::PoxConfig,
-    utils::{AbstractBlock, Context},
-};
+use std::collections::{HashMap, VecDeque};
 
 use chainhook_types::{
     BitcoinBlockSignaling, BitcoinNetwork, BlockHeader, BlockIdentifier, BlockchainEvent,
@@ -13,11 +10,11 @@ use chainhook_types::{
 };
 use hiro_system_kit::slog;
 use rocket::serde::json::Value as JsonValue;
-
 use stacks::StacksBlockPool;
-use std::collections::{HashMap, VecDeque};
 
 use self::fork_scratch_pad::ForkScratchPad;
+use crate::chainhooks::types::PoxConfig;
+use crate::utils::{AbstractBlock, Context};
 
 #[derive(Deserialize, Debug, Clone, Default)]
 pub struct AssetClassCache {
@@ -185,7 +182,7 @@ impl Indexer {
             marshalled_stackerdb_chunks,
             ctx,
         )?;
-        if chunks.len() > 0 {
+        if !chunks.is_empty() {
             Ok(Some(StacksChainEvent::ChainUpdatedWithNonConsensusEvents(
                 StacksChainUpdatedWithNonConsensusEventsData {
                     events: chunks

@@ -149,13 +149,7 @@ pub struct StacksTransactionEvent {
     pub position: StacksTransactionEventPosition,
 }
 
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, Default)]
 pub struct StacksTransactionEventPosition {
     pub index: u32,
-}
-
-impl Default for StacksTransactionEventPosition {
-    fn default() -> Self {
-        Self { index: 0 }
-    }
 }

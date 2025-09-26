@@ -4,14 +4,11 @@ use chainhook_types::{
     NFTTransferEventData, STXBurnEventData, STXLockEventData, STXMintEventData,
     STXTransferEventData, SmartContractEventData, StacksTransactionEventPayload,
 };
-
-use crate::indexer::tests::helpers::stacks_events::create_new_event_from_stacks_event;
-
-use super::{
-    super::tests::{helpers, process_stacks_blocks_and_check_expectations},
-    NewEvent,
-};
 use test_case::test_case;
+
+use super::super::tests::{helpers, process_stacks_blocks_and_check_expectations};
+use super::NewEvent;
+use crate::indexer::tests::helpers::stacks_events::create_new_event_from_stacks_event;
 
 #[test]
 fn test_stacks_vector_001() {
@@ -404,15 +401,12 @@ fn into_chainhook_event_rejects_invalid_missing_event() {
 fn parses_block_response_signer_message() {
     use chainhook_types::{BlockResponseData, StacksSignerMessage};
 
-    use crate::{
-        indexer::stacks::{
-            NewSignerModifiedSlot, NewStackerDbChunkIssuerId, NewStackerDbChunkIssuerSlots,
-            NewStackerDbChunks, NewStackerDbChunksContractId,
-        },
-        utils::Context,
-    };
-
     use super::standardize_stacks_stackerdb_chunks;
+    use crate::indexer::stacks::{
+        NewSignerModifiedSlot, NewStackerDbChunkIssuerId, NewStackerDbChunkIssuerSlots,
+        NewStackerDbChunks, NewStackerDbChunksContractId,
+    };
+    use crate::utils::Context;
 
     let new_chunks = NewStackerDbChunks {
         contract_id: NewStackerDbChunksContractId {
@@ -442,16 +436,13 @@ fn parses_block_response_signer_message() {
     assert_eq!(message.sig, "0x01060cc1bef9ccfe7139f5240ff5c33c44c83206e851e21b63234a996654f70d750b44d9c76466a5c45515b63183dfcfaefe5877fbd3593859e50d5df39cd469a1");
 
     match &message.message {
-        StacksSignerMessage::BlockResponse(response) => match response {
-            BlockResponseData::Accepted(accepted) => {
-                assert_eq!(accepted.signature, "0x00a1c66742e665e981d10f7a70a5df312c9cba729331129ff1b510e71133d79c0122b25266bf47e8c1c923b4fde0464756ced884030e9983f797c902961fc9b0b1");
-                assert_eq!(
-                    accepted.signer_signature_hash,
-                    "0x8f913dd2bcc2cfbd1c82166e0ad99230f76de098a5ba6ee1b15b042c8f67c6f0"
-                );
-            }
-            _ => assert!(false),
-        },
-        _ => assert!(false),
+        StacksSignerMessage::BlockResponse(BlockResponseData::Accepted(accepted)) => {
+            assert_eq!(accepted.signature, "0x00a1c66742e665e981d10f7a70a5df312c9cba729331129ff1b510e71133d79c0122b25266bf47e8c1c923b4fde0464756ced884030e9983f797c902961fc9b0b1");
+            assert_eq!(
+                accepted.signer_signature_hash,
+                "0x8f913dd2bcc2cfbd1c82166e0ad99230f76de098a5ba6ee1b15b042c8f67c6f0"
+            );
+        }
+        _ => panic!(),
     }
 }

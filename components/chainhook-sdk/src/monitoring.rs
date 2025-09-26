@@ -1,18 +1,14 @@
-use crate::utils::Context;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use hiro_system_kit::slog;
-use hyper::{
-    header::CONTENT_TYPE,
-    service::{make_service_fn, service_fn},
-    Body, Method, Request, Response, Server,
-};
-use prometheus::{
-    self,
-    core::{AtomicU64, GenericGauge},
-    Encoder, IntGauge, Registry, TextEncoder,
-};
+use hyper::header::CONTENT_TYPE;
+use hyper::service::{make_service_fn, service_fn};
+use hyper::{Body, Method, Request, Response, Server};
+use prometheus::core::{AtomicU64, GenericGauge};
+use prometheus::{self, Encoder, IntGauge, Registry, TextEncoder};
 use rocket::serde::json::{json, Value as JsonValue};
-use std::time::{SystemTime, UNIX_EPOCH};
+
+use crate::utils::Context;
 
 type UInt64Gauge = GenericGauge<AtomicU64>;
 
@@ -476,7 +472,8 @@ pub async fn start_serving_prometheus_metrics(port: u16, registry: Registry, ctx
 
 #[cfg(test)]
 mod test {
-    use std::{thread::sleep, time::Duration};
+    use std::thread::sleep;
+    use std::time::Duration;
 
     use super::PrometheusMonitoring;
 

@@ -687,10 +687,9 @@ pub fn standardize_stacks_marshalled_stackerdb_chunks(
     marshalled_stackerdb_chunks: JsonValue,
     ctx: &Context,
 ) -> Result<Vec<StacksStackerDbChunk>, String> {
-    let mut stackerdb_chunks: NewStackerDbChunks =
-        serde_json::from_value(marshalled_stackerdb_chunks)
-            .map_err(|e| format!("unable to parse stackerdb chunks {e}"))?;
-    standardize_stacks_stackerdb_chunks(&mut stackerdb_chunks, ctx)
+    let stackerdb_chunks: NewStackerDbChunks = serde_json::from_value(marshalled_stackerdb_chunks)
+        .map_err(|e| format!("unable to parse stackerdb chunks {e}"))?;
+    standardize_stacks_stackerdb_chunks(&stackerdb_chunks, ctx)
 }
 
 #[cfg(feature = "stacks-signers")]
@@ -801,13 +800,12 @@ pub fn standardize_stacks_stackerdb_chunks(
                 mock_signatures: data
                     .mock_signatures
                     .iter()
-                    .map(|signature| standardize_stacks_signer_mock_signature(signature))
+                    .map(standardize_stacks_signer_mock_signature)
                     .try_fold(
                         Vec::new(),
                         |mut acc, item| -> Result<Vec<MockSignatureData>, String> {
-                            item.and_then(|val| {
+                            item.map(|val| {
                                 acc.push(val);
-                                Ok(())
                             })?;
                             Ok(acc)
                         },
@@ -833,11 +831,11 @@ pub fn standardize_stacks_signer_mock_signature(
     signature: &stacks_codec::codec::MockSignature,
 ) -> Result<MockSignatureData, String> {
     let pubkey = get_signer_pubkey_from_message_hash(
-        &signature
+        signature
             .mock_proposal
             .signer_signature_hash()
             .as_bytes()
-            .to_vec(),
+            .as_ref(),
         &signature.signature,
     )?;
     Ok(MockSignatureData {
@@ -933,13 +931,13 @@ fn get_nakamoto_block_hash(block: &stacks_codec::codec::NakamotoBlock) -> Result
 
 #[cfg(feature = "stacks-signers")]
 fn get_nakamoto_index_block_hash(
-    block_hash: &String,
+    block_hash: &str,
     consensus_hash: &clarity::types::chainstate::ConsensusHash,
 ) -> Result<String, String> {
     use clarity::util::hash::Sha512Trunc256Sum;
 
-    let mut bytes = hex::decode(block_hash[2..].to_string())
-        .map_err(|e| format!("unable to decode block hash: {e}"))?;
+    let mut bytes =
+        hex::decode(&block_hash[2..]).map_err(|e| format!("unable to decode block hash: {e}"))?;
     bytes.extend(consensus_hash.as_bytes());
 
     let hash = Sha512Trunc256Sum::from_data(&bytes).to_bytes();
@@ -947,7 +945,7 @@ fn get_nakamoto_index_block_hash(
 }
 
 pub fn get_signer_pubkey_from_message_hash(
-    message_hash: &Vec<u8>,
+    message_hash: &[u8],
     signature: &clarity::util::secp256k1::MessageSignature,
 ) -> Result<[u8; 33], String> {
     use miniscript::bitcoin::key::Secp256k1;
@@ -960,9 +958,9 @@ pub fn get_signer_pubkey_from_message_hash(
     let secp = Secp256k1::new();
     let recovery_id =
         RecoveryId::from_i32(rec_id as i32).map_err(|e| format!("invalid recovery id: {e}"))?;
-    let signature = RecoverableSignature::from_compact(&sig, recovery_id)
+    let signature = RecoverableSignature::from_compact(sig, recovery_id)
         .map_err(|e| format!("invalid signature: {e}"))?;
-    let message = Message::from_digest_slice(&message_hash)
+    let message = Message::from_digest_slice(message_hash)
         .map_err(|e| format!("invalid digest message: {e}"))?;
 
     let pubkey = secp
@@ -975,7 +973,7 @@ pub fn get_signer_pubkey_from_message_hash(
 #[cfg(feature = "stacks-signers")]
 pub fn get_signer_pubkey_from_stackerdb_chunk_slot(
     slot: &NewSignerModifiedSlot,
-    data_bytes: &Vec<u8>,
+    data_bytes: &[u8],
 ) -> Result<String, String> {
     use clarity::util::hash::Sha512Trunc256Sum;
     use miniscript::bitcoin::key::Secp256k1;
@@ -984,7 +982,7 @@ pub fn get_signer_pubkey_from_stackerdb_chunk_slot(
 
     let mut digest_bytes = slot.slot_id.to_be_bytes().to_vec();
     digest_bytes.extend(slot.slot_version.to_be_bytes());
-    let data_bytes_hashed = Sha512Trunc256Sum::from_data(&data_bytes).to_bytes();
+    let data_bytes_hashed = Sha512Trunc256Sum::from_data(data_bytes).to_bytes();
     digest_bytes.extend(data_bytes_hashed);
     let digest = Sha512Trunc256Sum::from_data(&digest_bytes).to_bytes();
 
@@ -996,7 +994,7 @@ pub fn get_signer_pubkey_from_stackerdb_chunk_slot(
     let secp = Secp256k1::new();
     let recovery_id =
         RecoveryId::from_i32(rec_id as i32).map_err(|e| format!("invalid recovery id: {e}"))?;
-    let signature = RecoverableSignature::from_compact(&sig, recovery_id)
+    let signature = RecoverableSignature::from_compact(sig, recovery_id)
         .map_err(|e| format!("invalid signature: {e}"))?;
     let message =
         Message::from_digest_slice(&digest).map_err(|e| format!("invalid digest message: {e}"))?;

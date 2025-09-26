@@ -1,3 +1,16 @@
+use std::sync::mpsc::Sender;
+use std::sync::{Arc, Mutex, RwLock};
+
+use hiro_system_kit::slog;
+use rocket::http::Status;
+use rocket::response::status::Custom;
+use rocket::serde::json::{json, Json, Value as JsonValue};
+use rocket::State;
+
+use super::{
+    BitcoinConfig, BitcoinRPCRequest, MempoolAdmissionData, ObserverCommand,
+    StacksChainMempoolEvent,
+};
 use crate::indexer::bitcoin::{
     build_http_client, download_and_parse_block_with_retry, NewBitcoinBlock,
 };
@@ -5,18 +18,6 @@ use crate::indexer::{self, Indexer};
 use crate::monitoring::PrometheusMonitoring;
 use crate::utils::Context;
 use crate::{try_error, try_info};
-use hiro_system_kit::slog;
-use rocket::http::Status;
-use rocket::response::status::Custom;
-use rocket::serde::json::{json, Json, Value as JsonValue};
-use rocket::State;
-use std::sync::mpsc::Sender;
-use std::sync::{Arc, Mutex, RwLock};
-
-use super::{
-    BitcoinConfig, BitcoinRPCRequest, MempoolAdmissionData, ObserverCommand,
-    StacksChainMempoolEvent,
-};
 
 fn success_response() -> Result<Json<JsonValue>, Custom<Json<JsonValue>>> {
     Ok(Json(json!({
@@ -195,8 +196,11 @@ pub fn handle_stackerdb_chunks(
         return error_response("Unable to get system receipt_time".to_string(), ctx);
     };
     let chain_event = match indexer_rw_lock.inner().write() {
-        Ok(mut indexer) => indexer
-            .handle_stacks_marshalled_stackerdb_chunk(payload.into_inner(), epoch.as_millis(), ctx),
+        Ok(mut indexer) => indexer.handle_stacks_marshalled_stackerdb_chunk(
+            payload.into_inner(),
+            epoch.as_millis(),
+            ctx,
+        ),
         Err(e) => {
             return error_response(format!("Unable to acquire background_job_tx: {e}"), ctx);
         }
@@ -274,12 +278,12 @@ pub fn handle_new_mempool_tx(
     let transactions = match raw_txs
         .iter()
         .map(|tx_data| {
-            indexer::stacks::get_tx_description(tx_data, &vec![])
-                .map(|(tx_description, ..)| MempoolAdmissionData {
+            indexer::stacks::get_tx_description(tx_data, &vec![]).map(|(tx_description, ..)| {
+                MempoolAdmissionData {
                     tx_data: tx_data.clone(),
                     tx_description,
-                })
-                .map_err(|e| e)
+                }
+            })
         })
         .collect::<Result<Vec<MempoolAdmissionData>, _>>()
     {

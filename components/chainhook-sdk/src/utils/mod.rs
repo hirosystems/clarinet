@@ -1,12 +1,11 @@
-use std::{
-    collections::{BTreeSet, VecDeque},
-    fs::{self, OpenOptions},
-    io::{Read, Write},
-    path::PathBuf,
-};
+use std::collections::{BTreeSet, VecDeque};
+use std::fs::{self, OpenOptions};
+use std::io::{Read, Write};
+use std::path::{Path, PathBuf};
 
 use chainhook_types::{
-    BitcoinBlockData, BlockHeader, BlockIdentifier, StacksBlockData, StacksMicroblockData, StacksTransactionData
+    BitcoinBlockData, BlockHeader, BlockIdentifier, StacksBlockData, StacksMicroblockData,
+    StacksTransactionData,
 };
 use hiro_system_kit::slog::{self, Logger};
 use reqwest::RequestBuilder;
@@ -206,11 +205,7 @@ pub fn file_append(path: String, bytes: Vec<u8>, ctx: &Context) -> Result<(), St
                 let _ = file.write_all(&bytes);
             }
             Err(e) => {
-                let msg = format!(
-                    "unable to create file {}: {}",
-                    file_path.display(),
-                    e
-                );
+                let msg = format!("unable to create file {}: {}", file_path.display(), e);
                 ctx.try_log(|logger| slog::warn!(logger, "{}", msg));
                 return Err(msg);
             }
@@ -219,7 +214,6 @@ pub fn file_append(path: String, bytes: Vec<u8>, ctx: &Context) -> Result<(), St
 
     let mut file = match OpenOptions::new()
         .create(false)
-        
         .append(true)
         .open(file_path)
     {
@@ -371,11 +365,11 @@ fn test_block_heights_blocks_limits_entries() {
     };
 }
 
-pub fn read_file_content_at_path(file_path: &PathBuf) -> Result<Vec<u8>, String> {
+pub fn read_file_content_at_path(file_path: &Path) -> Result<Vec<u8>, String> {
     use std::fs::File;
     use std::io::BufReader;
 
-    let file = File::open(file_path.clone())
+    let file = File::open(file_path)
         .map_err(|e| format!("unable to read file {}\n{:?}", file_path.display(), e))?;
     let mut file_reader = BufReader::new(file);
     let mut file_buffer = vec![];

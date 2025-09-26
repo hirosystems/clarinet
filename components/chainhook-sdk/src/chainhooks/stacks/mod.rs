@@ -750,7 +750,7 @@ pub fn evaluate_stacks_chainhooks_on_chain_event<'a>(
                             ctx,
                         );
                     expired_predicates.append(&mut expirations);
-                    if occurrences.len() > 0 {
+                    if !occurrences.is_empty() {
                         triggered_predicates.push(StacksTriggerChainhook {
                             chainhook,
                             apply: vec![],

@@ -1,12 +1,15 @@
-use super::bitcoin::{TxIn, TxOut};
-use crate::contract_interface::ContractInterface;
-use crate::ordinals::OrdinalOperation;
-use crate::{events::*, Brc20Operation, StacksStackerDbChunk, DEFAULT_STACKS_NODE_RPC};
-use schemars::JsonSchema;
 use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::fmt::Display;
 use std::hash::{Hash, Hasher};
+
+use schemars::JsonSchema;
+
+use super::bitcoin::{TxIn, TxOut};
+use crate::contract_interface::ContractInterface;
+use crate::events::*;
+use crate::ordinals::OrdinalOperation;
+use crate::{Brc20Operation, StacksStackerDbChunk, DEFAULT_STACKS_NODE_RPC};
 
 /// BlockIdentifier uniquely identifies a block in a particular network.
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
@@ -22,7 +25,7 @@ impl BlockIdentifier {
     }
 
     pub fn get_hash_bytes(&self) -> Vec<u8> {
-        hex::decode(&self.get_hash_bytes_str()).unwrap()
+        hex::decode(self.get_hash_bytes_str()).unwrap()
     }
 }
 
@@ -52,7 +55,7 @@ impl Ord for BlockIdentifier {
 
 impl PartialOrd for BlockIdentifier {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(other.cmp(self))
+        Some(self.cmp(other))
     }
 }
 
@@ -429,7 +432,7 @@ impl TransactionIdentifier {
     }
 
     pub fn get_hash_bytes(&self) -> Vec<u8> {
-        hex::decode(&self.get_hash_bytes_str()).unwrap()
+        hex::decode(self.get_hash_bytes_str()).unwrap()
     }
 
     pub fn get_8_hash_bytes(&self) -> [u8; 8] {
@@ -733,22 +736,21 @@ impl StacksChainEvent {
 
     pub fn get_latest_block_identifier(&self) -> Option<&BlockIdentifier> {
         match self {
-            StacksChainEvent::ChainUpdatedWithBlocks(event) => event
-                .new_blocks
-                .last()
-                .and_then(|b| Some(&b.block.block_identifier)),
+            StacksChainEvent::ChainUpdatedWithBlocks(event) => {
+                event.new_blocks.last().map(|b| &b.block.block_identifier)
+            }
             StacksChainEvent::ChainUpdatedWithReorg(event) => event
                 .blocks_to_apply
                 .last()
-                .and_then(|b| Some(&b.block.block_identifier)),
+                .map(|b| &b.block.block_identifier),
             StacksChainEvent::ChainUpdatedWithMicroblocks(event) => event
                 .new_microblocks
                 .first()
-                .and_then(|b| Some(&b.metadata.anchor_block_identifier)),
+                .map(|b| &b.metadata.anchor_block_identifier),
             StacksChainEvent::ChainUpdatedWithMicroblocksReorg(event) => event
                 .microblocks_to_apply
                 .first()
-                .and_then(|b| Some(&b.metadata.anchor_block_identifier)),
+                .map(|b| &b.metadata.anchor_block_identifier),
             StacksChainEvent::ChainUpdatedWithNonConsensusEvents(_) => None,
         }
     }
@@ -811,23 +813,24 @@ impl std::fmt::Display for StacksNetwork {
         write!(f, "{}", self.as_str())
     }
 }
-impl StacksNetwork {
-    pub fn from_str(network: &str) -> Result<StacksNetwork, String> {
-        let value = match network {
-            "devnet" => StacksNetwork::Devnet,
-            "testnet" => StacksNetwork::Testnet,
-            "mainnet" => StacksNetwork::Mainnet,
-            "simnet" => StacksNetwork::Simnet,
-            _ => {
-                return Err(format!(
-                    "network '{}' unsupported (mainnet, testnet, devnet, simnet)",
-                    network
-                ))
-            }
-        };
-        Ok(value)
-    }
 
+impl TryFrom<&str> for StacksNetwork {
+    type Error = String;
+
+    fn try_from(network: &str) -> Result<Self, Self::Error> {
+        match network {
+            "devnet" => Ok(StacksNetwork::Devnet),
+            "testnet" => Ok(StacksNetwork::Testnet),
+            "mainnet" => Ok(StacksNetwork::Mainnet),
+            "simnet" => Ok(StacksNetwork::Simnet),
+            _ => Err(format!(
+                "network '{network}' unsupported (mainnet, testnet, devnet, simnet)",
+            )),
+        }
+    }
+}
+
+impl StacksNetwork {
     pub fn as_str(&self) -> &str {
         match self {
             StacksNetwork::Devnet => "devnet",
@@ -838,45 +841,27 @@ impl StacksNetwork {
     }
 
     pub fn is_simnet(&self) -> bool {
-        match self {
-            StacksNetwork::Simnet => true,
-            _ => false,
-        }
+        matches!(self, StacksNetwork::Simnet)
     }
 
     pub fn is_testnet(&self) -> bool {
-        match self {
-            StacksNetwork::Testnet => true,
-            _ => false,
-        }
+        matches!(self, StacksNetwork::Testnet)
     }
 
     pub fn either_devnet_or_testnet(&self) -> bool {
-        match self {
-            StacksNetwork::Devnet | StacksNetwork::Testnet => true,
-            _ => false,
-        }
+        matches!(self, StacksNetwork::Devnet | StacksNetwork::Testnet)
     }
 
     pub fn either_testnet_or_mainnet(&self) -> bool {
-        match self {
-            StacksNetwork::Mainnet | StacksNetwork::Testnet => true,
-            _ => false,
-        }
+        matches!(self, StacksNetwork::Mainnet | StacksNetwork::Testnet)
     }
 
     pub fn is_devnet(&self) -> bool {
-        match self {
-            StacksNetwork::Devnet => true,
-            _ => false,
-        }
+        matches!(self, StacksNetwork::Devnet)
     }
 
     pub fn is_mainnet(&self) -> bool {
-        match self {
-            StacksNetwork::Mainnet => true,
-            _ => false,
-        }
+        matches!(self, StacksNetwork::Mainnet)
     }
 
     pub fn get_networks(&self) -> (BitcoinNetwork, StacksNetwork) {
@@ -906,23 +891,24 @@ impl std::fmt::Display for BitcoinNetwork {
         write!(f, "{}", self.as_str())
     }
 }
-impl BitcoinNetwork {
-    pub fn from_str(network: &str) -> Result<BitcoinNetwork, String> {
-        let value = match network {
-            "regtest" => BitcoinNetwork::Regtest,
-            "testnet" => BitcoinNetwork::Testnet,
-            "mainnet" => BitcoinNetwork::Mainnet,
-            "signet" => BitcoinNetwork::Signet,
-            _ => {
-                return Err(format!(
-                    "network '{}' unsupported (mainnet, testnet, regtest, signet)",
-                    network
-                ))
-            }
-        };
-        Ok(value)
-    }
 
+impl TryFrom<&str> for BitcoinNetwork {
+    type Error = String;
+
+    fn try_from(network: &str) -> Result<Self, Self::Error> {
+        match network {
+            "regtest" => Ok(BitcoinNetwork::Regtest),
+            "testnet" => Ok(BitcoinNetwork::Testnet),
+            "mainnet" => Ok(BitcoinNetwork::Mainnet),
+            "signet" => Ok(BitcoinNetwork::Signet),
+            _ => Err(format!(
+                "network '{network}' unsupported (mainnet, testnet, regtest, signet)",
+            )),
+        }
+    }
+}
+
+impl BitcoinNetwork {
     pub fn as_str(&self) -> &str {
         match self {
             BitcoinNetwork::Regtest => "regtest",
@@ -963,16 +949,10 @@ impl StacksNodeConfig {
 
 impl BitcoinBlockSignaling {
     pub fn should_ignore_bitcoin_block_signaling_through_stacks(&self) -> bool {
-        match &self {
-            BitcoinBlockSignaling::Stacks(_) => false,
-            _ => true,
-        }
+        !matches!(self, BitcoinBlockSignaling::Stacks(_))
     }
 
     pub fn is_bitcoind_zmq_block_signaling_expected(&self) -> bool {
-        match &self {
-            BitcoinBlockSignaling::ZeroMQ(_) => false,
-            _ => true,
-        }
+        !matches!(self, BitcoinBlockSignaling::ZeroMQ(_))
     }
 }

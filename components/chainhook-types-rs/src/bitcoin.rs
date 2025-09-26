@@ -45,7 +45,7 @@ pub struct OutPoint {
 
 impl TxOut {
     pub fn get_script_pubkey_bytes(&self) -> Vec<u8> {
-        hex::decode(&self.get_script_pubkey_hex()).expect("not provided for coinbase txs")
+        hex::decode(self.get_script_pubkey_hex()).expect("not provided for coinbase txs")
     }
 
     pub fn get_script_pubkey_hex(&self) -> &str {
