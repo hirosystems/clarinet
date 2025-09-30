@@ -46,6 +46,7 @@ use stackslib::util_lib::signed_structured_data::pox4::{
 };
 
 use super::ChainsCoordinatorCommand;
+use crate::command::run_command;
 use crate::event::{send_status_update, DevnetEvent, Status};
 use crate::orchestrator::{
     copy_directory, get_global_snapshot_dir, get_project_snapshot_dir, ServicesMapHosts,
@@ -1314,20 +1315,15 @@ async fn export_stacks_api_events(
     // Get container name
     let container_name = format!("stacks-api.{}.devnet", config.manifest.project.name);
 
-    // Create exec command to export events
-    let export_command = format!(
-        "docker exec {container_name} node /app/lib/index.js export-events --file /tmp/events_cache.tsv --overwrite-file"
-    );
-
     let _ = devnet_event_tx.send(DevnetEvent::info(
         "Exporting Stacks API events...".to_string(),
     ));
 
-    // Execute the export command
-    let output = std::process::Command::new("sh")
-        .arg("-c")
-        .arg(&export_command)
-        .output()
+    // Create exec command to export events
+    let export_command = format!(
+        "docker exec {container_name} node /app/lib/index.js export-events --file /tmp/events_cache.tsv --overwrite-file"
+    );
+    let output = run_command(&export_command)
         .map_err(|e| format!("Failed to execute export command: {e}"))?;
 
     if !output.status.success() {
@@ -1351,11 +1347,8 @@ async fn export_stacks_api_events(
         export_path.join("events_cache.tsv").display()
     );
 
-    let output = std::process::Command::new("sh")
-        .arg("-c")
-        .arg(&copy_command)
-        .output()
-        .map_err(|e| format!("Failed to copy events file: {e}"))?;
+    let output =
+        run_command(&copy_command).map_err(|e| format!("Failed to copy events file: {e}"))?;
 
     if !output.status.success() {
         return Err(format!(
