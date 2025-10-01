@@ -2,7 +2,7 @@
 resolver = "2"
 members = [
     "components/chainhook-sdk",
-    "components/chainhook-types-rs",
+    "components/chainhook-types",
     "components/clarinet-cli",
     "components/clarinet-deployments",
     "components/clarinet-files",

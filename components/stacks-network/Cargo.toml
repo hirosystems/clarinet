@@ -38,7 +38,7 @@ stacks-common = { workspace = true, default-features = false }
 stackslib = { workspace = true }
 
 chainhook-sdk = { path = "../chainhook-sdk" }
-chainhook-types = { path = "../chainhook-types-rs" }
+chainhook-types = { path = "../chainhook-types" }
 stacks-rpc-client = { path = "../stacks-rpc-client" }
 clarinet-files = { path = "../clarinet-files" }
 clarinet-deployments = { path = "../clarinet-deployments" }
