@@ -825,7 +825,8 @@ pub fn start_event_observer(
             let context_cloned = ctx.clone();
             let event_observer_config_moved = config.clone();
             let observer_commands_tx_moved = observer_commands_tx.clone();
-            let _ = std::thread::Builder::new().name("Chainhook event observer".to_string())
+            let _ = std::thread::Builder::new()
+                .name("Chainhook event observer".to_string())
                 .spawn(move || {
                     let rt = tokio::runtime::Runtime::new().unwrap();
                     rt.block_on(start_bitcoin_event_observer(
@@ -835,7 +836,8 @@ pub fn start_event_observer(
                         observer_events_tx.clone(),
                         observer_sidecar,
                         context_cloned.clone(),
-                    )).unwrap_or_else(|e| {
+                    ))
+                    .unwrap_or_else(|e| {
                         if let Some(tx) = observer_events_tx {
                             context_cloned.try_log(|logger| {
                                 slog::crit!(
@@ -855,7 +857,8 @@ pub fn start_event_observer(
             let event_observer_config_moved = config.clone();
             let observer_commands_tx_moved = observer_commands_tx.clone();
 
-            let _ = std::thread::Builder::new().name("Chainhook event observer".to_string())
+            let _ = std::thread::Builder::new()
+                .name("Chainhook event observer".to_string())
                 .spawn(move || {
                     let rt = tokio::runtime::Runtime::new().unwrap();
                     rt.block_on(start_stacks_event_observer(
@@ -866,7 +869,8 @@ pub fn start_event_observer(
                         observer_sidecar,
                         stacks_startup_context.unwrap_or_default(),
                         context_cloned.clone(),
-                    )).unwrap_or_else(|e| {
+                    ))
+                    .unwrap_or_else(|e| {
                         if let Some(tx) = observer_events_tx {
                             context_cloned.try_log(|logger| {
                                 slog::crit!(
