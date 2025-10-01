@@ -3887,6 +3887,7 @@ impl From<&BlockResponse> for BlockResponseTypePrefix {
 
 // This enum is used to supply a `reason_code` for validation
 //  rejection responses. This is serialized as an enum with string
+//  type (in jsonschema terminology).
 define_u8_enum![ValidateRejectCode {
     BadBlockHash = 0,
     BadTransaction = 1,
