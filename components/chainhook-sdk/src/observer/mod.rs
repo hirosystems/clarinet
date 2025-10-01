@@ -29,18 +29,13 @@ impl Shutdown {
 }
 
 // LogLevel enum to replace Rocket's LogLevel
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub enum LogLevel {
     Off,
     Critical,
+    #[default]
     Normal,
     Debug,
-}
-
-impl Default for LogLevel {
-    fn default() -> Self {
-        LogLevel::Normal
-    }
 }
 
 use crate::chainhooks::bitcoin::{
