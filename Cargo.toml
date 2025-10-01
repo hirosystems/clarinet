@@ -28,7 +28,10 @@ stacks-common = { git = "https://github.com/stacks-network/stacks-core.git", bra
 pox-locking = { git = "https://github.com/stacks-network/stacks-core.git", branch="develop", package = "pox-locking", default-features = false }
 stackslib = { git = "https://github.com/stacks-network/stacks-core.git", branch="develop", package = "stackslib", default-features = false}
 
+base58 = "0.2.0"
 base64 = "0.22.1"
+bitcoincore-rpc = "0.18.0"
+bitcoincore-rpc-json = "0.18.0"
 clap = "4.5.47"
 colored = "3"
 chrono = "0.4.42"

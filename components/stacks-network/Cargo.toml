@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-bitcoincore-rpc = "0.18.0"
+bitcoincore-rpc = { workspace= true }
 bollard = "0.17"
 colored = { workspace = true }
 dirs = { workspace = true }
@@ -24,7 +24,7 @@ crossterm = { workspace = true }
 ratatui = { workspace = true }
 chrono = { workspace = true }
 futures = "0.3.12"
-base58 = "0.2.0"
+base58 = { workspace = true }
 tokio = { workspace = true}
 clap = { workspace = true, features = ["derive"] }
 toml = { workspace = true }
