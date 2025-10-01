@@ -1,13 +1,13 @@
-use crate::{
-    indexer::{ChainSegment, ChainSegmentIncompatibility},
-    utils::Context,
-};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
+
 use chainhook_types::{
     BlockHeader, BlockIdentifier, BlockchainEvent, BlockchainUpdatedWithHeaders,
     BlockchainUpdatedWithReorg,
 };
 use hiro_system_kit::slog;
-use std::collections::{BTreeMap, BTreeSet, HashSet};
+
+use crate::indexer::{ChainSegment, ChainSegmentIncompatibility};
+use crate::utils::Context;
 
 pub struct ForkScratchPad {
     canonical_fork_id: usize,

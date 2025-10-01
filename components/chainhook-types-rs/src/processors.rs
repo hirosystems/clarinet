@@ -1,7 +1,8 @@
 use std::collections::BTreeMap;
 
-use super::{BitcoinBlockData, BitcoinTransactionData, StacksBlockData, StacksTransactionData};
 use serde_json::Value as JsonValue;
+
+use super::{BitcoinBlockData, BitcoinTransactionData, StacksBlockData, StacksTransactionData};
 
 pub struct ProcessedStacksTransaction {
     pub tx: StacksTransactionData,

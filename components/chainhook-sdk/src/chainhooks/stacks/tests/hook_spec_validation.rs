@@ -1,9 +1,14 @@
 use std::collections::BTreeMap;
-use crate::chainhooks::stacks::{StacksChainhookSpecification, StacksChainhookSpecificationNetworkMap, StacksContractCallBasedPredicate, StacksContractDeploymentPredicate, StacksPredicate, StacksPrintEventBasedPredicate};
-use crate::chainhooks::types::*;
-use crate::chainhooks::types::HttpHook;
+
 use chainhook_types::StacksNetwork;
 use test_case::test_case;
+
+use crate::chainhooks::stacks::{
+    StacksChainhookSpecification, StacksChainhookSpecificationNetworkMap,
+    StacksContractCallBasedPredicate, StacksContractDeploymentPredicate, StacksPredicate,
+    StacksPrintEventBasedPredicate,
+};
+use crate::chainhooks::types::{HttpHook, *};
 
 lazy_static! {
     static ref TXID_NO_PREFIX: String = "1234567890123456789012345678901234567890123456789012345678901234".into();
@@ -32,24 +37,24 @@ lazy_static! {
     static ref CONTRACT_METHOD_ERR: String = "invalid predicate for scope 'contract_call': invalid contract method: BadNameValue(\"ClarityName\", \"!@*&!*\")".into();
     static ref PRINT_EVENT_ID_ERR: String = "invalid predicate for scope 'print_event': invalid contract identifier: ParseError(\"Invalid principal literal: base58ck checksum 0x147e6835 does not match expected 0x9b3dfe6a\")".into();
     static ref INVALID_REGEX_ERR: String = "invalid predicate for scope 'print_event': invalid regex: regex parse error:\n    [\\]\n    ^\nerror: unclosed character class".into();
-    
+
     static ref INVALID_PREDICATE: StacksPredicate = StacksPredicate::PrintEvent(StacksPrintEventBasedPredicate::MatchesRegex { contract_identifier: CONTRACT_ID_INVALID_ADDRESS.clone(), regex:  INVALID_REGEX.clone() });
-    static ref INVALID_HOOK_ACTION: HookAction = 
+    static ref INVALID_HOOK_ACTION: HookAction =
         HookAction::HttpPost(HttpHook { url: "".into(), authorization_header: "\n".into() });
     static ref ALL_INVALID_SPEC: StacksChainhookSpecification = StacksChainhookSpecification::new(INVALID_PREDICATE.clone(), INVALID_HOOK_ACTION.clone());
-    static ref ALL_INVALID_SPEC_NETWORK_MAP: ChainhookSpecificationNetworkMap = 
+    static ref ALL_INVALID_SPEC_NETWORK_MAP: ChainhookSpecificationNetworkMap =
         ChainhookSpecificationNetworkMap::Stacks(
-            StacksChainhookSpecificationNetworkMap { 
-                uuid: "test".into(), 
-                owner_uuid: None, 
-                name: "test".into(), 
-                version: 1, 
+            StacksChainhookSpecificationNetworkMap {
+                uuid: "test".into(),
+                owner_uuid: None,
+                name: "test".into(),
+                version: 1,
                 networks: BTreeMap::from([
                     (StacksNetwork::Simnet, ALL_INVALID_SPEC.clone()),
                     (StacksNetwork::Devnet, ALL_INVALID_SPEC.clone()),
                     (StacksNetwork::Testnet, ALL_INVALID_SPEC.clone()),
                     (StacksNetwork::Mainnet, ALL_INVALID_SPEC.clone()),
-                ]) 
+                ])
             }
         );
 
@@ -57,124 +62,124 @@ lazy_static! {
 
 // StacksPredicate::BlockHeight
 #[test_case(
-    &StacksPredicate::BlockHeight(BlockIdentifierIndexRule::LowerThan(0)), 
-    Some(vec!["invalid predicate for scope 'block_height': 'lower_than' filter must be greater than 0".to_string()]); 
+    &StacksPredicate::BlockHeight(BlockIdentifierIndexRule::LowerThan(0)),
+    Some(vec!["invalid predicate for scope 'block_height': 'lower_than' filter must be greater than 0".to_string()]);
     "invalid lower than"
 )]
 #[test_case(&StacksPredicate::BlockHeight(BlockIdentifierIndexRule::LowerThan(1)), None; "valid lower than")]
 #[test_case(
-    &StacksPredicate::BlockHeight(BlockIdentifierIndexRule::Between(10, 5)), 
-    Some(vec!["invalid predicate for scope 'block_height': 'between' filter must have left-hand-side valud greater than right-hand-side value".to_string()]); 
+    &StacksPredicate::BlockHeight(BlockIdentifierIndexRule::Between(10, 5)),
+    Some(vec!["invalid predicate for scope 'block_height': 'between' filter must have left-hand-side valud greater than right-hand-side value".to_string()]);
     "invalid between"
 )]
 #[test_case(&StacksPredicate::BlockHeight(BlockIdentifierIndexRule::Between(5, 10)), None; "valid between")]
 // StacksPredicate::ContractDeployment
 #[test_case(
-    &StacksPredicate::ContractDeployment(StacksContractDeploymentPredicate::Deployer(STACKS_ADDRESS_INVALID.clone())), 
-    Some(vec![CONTRACT_DEPLOYER_ERR.clone()]); 
+    &StacksPredicate::ContractDeployment(StacksContractDeploymentPredicate::Deployer(STACKS_ADDRESS_INVALID.clone())),
+    Some(vec![CONTRACT_DEPLOYER_ERR.clone()]);
     "deployer bad prefix"
 )]
 #[test_case(
-    &StacksPredicate::ContractDeployment(StacksContractDeploymentPredicate::Deployer(STACKS_ADDRESS_VALID_MAINNET.clone())), 
-    None; 
+    &StacksPredicate::ContractDeployment(StacksContractDeploymentPredicate::Deployer(STACKS_ADDRESS_VALID_MAINNET.clone())),
+    None;
     "deployer valid mainnet"
 )]
 #[test_case(
-    &StacksPredicate::ContractDeployment(StacksContractDeploymentPredicate::Deployer(STACKS_ADDRESS_VALID_TESTNET.clone())), 
-    None; 
+    &StacksPredicate::ContractDeployment(StacksContractDeploymentPredicate::Deployer(STACKS_ADDRESS_VALID_TESTNET.clone())),
+    None;
     "deployer valid testnet"
 )]
 #[test_case(
-    &StacksPredicate::ContractDeployment(StacksContractDeploymentPredicate::Deployer(STACKS_ADDRESS_VALID_MULTISIG.clone())), 
-    None; 
+    &StacksPredicate::ContractDeployment(StacksContractDeploymentPredicate::Deployer(STACKS_ADDRESS_VALID_MULTISIG.clone())),
+    None;
     "deployer valid multisig"
 )]
 #[test_case(
-    &StacksPredicate::ContractDeployment(StacksContractDeploymentPredicate::Deployer("*".to_string())), 
-    None; 
+    &StacksPredicate::ContractDeployment(StacksContractDeploymentPredicate::Deployer("*".to_string())),
+    None;
     "deployer valid wildcard"
 )]
 // StacksPredicate::ContractCall
 #[test_case(
     &StacksPredicate::ContractCall(StacksContractCallBasedPredicate { contract_identifier: CONTRACT_ID_INVALID_ADDRESS.clone(), method: INVALID_METHOD.clone()}),
-    Some(vec![CONTRACT_ID_ERR.clone(), CONTRACT_METHOD_ERR.clone()]); 
+    Some(vec![CONTRACT_ID_ERR.clone(), CONTRACT_METHOD_ERR.clone()]);
     "invalid id with invalid method"
 )]
 #[test_case(
     &StacksPredicate::ContractCall(StacksContractCallBasedPredicate { contract_identifier: CONTRACT_ID_VALID.clone(), method: INVALID_METHOD.clone()}),
-    Some(vec![CONTRACT_METHOD_ERR.clone()]); 
+    Some(vec![CONTRACT_METHOD_ERR.clone()]);
     "valid id with invalid method"
 )]
 #[test_case(
     &StacksPredicate::ContractCall(StacksContractCallBasedPredicate { contract_identifier: CONTRACT_ID_NO_PERIOD.clone(), method: "contract-name".to_string()}),
-    Some(vec![CONTRACT_ID_NO_PERIOD_ERR.clone()]); 
+    Some(vec![CONTRACT_ID_NO_PERIOD_ERR.clone()]);
     "id no period"
 )]
 #[test_case(
     &StacksPredicate::ContractCall(StacksContractCallBasedPredicate { contract_identifier: CONTRACT_ID_INVALID_NAME.clone(), method: "contract-name".to_string()}),
-    Some(vec![CONTRACT_ID_ERR.clone()]); 
+    Some(vec![CONTRACT_ID_ERR.clone()]);
     "id invalid contract name"
 )]
 #[test_case(
     &StacksPredicate::ContractCall(StacksContractCallBasedPredicate { contract_identifier: CONTRACT_ID_VALID.clone(), method: "contract-name".to_string()}),
-    None; 
+    None;
     "id valid"
 )]
 // StacksPredicate::PrintEvent
 #[test_case(
     &StacksPredicate::PrintEvent(StacksPrintEventBasedPredicate::Contains { contract_identifier: CONTRACT_ID_INVALID_ADDRESS.clone(), contains: "string".to_string() }),
-    Some(vec![PRINT_EVENT_ID_ERR.clone()]); 
+    Some(vec![PRINT_EVENT_ID_ERR.clone()]);
     "contains invalid id"
 )]
 #[test_case(
     &StacksPredicate::PrintEvent(StacksPrintEventBasedPredicate::Contains { contract_identifier: CONTRACT_ID_VALID.clone(), contains: "string".to_string() }),
-    None; 
+    None;
     "contains valid"
 )]
 #[test_case(
     &StacksPredicate::PrintEvent(StacksPrintEventBasedPredicate::Contains { contract_identifier: "*".to_string(), contains: "string".to_string() }),
-    None; 
+    None;
     "allows wildcard contract id"
 )]
 #[test_case(
     &StacksPredicate::PrintEvent(StacksPrintEventBasedPredicate::MatchesRegex { contract_identifier: CONTRACT_ID_INVALID_ADDRESS.clone(), regex: VALID_REGEX.clone() }),
-    Some(vec![PRINT_EVENT_ID_ERR.clone()]); 
+    Some(vec![PRINT_EVENT_ID_ERR.clone()]);
     "regex invalid id"
 )]
 #[test_case(
     &StacksPredicate::PrintEvent(StacksPrintEventBasedPredicate::MatchesRegex { contract_identifier: CONTRACT_ID_VALID.clone(), regex:  INVALID_REGEX.clone() }),
-    Some(vec![INVALID_REGEX_ERR.clone()]); 
+    Some(vec![INVALID_REGEX_ERR.clone()]);
     "regex invalid regex"
 )]
 #[test_case(
     &StacksPredicate::PrintEvent(StacksPrintEventBasedPredicate::MatchesRegex { contract_identifier: CONTRACT_ID_INVALID_ADDRESS.clone(), regex:  INVALID_REGEX.clone() }),
-    Some(vec![PRINT_EVENT_ID_ERR.clone(), INVALID_REGEX_ERR.clone()]); 
+    Some(vec![PRINT_EVENT_ID_ERR.clone(), INVALID_REGEX_ERR.clone()]);
     "regex invalid both"
 )]
 #[test_case(
     &StacksPredicate::PrintEvent(StacksPrintEventBasedPredicate::MatchesRegex { contract_identifier: CONTRACT_ID_VALID.clone(), regex:  VALID_REGEX.clone() }),
-    None; 
+    None;
     "regex valid"
 )]
 // StacksPredicate::Txid
 #[test_case(
-    &StacksPredicate::Txid(ExactMatchingRule::Equals(TXID_NO_PREFIX.clone())), 
+    &StacksPredicate::Txid(ExactMatchingRule::Equals(TXID_NO_PREFIX.clone())),
     Some(vec![TXID_PREDICATE_ERR.clone()]); "txid without 0x"
 )]
 #[test_case(
-    &StacksPredicate::Txid(ExactMatchingRule::Equals(TXID_NOT_HEX.clone())), 
+    &StacksPredicate::Txid(ExactMatchingRule::Equals(TXID_NOT_HEX.clone())),
     Some(vec![TXID_PREDICATE_ERR.clone()]); "txid not hex"
 )]
 #[test_case(
-    &StacksPredicate::Txid(ExactMatchingRule::Equals(TXID_SHORT.clone())), 
+    &StacksPredicate::Txid(ExactMatchingRule::Equals(TXID_SHORT.clone())),
     Some(vec![TXID_PREDICATE_ERR.clone()]); "txid too short"
 )]
 #[test_case(
-    &StacksPredicate::Txid(ExactMatchingRule::Equals(TXID_LONG.clone())), 
+    &StacksPredicate::Txid(ExactMatchingRule::Equals(TXID_LONG.clone())),
     Some(vec![TXID_PREDICATE_ERR.clone()]); "txid too long"
 )]
 #[test_case(
-    &StacksPredicate::Txid(ExactMatchingRule::Equals(TXID_VALID.clone())), 
+    &StacksPredicate::Txid(ExactMatchingRule::Equals(TXID_VALID.clone())),
     None; "txid just right"
 )]
 fn it_validates_stacks_predicates(predicate: &StacksPredicate, expected_err: Option<Vec<String>>) {
@@ -191,7 +196,6 @@ fn it_validates_stacks_predicates(predicate: &StacksPredicate, expected_err: Opt
         );
     }
 }
-
 
 #[test_case(&ALL_INVALID_SPEC_NETWORK_MAP, INVALID_SPEC_NETWORK_MAP_ERR.clone())]
 fn it_validates_stacks_chainhook_specs(

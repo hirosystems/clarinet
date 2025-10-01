@@ -1,7 +1,8 @@
-use super::BlockEvent;
 use chainhook_types::{
     BlockIdentifier, StacksMicroblockData, StacksMicroblockMetadata, StacksTransactionData,
 };
+
+use super::BlockEvent;
 
 pub fn generate_test_microblock(
     fork_id: u8,

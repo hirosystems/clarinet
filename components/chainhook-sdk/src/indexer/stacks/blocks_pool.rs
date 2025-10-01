@@ -1,10 +1,6 @@
-use crate::{
-    indexer::{
-        fork_scratch_pad::CONFIRMED_SEGMENT_MINIMUM_LENGTH, ChainSegment,
-        ChainSegmentIncompatibility,
-    },
-    utils::Context,
-};
+use std::collections::hash_map::Entry;
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+
 use chainhook_types::{
     BlockIdentifier, StacksBlockData, StacksBlockUpdate, StacksChainEvent,
     StacksChainUpdatedWithBlocksData, StacksChainUpdatedWithMicroblocksData,
@@ -12,7 +8,10 @@ use chainhook_types::{
     StacksMicroblockData,
 };
 use hiro_system_kit::slog;
-use std::collections::{hash_map::Entry, BTreeMap, BTreeSet, HashMap, HashSet};
+
+use crate::indexer::fork_scratch_pad::CONFIRMED_SEGMENT_MINIMUM_LENGTH;
+use crate::indexer::{ChainSegment, ChainSegmentIncompatibility};
+use crate::utils::Context;
 
 pub struct StacksBlockPool {
     canonical_fork_id: usize,
@@ -51,9 +50,7 @@ impl StacksBlockPool {
 
     pub fn get_canonical_fork_chain_tip(&self) -> Option<&BlockIdentifier> {
         match self.forks.get(&self.canonical_fork_id) {
-            Some(fork) => {
-                Some(fork.get_tip())
-            },
+            Some(fork) => Some(fork.get_tip()),
             None => None,
         }
     }
@@ -517,12 +514,13 @@ impl StacksBlockPool {
                         micro_fork.try_append_block(&microblock, ctx);
                     if block_appended {
                         ctx.try_log(|logger| {
-                            slog::info!(logger,
-                            "Attempt to append micro fork {} with {} (parent = {}) succeeded",
-                            micro_fork,
-                            microblock.block_identifier,
-                            microblock.parent_block_identifier
-                        )
+                            slog::info!(
+                                logger,
+                                "Attempt to append micro fork {} with {} (parent = {}) succeeded",
+                                micro_fork,
+                                microblock.block_identifier,
+                                microblock.parent_block_identifier
+                            )
                         });
                         if let Some(new_micro_fork) = new_micro_fork.take() {
                             microforks.push(new_micro_fork);
@@ -705,7 +703,8 @@ impl StacksBlockPool {
             (Some(last_microblock), Some(microforks)) => {
                 let previous_canonical_segment = self
                     .canonical_micro_fork_id
-                    .get(&block.parent_block_identifier).map(|id| microforks[*id].clone());
+                    .get(&block.parent_block_identifier)
+                    .map(|id| microforks[*id].clone());
 
                 let mut new_canonical_segment = None;
                 for (microfork_id, microfork) in microforks.iter().enumerate() {

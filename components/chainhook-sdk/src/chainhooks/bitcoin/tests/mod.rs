@@ -1,5 +1,9 @@
 use std::collections::HashSet;
 
+use chainhook_types::bitcoin::TxOut;
+use chainhook_types::{BitcoinNetwork, Brc20Operation, Brc20TokenDeployData};
+use test_case::test_case;
+
 use super::super::types::MatchingRule;
 use super::*;
 use crate::chainhooks::bitcoin::InscriptionFeedData;
@@ -7,10 +11,6 @@ use crate::indexer::tests::helpers::accounts;
 use crate::indexer::tests::helpers::bitcoin_blocks::generate_test_bitcoin_block;
 use crate::indexer::tests::helpers::transactions::generate_test_tx_bitcoin_p2pkh_transfer;
 use crate::types::BitcoinTransactionMetadata;
-use chainhook_types::bitcoin::TxOut;
-
-use chainhook_types::{BitcoinNetwork, Brc20Operation, Brc20TokenDeployData};
-use test_case::test_case;
 mod hook_spec_validation;
 
 #[test_case(

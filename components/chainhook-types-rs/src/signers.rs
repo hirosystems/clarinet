@@ -57,7 +57,7 @@ pub enum BlockValidationFailedCode {
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum BlockRejectReasonCode {
-    #[serde(rename_all = "SCREAMING_SNAKE_CASE")] 
+    #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
     ValidationFailed {
         #[serde(rename = "VALIDATION_FAILED")]
         validation_failed: BlockValidationFailedCode,
@@ -119,7 +119,7 @@ pub struct MockSignatureData {
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct MockBlockData {
     pub mock_proposal: MockProposalData,
-    pub mock_signatures: Vec<MockSignatureData>
+    pub mock_signatures: Vec<MockSignatureData>,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
