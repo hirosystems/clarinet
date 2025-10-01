@@ -28,7 +28,6 @@ hex = "0.4.3"
 lazy_static = "1.4.0"
 regex = { workspace = true }
 miniscript = "11.0.0"
-prometheus = { version = "0.13.3", default-features = false }
 
 chainhook-types = { path = "../chainhook-types-rs" }
 stacks-codec = { path = "../stacks-codec" }

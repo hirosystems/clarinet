@@ -28,7 +28,6 @@ use crate::indexer::tests::helpers::transactions::{
     generate_test_tx_bitcoin_p2pkh_transfer, generate_test_tx_stacks_contract_call,
 };
 use crate::indexer::tests::helpers::{accounts, bitcoin_blocks, stacks_blocks};
-use crate::monitoring::PrometheusMonitoring;
 use crate::observer::{
     start_observer_commands_handler, EventObserverConfig, ObserverCommand, ObserverSidecar,
     PredicateDeregisteredEvent,
@@ -268,54 +267,6 @@ fn assert_stacks_chain_event(observer_events_rx: &crossbeam_channel::Receiver<Ob
     );
 }
 
-fn assert_observer_metrics_stacks_registered_predicates(
-    prometheus_monitoring: &PrometheusMonitoring,
-    expected_count: u64,
-) {
-    assert_eq!(
-        expected_count,
-        prometheus_monitoring.stx_registered_predicates.get(),
-        "expected {} registered stacks hooks",
-        expected_count
-    );
-}
-
-fn assert_observer_metrics_stacks_deregistered_predicates(
-    prometheus_monitoring: &PrometheusMonitoring,
-    expected_count: u64,
-) {
-    assert_eq!(
-        expected_count,
-        prometheus_monitoring.stx_deregistered_predicates.get(),
-        "expected {} deregistered stacks hooks",
-        expected_count
-    );
-}
-
-fn assert_observer_metrics_bitcoin_registered_predicates(
-    prometheus_monitoring: &PrometheusMonitoring,
-    expected_count: u64,
-) {
-    assert_eq!(
-        expected_count,
-        prometheus_monitoring.btc_registered_predicates.get(),
-        "expected {} registered bitcoin hooks",
-        expected_count
-    );
-}
-
-fn assert_observer_metrics_bitcoin_deregistered_predicates(
-    prometheus_monitoring: &PrometheusMonitoring,
-    expected_count: u64,
-) {
-    assert_eq!(
-        expected_count,
-        prometheus_monitoring.btc_deregistered_predicates.get(),
-        "expected {} deregistered bitcoin hooks",
-        expected_count
-    );
-}
-
 fn generate_and_register_new_ordinals_chainhook(
     observer_commands_tx: &Sender<ObserverCommand>,
     observer_events_rx: &crossbeam_channel::Receiver<ObserverEvent>,
@@ -347,8 +298,6 @@ fn generate_and_register_new_ordinals_chainhook(
 fn test_stacks_chainhook_register_deregister() {
     let (observer_commands_tx, observer_commands_rx) = channel();
     let (observer_events_tx, observer_events_rx) = crossbeam_channel::unbounded();
-    let prometheus_monitoring = PrometheusMonitoring::new();
-    let prometheus_monitoring_moved = prometheus_monitoring.clone();
 
     let handle = std::thread::spawn(move || {
         let (config, chainhook_store) = generate_test_config();
@@ -358,7 +307,6 @@ fn test_stacks_chainhook_register_deregister() {
             observer_commands_rx,
             Some(observer_events_tx),
             None,
-            prometheus_monitoring_moved,
             None,
             Context::empty(),
         ));
@@ -372,9 +320,6 @@ fn test_stacks_chainhook_register_deregister() {
         "counter",
         "increment",
     );
-
-    // registering stacks chainhook should increment the observer_metric's registered stacks hooks
-    assert_observer_metrics_stacks_registered_predicates(&prometheus_monitoring, 1);
 
     // Simulate a block that does not include a trigger
     let transactions = vec![generate_test_tx_stacks_contract_call(
@@ -504,11 +449,6 @@ fn test_stacks_chainhook_register_deregister() {
         _ => false,
     });
 
-    // deregistering stacks chainhook should decrement the observer_metric's registered stacks hooks
-    assert_observer_metrics_stacks_registered_predicates(&prometheus_monitoring, 0);
-    // and increment the deregistered hooks
-    assert_observer_metrics_stacks_deregistered_predicates(&prometheus_monitoring, 1);
-
     // Simulate a block that does not include a trigger
     let transactions = vec![generate_test_tx_stacks_contract_call(
         2,
@@ -557,8 +497,6 @@ fn test_stacks_chainhook_register_deregister() {
 fn test_stacks_chainhook_auto_deregister() {
     let (observer_commands_tx, observer_commands_rx) = channel();
     let (observer_events_tx, observer_events_rx) = crossbeam_channel::unbounded();
-    let prometheus_monitoring = PrometheusMonitoring::new();
-    let prometheus_monitoring_moved = prometheus_monitoring.clone();
 
     let handle = std::thread::spawn(move || {
         let (config, chainhook_store) = generate_test_config();
@@ -568,7 +506,6 @@ fn test_stacks_chainhook_auto_deregister() {
             observer_commands_rx,
             Some(observer_events_tx),
             None,
-            prometheus_monitoring_moved,
             None,
             Context::empty(),
         ));
@@ -597,8 +534,6 @@ fn test_stacks_chainhook_auto_deregister() {
         }
         _ => false,
     });
-    // registering stacks chainhook should increment the observer_metric's registered stacks hooks
-    assert_observer_metrics_stacks_registered_predicates(&prometheus_monitoring, 1);
 
     // Simulate a block that does not include a trigger
     let transactions = vec![generate_test_tx_stacks_contract_call(
@@ -694,11 +629,6 @@ fn test_stacks_chainhook_auto_deregister() {
         _ => false,
     });
 
-    // deregistering stacks chainhook should decrement the observer_metric's registered stacks hooks
-    assert_observer_metrics_stacks_registered_predicates(&prometheus_monitoring, 0);
-    // and increment the deregistered hooks
-    assert_observer_metrics_stacks_deregistered_predicates(&prometheus_monitoring, 1);
-
     // Should propagate block
     assert_stacks_chain_event(&observer_events_rx);
 
@@ -710,8 +640,6 @@ fn test_stacks_chainhook_auto_deregister() {
 fn test_bitcoin_chainhook_register_deregister() {
     let (observer_commands_tx, observer_commands_rx) = channel();
     let (observer_events_tx, observer_events_rx) = crossbeam_channel::unbounded();
-    let prometheus_monitoring = PrometheusMonitoring::new();
-    let prometheus_monitoring_moved = prometheus_monitoring.clone();
 
     let handle = std::thread::spawn(move || {
         let (config, chainhook_store) = generate_test_config();
@@ -721,7 +649,6 @@ fn test_bitcoin_chainhook_register_deregister() {
             observer_commands_rx,
             Some(observer_events_tx),
             None,
-            prometheus_monitoring_moved,
             None,
             Context::empty(),
         ));
@@ -735,9 +662,6 @@ fn test_bitcoin_chainhook_register_deregister() {
         &accounts::wallet_2_btc_address(),
         None,
     );
-
-    // registering bitcoin chainhook should increment the observer_metric's registered bitcoin hooks
-    assert_observer_metrics_bitcoin_registered_predicates(&prometheus_monitoring, 1);
 
     // Simulate a block that does not include a trigger (wallet_1 to wallet_3)
     let transactions = vec![generate_test_tx_bitcoin_p2pkh_transfer(
@@ -857,11 +781,6 @@ fn test_bitcoin_chainhook_register_deregister() {
         _ => false,
     });
 
-    // deregistering bitcoin chainhook should decrement the observer_metric's registered bitcoin hooks
-    assert_observer_metrics_bitcoin_registered_predicates(&prometheus_monitoring, 0);
-    // and increment the deregistered hooks
-    assert_observer_metrics_bitcoin_deregistered_predicates(&prometheus_monitoring, 1);
-
     // Simulate a block that does not include a trigger
     let transactions = vec![generate_test_tx_bitcoin_p2pkh_transfer(
         2,
@@ -917,8 +836,6 @@ fn test_bitcoin_chainhook_register_deregister() {
 fn test_bitcoin_chainhook_auto_deregister() {
     let (observer_commands_tx, observer_commands_rx) = channel();
     let (observer_events_tx, observer_events_rx) = crossbeam_channel::unbounded();
-    let prometheus_monitoring = PrometheusMonitoring::new();
-    let prometheus_monitoring_moved = prometheus_monitoring.clone();
 
     let handle = std::thread::spawn(move || {
         let (config, chainhook_store) = generate_test_config();
@@ -928,7 +845,6 @@ fn test_bitcoin_chainhook_auto_deregister() {
             observer_commands_rx,
             Some(observer_events_tx),
             None,
-            prometheus_monitoring_moved,
             None,
             Context::empty(),
         ));
@@ -942,9 +858,6 @@ fn test_bitcoin_chainhook_auto_deregister() {
         &accounts::wallet_2_btc_address(),
         Some(1),
     );
-
-    // registering bitcoin chainhook should increment the observer_metric's registered bitcoin hooks
-    assert_observer_metrics_bitcoin_registered_predicates(&prometheus_monitoring, 1);
 
     // Simulate a block that does not include a trigger (wallet_1 to wallet_3)
     let transactions = vec![generate_test_tx_bitcoin_p2pkh_transfer(
@@ -1056,11 +969,6 @@ fn test_bitcoin_chainhook_auto_deregister() {
         _ => false,
     });
 
-    // deregistering bitcoin chainhook should decrement the observer_metric's registered bitcoin hooks
-    assert_observer_metrics_bitcoin_registered_predicates(&prometheus_monitoring, 0);
-    // and increment the deregistered hooks
-    assert_observer_metrics_bitcoin_deregistered_predicates(&prometheus_monitoring, 1);
-
     // Should propagate block
     assert!(matches!(
         observer_events_rx.recv(),
@@ -1085,8 +993,6 @@ fn test_bitcoin_chainhook_through_reorg() {
         bitcoin_blocks_mutator: Some((block_pre_processor_in_tx, block_pre_processor_out_rx)),
         bitcoin_chain_event_notifier: None,
     };
-    let prometheus_monitoring = PrometheusMonitoring::new();
-    let prometheus_monitoring_moved = prometheus_monitoring.clone();
 
     let handle = std::thread::spawn(move || {
         let (config, chainhook_store) = generate_test_config();
@@ -1096,7 +1002,6 @@ fn test_bitcoin_chainhook_through_reorg() {
             observer_commands_rx,
             Some(observer_events_tx),
             None,
-            prometheus_monitoring_moved,
             Some(observer_sidecar),
             Context::empty(),
         ));
@@ -1154,10 +1059,6 @@ fn test_bitcoin_chainhook_through_reorg() {
     // Create and register a new chainhook (wallet_2 received some sats)
     let _chainhook =
         generate_and_register_new_ordinals_chainhook(&observer_commands_tx, &observer_events_rx, 1);
-
-    // registering bitcoin chainhook should increment the observer_metric's registered bitcoin hooks
-
-    assert_observer_metrics_bitcoin_registered_predicates(&prometheus_monitoring, 1);
 
     // Simulate a block that does not include a trigger (wallet_1 to wallet_3)
     let transactions = vec![generate_test_tx_bitcoin_p2pkh_transfer(

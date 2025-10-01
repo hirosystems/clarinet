@@ -40,7 +40,6 @@ use crate::indexer::bitcoin::{
     BitcoinBlockFullBreakdown,
 };
 use crate::indexer::{Indexer, IndexerConfig};
-use crate::monitoring::{start_serving_prometheus_metrics, PrometheusMonitoring};
 use crate::utils::{send_request, Context};
 
 pub const DEFAULT_INGESTION_PORT: u16 = 20445;
@@ -893,25 +892,6 @@ pub async fn start_bitcoin_event_observer(
 ) -> Result<(), Box<dyn Error>> {
     let chainhook_store = config.registered_chainhooks.clone();
 
-    let prometheus_monitoring = PrometheusMonitoring::new();
-    prometheus_monitoring.initialize(
-        chainhook_store.stacks_chainhooks.len() as u64,
-        chainhook_store.bitcoin_chainhooks.len() as u64,
-        None,
-    );
-
-    if let Some(port) = config.prometheus_monitoring_port {
-        let registry_moved = prometheus_monitoring.registry.clone();
-        let ctx_cloned = ctx.clone();
-        let _ = std::thread::spawn(move || {
-            hiro_system_kit::nestable_block_on(start_serving_prometheus_metrics(
-                port,
-                registry_moved,
-                ctx_cloned,
-            ));
-        });
-    }
-
     // This loop is used for handling background jobs, emitted by HTTP calls.
     start_observer_commands_handler(
         config,
@@ -919,7 +899,6 @@ pub async fn start_bitcoin_event_observer(
         observer_commands_rx,
         observer_events_tx,
         None,
-        prometheus_monitoring,
         observer_sidecar,
         ctx,
     )
@@ -964,25 +943,6 @@ pub async fn start_stacks_event_observer(
 
     let background_job_tx_mutex = Arc::new(Mutex::new(observer_commands_tx.clone()));
 
-    let prometheus_monitoring = PrometheusMonitoring::new();
-    prometheus_monitoring.initialize(
-        chainhook_store.stacks_chainhooks.len() as u64,
-        chainhook_store.bitcoin_chainhooks.len() as u64,
-        Some(stacks_startup_context.last_block_height_appended),
-    );
-
-    if let Some(port) = config.prometheus_monitoring_port {
-        let registry_moved = prometheus_monitoring.registry.clone();
-        let ctx_cloned = ctx.clone();
-        let _ = std::thread::spawn(move || {
-            hiro_system_kit::nestable_block_on(start_serving_prometheus_metrics(
-                port,
-                registry_moved,
-                ctx_cloned,
-            ));
-        });
-    }
-
     let limits = Limits::default().limit("json", 500.megabytes());
     let shutdown_config = config::Shutdown {
         ctrlc: false,
@@ -1005,7 +965,6 @@ pub async fn start_stacks_event_observer(
     };
 
     let mut routes = rocket::routes![
-        http::handle_ping,
         http::handle_new_bitcoin_block,
         http::handle_new_stacks_block,
         http::handle_new_microblocks,
@@ -1030,7 +989,6 @@ pub async fn start_stacks_event_observer(
         .manage(background_job_tx_mutex)
         .manage(bitcoin_config)
         .manage(ctx_cloned)
-        .manage(prometheus_monitoring.clone())
         .mount("/", routes)
         .ignite()
         .await?;
@@ -1047,7 +1005,6 @@ pub async fn start_stacks_event_observer(
         observer_commands_rx,
         observer_events_tx,
         ingestion_shutdown,
-        prometheus_monitoring,
         observer_sidecar,
         ctx,
     )
@@ -1127,7 +1084,6 @@ pub async fn start_observer_commands_handler(
     observer_commands_rx: Receiver<ObserverCommand>,
     observer_events_tx: Option<crossbeam_channel::Sender<ObserverEvent>>,
     ingestion_shutdown: Option<Shutdown>,
-    prometheus_monitoring: PrometheusMonitoring,
     observer_sidecar: Option<ObserverSidecar>,
     ctx: Context,
 ) -> Result<(), Box<dyn Error>> {
@@ -1233,7 +1189,7 @@ pub async fn start_observer_commands_handler(
                 let mut confirmed_blocks = vec![];
 
                 // Update Chain event before propagation
-                let (chain_event, new_tip) = match blockchain_event {
+                let (chain_event, _new_tip) = match blockchain_event {
                     BlockchainEvent::BlockchainUpdatedWithHeaders(data) => {
                         let mut blocks_to_mutate = vec![];
                         let mut new_blocks = vec![];
@@ -1376,17 +1332,6 @@ pub async fn start_observer_commands_handler(
                                     });
                                 }
                             }
-                        }
-
-                        if let Some(highest_tip_block) = blocks_to_apply
-                            .iter()
-                            .max_by_key(|b| b.block_identifier.index)
-                        {
-                            prometheus_monitoring.btc_metrics_set_reorg(
-                                highest_tip_block.timestamp.into(),
-                                blocks_to_apply.len() as u64,
-                                blocks_to_rollback.len() as u64,
-                            );
                         }
 
                         (
@@ -1536,12 +1481,6 @@ pub async fn start_observer_commands_handler(
                 });
 
                 for hook_uuid in hooks_ids_to_deregister.iter() {
-                    if chainhook_store
-                        .deregister_bitcoin_hook(hook_uuid.clone())
-                        .is_some()
-                    {
-                        prometheus_monitoring.btc_metrics_deregister_predicate();
-                    }
                     if let Some(ref tx) = observer_events_tx {
                         let _ = tx.send(ObserverEvent::PredicateDeregistered(
                             PredicateDeregisteredEvent {
@@ -1571,8 +1510,6 @@ pub async fn start_observer_commands_handler(
                     }
                 }
 
-                prometheus_monitoring.btc_metrics_block_evaluated(new_tip);
-
                 if let Some(ref tx) = observer_events_tx {
                     let _ = tx.send(ObserverEvent::BitcoinChainEvent((chain_event, report)));
                 }
@@ -1600,7 +1537,7 @@ pub async fn start_observer_commands_handler(
                 });
 
                 // track stacks chain metrics
-                let new_tip = match &chain_event {
+                match &chain_event {
                     StacksChainEvent::ChainUpdatedWithBlocks(update) => {
                         match update
                             .new_blocks
@@ -1620,11 +1557,6 @@ pub async fn start_observer_commands_handler(
                             .max_by_key(|b| b.block.block_identifier.index)
                         {
                             Some(highest_tip_update) => {
-                                prometheus_monitoring.stx_metrics_set_reorg(
-                                    highest_tip_update.block.timestamp,
-                                    update.blocks_to_apply.len() as u64,
-                                    update.blocks_to_rollback.len() as u64,
-                                );
                                 highest_tip_update.block.block_identifier.index
                             }
                             None => 0,
@@ -1726,12 +1658,6 @@ pub async fn start_observer_commands_handler(
                 }
 
                 for hook_uuid in hooks_ids_to_deregister.iter() {
-                    if chainhook_store
-                        .deregister_stacks_hook(hook_uuid.clone())
-                        .is_some()
-                    {
-                        prometheus_monitoring.stx_metrics_deregister_predicate();
-                    }
                     if let Some(ref tx) = observer_events_tx {
                         let _ = tx.send(ObserverEvent::PredicateDeregistered(
                             PredicateDeregisteredEvent {
@@ -1768,8 +1694,6 @@ pub async fn start_observer_commands_handler(
                         }
                     };
                 }
-
-                prometheus_monitoring.stx_metrics_block_evaluated(new_tip);
 
                 if let Some(ref tx) = observer_events_tx {
                     let _ = tx.send(ObserverEvent::StacksChainEvent((chain_event, report)));
@@ -1809,15 +1733,6 @@ pub async fn start_observer_commands_handler(
                         }
                     };
 
-                match spec {
-                    ChainhookInstance::Bitcoin(_) => {
-                        prometheus_monitoring.btc_metrics_register_predicate()
-                    }
-                    ChainhookInstance::Stacks(_) => {
-                        prometheus_monitoring.stx_metrics_register_predicate()
-                    }
-                };
-
                 ctx.try_log(
                     |logger| slog::debug!(logger, "Registering chainhook {}", spec.uuid(),),
                 );
@@ -1841,13 +1756,8 @@ pub async fn start_observer_commands_handler(
                 ctx.try_log(|logger| {
                     slog::info!(logger, "Handling DeregisterStacksPredicate command")
                 });
-                let hook = chainhook_store.deregister_stacks_hook(hook_uuid.clone());
+                let _hook = chainhook_store.deregister_stacks_hook(hook_uuid.clone());
 
-                if hook.is_some() {
-                    // on startup, only the predicates in the `chainhook_store` are added to the monitoring count,
-                    // so only those that we find in the store should be removed
-                    prometheus_monitoring.stx_metrics_deregister_predicate();
-                };
                 // event if the predicate wasn't in the `chainhook_store`, propogate this event to delete from redis
                 if let Some(tx) = &observer_events_tx {
                     let _ = tx.send(ObserverEvent::PredicateDeregistered(
@@ -1862,13 +1772,8 @@ pub async fn start_observer_commands_handler(
                 ctx.try_log(|logger| {
                     slog::info!(logger, "Handling DeregisterBitcoinPredicate command")
                 });
-                let hook = chainhook_store.deregister_bitcoin_hook(hook_uuid.clone());
+                let _hook = chainhook_store.deregister_bitcoin_hook(hook_uuid.clone());
 
-                if hook.is_some() {
-                    // on startup, only the predicates in the `chainhook_store` are added to the monitoring count,
-                    // so only those that we find in the store should be removed
-                    prometheus_monitoring.btc_metrics_deregister_predicate();
-                };
                 // even if the predicate wasn't in the `chainhook_store`, propogate this event to delete from redis
                 if let Some(tx) = &observer_events_tx {
                     let _ = tx.send(ObserverEvent::PredicateDeregistered(

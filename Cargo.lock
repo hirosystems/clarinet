@@ -485,7 +485,6 @@ dependencies = [
  "hyper 0.14.27",
  "lazy_static",
  "miniscript",
- "prometheus",
  "regex",
  "reqwest",
  "rocket",
@@ -2886,20 +2885,6 @@ dependencies = [
  "syn",
  "version_check",
  "yansi",
-]
-
-[[package]]
-name = "prometheus"
-version = "0.13.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3d33c28a30771f7f96db69893f78b857f7450d7e0237e9c8fc6427a81bae7ed1"
-dependencies = [
- "cfg-if 1.0.3",
- "fnv",
- "lazy_static",
- "memchr",
- "parking_lot",
- "thiserror 1.0.69",
 ]
 
 [[package]]
