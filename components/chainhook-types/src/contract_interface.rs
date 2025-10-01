@@ -2,9 +2,6 @@
 // `clarity-vm` repository's [ContractInterface](https://github.com/stacks-network/stacks-blockchain/blob/eca1cfe81f0c0989ebd3e53c32e3e5d70ed83757/clarity/src/vm/analysis/contract_interface_builder/mod.rs#L368) type.
 // We've copied it here rather than using `clarity-vm` as a dependency to avoid circular dependencies.
 
-use std::fmt;
-use std::str::FromStr;
-
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ContractInterface {
     pub functions: Vec<ContractInterfaceFunction>,
@@ -114,69 +111,4 @@ pub struct ContractInterfaceNonFungibleTokens {
     pub name: String,
     #[serde(rename = "type")]
     pub type_f: ContractInterfaceAtomType,
-}
-#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, PartialOrd)]
-pub enum ClarityVersion {
-    Clarity1,
-    Clarity2,
-    Clarity3,
-}
-
-impl fmt::Display for ClarityVersion {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ClarityVersion::Clarity1 => write!(f, "Clarity 1"),
-            ClarityVersion::Clarity2 => write!(f, "Clarity 2"),
-            ClarityVersion::Clarity3 => write!(f, "Clarity 3"),
-        }
-    }
-}
-
-impl FromStr for ClarityVersion {
-    type Err = String;
-    fn from_str(version: &str) -> Result<ClarityVersion, String> {
-        let s = version.to_string().to_lowercase();
-        if s == "clarity1" {
-            Ok(ClarityVersion::Clarity1)
-        } else if s == "clarity2" {
-            Ok(ClarityVersion::Clarity2)
-        } else if s == "clarity3" {
-            Ok(ClarityVersion::Clarity3)
-        } else {
-            Err("Invalid clarity version. Valid versions are: Clarity1, Clarity2.".to_string())
-        }
-    }
-}
-#[repr(u32)]
-#[derive(Debug, Clone, Eq, PartialEq, PartialOrd, Ord, Hash, Copy, Serialize, Deserialize)]
-pub enum StacksEpochId {
-    Epoch10 = 0x01000,
-    Epoch20 = 0x02000,
-    Epoch2_05 = 0x02005,
-    Epoch21 = 0x0200a,
-    Epoch22 = 0x0200f,
-    Epoch23 = 0x02014,
-    Epoch24 = 0x02019,
-    Epoch25 = 0x0201a,
-    Epoch30 = 0x03000,
-    Epoch31 = 0x03001,
-    Epoch32 = 0x03002,
-}
-
-impl std::fmt::Display for StacksEpochId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            StacksEpochId::Epoch10 => write!(f, "1.0"),
-            StacksEpochId::Epoch20 => write!(f, "2.0"),
-            StacksEpochId::Epoch2_05 => write!(f, "2.05"),
-            StacksEpochId::Epoch21 => write!(f, "2.1"),
-            StacksEpochId::Epoch22 => write!(f, "2.2"),
-            StacksEpochId::Epoch23 => write!(f, "2.3"),
-            StacksEpochId::Epoch24 => write!(f, "2.4"),
-            StacksEpochId::Epoch25 => write!(f, "2.5"),
-            StacksEpochId::Epoch30 => write!(f, "3.0"),
-            StacksEpochId::Epoch31 => write!(f, "3.1"),
-            StacksEpochId::Epoch32 => write!(f, "3.2"),
-        }
-    }
 }
