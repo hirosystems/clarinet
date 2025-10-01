@@ -30,6 +30,7 @@ use indoc::formatdoc;
 use reqwest::RequestBuilder;
 use serde_json::Value as JsonValue;
 
+use crate::command::run_command;
 use crate::event::{send_status_update, DevnetEvent, Status};
 
 const BITCOIND_DATA_DIR: &str = "/home/bitcoin/.bitcoin";
@@ -1596,11 +1597,7 @@ db_path = "stacks-signer-{signer_id}.sqlite"
                 events_path.display(),
                 container_name
             );
-
-            let output = std::process::Command::new("sh")
-                .arg("-c")
-                .arg(&copy_command)
-                .output()
+            let output = run_command(&copy_command)
                 .map_err(|e| format!("Failed to copy events file to container: {e}"))?;
 
             if !output.status.success() {
@@ -1612,13 +1609,9 @@ db_path = "stacks-signer-{signer_id}.sqlite"
 
             // Run the import command
             let import_command = format!(
-            "docker exec {container_name} node /app/lib/index.js import-events --file /tmp/events_cache.tsv --wipe-db"
-        );
-
-            let output = std::process::Command::new("sh")
-                .arg("-c")
-                .arg(&import_command)
-                .output()
+                "docker exec {container_name} node /app/lib/index.js import-events --file /tmp/events_cache.tsv --wipe-db"
+            );
+            let output = run_command(&import_command)
                 .map_err(|e| format!("Failed to import events: {e}"))?;
 
             if !output.status.success() {
@@ -2969,12 +2962,8 @@ pub async fn copy_snapshot_to_container(
         container_id,
         dest_path
     );
-
-    let output = std::process::Command::new("sh")
-        .arg("-c")
-        .arg(&copy_command)
-        .output()
-        .map_err(|e| format!("Failed to execute docker cp: {e}"))?;
+    let output =
+        run_command(&copy_command).map_err(|e| format!("Failed to execute docker cp: {e}"))?;
 
     if !output.status.success() {
         return Err(format!(
