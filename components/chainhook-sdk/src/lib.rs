@@ -1,5 +1,3 @@
-#[macro_use]
-extern crate rocket;
 
 extern crate serde;
 

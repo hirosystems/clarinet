@@ -2,7 +2,7 @@ mod http;
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::error::Error;
-use std::net::{IpAddr, Ipv4Addr};
+use std::net::SocketAddr;
 use std::str;
 use std::str::FromStr;
 use std::sync::mpsc::{Receiver, Sender};
@@ -16,12 +16,32 @@ use chainhook_types::{
     StacksBlockData, StacksChainEvent, StacksNetwork, StacksNodeConfig, TransactionIdentifier,
     DEFAULT_STACKS_NODE_RPC,
 };
-use hiro_system_kit;
 use hiro_system_kit::slog;
-use rocket::config::{self, Config, LogLevel};
-use rocket::data::{Limits, ToByteUnit};
-use rocket::serde::Deserialize;
-use rocket::Shutdown;
+use serde::Deserialize;
+
+// Custom shutdown wrapper to replace Rocket's Shutdown
+pub struct Shutdown(tokio::sync::oneshot::Sender<()>);
+
+impl Shutdown {
+    pub fn notify(self) {
+        let _ = self.0.send(());
+    }
+}
+
+// LogLevel enum to replace Rocket's LogLevel
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum LogLevel {
+    Off,
+    Critical,
+    Normal,
+    Debug,
+}
+
+impl Default for LogLevel {
+    fn default() -> Self {
+        LogLevel::Normal
+    }
+}
 
 use crate::chainhooks::bitcoin::{
     evaluate_bitcoin_chainhooks_on_chain_event, handle_bitcoin_hook_action,
@@ -805,30 +825,27 @@ pub fn start_event_observer(
             let context_cloned = ctx.clone();
             let event_observer_config_moved = config.clone();
             let observer_commands_tx_moved = observer_commands_tx.clone();
-            let _ = hiro_system_kit::thread_named("Chainhook event observer")
+            let _ = std::thread::Builder::new().name("Chainhook event observer".to_string())
                 .spawn(move || {
-                    let future = start_bitcoin_event_observer(
+                    let rt = tokio::runtime::Runtime::new().unwrap();
+                    rt.block_on(start_bitcoin_event_observer(
                         event_observer_config_moved,
                         observer_commands_tx_moved,
                         observer_commands_rx,
                         observer_events_tx.clone(),
                         observer_sidecar,
                         context_cloned.clone(),
-                    );
-                    match hiro_system_kit::nestable_block_on(future) {
-                        Ok(_) => {}
-                        Err(e) => {
-                            if let Some(tx) = observer_events_tx {
-                                context_cloned.try_log(|logger| {
-                                    slog::crit!(
-                                        logger,
-                                        "Chainhook event observer thread failed with error: {e}",
-                                    )
-                                });
-                                let _ = tx.send(ObserverEvent::Terminate);
-                            }
+                    )).unwrap_or_else(|e| {
+                        if let Some(tx) = observer_events_tx {
+                            context_cloned.try_log(|logger| {
+                                slog::crit!(
+                                    logger,
+                                    "Chainhook event observer thread failed with error: {e}",
+                                )
+                            });
+                            let _ = tx.send(ObserverEvent::Terminate);
                         }
-                    }
+                    });
                 })
                 .expect("unable to spawn thread");
         }
@@ -838,9 +855,10 @@ pub fn start_event_observer(
             let event_observer_config_moved = config.clone();
             let observer_commands_tx_moved = observer_commands_tx.clone();
 
-            let _ = hiro_system_kit::thread_named("Chainhook event observer")
+            let _ = std::thread::Builder::new().name("Chainhook event observer".to_string())
                 .spawn(move || {
-                    let future = start_stacks_event_observer(
+                    let rt = tokio::runtime::Runtime::new().unwrap();
+                    rt.block_on(start_stacks_event_observer(
                         event_observer_config_moved,
                         observer_commands_tx_moved,
                         observer_commands_rx,
@@ -848,21 +866,17 @@ pub fn start_event_observer(
                         observer_sidecar,
                         stacks_startup_context.unwrap_or_default(),
                         context_cloned.clone(),
-                    );
-                    match hiro_system_kit::nestable_block_on(future) {
-                        Ok(_) => {}
-                        Err(e) => {
-                            if let Some(tx) = observer_events_tx {
-                                context_cloned.try_log(|logger| {
-                                    slog::crit!(
-                                        logger,
-                                        "Chainhook event observer thread failed with error: {e}",
-                                    )
-                                });
-                                let _ = tx.send(ObserverEvent::Terminate);
-                            }
+                    )).unwrap_or_else(|e| {
+                        if let Some(tx) = observer_events_tx {
+                            context_cloned.try_log(|logger| {
+                                slog::crit!(
+                                    logger,
+                                    "Chainhook event observer thread failed with error: {e}",
+                                )
+                            });
+                            let _ = tx.send(ObserverEvent::Terminate);
                         }
-                    }
+                    });
                 })
                 .expect("unable to spawn thread");
 
@@ -927,7 +941,7 @@ pub async fn start_stacks_event_observer(
 
     indexer.seed_stacks_block_pool(stacks_startup_context.block_pool_seed, &ctx);
 
-    let log_level = if config.display_stacks_ingestion_logs {
+    let _log_level = if config.display_stacks_ingestion_logs {
         LogLevel::Debug
     } else {
         LogLevel::Off
@@ -943,59 +957,41 @@ pub async fn start_stacks_event_observer(
 
     let background_job_tx_mutex = Arc::new(Mutex::new(observer_commands_tx.clone()));
 
-    let limits = Limits::default().limit("json", 500.megabytes());
-    let shutdown_config = config::Shutdown {
-        ctrlc: false,
-        grace: 0,
-        mercy: 0,
-        ..Default::default()
-    };
-
-    let ingestion_config = Config {
-        port: ingestion_port,
-        workers: 1,
-        address: IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)),
-        keep_alive: 5,
-        temp_dir: std::env::temp_dir().into(),
-        log_level,
-        cli_colors: false,
-        limits,
-        shutdown: shutdown_config,
-        ..Config::default()
-    };
-
-    let mut routes = rocket::routes![
-        http::handle_new_bitcoin_block,
-        http::handle_new_stacks_block,
-        http::handle_new_microblocks,
-        http::handle_new_mempool_tx,
-        http::handle_drop_mempool_tx,
-        http::handle_new_attachement,
-        http::handle_mined_block,
-        http::handle_mined_microblock,
-    ];
-    #[cfg(feature = "stacks-signers")]
-    {
-        routes.append(&mut routes![http::handle_stackerdb_chunks]);
-    }
-    if bitcoin_rpc_proxy_enabled {
-        routes.append(&mut routes![http::handle_bitcoin_rpc_call]);
-        routes.append(&mut routes![http::handle_bitcoin_wallet_rpc_call]);
-    }
-
+    // Create Axum router
     let ctx_cloned = ctx.clone();
-    let ignite = rocket::custom(ingestion_config)
-        .manage(indexer_rw_lock)
-        .manage(background_job_tx_mutex)
-        .manage(bitcoin_config)
-        .manage(ctx_cloned)
-        .mount("/", routes)
-        .ignite()
-        .await?;
-    let ingestion_shutdown = Some(ignite.shutdown());
+    let app = http::create_router(
+        indexer_rw_lock,
+        background_job_tx_mutex,
+        bitcoin_config,
+        ctx_cloned,
+        bitcoin_rpc_proxy_enabled,
+    );
 
-    let _ = std::thread::spawn(move || {
-        let _ = hiro_system_kit::nestable_block_on(ignite.launch());
+    // Create socket address
+    let addr = SocketAddr::from(([0, 0, 0, 0], ingestion_port));
+
+    // Create a tokio handle for shutdown
+    let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel::<()>();
+    let ingestion_shutdown = Some(Shutdown(shutdown_tx));
+
+    // Spawn the server
+    let _server = tokio::spawn(async move {
+        let listener = match tokio::net::TcpListener::bind(&addr).await {
+            Ok(listener) => listener,
+            Err(e) => {
+                eprintln!("Failed to bind to address {}: {}", addr, e);
+                return;
+            }
+        };
+
+        if let Err(e) = axum::serve(listener, app.into_make_service())
+            .with_graceful_shutdown(async {
+                let _ = shutdown_rx.await;
+            })
+            .await
+        {
+            eprintln!("Server error: {}", e);
+        }
     });
 
     // This loop is used for handling background jobs, emitted by HTTP calls.
