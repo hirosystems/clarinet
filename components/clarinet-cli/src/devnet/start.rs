@@ -3,8 +3,6 @@ use std::fs::OpenOptions;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::mpsc::{self, channel, Sender};
-use std::thread;
-
 
 use clarinet_deployments::types::DeploymentSpecification;
 use hiro_system_kit::{slog, slog_async, slog_term, Drain};
@@ -77,29 +75,6 @@ pub fn start(
 
     let (orchestrator_terminated_tx, orchestrator_terminated_rx) = channel();
 
- 
-
-    thread::spawn(move || {
-        let mut signals = match signal_hook::iterator::Signals::new(&[signal_hook::consts::SIGTERM]) {
-            Ok(signals) => signals,
-            Err(e) => {
-                eprintln!("Failed to setup SIGTERM handler: {}", e);
-                return;
-            }
-        };
-
-        for sig in signals.forever() {
-            if sig == signal_hook::consts::SIGTERM {
-               
-                unsafe {
-                    libc::kill(std::process::id() as libc::pid_t, libc::SIGINT);
-                }
-                break;
-            }
-        }
-    });
-
-  
     let res = hiro_system_kit::nestable_block_on(do_run_local_devnet(
         config.devnet,
         config.deployment,
