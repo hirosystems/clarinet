@@ -196,6 +196,7 @@ mod tests {
         };
     }
 
+    #[test]
     fn single_operand_logical() {
         let mut settings = SessionSettings::default();
         settings.repl_settings.analysis.passes = vec![Pass::NoopChecker];
