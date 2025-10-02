@@ -62,8 +62,8 @@ use std::sync::LazyLock;
 
 use clarity::types::StacksEpochId;
 use clarity::vm::ast::ContractAST;
-use clarity::vm::types::{PrincipalData, QualifiedContractIdentifier, StandardPrincipalData};
 use clarity::vm::ClarityVersion;
+use clarity_types::types::{PrincipalData, QualifiedContractIdentifier, StandardPrincipalData};
 
 use crate::repl::{
     ClarityCodeSource, ClarityContract, ClarityInterpreter, ContractDeployer, Epoch, Settings,
