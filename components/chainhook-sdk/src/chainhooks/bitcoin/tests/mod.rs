@@ -1,12 +1,9 @@
-use std::collections::HashSet;
-
 use chainhook_types::bitcoin::TxOut;
-use chainhook_types::{BitcoinNetwork, Brc20Operation, Brc20TokenDeployData};
+use chainhook_types::BitcoinNetwork;
 use test_case::test_case;
 
 use super::super::types::MatchingRule;
 use super::*;
-use crate::chainhooks::bitcoin::InscriptionFeedData;
 use crate::indexer::tests::helpers::accounts;
 use crate::indexer::tests::helpers::bitcoin_blocks::generate_test_bitcoin_block;
 use crate::indexer::tests::helpers::transactions::generate_test_tx_bitcoin_p2pkh_transfer;
@@ -129,8 +126,6 @@ fn script_pubkey_evaluation(output: OutputPredicate, script_pubkey: &str, matche
             proof: None,
             inputs: vec![],
             stacks_operations: vec![],
-            ordinal_operations: vec![],
-            brc20_operation: None,
             outputs,
         },
     };
@@ -196,79 +191,4 @@ fn it_serdes_occurrence_payload(
     .unwrap();
 
     let _: BitcoinChainhookOccurrencePayload = serde_json::from_slice(&payload[..]).unwrap();
-}
-
-#[test_case(
-    "pepe".to_string();
-    "including brc20 data"
-)]
-fn it_serdes_brc20_payload(tick: String) {
-    let transaction = BitcoinTransactionData {
-        transaction_identifier: TransactionIdentifier {
-            hash: "0xc6191000459e4c58611103216e44547e512c01ee04119462644ee09ce9d8e8bb".to_string(),
-        },
-        operations: vec![],
-        metadata: BitcoinTransactionMetadata {
-            inputs: vec![],
-            outputs: vec![],
-            ordinal_operations: vec![],
-            stacks_operations: vec![],
-            brc20_operation: Some(Brc20Operation::Deploy(Brc20TokenDeployData {
-                tick,
-                max: "21000000.000000".to_string(),
-                lim: "1000.000000".to_string(),
-                dec: "6".to_string(),
-                address: "3P4WqXDbSLRhzo2H6MT6YFbvBKBDPLbVtQ".to_string(),
-                inscription_id:
-                    "c6191000459e4c58611103216e44547e512c01ee04119462644ee09ce9d8e8bbi0".to_string(),
-                self_mint: false,
-            })),
-            proof: None,
-            fee: 0,
-            index: 0,
-        },
-    };
-    let block = generate_test_bitcoin_block(0, 0, vec![transaction.clone()], None);
-    let mut meta_protocols = HashSet::<OrdinalsMetaProtocol>::new();
-    meta_protocols.insert(OrdinalsMetaProtocol::Brc20);
-    let chainhook = &BitcoinChainhookInstance {
-        uuid: "uuid".into(),
-        owner_uuid: None,
-        name: "name".into(),
-        network: BitcoinNetwork::Mainnet,
-        version: 0,
-        blocks: None,
-        start_block: None,
-        end_block: None,
-        expire_after_occurrence: None,
-        predicate: BitcoinPredicateType::OrdinalsProtocol(OrdinalOperations::InscriptionFeed(
-            InscriptionFeedData {
-                meta_protocols: Some(meta_protocols),
-            },
-        )),
-        action: HookAction::Noop,
-        include_proof: false,
-        include_inputs: false,
-        include_outputs: false,
-        include_witness: false,
-        enabled: true,
-        expired_at: None,
-    };
-    let trigger = BitcoinTriggerChainhook {
-        chainhook,
-        apply: vec![(vec![&transaction], &block)],
-        rollback: vec![],
-    };
-    let payload = serde_json::to_vec(&serialize_bitcoin_payload_to_json(
-        &trigger,
-        &HashMap::new(),
-    ))
-    .unwrap();
-
-    let deserialized: BitcoinChainhookOccurrencePayload =
-        serde_json::from_slice(&payload[..]).unwrap();
-    assert!(deserialized.apply[0].block.transactions[0]
-        .metadata
-        .brc20_operation
-        .is_some());
 }

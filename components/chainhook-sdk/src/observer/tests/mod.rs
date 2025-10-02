@@ -2,18 +2,16 @@ use std::collections::BTreeMap;
 use std::sync::mpsc::{channel, Sender};
 
 use chainhook_types::{
-    BitcoinBlockSignaling, BitcoinChainEvent, BitcoinNetwork, BlockchainEvent,
-    BlockchainUpdatedWithHeaders, OrdinalInscriptionCharms, OrdinalInscriptionNumber,
-    OrdinalInscriptionRevealData, OrdinalOperation, StacksBlockUpdate, StacksChainEvent,
-    StacksChainUpdatedWithBlocksData, StacksNetwork, StacksNodeConfig,
+    BitcoinBlockSignaling, BitcoinNetwork, BlockchainEvent, BlockchainUpdatedWithHeaders,
+    StacksBlockUpdate, StacksChainEvent, StacksChainUpdatedWithBlocksData, StacksNetwork,
+    StacksNodeConfig,
 };
 use hiro_system_kit;
 
 use super::{ObserverEvent, PredicatesConfig, DEFAULT_INGESTION_PORT};
 use crate::chainhooks::bitcoin::{
     BitcoinChainhookInstance, BitcoinChainhookSpecification,
-    BitcoinChainhookSpecificationNetworkMap, BitcoinPredicateType, InscriptionFeedData,
-    OrdinalOperations, OutputPredicate,
+    BitcoinChainhookSpecificationNetworkMap, BitcoinPredicateType, OutputPredicate,
 };
 use crate::chainhooks::stacks::{
     StacksChainhookInstance, StacksChainhookSpecification, StacksChainhookSpecificationNetworkMap,
@@ -23,13 +21,12 @@ use crate::chainhooks::types::{
     ChainhookInstance, ChainhookSpecificationNetworkMap, ChainhookStore, ExactMatchingRule,
     HookAction,
 };
-use crate::indexer::fork_scratch_pad::ForkScratchPad;
 use crate::indexer::tests::helpers::transactions::{
     generate_test_tx_bitcoin_p2pkh_transfer, generate_test_tx_stacks_contract_call,
 };
 use crate::indexer::tests::helpers::{accounts, bitcoin_blocks, stacks_blocks};
 use crate::observer::{
-    start_observer_commands_handler, EventObserverConfig, ObserverCommand, ObserverSidecar,
+    start_observer_commands_handler, EventObserverConfig, ObserverCommand,
     PredicateDeregisteredEvent,
 };
 use crate::utils::{AbstractBlock, Context};
@@ -102,37 +99,6 @@ fn bitcoin_chainhook_p2pkh(
             expire_after_occurrence,
             predicate: BitcoinPredicateType::Outputs(OutputPredicate::P2pkh(
                 ExactMatchingRule::Equals(address.to_string()),
-            )),
-            action: HookAction::Noop,
-            include_proof: None,
-            include_inputs: None,
-            include_outputs: None,
-            include_witness: None,
-        },
-    );
-
-    BitcoinChainhookSpecificationNetworkMap {
-        uuid: format!("{}", id),
-        name: format!("Chainhook {}", id),
-        owner_uuid: None,
-        version: 1,
-        networks,
-    }
-}
-
-fn bitcoin_chainhook_ordinals(id: u8) -> BitcoinChainhookSpecificationNetworkMap {
-    let mut networks = BTreeMap::new();
-    networks.insert(
-        BitcoinNetwork::Regtest,
-        BitcoinChainhookSpecification {
-            start_block: None,
-            end_block: None,
-            blocks: None,
-            expire_after_occurrence: None,
-            predicate: BitcoinPredicateType::OrdinalsProtocol(OrdinalOperations::InscriptionFeed(
-                InscriptionFeedData {
-                    meta_protocols: None,
-                },
             )),
             action: HookAction::Noop,
             include_proof: None,
@@ -265,33 +231,6 @@ fn assert_stacks_chain_event(observer_events_rx: &crossbeam_channel::Receiver<Ob
         ),
         "expected StacksChainEvent event to occur"
     );
-}
-
-fn generate_and_register_new_ordinals_chainhook(
-    observer_commands_tx: &Sender<ObserverCommand>,
-    observer_events_rx: &crossbeam_channel::Receiver<ObserverEvent>,
-    id: u8,
-) -> BitcoinChainhookInstance {
-    let chainhook = bitcoin_chainhook_ordinals(id);
-    let _ = observer_commands_tx.send(ObserverCommand::RegisterPredicate(
-        ChainhookSpecificationNetworkMap::Bitcoin(chainhook.clone()),
-    ));
-    let mut chainhook = chainhook
-        .into_specification_for_network(&BitcoinNetwork::Regtest)
-        .unwrap();
-    chainhook.enabled = true;
-    let _ = observer_commands_tx.send(ObserverCommand::EnablePredicate(
-        ChainhookInstance::Bitcoin(chainhook.clone()),
-    ));
-    assert!(matches!(
-        observer_events_rx.recv(),
-        Ok(ObserverEvent::PredicateRegistered(_))
-    ));
-    assert!(matches!(
-        observer_events_rx.recv(),
-        Ok(ObserverEvent::PredicateEnabled(_))
-    ));
-    chainhook
 }
 
 #[test]
@@ -977,230 +916,4 @@ fn test_bitcoin_chainhook_auto_deregister() {
 
     let _ = observer_commands_tx.send(ObserverCommand::Terminate);
     handle.join().expect("unable to terminate thread");
-}
-
-#[test]
-fn test_bitcoin_chainhook_through_reorg() {
-    let (observer_commands_tx, observer_commands_rx) = channel();
-    let (block_pre_processor_in_tx, block_pre_processor_in_rx) = crossbeam_channel::unbounded();
-    let (block_pre_processor_out_tx, block_pre_processor_out_rx) = crossbeam_channel::unbounded();
-
-    let (observer_events_tx, observer_events_rx) = crossbeam_channel::unbounded();
-
-    let empty_ctx = Context::empty();
-
-    let observer_sidecar = ObserverSidecar {
-        bitcoin_blocks_mutator: Some((block_pre_processor_in_tx, block_pre_processor_out_rx)),
-        bitcoin_chain_event_notifier: None,
-    };
-
-    let handle = std::thread::spawn(move || {
-        let (config, chainhook_store) = generate_test_config();
-        let _ = hiro_system_kit::nestable_block_on(start_observer_commands_handler(
-            config,
-            chainhook_store,
-            observer_commands_rx,
-            Some(observer_events_tx),
-            None,
-            Some(observer_sidecar),
-            Context::empty(),
-        ));
-    });
-
-    // The block pre-processor will simulate block augmentation with new informations, which should trigger
-    // registered predicates
-    let block_pre_processor_handle = std::thread::spawn(move || {
-        let mut inscription_number = OrdinalInscriptionNumber::zero();
-        let mut cursor = 0;
-        while let Ok((mut blocks, _)) = block_pre_processor_in_rx.recv() {
-            for b in blocks.iter_mut() {
-                for (tx_index, tx) in b.block.transactions.iter_mut().enumerate() {
-                    cursor += 1;
-                    inscription_number.classic += 1;
-                    inscription_number.jubilee += 1;
-                    tx.metadata
-                        .ordinal_operations
-                        .push(OrdinalOperation::InscriptionRevealed(Box::new(
-                            OrdinalInscriptionRevealData {
-                                content_bytes: format!("{cursor}"),
-                                content_type: "".to_string(),
-                                content_length: cursor as usize,
-                                inscription_number: inscription_number.clone(),
-                                inscription_fee: cursor,
-                                inscription_output_value: cursor,
-                                inscription_id: format!("{cursor}"),
-                                inscription_input_index: 0,
-                                inscription_pointer: None,
-                                inscriber_address: None,
-                                metadata: None,
-                                metaprotocol: None,
-                                delegate: None,
-                                parents: vec![],
-                                ordinal_number: cursor,
-                                ordinal_block_height: b.block.block_identifier.index,
-                                ordinal_offset: 0,
-                                tx_index,
-                                transfers_pre_inscription: cursor as u32,
-                                satpoint_post_inscription: format!("{cursor}"),
-                                curse_type: None,
-                                charms: OrdinalInscriptionCharms::none(),
-                            },
-                        )))
-                }
-            }
-            let _ = block_pre_processor_out_tx.send(blocks);
-        }
-    });
-
-    let genesis = bitcoin_blocks::generate_test_bitcoin_block(0, 1, vec![], None);
-    let mut fork_pad = ForkScratchPad::new();
-    let _ = fork_pad.process_header(genesis.get_header(), &empty_ctx);
-
-    // Create and register a new chainhook (wallet_2 received some sats)
-    let _chainhook =
-        generate_and_register_new_ordinals_chainhook(&observer_commands_tx, &observer_events_rx, 1);
-
-    // Simulate a block that does not include a trigger (wallet_1 to wallet_3)
-    let transactions = vec![generate_test_tx_bitcoin_p2pkh_transfer(
-        0,
-        &accounts::wallet_1_btc_address(),
-        &accounts::wallet_3_btc_address(),
-        3,
-    )];
-    let block = bitcoin_blocks::generate_test_bitcoin_block(0, 2, transactions, None);
-    let _ = observer_commands_tx.send(ObserverCommand::CacheBitcoinBlock(block.clone()));
-
-    let chain_event = fork_pad
-        .process_header(block.get_header(), &empty_ctx)
-        .unwrap()
-        .unwrap();
-    let _ = observer_commands_tx.send(ObserverCommand::PropagateBitcoinChainEvent(chain_event));
-    // Should signal that no hook were triggered
-    assert!(match observer_events_rx.recv() {
-        Ok(ObserverEvent::PredicatesTriggered(len)) => {
-            assert_eq!(len, 1);
-            true
-        }
-        Ok(event) => {
-            println!("Unexpected event: {:?}", event);
-            false
-        }
-        Err(e) => {
-            println!("Error: {:?}", e);
-            false
-        }
-    });
-
-    // 1) Should kick off predicate event
-    assert!(match observer_events_rx.recv() {
-        Ok(ObserverEvent::BitcoinPredicateTriggered(payload)) => {
-            assert_eq!(payload.apply.len(), 1);
-            assert_eq!(payload.apply[0].block.transactions.len(), 1);
-            true
-        }
-        _ => false,
-    });
-
-    // 2) Should kick off bitcoin chain event
-    assert!(matches!(
-        observer_events_rx.recv(),
-        Ok(ObserverEvent::BitcoinChainEvent((
-            BitcoinChainEvent::ChainUpdatedWithBlocks(_),
-            _
-        )))
-    ));
-
-    // Simulate a block that does include a trigger (wallet_1 to wallet_2)
-    let transactions = vec![generate_test_tx_bitcoin_p2pkh_transfer(
-        0,
-        &accounts::wallet_1_btc_address(),
-        &accounts::wallet_2_btc_address(),
-        3,
-    )];
-    let block = bitcoin_blocks::generate_test_bitcoin_block(1, 2, transactions, None);
-    let _ = observer_commands_tx.send(ObserverCommand::CacheBitcoinBlock(block.clone()));
-    let chain_event = fork_pad
-        .process_header(block.get_header(), &empty_ctx)
-        .unwrap()
-        .unwrap();
-    let _ = observer_commands_tx.send(ObserverCommand::PropagateBitcoinChainEvent(chain_event));
-
-    // Should signal that no hook were triggered
-    assert!(match observer_events_rx.recv() {
-        Ok(ObserverEvent::PredicatesTriggered(len)) => {
-            assert_eq!(len, 1);
-            true
-        }
-        _ => false,
-    });
-
-    assert!(match observer_events_rx.recv() {
-        Ok(ObserverEvent::BitcoinPredicateTriggered(payload)) => {
-            assert_eq!(payload.rollback.len(), 1);
-            assert_eq!(payload.rollback[0].block.transactions.len(), 1);
-            assert_eq!(payload.apply.len(), 1);
-            assert_eq!(payload.apply[0].block.transactions.len(), 1);
-            true
-        }
-        _ => false,
-    });
-
-    // Should propagate chain event
-    assert!(matches!(
-        observer_events_rx.recv(),
-        Ok(ObserverEvent::BitcoinChainEvent((
-            BitcoinChainEvent::ChainUpdatedWithReorg(_),
-            _
-        )))
-    ));
-
-    // Simulate a block that does include a trigger (wallet_1 to wallet_2)
-    let transactions = vec![generate_test_tx_bitcoin_p2pkh_transfer(
-        0,
-        &accounts::wallet_1_btc_address(),
-        &accounts::wallet_2_btc_address(),
-        3,
-    )];
-    let block = bitcoin_blocks::generate_test_bitcoin_block(0, 3, transactions, None);
-    let _ = observer_commands_tx.send(ObserverCommand::CacheBitcoinBlock(block.clone()));
-    let chain_event = fork_pad
-        .process_header(block.get_header(), &empty_ctx)
-        .unwrap()
-        .unwrap();
-    let _ = observer_commands_tx.send(ObserverCommand::PropagateBitcoinChainEvent(chain_event));
-
-    // Should signal that no hook were triggered
-    assert!(match observer_events_rx.recv() {
-        Ok(ObserverEvent::PredicatesTriggered(len)) => {
-            assert_eq!(len, 1);
-            true
-        }
-        _ => false,
-    });
-
-    assert!(match observer_events_rx.recv() {
-        Ok(ObserverEvent::BitcoinPredicateTriggered(payload)) => {
-            assert_eq!(payload.rollback.len(), 1);
-            assert_eq!(payload.rollback[0].block.transactions.len(), 1);
-            assert_eq!(payload.apply.len(), 2);
-            assert_eq!(payload.apply[0].block.transactions.len(), 1);
-            true
-        }
-        _ => false,
-    });
-
-    // Should propagate block
-    assert!(matches!(
-        observer_events_rx.recv(),
-        Ok(ObserverEvent::BitcoinChainEvent((
-            BitcoinChainEvent::ChainUpdatedWithReorg(_),
-            _
-        )))
-    ));
-
-    let _ = observer_commands_tx.send(ObserverCommand::Terminate);
-    handle.join().expect("unable to terminate thread");
-    block_pre_processor_handle
-        .join()
-        .expect("unable to terminate thread");
 }

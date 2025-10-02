@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap};
 use std::str::FromStr;
 use std::time::Duration;
 
@@ -263,7 +263,6 @@ pub enum BitcoinPredicateType {
     Inputs(InputPredicate),
     Outputs(OutputPredicate),
     StacksProtocol(StacksOperations),
-    OrdinalsProtocol(OrdinalOperations),
 }
 
 impl BitcoinPredicateType {
@@ -295,7 +294,6 @@ impl BitcoinPredicateType {
                 }
             }
             BitcoinPredicateType::StacksProtocol(_) => {}
-            BitcoinPredicateType::OrdinalsProtocol(_) => {}
         }
         Ok(())
     }
@@ -367,26 +365,6 @@ pub enum StacksOperations {
     LeaderRegistered,
     StxTransferred,
     StxLocked,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, Hash, PartialEq, Eq)]
-#[serde(rename_all = "kebab-case")]
-pub enum OrdinalsMetaProtocol {
-    All,
-    #[serde(rename = "brc-20")]
-    Brc20,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-pub struct InscriptionFeedData {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub meta_protocols: Option<HashSet<OrdinalsMetaProtocol>>,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case", tag = "operation")]
-pub enum OrdinalOperations {
-    InscriptionFeed(InscriptionFeedData),
 }
 
 pub fn get_stacks_canonical_magic_bytes(network: &BitcoinNetwork) -> [u8; 2] {
@@ -722,17 +700,6 @@ pub fn serialize_bitcoin_transactions_to_json(
             };
             metadata.insert("stacks_operations".into(), json!(stacks_ops));
 
-            let ordinals_ops = if transaction.metadata.ordinal_operations.is_empty() {
-                vec![]
-            } else {
-                transaction.metadata.ordinal_operations.clone()
-            };
-            metadata.insert("ordinal_operations".into(), json!(ordinals_ops));
-
-            if let Some(ref brc20) = transaction.metadata.brc20_operation {
-                metadata.insert("brc20_operation".into(), json!(brc20));
-            }
-
             metadata.insert(
                 "proof".into(),
                 json!(proofs.get(&transaction.transaction_identifier)),
@@ -985,24 +952,6 @@ impl BitcoinPredicateType {
                 }
                 false
             }
-            BitcoinPredicateType::OrdinalsProtocol(OrdinalOperations::InscriptionFeed(
-                feed_data,
-            )) => match &feed_data.meta_protocols {
-                Some(meta_protocols) => {
-                    if let Some(meta_protocol) = meta_protocols.iter().next() {
-                        match meta_protocol {
-                            OrdinalsMetaProtocol::All => {
-                                return !tx.metadata.ordinal_operations.is_empty()
-                            }
-                            OrdinalsMetaProtocol::Brc20 => {
-                                return tx.metadata.brc20_operation.is_some()
-                            }
-                        }
-                    }
-                    false
-                }
-                None => !tx.metadata.ordinal_operations.is_empty(),
-            },
         }
     }
 }

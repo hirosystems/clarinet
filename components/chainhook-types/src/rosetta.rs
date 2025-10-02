@@ -6,8 +6,7 @@ use std::hash::{Hash, Hasher};
 use super::bitcoin::{TxIn, TxOut};
 use crate::contract_interface::ContractInterface;
 use crate::events::*;
-use crate::ordinals::OrdinalOperation;
-use crate::{Brc20Operation, StacksStackerDbChunk, DEFAULT_STACKS_NODE_RPC};
+use crate::{StacksStackerDbChunk, DEFAULT_STACKS_NODE_RPC};
 
 /// BlockIdentifier uniquely identifies a block in a particular network.
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
@@ -339,8 +338,6 @@ pub struct BitcoinTransactionMetadata {
     pub inputs: Vec<TxIn>,
     pub outputs: Vec<TxOut>,
     pub stacks_operations: Vec<StacksBaseChainOperation>,
-    pub ordinal_operations: Vec<OrdinalOperation>,
-    pub brc20_operation: Option<Brc20Operation>,
     pub proof: Option<String>,
     pub fee: u64,
     pub index: u32,
