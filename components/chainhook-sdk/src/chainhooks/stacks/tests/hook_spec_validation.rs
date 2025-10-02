@@ -11,48 +11,94 @@ use crate::chainhooks::stacks::{
 };
 use crate::chainhooks::types::{HttpHook, *};
 
-static TXID_NO_PREFIX: LazyLock<String> = LazyLock::new(|| "1234567890123456789012345678901234567890123456789012345678901234".into());
-static TXID_NOT_HEX: LazyLock<String> = LazyLock::new(|| "0xw234567890123456789012345678901234567890123456789012345678901234".into());
-static TXID_SHORT: LazyLock<String> = LazyLock::new(|| "0x234567890123456789012345678901234567890123456789012345678901234".into());
-static TXID_LONG: LazyLock<String> = LazyLock::new(|| "0x11234567890123456789012345678901234567890123456789012345678901234".into());
-static TXID_VALID: LazyLock<String> = LazyLock::new(|| "0x1234567890123456789012345678901234567890123456789012345678901234".into());
-static STACKS_ADDRESS_INVALID: LazyLock<String> = LazyLock::new(|| "SQ1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM".into());
-static STACKS_ADDRESS_VALID_MAINNET: LazyLock<String> = LazyLock::new(|| "SP000000000000000000002Q6VF78".into());
-static STACKS_ADDRESS_VALID_TESTNET: LazyLock<String> = LazyLock::new(|| "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM".into());
-static STACKS_ADDRESS_VALID_MULTISIG: LazyLock<String> = LazyLock::new(|| "SN2QE43MMXFDMAT3TPRGQ38BQ50VSRMBRQ6B16W5J".into());
-static CONTRACT_ID_INVALID_ADDRESS: LazyLock<String> = LazyLock::new(|| "SQ1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.contract-name".into());
-static CONTRACT_ID_NO_PERIOD: LazyLock<String> = LazyLock::new(|| "SQ1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGMcontract-name".into());
-static CONTRACT_ID_INVALID_NAME: LazyLock<String> = LazyLock::new(|| "SQ1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.!&*!".into());
-static CONTRACT_ID_VALID: LazyLock<String> = LazyLock::new(|| "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.contract-name".into());
+static TXID_NO_PREFIX: LazyLock<String> =
+    LazyLock::new(|| "1234567890123456789012345678901234567890123456789012345678901234".into());
+static TXID_NOT_HEX: LazyLock<String> =
+    LazyLock::new(|| "0xw234567890123456789012345678901234567890123456789012345678901234".into());
+static TXID_SHORT: LazyLock<String> =
+    LazyLock::new(|| "0x234567890123456789012345678901234567890123456789012345678901234".into());
+static TXID_LONG: LazyLock<String> =
+    LazyLock::new(|| "0x11234567890123456789012345678901234567890123456789012345678901234".into());
+static TXID_VALID: LazyLock<String> =
+    LazyLock::new(|| "0x1234567890123456789012345678901234567890123456789012345678901234".into());
+static STACKS_ADDRESS_INVALID: LazyLock<String> =
+    LazyLock::new(|| "SQ1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM".into());
+static STACKS_ADDRESS_VALID_MAINNET: LazyLock<String> =
+    LazyLock::new(|| "SP000000000000000000002Q6VF78".into());
+static STACKS_ADDRESS_VALID_TESTNET: LazyLock<String> =
+    LazyLock::new(|| "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM".into());
+static STACKS_ADDRESS_VALID_MULTISIG: LazyLock<String> =
+    LazyLock::new(|| "SN2QE43MMXFDMAT3TPRGQ38BQ50VSRMBRQ6B16W5J".into());
+static CONTRACT_ID_INVALID_ADDRESS: LazyLock<String> =
+    LazyLock::new(|| "SQ1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.contract-name".into());
+static CONTRACT_ID_NO_PERIOD: LazyLock<String> =
+    LazyLock::new(|| "SQ1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGMcontract-name".into());
+static CONTRACT_ID_INVALID_NAME: LazyLock<String> =
+    LazyLock::new(|| "SQ1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.!&*!".into());
+static CONTRACT_ID_VALID: LazyLock<String> =
+    LazyLock::new(|| "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.contract-name".into());
 static INVALID_METHOD: LazyLock<String> = LazyLock::new(|| "!@*&!*".into());
 static INVALID_REGEX: LazyLock<String> = LazyLock::new(|| "[\\]".into());
 static VALID_REGEX: LazyLock<String> = LazyLock::new(|| "anything".into());
 
-static TXID_PREDICATE_ERR: LazyLock<String> = LazyLock::new(|| "invalid predicate for scope 'txid': txid must be a 32 byte (64 character) hexadecimal string prefixed with '0x'".into());
-static INPUT_TXID_ERR: LazyLock<String> = LazyLock::new(|| "invalid predicate for scope 'inputs': txid must be a 32 byte (64 character) hexadecimal string prefixed with '0x'".into());
-static INVALID_SPEC_NETWORK_MAP_ERR: LazyLock<String> = LazyLock::new(|| "invalid Stacks predicate 'test' for network simnet: invalid 'then_that' value: invalid 'http_post' data: url string must be a valid Url: relative URL without a base\ninvalid Stacks predicate 'test' for network simnet: invalid 'then_that' value: invalid 'http_post' data: auth header must be a valid header value: failed to parse header value\ninvalid Stacks predicate 'test' for network simnet: invalid 'if_this' value: invalid predicate for scope 'print_event': invalid contract identifier: ParseError(\"Invalid principal literal: base58ck checksum 0x147e6835 does not match expected 0x9b3dfe6a\")\ninvalid Stacks predicate 'test' for network simnet: invalid 'if_this' value: invalid predicate for scope 'print_event': invalid regex: regex parse error:\n    [\\]\n    ^\nerror: unclosed character class\ninvalid Stacks predicate 'test' for network devnet: invalid 'then_that' value: invalid 'http_post' data: url string must be a valid Url: relative URL without a base\ninvalid Stacks predicate 'test' for network devnet: invalid 'then_that' value: invalid 'http_post' data: auth header must be a valid header value: failed to parse header value\ninvalid Stacks predicate 'test' for network devnet: invalid 'if_this' value: invalid predicate for scope 'print_event': invalid contract identifier: ParseError(\"Invalid principal literal: base58ck checksum 0x147e6835 does not match expected 0x9b3dfe6a\")\ninvalid Stacks predicate 'test' for network devnet: invalid 'if_this' value: invalid predicate for scope 'print_event': invalid regex: regex parse error:\n    [\\]\n    ^\nerror: unclosed character class\ninvalid Stacks predicate 'test' for network testnet: invalid 'then_that' value: invalid 'http_post' data: url string must be a valid Url: relative URL without a base\ninvalid Stacks predicate 'test' for network testnet: invalid 'then_that' value: invalid 'http_post' data: auth header must be a valid header value: failed to parse header value\ninvalid Stacks predicate 'test' for network testnet: invalid 'if_this' value: invalid predicate for scope 'print_event': invalid contract identifier: ParseError(\"Invalid principal literal: base58ck checksum 0x147e6835 does not match expected 0x9b3dfe6a\")\ninvalid Stacks predicate 'test' for network testnet: invalid 'if_this' value: invalid predicate for scope 'print_event': invalid regex: regex parse error:\n    [\\]\n    ^\nerror: unclosed character class\ninvalid Stacks predicate 'test' for network mainnet: invalid 'then_that' value: invalid 'http_post' data: url string must be a valid Url: relative URL without a base\ninvalid Stacks predicate 'test' for network mainnet: invalid 'then_that' value: invalid 'http_post' data: auth header must be a valid header value: failed to parse header value\ninvalid Stacks predicate 'test' for network mainnet: invalid 'if_this' value: invalid predicate for scope 'print_event': invalid contract identifier: ParseError(\"Invalid principal literal: base58ck checksum 0x147e6835 does not match expected 0x9b3dfe6a\")\ninvalid Stacks predicate 'test' for network mainnet: invalid 'if_this' value: invalid predicate for scope 'print_event': invalid regex: regex parse error:\n    [\\]\n    ^\nerror: unclosed character class".into());
-static CONTRACT_DEPLOYER_ERR: LazyLock<String> = LazyLock::new(|| "invalid predicate for scope 'contract_deployment': contract deployer must be a valid Stacks address: ParseError(\"Invalid principal literal: base58ck checksum 0x147e6835 does not match expected 0x9b3dfe6a\")".into());
-static CONTRACT_ID_ERR: LazyLock<String> = LazyLock::new(|| "invalid predicate for scope 'contract_call': invalid contract identifier: ParseError(\"Invalid principal literal: base58ck checksum 0x147e6835 does not match expected 0x9b3dfe6a\")".into());
-static CONTRACT_ID_NO_PERIOD_ERR: LazyLock<String> = LazyLock::new(|| "invalid predicate for scope 'contract_call': invalid contract identifier: ParseError(\"Invalid principal literal: expected a `.` in a qualified contract name\")".into());
-static CONTRACT_METHOD_ERR: LazyLock<String> = LazyLock::new(|| "invalid predicate for scope 'contract_call': invalid contract method: BadNameValue(\"ClarityName\", \"!@*&!*\")".into());
-static PRINT_EVENT_ID_ERR: LazyLock<String> = LazyLock::new(|| "invalid predicate for scope 'print_event': invalid contract identifier: ParseError(\"Invalid principal literal: base58ck checksum 0x147e6835 does not match expected 0x9b3dfe6a\")".into());
-static INVALID_REGEX_ERR: LazyLock<String> = LazyLock::new(|| "invalid predicate for scope 'print_event': invalid regex: regex parse error:\n    [\\]\n    ^\nerror: unclosed character class".into());
+static TXID_PREDICATE_ERR: LazyLock<String> = LazyLock::new(|| {
+    "invalid predicate for scope 'txid': txid must be a 32 byte (64 character) hexadecimal string prefixed with '0x'".into()
+});
+static INPUT_TXID_ERR: LazyLock<String> = LazyLock::new(|| {
+    "invalid predicate for scope 'inputs': txid must be a 32 byte (64 character) hexadecimal string prefixed with '0x'".into()
+});
+static INVALID_SPEC_NETWORK_MAP_ERR: LazyLock<String> = LazyLock::new(|| {
+    "invalid Stacks predicate 'test' for network simnet: invalid 'then_that' value: invalid 'http_post' data: url string must be a valid Url: relative URL without a base\ninvalid Stacks predicate 'test' for network simnet: invalid 'then_that' value: invalid 'http_post' data: auth header must be a valid header value: failed to parse header value\ninvalid Stacks predicate 'test' for network simnet: invalid 'if_this' value: invalid predicate for scope 'print_event': invalid contract identifier: ParseError(\"Invalid principal literal: base58ck checksum 0x147e6835 does not match expected 0x9b3dfe6a\")\ninvalid Stacks predicate 'test' for network simnet: invalid 'if_this' value: invalid predicate for scope 'print_event': invalid regex: regex parse error:\n    [\\]\n    ^\nerror: unclosed character class\ninvalid Stacks predicate 'test' for network devnet: invalid 'then_that' value: invalid 'http_post' data: url string must be a valid Url: relative URL without a base\ninvalid Stacks predicate 'test' for network devnet: invalid 'then_that' value: invalid 'http_post' data: auth header must be a valid header value: failed to parse header value\ninvalid Stacks predicate 'test' for network devnet: invalid 'if_this' value: invalid predicate for scope 'print_event': invalid contract identifier: ParseError(\"Invalid principal literal: base58ck checksum 0x147e6835 does not match expected 0x9b3dfe6a\")\ninvalid Stacks predicate 'test' for network devnet: invalid 'if_this' value: invalid predicate for scope 'print_event': invalid regex: regex parse error:\n    [\\]\n    ^\nerror: unclosed character class\ninvalid Stacks predicate 'test' for network testnet: invalid 'then_that' value: invalid 'http_post' data: url string must be a valid Url: relative URL without a base\ninvalid Stacks predicate 'test' for network testnet: invalid 'then_that' value: invalid 'http_post' data: auth header must be a valid header value: failed to parse header value\ninvalid Stacks predicate 'test' for network testnet: invalid 'if_this' value: invalid predicate for scope 'print_event': invalid contract identifier: ParseError(\"Invalid principal literal: base58ck checksum 0x147e6835 does not match expected 0x9b3dfe6a\")\ninvalid Stacks predicate 'test' for network testnet: invalid 'if_this' value: invalid predicate for scope 'print_event': invalid regex: regex parse error:\n    [\\]\n    ^\nerror: unclosed character class\ninvalid Stacks predicate 'test' for network mainnet: invalid 'then_that' value: invalid 'http_post' data: url string must be a valid Url: relative URL without a base\ninvalid Stacks predicate 'test' for network mainnet: invalid 'then_that' value: invalid 'http_post' data: auth header must be a valid header value: failed to parse header value\ninvalid Stacks predicate 'test' for network mainnet: invalid 'if_this' value: invalid predicate for scope 'print_event': invalid contract identifier: ParseError(\"Invalid principal literal: base58ck checksum 0x147e6835 does not match expected 0x9b3dfe6a\")\ninvalid Stacks predicate 'test' for network mainnet: invalid 'if_this' value: invalid predicate for scope 'print_event': invalid regex: regex parse error:\n    [\\]\n    ^\nerror: unclosed character class".into()
+});
+static CONTRACT_DEPLOYER_ERR: LazyLock<String> = LazyLock::new(|| {
+    "invalid predicate for scope 'contract_deployment': contract deployer must be a valid Stacks address: ParseError(\"Invalid principal literal: base58ck checksum 0x147e6835 does not match expected 0x9b3dfe6a\")".into()
+});
+static CONTRACT_ID_ERR: LazyLock<String> = LazyLock::new(|| {
+    "invalid predicate for scope 'contract_call': invalid contract identifier: ParseError(\"Invalid principal literal: base58ck checksum 0x147e6835 does not match expected 0x9b3dfe6a\")".into()
+});
+static CONTRACT_ID_NO_PERIOD_ERR: LazyLock<String> = LazyLock::new(|| {
+    "invalid predicate for scope 'contract_call': invalid contract identifier: ParseError(\"Invalid principal literal: expected a `.` in a qualified contract name\")".into()
+});
+static CONTRACT_METHOD_ERR: LazyLock<String> = LazyLock::new(|| {
+    "invalid predicate for scope 'contract_call': invalid contract method: BadNameValue(\"ClarityName\", \"!@*&!*\")".into()
+});
+static PRINT_EVENT_ID_ERR: LazyLock<String> = LazyLock::new(|| {
+    "invalid predicate for scope 'print_event': invalid contract identifier: ParseError(\"Invalid principal literal: base58ck checksum 0x147e6835 does not match expected 0x9b3dfe6a\")".into()
+});
+static INVALID_REGEX_ERR: LazyLock<String> = LazyLock::new(|| {
+    "invalid predicate for scope 'print_event': invalid regex: regex parse error:\n    [\\]\n    ^\nerror: unclosed character class".into()
+});
 
-static INVALID_PREDICATE: LazyLock<StacksPredicate> = LazyLock::new(|| StacksPredicate::PrintEvent(StacksPrintEventBasedPredicate::MatchesRegex { contract_identifier: CONTRACT_ID_INVALID_ADDRESS.clone(), regex: INVALID_REGEX.clone() }));
-static INVALID_HOOK_ACTION: LazyLock<HookAction> = LazyLock::new(|| HookAction::HttpPost(HttpHook { url: "".into(), authorization_header: "\n".into() }));
-static ALL_INVALID_SPEC: LazyLock<StacksChainhookSpecification> = LazyLock::new(|| StacksChainhookSpecification::new(INVALID_PREDICATE.clone(), INVALID_HOOK_ACTION.clone()));
-static ALL_INVALID_SPEC_NETWORK_MAP: LazyLock<ChainhookSpecificationNetworkMap> = LazyLock::new(|| ChainhookSpecificationNetworkMap::Stacks(StacksChainhookSpecificationNetworkMap {
-    uuid: "test".into(),
-    owner_uuid: None,
-    name: "test".into(),
-    version: 1,
-    networks: BTreeMap::from([
-        (StacksNetwork::Simnet, ALL_INVALID_SPEC.clone()),
-        (StacksNetwork::Devnet, ALL_INVALID_SPEC.clone()),
-        (StacksNetwork::Testnet, ALL_INVALID_SPEC.clone()),
-        (StacksNetwork::Mainnet, ALL_INVALID_SPEC.clone()),
-    ])
-}));
+static INVALID_PREDICATE: LazyLock<StacksPredicate> = LazyLock::new(|| {
+    StacksPredicate::PrintEvent(StacksPrintEventBasedPredicate::MatchesRegex {
+        contract_identifier: CONTRACT_ID_INVALID_ADDRESS.clone(),
+        regex: INVALID_REGEX.clone(),
+    })
+});
+static INVALID_HOOK_ACTION: LazyLock<HookAction> = LazyLock::new(|| {
+    HookAction::HttpPost(HttpHook {
+        url: "".into(),
+        authorization_header: "\n".into(),
+    })
+});
+static ALL_INVALID_SPEC: LazyLock<StacksChainhookSpecification> = LazyLock::new(|| {
+    StacksChainhookSpecification::new(INVALID_PREDICATE.clone(), INVALID_HOOK_ACTION.clone())
+});
+static ALL_INVALID_SPEC_NETWORK_MAP: LazyLock<ChainhookSpecificationNetworkMap> =
+    LazyLock::new(|| {
+        ChainhookSpecificationNetworkMap::Stacks(StacksChainhookSpecificationNetworkMap {
+            uuid: "test".into(),
+            owner_uuid: None,
+            name: "test".into(),
+            version: 1,
+            networks: BTreeMap::from([
+                (StacksNetwork::Simnet, ALL_INVALID_SPEC.clone()),
+                (StacksNetwork::Devnet, ALL_INVALID_SPEC.clone()),
+                (StacksNetwork::Testnet, ALL_INVALID_SPEC.clone()),
+                (StacksNetwork::Mainnet, ALL_INVALID_SPEC.clone()),
+            ]),
+        })
+    });
 
 // StacksPredicate::BlockHeight
 #[test_case(

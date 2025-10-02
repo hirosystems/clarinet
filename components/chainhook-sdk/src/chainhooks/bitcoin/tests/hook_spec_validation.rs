@@ -7,35 +7,65 @@ use super::*;
 use crate::chainhooks::bitcoin::InscriptionFeedData;
 use crate::chainhooks::types::{ChainhookSpecificationNetworkMap, HttpHook};
 
-static TXID_NO_PREFIX: LazyLock<String> = LazyLock::new(|| "1234567890123456789012345678901234567890123456789012345678901234".into());
-static TXID_NOT_HEX: LazyLock<String> = LazyLock::new(|| "0xw234567890123456789012345678901234567890123456789012345678901234".into());
-static TXID_SHORT: LazyLock<String> = LazyLock::new(|| "0x234567890123456789012345678901234567890123456789012345678901234".into());
-static TXID_LONG: LazyLock<String> = LazyLock::new(|| "0x11234567890123456789012345678901234567890123456789012345678901234".into());
-static TXID_VALID: LazyLock<String> = LazyLock::new(|| "0x1234567890123456789012345678901234567890123456789012345678901234".into());
+static TXID_NO_PREFIX: LazyLock<String> =
+    LazyLock::new(|| "1234567890123456789012345678901234567890123456789012345678901234".into());
+static TXID_NOT_HEX: LazyLock<String> =
+    LazyLock::new(|| "0xw234567890123456789012345678901234567890123456789012345678901234".into());
+static TXID_SHORT: LazyLock<String> =
+    LazyLock::new(|| "0x234567890123456789012345678901234567890123456789012345678901234".into());
+static TXID_LONG: LazyLock<String> =
+    LazyLock::new(|| "0x11234567890123456789012345678901234567890123456789012345678901234".into());
+static TXID_VALID: LazyLock<String> =
+    LazyLock::new(|| "0x1234567890123456789012345678901234567890123456789012345678901234".into());
 
-static TXID_PREDICATE_ERR: LazyLock<String> = LazyLock::new(|| "invalid predicate for scope 'txid': txid must be a 32 byte (64 character) hexadecimal string prefixed with '0x'".into());
-static INPUT_TXID_ERR: LazyLock<String> = LazyLock::new(|| "invalid predicate for scope 'inputs': txid must be a 32 byte (64 character) hexadecimal string prefixed with '0x'".into());
-static DESCRIPTOR_KEY_SHORT_ERR: LazyLock<String> = LazyLock::new(|| "invalid predicate for scope 'outputs': invalid descriptor: unexpected «Key too short (<66 char), doesn't match any format»".into());
-static INVALID_DESCRIPTOR_ERR: LazyLock<String> = LazyLock::new(|| "invalid predicate for scope 'outputs': invalid descriptor: Anything but c:pk(key) (P2PK), c:pk_h(key) (P2PKH), and thresh_m(k,...) up to n=3 is invalid by standardness (bare).\n                ".into());
-static INVALID_URL_ERR: LazyLock<String> = LazyLock::new(|| "invalid 'http_post' data: url string must be a valid Url: relative URL without a base".into());
-static INVALID_HTTP_HEADER_ERR: LazyLock<String> = LazyLock::new(|| "invalid 'http_post' data: auth header must be a valid header value: failed to parse header value".into());
-static INVALID_SPEC_NETWORK_MAP_ERR: LazyLock<String> = LazyLock::new(|| "invalid Bitcoin predicate 'test' for network regtest: invalid 'then_that' value: invalid 'http_post' data: url string must be a valid Url: relative URL without a base\ninvalid Bitcoin predicate 'test' for network regtest: invalid 'then_that' value: invalid 'http_post' data: auth header must be a valid header value: failed to parse header value\ninvalid Bitcoin predicate 'test' for network regtest: invalid 'if_this' value: invalid predicate for scope 'txid': txid must be a 32 byte (64 character) hexadecimal string prefixed with '0x'\ninvalid Bitcoin predicate 'test' for network testnet: invalid 'then_that' value: invalid 'http_post' data: url string must be a valid Url: relative URL without a base\ninvalid Bitcoin predicate 'test' for network testnet: invalid 'then_that' value: invalid 'http_post' data: auth header must be a valid header value: failed to parse header value\ninvalid Bitcoin predicate 'test' for network testnet: invalid 'if_this' value: invalid predicate for scope 'txid': txid must be a 32 byte (64 character) hexadecimal string prefixed with '0x'\ninvalid Bitcoin predicate 'test' for network signet: invalid 'then_that' value: invalid 'http_post' data: url string must be a valid Url: relative URL without a base\ninvalid Bitcoin predicate 'test' for network signet: invalid 'then_that' value: invalid 'http_post' data: auth header must be a valid header value: failed to parse header value\ninvalid Bitcoin predicate 'test' for network signet: invalid 'if_this' value: invalid predicate for scope 'txid': txid must be a 32 byte (64 character) hexadecimal string prefixed with '0x'\ninvalid Bitcoin predicate 'test' for network mainnet: invalid 'then_that' value: invalid 'http_post' data: url string must be a valid Url: relative URL without a base\ninvalid Bitcoin predicate 'test' for network mainnet: invalid 'then_that' value: invalid 'http_post' data: auth header must be a valid header value: failed to parse header value\ninvalid Bitcoin predicate 'test' for network mainnet: invalid 'if_this' value: invalid predicate for scope 'txid': txid must be a 32 byte (64 character) hexadecimal string prefixed with '0x'".into());
+static TXID_PREDICATE_ERR: LazyLock<String> = LazyLock::new(|| {
+    "invalid predicate for scope 'txid': txid must be a 32 byte (64 character) hexadecimal string prefixed with '0x'".into()
+});
+static INPUT_TXID_ERR: LazyLock<String> = LazyLock::new(|| {
+    "invalid predicate for scope 'inputs': txid must be a 32 byte (64 character) hexadecimal string prefixed with '0x'".into()
+});
+static DESCRIPTOR_KEY_SHORT_ERR: LazyLock<String> = LazyLock::new(|| {
+    "invalid predicate for scope 'outputs': invalid descriptor: unexpected «Key too short (<66 char), doesn't match any format»".into()
+});
+static INVALID_DESCRIPTOR_ERR: LazyLock<String> = LazyLock::new(|| {
+    "invalid predicate for scope 'outputs': invalid descriptor: Anything but c:pk(key) (P2PK), c:pk_h(key) (P2PKH), and thresh_m(k,...) up to n=3 is invalid by standardness (bare).\n                ".into()
+});
+static INVALID_URL_ERR: LazyLock<String> = LazyLock::new(|| {
+    "invalid 'http_post' data: url string must be a valid Url: relative URL without a base".into()
+});
+static INVALID_HTTP_HEADER_ERR: LazyLock<String> = LazyLock::new(|| {
+    "invalid 'http_post' data: auth header must be a valid header value: failed to parse header value".into()
+});
+static INVALID_SPEC_NETWORK_MAP_ERR: LazyLock<String> = LazyLock::new(|| {
+    "invalid Bitcoin predicate 'test' for network regtest: invalid 'then_that' value: invalid 'http_post' data: url string must be a valid Url: relative URL without a base\ninvalid Bitcoin predicate 'test' for network regtest: invalid 'then_that' value: invalid 'http_post' data: auth header must be a valid header value: failed to parse header value\ninvalid Bitcoin predicate 'test' for network regtest: invalid 'if_this' value: invalid predicate for scope 'txid': txid must be a 32 byte (64 character) hexadecimal string prefixed with '0x'\ninvalid Bitcoin predicate 'test' for network testnet: invalid 'then_that' value: invalid 'http_post' data: url string must be a valid Url: relative URL without a base\ninvalid Bitcoin predicate 'test' for network testnet: invalid 'then_that' value: invalid 'http_post' data: auth header must be a valid header value: failed to parse header value\ninvalid Bitcoin predicate 'test' for network testnet: invalid 'if_this' value: invalid predicate for scope 'txid': txid must be a 32 byte (64 character) hexadecimal string prefixed with '0x'\ninvalid Bitcoin predicate 'test' for network signet: invalid 'then_that' value: invalid 'http_post' data: url string must be a valid Url: relative URL without a base\ninvalid Bitcoin predicate 'test' for network signet: invalid 'then_that' value: invalid 'http_post' data: auth header must be a valid header value: failed to parse header value\ninvalid Bitcoin predicate 'test' for network signet: invalid 'if_this' value: invalid predicate for scope 'txid': txid must be a 32 byte (64 character) hexadecimal string prefixed with '0x'\ninvalid Bitcoin predicate 'test' for network mainnet: invalid 'then_that' value: invalid 'http_post' data: url string must be a valid Url: relative URL without a base\ninvalid Bitcoin predicate 'test' for network mainnet: invalid 'then_that' value: invalid 'http_post' data: auth header must be a valid header value: failed to parse header value\ninvalid Bitcoin predicate 'test' for network mainnet: invalid 'if_this' value: invalid predicate for scope 'txid': txid must be a 32 byte (64 character) hexadecimal string prefixed with '0x'".into()
+});
 
-static INVALID_TXID_PREDICATE: LazyLock<BitcoinPredicateType> = LazyLock::new(|| BitcoinPredicateType::Txid(ExactMatchingRule::Equals("test".into())));
-static INVALID_HOOK_ACTION: LazyLock<HookAction> = LazyLock::new(|| HookAction::HttpPost(HttpHook { url: "".into(), authorization_header: "\n".into() }));
-static ALL_INVALID_SPEC: LazyLock<BitcoinChainhookSpecification> = LazyLock::new(|| BitcoinChainhookSpecification::new(INVALID_TXID_PREDICATE.clone(), INVALID_HOOK_ACTION.clone()));
-static ALL_INVALID_SPEC_NETWORK_MAP: LazyLock<ChainhookSpecificationNetworkMap> = LazyLock::new(|| ChainhookSpecificationNetworkMap::Bitcoin(BitcoinChainhookSpecificationNetworkMap {
-    uuid: "test".into(),
-    owner_uuid: None,
-    name: "test".into(),
-    version: 1,
-    networks: BTreeMap::from([
-        (BitcoinNetwork::Regtest, ALL_INVALID_SPEC.clone()),
-        (BitcoinNetwork::Signet, ALL_INVALID_SPEC.clone()),
-        (BitcoinNetwork::Mainnet, ALL_INVALID_SPEC.clone()),
-        (BitcoinNetwork::Testnet, ALL_INVALID_SPEC.clone()),
-    ])
-}));
+static INVALID_TXID_PREDICATE: LazyLock<BitcoinPredicateType> =
+    LazyLock::new(|| BitcoinPredicateType::Txid(ExactMatchingRule::Equals("test".into())));
+static INVALID_HOOK_ACTION: LazyLock<HookAction> = LazyLock::new(|| {
+    HookAction::HttpPost(HttpHook {
+        url: "".into(),
+        authorization_header: "\n".into(),
+    })
+});
+static ALL_INVALID_SPEC: LazyLock<BitcoinChainhookSpecification> = LazyLock::new(|| {
+    BitcoinChainhookSpecification::new(INVALID_TXID_PREDICATE.clone(), INVALID_HOOK_ACTION.clone())
+});
+static ALL_INVALID_SPEC_NETWORK_MAP: LazyLock<ChainhookSpecificationNetworkMap> =
+    LazyLock::new(|| {
+        ChainhookSpecificationNetworkMap::Bitcoin(BitcoinChainhookSpecificationNetworkMap {
+            uuid: "test".into(),
+            owner_uuid: None,
+            name: "test".into(),
+            version: 1,
+            networks: BTreeMap::from([
+                (BitcoinNetwork::Regtest, ALL_INVALID_SPEC.clone()),
+                (BitcoinNetwork::Signet, ALL_INVALID_SPEC.clone()),
+                (BitcoinNetwork::Mainnet, ALL_INVALID_SPEC.clone()),
+                (BitcoinNetwork::Testnet, ALL_INVALID_SPEC.clone()),
+            ]),
+        })
+    });
 
 // BitcoinPredicateType::Block
 #[test_case(&BitcoinPredicateType::Block, None; "block")]
