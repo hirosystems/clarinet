@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::LazyLock;
 
 use chainhook_types::{
     FTBurnEventData, FTMintEventData, FTTransferEventData, NFTBurnEventData, NFTMintEventData,
@@ -7,16 +8,15 @@ use chainhook_types::{
     StacksTransactionEvent, StacksTransactionEventPayload,
 };
 
-lazy_static! {
-    pub static ref TESTNET_STACKS_BLOCK_FIXTURES: HashMap<u64, StacksBlockData> = {
+static TESTNET_STACKS_BLOCK_FIXTURES: LazyLock<HashMap<u64, StacksBlockData>> =
+    LazyLock::new(|| {
         let mut fixtures: HashMap<u64, StacksBlockData> = HashMap::new();
         fixtures.insert(
             107605,
             load_stacks_block_fixture(std::include_str!("stacks/testnet/107605.json")),
         );
         fixtures
-    };
-}
+    });
 
 pub fn load_stacks_block_fixture(json_str: &str) -> StacksBlockData {
     serde_json::from_str(json_str).unwrap()

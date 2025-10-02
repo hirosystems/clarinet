@@ -486,7 +486,6 @@ dependencies = [
  "crossbeam-channel",
  "hex",
  "hiro-system-kit",
- "lazy_static",
  "miniscript",
  "regex",
  "reqwest",
