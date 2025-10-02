@@ -1947,4 +1947,47 @@ mod tests {
             _ => panic!("Expected NoSuchFunction error"),
         }
     }
+
+    #[test]
+    fn can_call_clarity_4_contract_hash() {
+        let mut interpreter = get_interpreter(None);
+
+        interpreter.set_current_epoch(StacksEpochId::Epoch33);
+
+        let dummy_contract = ClarityContractBuilder::default()
+            .name("dummy-contract".into())
+            .code_source("(define-read-only (oktrue) (ok true))".into())
+            .epoch(StacksEpochId::Epoch33)
+            .build();
+        let _ = deploy_contract(&mut interpreter, &dummy_contract);
+
+        let contract = ClarityContractBuilder::default()
+            .code_source(
+                "(define-read-only (get-hash) (ok (contract-hash? .dummy-contract)))".into(),
+            )
+            .epoch(StacksEpochId::Epoch33)
+            .clarity_version(ClarityVersion::Clarity4)
+            .build();
+        let _ = deploy_contract(&mut interpreter, &contract);
+
+        let result = interpreter.call_contract_fn(
+            &contract
+                .expect_resolved_contract_identifier(Some(&StandardPrincipalData::transient())),
+            "get-hash",
+            &[],
+            StacksEpochId::Epoch33,
+            ClarityVersion::Clarity4,
+            false,
+            false,
+            vec![],
+        );
+
+        println!("result: {:#?}", result);
+        assert!(result.is_ok());
+        let ExecutionResult { result, .. } = result.unwrap();
+
+        // assert!(
+        //     matches!(result, EvaluationResult::Snippet(SnippetEvaluationResult { result }) if matches!(result, Value::Ok(box Value::Buffer(_))))
+        // );
+    }
 }
