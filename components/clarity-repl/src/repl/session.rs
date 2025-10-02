@@ -7,11 +7,12 @@ use clarity::codec::StacksMessageCodec;
 use clarity::types::StacksEpochId;
 use clarity::vm::ast::ContractAST;
 use clarity::vm::diagnostic::{Diagnostic, Level};
-use clarity::vm::types::{PrincipalData, QualifiedContractIdentifier, Value};
 use clarity::vm::{
     ClarityVersion, CostSynthesis, EvalHook, EvaluationResult, ExecutionResult, ParsedContract,
     SymbolicExpression,
 };
+use clarity_types::types::{PrincipalData, QualifiedContractIdentifier};
+use clarity_types::Value;
 use colored::Colorize;
 use comfy_table::Table;
 
@@ -1275,7 +1276,7 @@ fn decode_hex(byte_string: &str) -> Result<Vec<u8>, DecodeHexError> {
 #[cfg(test)]
 mod tests {
     use clarity::util::hash::hex_bytes;
-    use clarity::vm::types::TupleData;
+    use clarity_types::types::TupleData;
 
     use super::*;
     use crate::repl::boot::{BOOT_MAINNET_ADDRESS, BOOT_TESTNET_ADDRESS};

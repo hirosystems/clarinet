@@ -6,7 +6,7 @@ use std::str::FromStr;
 
 use clarity::types::chainstate::StacksAddress;
 use clarity::types::StacksEpochId;
-use clarity::vm::types::{PrincipalData, QualifiedContractIdentifier, StandardPrincipalData};
+use clarity_types::types::{PrincipalData, QualifiedContractIdentifier, StandardPrincipalData};
 
 use super::remote_data::HttpClient;
 use crate::analysis;

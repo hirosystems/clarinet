@@ -14,13 +14,12 @@ use clarity::vm::diagnostic::{Diagnostic, Level};
 use clarity::vm::events::*;
 use clarity::vm::representations::SymbolicExpressionType::{Atom, List};
 use clarity::vm::representations::{Span, SymbolicExpression};
-use clarity::vm::types::{
-    PrincipalData, QualifiedContractIdentifier, StandardPrincipalData, Value,
-};
 use clarity::vm::{
     eval, eval_all, ClarityVersion, ContractEvaluationResult, CostSynthesis, EvalHook,
     EvaluationResult, ExecutionResult, ParsedContract, SnippetEvaluationResult,
 };
+use clarity_types::types::{PrincipalData, QualifiedContractIdentifier, StandardPrincipalData};
+use clarity_types::Value;
 
 use super::datastore::StacksConstants;
 use super::remote_data::HttpClient;
@@ -276,7 +275,7 @@ impl ClarityInterpreter {
             contract.clarity_version,
             true,
         )
-        .map_err(|(error, _)| error.diagnostic)?;
+        .map_err(|boxed_error| boxed_error.0.diagnostic)?;
 
         // Run REPL-only analyses
         let diagnostics = analysis::run_analysis(
@@ -936,8 +935,8 @@ impl ClarityInterpreter {
 mod tests {
     use clarity::types::chainstate::StacksAddress;
     use clarity::types::Address;
-    use clarity::vm::types::TupleData;
     use clarity::vm::{self, ClarityVersion};
+    use clarity_types::types::TupleData;
 
     use super::*;
     use crate::analysis::Settings as AnalysisSettings;

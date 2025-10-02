@@ -24,6 +24,7 @@ version = "3.7.0"
 
 [workspace.dependencies]
 clarity = { git = "https://github.com/stacks-network/stacks-core.git", branch="develop", package = "clarity", default-features = false }
+clarity-types = { git = "https://github.com/stacks-network/stacks-core.git", branch="develop", package = "clarity-types"}
 stacks-common = { git = "https://github.com/stacks-network/stacks-core.git", branch="develop", package = "stacks-common", default-features = false }
 pox-locking = { git = "https://github.com/stacks-network/stacks-core.git", branch="develop", package = "pox-locking", default-features = false }
 stackslib = { git = "https://github.com/stacks-network/stacks-core.git", branch="develop", package = "stackslib", default-features = false}
