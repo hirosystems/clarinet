@@ -1,115 +1,146 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "description": "Configuration schema for Clarinet.toml files used in Clarity smart contract projects",
-  "properties": {
-    "contracts": {
-      "additionalProperties": {
-        "properties": {
-          "clarity_version": {
-            "default": 1,
-            "description": "Clarity language version to use",
-            "enum": [
-              1,
-              2,
-              3
-            ],
-            "type": "integer"
-          },
-          "deployer": {
-            "description": "Deployer identifier (wallet name from settings/Devnet.toml)",
-            "type": "string"
-          },
-          "epoch": {
-            "default": "2.05",
-            "description": "Stacks blockchain epoch",
-            "oneOf": [
-              {
-                "enum": [
-                  "2.0",
-                  "2.05",
-                  "2.1",
-                  "2.2",
-                  "2.3",
-                  "2.4",
-                  "2.5",
-                  "3.0",
-                  "3.1",
-                  "3.2",
-                  "latest"
-                ],
-                "type": "string"
-              },
-              {
-                "enum": [
-                  2.0,
-                  2.05,
-                  2.1,
-                  2.2,
-                  2.3,
-                  2.4,
-                  2.5,
-                  3.0,
-                  3.1,
-                  3.2
-                ],
-                "type": "number"
-              }
-            ]
-          },
-          "path": {
-            "description": "Relative path to the contract file from project root",
-            "type": "string"
-          }
+  "$defs": {
+    "ApiUrl": {
+      "type": "string"
+    },
+    "ContractConfig": {
+      "description": "Schema definition for contract configuration",
+      "properties": {
+        "clarity_version": {
+          "description": "Clarity language version to use",
+          "enum": [
+            1,
+            2,
+            3
+          ],
+          "type": "integer"
         },
-        "required": [
-          "path"
-        ],
-        "type": "object"
-      },
-      "description": "Contract definitions for the project",
-      "examples": [
-        {
-          "counter": {
-            "clarity_version": 2,
-            "epoch": "2.1",
-            "path": "contracts/counter.clar"
-          }
+        "deployer": {
+          "description": "Deployer identifier",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "epoch": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EpochValue"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Stacks blockchain epoch"
+        },
+        "path": {
+          "description": "Relative path to the contract file from project root",
+          "type": "string"
         }
+      },
+      "required": [
+        "path",
+        "clarity_version"
       ],
       "type": "object"
     },
-    "project": {
-      "description": "Project-level configuration",
-      "properties": {
-        "analysis": {
-          "description": "Analysis passes to run (deprecated, use repl.analysis instead)",
+    "EpochValue": {
+      "anyOf": [
+        {
+          "description": "String epoch value",
+          "enum": [
+            "2.0",
+            "2.05",
+            "2.1",
+            "2.2",
+            "2.3",
+            "2.4",
+            "2.5",
+            "3.0",
+            "3.1",
+            "3.2",
+            "latest"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "Numeric epoch value",
+          "enum": [
+            2.0,
+            2.05,
+            2.1,
+            2.2,
+            2.3,
+            2.4,
+            2.5,
+            3.0,
+            3.1,
+            3.2
+          ],
+          "type": "number"
+        }
+      ],
+      "description": "Epoch can be specified as string or number"
+    },
+    "OneOrList": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Pass",
+          "description": "Allow `T` as shorthand for `[T]` in the TOML"
+        },
+        {
+          "description": "Allow more than one `T` in the TOML",
           "items": {
-            "type": "string"
+            "$ref": "#/$defs/Pass"
           },
           "type": "array"
-        },
+        }
+      ]
+    },
+    "Pass": {
+      "enum": [
+        "all",
+        "call_checker",
+        "check_checker",
+        "noop_checker"
+      ],
+      "type": "string"
+    },
+    "ProjectConfigFile": {
+      "properties": {
         "authors": {
           "description": "List of project authors",
           "items": {
             "type": "string"
           },
-          "type": "array"
+          "type": [
+            "array",
+            "null"
+          ]
         },
         "boot_contracts": {
-          "description": "List of boot contracts to include (deprecated, kept for backwards compatibility)",
+          "description": "List of boot contracts to include",
           "items": {
             "type": "string"
           },
-          "type": "array"
+          "type": [
+            "array",
+            "null"
+          ]
         },
         "cache_dir": {
-          "default": ".cache",
           "description": "Directory for caching build artifacts",
-          "type": "string"
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "description": {
           "description": "Project description",
-          "type": "string"
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "name": {
           "description": "Name of the project",
@@ -117,133 +148,185 @@
         },
         "override_boot_contracts_source": {
           "additionalProperties": {
-            "description": "Path to custom boot contract implementation",
             "type": "string"
           },
-          "description": "Override default boot contract implementations with custom ones",
-          "examples": [
-            {
-              "costs": "./custom-boot-contracts/costs.clar",
-              "pox-4": "./custom-boot-contracts/pox-4.clar"
-            }
-          ],
-          "type": "object"
+          "description": "Override default boot contract implementations",
+          "type": [
+            "object",
+            "null"
+          ]
         },
         "requirements": {
           "description": "External contract dependencies",
           "items": {
-            "properties": {
-              "contract_id": {
-                "description": "Fully qualified contract identifier (e.g., SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.nft-trait)",
-                "type": "string"
-              }
-            },
-            "required": [
-              "contract_id"
-            ],
-            "type": "object"
+            "$ref": "#/$defs/RequirementConfig"
           },
           "type": "array"
         },
         "telemetry": {
-          "default": false,
           "description": "Enable or disable telemetry",
-          "type": "boolean"
+          "type": [
+            "boolean",
+            "null"
+          ]
         }
       },
       "required": [
-        "name"
+        "name",
+        "requirements"
       ],
       "type": "object"
     },
-    "repl": {
-      "description": "REPL and analysis settings",
+    "RemoteDataSettingsFile": {
+      "properties": {
+        "api_url": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ApiUrl"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "enabled": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "initial_height": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "use_mainnet_wallets": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "RequirementConfig": {
+      "properties": {
+        "contract_id": {
+          "description": "Contract identifier (e.g., SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.nft-trait)",
+          "type": "string"
+        }
+      },
+      "required": [
+        "contract_id"
+      ],
+      "type": "object"
+    },
+    "SettingsFile": {
       "properties": {
         "analysis": {
-          "description": "Static analysis configuration",
-          "properties": {
-            "check_checker": {
-              "description": "Configuration for the check_checker analysis pass",
-              "properties": {
-                "callee_filter": {
-                  "description": "Allow filters in callee to filter caller",
-                  "type": "boolean"
-                },
-                "strict": {
-                  "description": "Strict mode sets all other options to false",
-                  "type": "boolean"
-                },
-                "trusted_caller": {
-                  "description": "After a filter on contract-caller, trust all inputs",
-                  "type": "boolean"
-                },
-                "trusted_sender": {
-                  "description": "After a filter on tx-sender, trust all inputs",
-                  "type": "boolean"
-                }
-              },
-              "type": "object"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SettingsFile2"
             },
-            "passes": {
-              "description": "List of analysis passes to run (can be a single string or array)",
-              "oneOf": [
-                {
-                  "enum": [
-                    "check_checker",
-                    "check_traits",
-                    "check_private_function_args"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "items": {
-                    "enum": [
-                      "check_checker",
-                      "check_traits",
-                      "check_private_function_args"
-                    ],
-                    "type": "string"
-                  },
-                  "type": "array"
-                }
-              ]
+            {
+              "type": "null"
             }
-          },
-          "type": "object"
+          ]
         },
         "remote_data": {
-          "description": "Remote data fetching configuration",
-          "properties": {
-            "api_url": {
-              "description": "API URL for remote data fetching",
-              "format": "uri",
-              "type": "string"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RemoteDataSettingsFile"
             },
-            "enabled": {
-              "default": false,
-              "description": "Enable fetching data from remote sources",
-              "type": "boolean"
-            },
-            "initial_height": {
-              "description": "Initial blockchain height for data fetching",
-              "minimum": 0,
-              "type": "integer"
-            },
-            "use_mainnet_wallets": {
-              "default": false,
-              "description": "Use mainnet wallet addresses for testing",
-              "type": "boolean"
+            {
+              "type": "null"
             }
-          },
-          "type": "object"
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "SettingsFile2": {
+      "properties": {
+        "check_checker": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SettingsFile3"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "passes": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OneOrList"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "SettingsFile3": {
+      "properties": {
+        "callee_filter": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "strict": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "trusted_caller": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "trusted_sender": {
+          "type": [
+            "boolean",
+            "null"
+          ]
         }
       },
       "type": "object"
     }
   },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "properties": {
+    "contracts": {
+      "additionalProperties": {
+        "$ref": "#/$defs/ContractConfig"
+      },
+      "description": "Contract definitions",
+      "type": "object"
+    },
+    "project": {
+      "$ref": "#/$defs/ProjectConfigFile",
+      "description": "Project-level configuration"
+    },
+    "repl": {
+      "$ref": "#/$defs/SettingsFile",
+      "description": "REPL and analysis settings"
+    }
+  },
   "required": [
-    "project"
+    "project",
+    "contracts",
+    "repl"
   ],
-  "title": "Clarinet Project Manifest",
+  "title": "ProjectManifestFile",
   "type": "object"
 }

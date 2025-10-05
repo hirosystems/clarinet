@@ -13,6 +13,7 @@ serde_derive = { workspace = true }
 serde_json = { workspace = true }
 toml = { workspace = true }
 url = { version = "2.5.4", features = ["serde"] }
+schemars = { workspace = true }
 
 clarity = { workspace = true, default-features = false }
 stacks-common = { workspace = true, default-features = false }

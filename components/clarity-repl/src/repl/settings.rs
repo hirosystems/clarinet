@@ -7,6 +7,7 @@ use std::str::FromStr;
 use clarity::types::chainstate::StacksAddress;
 use clarity::types::StacksEpochId;
 use clarity_types::types::{PrincipalData, QualifiedContractIdentifier, StandardPrincipalData};
+use schemars::JsonSchema;
 
 use super::remote_data::HttpClient;
 use crate::analysis;
@@ -67,7 +68,7 @@ impl SessionSettings {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq, JsonSchema)]
 pub struct ApiUrl(pub String);
 impl Default for ApiUrl {
     fn default() -> Self {
@@ -97,7 +98,7 @@ pub struct Settings {
     pub show_timings: bool,
 }
 
-#[derive(Debug, Default, Clone, Deserialize, Serialize)]
+#[derive(Debug, Default, Clone, Deserialize, Serialize, JsonSchema)]
 pub struct SettingsFile {
     analysis: Option<analysis::SettingsFile>,
     remote_data: Option<RemoteDataSettingsFile>,
@@ -123,7 +124,7 @@ impl From<SettingsFile> for Settings {
     }
 }
 
-#[derive(Debug, Default, Clone, Deserialize, Serialize)]
+#[derive(Debug, Default, Clone, Deserialize, Serialize, JsonSchema)]
 pub struct RemoteDataSettingsFile {
     enabled: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]

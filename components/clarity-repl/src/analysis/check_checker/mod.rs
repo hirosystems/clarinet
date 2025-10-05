@@ -13,13 +13,14 @@ use clarity::vm::representations::SymbolicExpressionType::*;
 use clarity::vm::types::TypeSignatureExt;
 use clarity::vm::{ClarityName, ClarityVersion, SymbolicExpression};
 use clarity_types::types::TypeSignature;
+use schemars::JsonSchema;
 
 use crate::analysis::annotation::{Annotation, AnnotationKind, WarningKind};
 use crate::analysis::ast_visitor::{traverse, ASTVisitor, TypedVar};
 use crate::analysis::{self, AnalysisPass, AnalysisResult};
 use crate::repl::DEFAULT_EPOCH;
 
-#[derive(Debug, Default, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Copy, Serialize, Deserialize, JsonSchema)]
 pub struct Settings {
     // Strict mode sets all other options to false
     strict: bool,
@@ -31,7 +32,7 @@ pub struct Settings {
     callee_filter: bool,
 }
 
-#[derive(Debug, Default, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Copy, Serialize, Deserialize, JsonSchema)]
 pub struct SettingsFile {
     // Strict mode sets all other options to false
     strict: Option<bool>,
