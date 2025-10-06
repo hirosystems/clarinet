@@ -37,6 +37,8 @@ pub enum EpochSpec {
     Epoch3_1,
     #[serde(rename = "3.2")]
     Epoch3_2,
+    #[serde(rename = "3.3")]
+    Epoch3_3,
 }
 
 impl From<StacksEpochId> for EpochSpec {
@@ -52,6 +54,7 @@ impl From<StacksEpochId> for EpochSpec {
             StacksEpochId::Epoch30 => EpochSpec::Epoch3_0,
             StacksEpochId::Epoch31 => EpochSpec::Epoch3_1,
             StacksEpochId::Epoch32 => EpochSpec::Epoch3_2,
+            StacksEpochId::Epoch33 => EpochSpec::Epoch3_3,
             StacksEpochId::Epoch10 => unreachable!("epoch 1.0 is not supported"),
         }
     }
@@ -70,6 +73,7 @@ impl From<EpochSpec> for StacksEpochId {
             EpochSpec::Epoch3_0 => StacksEpochId::Epoch30,
             EpochSpec::Epoch3_1 => StacksEpochId::Epoch31,
             EpochSpec::Epoch3_2 => StacksEpochId::Epoch32,
+            EpochSpec::Epoch3_3 => StacksEpochId::Epoch33,
         }
     }
 }
@@ -105,6 +109,7 @@ impl From<&DevnetConfig> for BurnchainEpochConfig {
                     EpochSpec::Epoch3_0 => config.epoch_3_0,
                     EpochSpec::Epoch3_1 => config.epoch_3_1,
                     EpochSpec::Epoch3_2 => config.epoch_3_2,
+                    EpochSpec::Epoch3_3 => config.epoch_3_3,
                 };
                 EpochConfig {
                     epoch_name: epoch,
@@ -116,6 +121,19 @@ impl From<&DevnetConfig> for BurnchainEpochConfig {
         Self {
             burnchain: EpochsConfig { epochs },
         }
+    }
+}
+
+fn try_clarity_version_from_option(value: Option<u8>) -> Result<ClarityVersion, String> {
+    match value {
+        Some(1) => Ok(ClarityVersion::Clarity1),
+        Some(2) => Ok(ClarityVersion::Clarity2),
+        Some(3) => Ok(ClarityVersion::Clarity3),
+        Some(4) => Ok(ClarityVersion::Clarity4),
+        Some(_) => {
+            Err("unable to parse clarity_version (can either be '1', '2', '3', or '4'".to_string())
+        }
+        None => Ok(DEFAULT_CLARITY_VERSION),
     }
 }
 
@@ -525,24 +543,7 @@ impl ContractPublishSpecification {
         .ok_or("unable to parse file location (can either be 'path' or 'url'".to_string())?;
 
         let source = location.read_content_as_utf8()?;
-
-        let clarity_version = match specs.clarity_version {
-            Some(clarity_version) => {
-                if clarity_version.eq(&1) {
-                    Ok(ClarityVersion::Clarity1)
-                } else if clarity_version.eq(&2) {
-                    Ok(ClarityVersion::Clarity2)
-                } else if clarity_version.eq(&3) {
-                    Ok(ClarityVersion::Clarity3)
-                } else {
-                    Err(
-                        "unable to parse clarity_version, it can either be '1', '2', or '3'"
-                            .to_string(),
-                    )
-                }
-            }
-            _ => Ok(DEFAULT_CLARITY_VERSION),
-        }?;
+        let clarity_version = try_clarity_version_from_option(specs.clarity_version)?;
 
         Ok(ContractPublishSpecification {
             contract_name,
@@ -698,6 +699,7 @@ pub mod clarity_version_serde {
             ClarityVersion::Clarity1 => s.serialize_i64(1),
             ClarityVersion::Clarity2 => s.serialize_i64(2),
             ClarityVersion::Clarity3 => s.serialize_i64(3),
+            ClarityVersion::Clarity4 => s.serialize_i64(4),
         }
     }
 
@@ -710,6 +712,7 @@ pub mod clarity_version_serde {
             1 => Ok(ClarityVersion::Clarity1),
             2 => Ok(ClarityVersion::Clarity2),
             3 => Ok(ClarityVersion::Clarity3),
+            4 => Ok(ClarityVersion::Clarity4),
             _ => Err(serde::de::Error::custom(INVALID_CLARITY_VERSION)),
         }
     }
@@ -762,24 +765,7 @@ impl RequirementPublishSpecification {
         .ok_or("unable to parse file location (can either be 'path' or 'url'".to_string())?;
 
         let source = location.read_content_as_utf8()?;
-
-        let clarity_version = match specs.clarity_version {
-            Some(clarity_version) => {
-                if clarity_version.eq(&1) {
-                    Ok(ClarityVersion::Clarity1)
-                } else if clarity_version.eq(&2) {
-                    Ok(ClarityVersion::Clarity2)
-                } else if clarity_version.eq(&3) {
-                    Ok(ClarityVersion::Clarity3)
-                } else {
-                    Err(
-                        "unable to parse clarity_version, it can either be '1', '2', or '3'"
-                            .to_string(),
-                    )
-                }
-            }
-            _ => Ok(DEFAULT_CLARITY_VERSION),
-        }?;
+        let clarity_version = try_clarity_version_from_option(specs.clarity_version)?;
 
         Ok(RequirementPublishSpecification {
             contract_id,
@@ -877,28 +863,11 @@ impl EmulatedContractPublishSpecification {
         }
         .ok_or("unable to parse file location (can either be 'path' or 'url'".to_string())?;
 
-        let clarity_version = match specs.clarity_version {
-            Some(clarity_version) => {
-                if clarity_version.eq(&1) {
-                    Ok(ClarityVersion::Clarity1)
-                } else if clarity_version.eq(&2) {
-                    Ok(ClarityVersion::Clarity2)
-                } else if clarity_version.eq(&3) {
-                    Ok(ClarityVersion::Clarity3)
-                } else {
-                    Err(
-                        "unable to parse clarity_version, it can either be '1', '2', or '3'"
-                            .to_string(),
-                    )
-                }
-            }
-            _ => Ok(DEFAULT_CLARITY_VERSION),
-        }?;
-
         let source = match source {
             Some(source) => source,
             None => location.read_content_as_utf8()?,
         };
+        let clarity_version = try_clarity_version_from_option(specs.clarity_version)?;
 
         Ok(EmulatedContractPublishSpecification {
             contract_name,
@@ -1410,6 +1379,7 @@ impl TransactionPlanSpecification {
                                     ClarityVersion::Clarity1 => Some(1),
                                     ClarityVersion::Clarity2 => Some(2),
                                     ClarityVersion::Clarity3 => Some(3),
+                                    ClarityVersion::Clarity4 => Some(3),
                                 },
                             },
                         )
@@ -1436,6 +1406,7 @@ impl TransactionPlanSpecification {
                                     ClarityVersion::Clarity1 => Some(1),
                                     ClarityVersion::Clarity2 => Some(2),
                                     ClarityVersion::Clarity3 => Some(3),
+                                    ClarityVersion::Clarity4 => Some(4),
                                 },
                             },
                         )
@@ -1458,6 +1429,7 @@ impl TransactionPlanSpecification {
                                     ClarityVersion::Clarity1 => Some(1),
                                     ClarityVersion::Clarity2 => Some(2),
                                     ClarityVersion::Clarity3 => Some(3),
+                                    ClarityVersion::Clarity4 => Some(4),
                                 },
                             },
                         )
@@ -1519,6 +1491,7 @@ mod tests {
             epoch_3_0: 8,
             epoch_3_1: 9,
             epoch_3_2: 10,
+            epoch_3_3: 11,
             ..Default::default()
         };
 
@@ -1567,6 +1540,10 @@ mod tests {
                 [[burnchain.epochs]]
                 epoch_name = "3.2"
                 start_height = 10
+
+                [[burnchain.epochs]]
+                epoch_name = "3.3"
+                start_height = 11
                 "#
             }
         );
