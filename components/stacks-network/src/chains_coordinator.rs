@@ -421,7 +421,6 @@ pub async fn start_chains_coordinator(
                         // Stacking orders can't be published until devnet is ready
                         if !stacks_signers_keys.is_empty()
                             && bitcoin_block_height >= DEFAULT_FIRST_BURN_HEADER_HEIGHT + 10
-                            && !using_snapshot
                         {
                             let res = publish_stacking_orders(
                                 &config.devnet_config,
