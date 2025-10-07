@@ -330,22 +330,6 @@ impl SDK {
         }
     }
 
-    // fn desugar_contract_id(&self, contract: &str) -> Result<QualifiedContractIdentifier, String> {
-    //     let parts_count = contract.split('.').count();
-    //     if parts_count > 2 {
-    //         return Err(format!("Invalid contract identifier: {contract}"));
-    //     }
-
-    //     let is_qualified = parts_count == 2;
-    //     let contract_id = if is_qualified {
-    //         contract.to_string()
-    //     } else {
-    //         format!("{}.{}", self.deployer, contract,)
-    //     };
-
-    //     QualifiedContractIdentifier::parse(&contract_id).map_err(|e| e.to_string())
-    // }
-
     #[wasm_bindgen(js_name=getDefaultEpoch)]
     pub fn get_default_epoch() -> EpochString {
         EpochString {
