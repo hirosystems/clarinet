@@ -1,4 +1,4 @@
-import { Cl, cvToHex, serializeCVBytes } from "@stacks/transactions";
+import { Cl, cvToHex } from "@stacks/transactions";
 import { describe, expect, it } from "vitest";
 
 const accounts = simnet.getAccounts();
