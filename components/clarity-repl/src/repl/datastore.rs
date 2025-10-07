@@ -982,12 +982,14 @@ impl Datastore {
             let id = StacksBlockId(bytes);
             let block_info = self.build_next_stacks_block(clarity_datastore);
 
-            clarity_datastore
-                .put_all_data(vec![(
-                    CLARITY_STORAGE_BLOCK_TIME_KEY.to_string(),
-                    format!("{}", block_info.stacks_block_time),
-                )])
-                .expect("failed to update vm-epoch::block-height");
+            if self.current_epoch.uses_marfed_block_time() {
+                clarity_datastore
+                    .put_all_data(vec![(
+                        CLARITY_STORAGE_BLOCK_TIME_KEY.to_string(),
+                        format!("{}", block_info.stacks_block_time),
+                    )])
+                    .expect("failed to update vm-epoch::block-height");
+            }
             self.stacks_blocks.insert(id.clone(), block_info);
 
             self.tenure_height_at_stacks_height

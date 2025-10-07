@@ -1997,7 +1997,7 @@ mod tests {
     fn can_call_clarity_4_block_time() {
         let mut interpreter = get_interpreter(None);
         interpreter.set_current_epoch(StacksEpochId::Epoch33);
-        let _ = interpreter.advance_stacks_chain_tip(5);
+        let _ = interpreter.advance_stacks_chain_tip(2);
 
         let src = indoc!(
             r#"(define-read-only (get-time) {
