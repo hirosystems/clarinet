@@ -293,18 +293,18 @@ async fn do_run_devnet(
             .expect("unable to retrieve join handle")
     };
 
+    // Set up signal handlers for graceful shutdown (SIGINT and SIGTERM)
+    setup_signal_handlers(
+        orchestrator_terminator_tx.clone(),
+        observer_command_tx,
+        mining_command_tx,
+        devnet_events_tx.clone(),
+    );
+
     if config.display_dashboard {
         config
             .ctx
             .try_log(|logger| slog::info!(logger, "Starting Devnet"));
-
-        // Set up signal handlers for graceful shutdown (SIGINT and SIGTERM)
-        setup_signal_handlers(
-            orchestrator_terminator_tx.clone(),
-            observer_command_tx,
-            mining_command_tx,
-            devnet_events_tx.clone(),
-        );
 
         let moved_chains_coordinator_commands_tx = chains_coordinator_commands_tx.clone();
         ui::start_ui(
@@ -331,14 +331,6 @@ async fn do_run_devnet(
             }
         }
     } else {
-        // Set up signal handlers for graceful shutdown (SIGINT and SIGTERM)
-        setup_signal_handlers(
-            orchestrator_terminator_tx.clone(),
-            observer_command_tx,
-            mining_command_tx,
-            devnet_events_tx.clone(),
-        );
-
         if config.log_tx.is_none() {
             loop {
                 match devnet_events_rx.recv() {
