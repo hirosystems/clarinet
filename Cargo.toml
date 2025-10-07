@@ -1,6 +1,8 @@
 [workspace]
 resolver = "2"
 members = [
+    "components/chainhook-sdk",
+    "components/chainhook-types",
     "components/clarinet-cli",
     "components/clarinet-deployments",
     "components/clarinet-files",
@@ -12,14 +14,13 @@ members = [
     "components/clarity-events",
     "components/hiro-system-kit",
     "components/stacks-codec",
-    "components/stacks-devnet-js",
     "components/stacks-network",
     "components/stacks-rpc-client",
 ]
 default-members = ["components/clarinet-cli"]
 
 [workspace.package]
-version = "3.4.0"
+version = "3.7.0"
 
 [workspace.dependencies]
 clarity = { git = "https://github.com/stacks-network/stacks-core.git", branch="develop", package = "clarity", default-features = false }
@@ -27,35 +28,42 @@ stacks-common = { git = "https://github.com/stacks-network/stacks-core.git", bra
 pox-locking = { git = "https://github.com/stacks-network/stacks-core.git", branch="develop", package = "pox-locking", default-features = false }
 stackslib = { git = "https://github.com/stacks-network/stacks-core.git", branch="develop", package = "stackslib", default-features = false}
 
-colored = { version = "3" }
-chrono = { version = "0.4.31" }
-crossterm = { version = "0.28" }
+base58 = "0.2.0"
+base64 = "0.22.1"
+bitcoincore-rpc = "0.18.0"
+bitcoincore-rpc-json = "0.18.0"
+clap = "4.5.47"
+colored = "3"
+chrono = "0.4.42"
+crossterm = "0.28.0"
+dirs = "6.0.0"
+js-sys = "0.3.80"
+libsecp256k1 = "0.7.2"
 pretty_assertions = "1.4"
 rand = "0.8.5"
 ratatui = { version = "0.29.0", default-features = false, features = ["crossterm"] }
+regex = "1.11.2"
 reqwest = { version = "0.12.22", default-features = false, features = [
     "json",
     "rustls-tls",
 ] }
-strum = { version = "0.27.1" }
+serde = "1.0.225"
+serde_json = "1.0.145"
+serde_derive = "1.0.225"
+serde_yaml = "0.8.23"
+serde-wasm-bindgen = "0.6.4"
+strum = "0.27.2"
+tempfile = "3.22.0"
 toml = { version = "0.5.6", features = ["preserve_order"] }
-tokio = { version = "1.46.1", features = ["full"] }
-tokio-util = { version = "0.7.15", features = ["codec"] }
-wasm-bindgen = { version = "=0.2.100" }
-wasm-bindgen-futures = { version = "=0.4.50" }
-web-sys = { version = "=0.3.77" }
+tokio = { version = "1.47.0", features = ["full"] }
+tokio-util = { version = "0.7.16", features = ["codec"] }
+wasm-bindgen = { version = "0.2.103" }
+wasm-bindgen-futures = { version = "0.4.53" }
+web-sys = { version = "0.3.80" }
 indoc = "2.0.3"
 
 # dev dependencies
 mockito = { version = "1.6", default-features = false }
-
-[patch.crates-io]
-stacks-codec = { path = "./components/stacks-codec" }
-hiro-system-kit = { path = "./components/hiro-system-kit" }
-chainhook-sdk = { git = "https://github.com/hirosystems/chainhook.git", branch = "chore/update-clarinet-and-clarity" }
-chainhook-types = { git = "https://github.com/hirosystems/chainhook.git", branch = "chore/update-clarinet-and-clarity" }
-# chainhook-sdk = { path = "../chainhook/components/chainhook-sdk" }
-# chainhook-types = { path = "../chainhook/components/chainhook-types-rs" }
 
 # [patch.'https://github.com/stacks-network/stacks-core.git']
 # clarity = { path = "../stacks-core/clarity" }

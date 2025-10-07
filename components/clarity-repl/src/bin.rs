@@ -36,28 +36,20 @@ fn main() {
     let code = args.subcommand().unwrap();
 
     let settings = SessionSettings {
-        include_boot_contracts: vec!["costs".into(), "costs-2".into(), "costs-3".into()],
         ..Default::default()
     };
 
     match code {
         Some(code_str) => {
             let mut session = Session::new(settings);
-            match session.start() {
-                Ok(_) => {}
-                Err(e) => {
-                    println!("{e}");
-                    std::process::exit(1);
-                }
-            };
 
-            let (_, output, _) = session.process_console_input(&code_str);
+            let (_, output) = session.process_console_input(&code_str);
             for line in output {
                 println!("{line}");
             }
         }
         None => loop {
-            let mut terminal = Terminal::new(settings.clone(), None);
+            let mut terminal = Terminal::new(settings.clone());
             if !terminal.start() {
                 break;
             }

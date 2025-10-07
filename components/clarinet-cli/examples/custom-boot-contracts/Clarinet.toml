@@ -1,0 +1,9 @@
+[project]
+name = "custom-boot-contracts-example"
+authors = []
+description = "Example project demonstrating custom boot contract overrides"
+telemetry = false
+
+# Override boot contracts with custom implementations
+[project.override_boot_contracts_source]
+pox-4 = "./custom-boot-contracts/pox-5.clar"

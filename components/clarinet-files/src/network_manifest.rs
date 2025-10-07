@@ -22,8 +22,7 @@ pub const DEFAULT_POSTGRES_IMAGE: &str = "postgres:alpine";
 pub const DEFAULT_BITCOIN_NODE_IMAGE: &str = "lncm/bitcoind:v27.2";
 pub const DEFAULT_BITCOIN_EXPLORER_IMAGE: &str = "quay.io/hirosystems/bitcoin-explorer:devnet";
 
-// This is the latest Explorer image before the "hybrid version" with SSR
-pub const DEFAULT_STACKS_EXPLORER_IMAGE: &str = "hirosystems/explorer:1.276.1";
+pub const DEFAULT_STACKS_EXPLORER_IMAGE: &str = "hirosystems/explorer:latest";
 
 pub const DEFAULT_STACKS_MINER_MNEMONIC: &str = "fragile loan twenty basic net assault jazz absorb diet talk art shock innocent float punch travel gadget embrace caught blossom hockey surround initial reduce";
 pub const DEFAULT_FAUCET_MNEMONIC: &str = "shadow private easily thought say logic fault paddle word top book during ignore notable orange flight clock image wealth health outside kitten belt reform";
@@ -178,28 +177,11 @@ pub struct DevnetConfigFile {
     pub docker_platform: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct PoxStackingOrderFile {
-    pub start_at_cycle: u32,
-    pub end_at_cycle: u32,
-    pub amount_locked: u32,
-    pub wallet_label: String,
-    pub bitcoin_address: String,
-}
-
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ExecuteScript {
     pub script: String,
     pub allow_wallets: bool,
     pub allow_write: bool,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct AccountConfigFile {
-    mnemonic: Option<String>,
-    derivation: Option<String>,
-    balance: Option<u64>,
-    is_mainnet: Option<bool>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

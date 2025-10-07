@@ -3,14 +3,6 @@ use clarity_repl::clarity::vm::events::StacksTransactionEvent;
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct SmartContractEvent {
-    contract_identifier: String,
-    topic: String,
-    value: String,
-}
-
-#[derive(Deserialize, Serialize)]
 pub struct StacksEvent {
     pub event: String,
     pub data: serde_json::Value,

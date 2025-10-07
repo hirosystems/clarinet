@@ -9,13 +9,18 @@ use clarity::types::chainstate::{
 };
 use clarity::types::StacksEpochId;
 use clarity::util::hash::Sha512Trunc256Sum;
-use clarity::vm::analysis::AnalysisDatabase;
-use clarity::vm::database::{BurnStateDB, ClarityBackingStore, HeadersDB};
-use clarity::vm::errors::InterpreterResult as Result;
+use clarity::vm::analysis::{AnalysisDatabase, ContractAnalysis};
+use clarity::vm::ast::build_ast_with_rules;
+use clarity::vm::contracts::Contract as ContractContextResponse;
+use clarity::vm::database::clarity_db::ContractDataVarName;
+use clarity::vm::database::{
+    BurnStateDB, ClarityBackingStore, ClarityDatabase, HeadersDB, StoreType,
+};
+use clarity::vm::errors::{InterpreterError, InterpreterResult as Result};
 use clarity::vm::types::{
     PrincipalData, QualifiedContractIdentifier, StandardPrincipalData, TupleData,
 };
-use clarity::vm::StacksEpoch;
+use clarity::vm::{ContractContext, StacksEpoch};
 use pox_locking::handle_contract_call_special_cases;
 use sha2::{Digest, Sha512_256};
 
@@ -23,6 +28,7 @@ use super::interpreter::BLOCK_LIMIT_MAINNET;
 use super::remote_data::fs::{get_file_from_cache, write_file_to_cache};
 use super::remote_data::{epoch_for_height, Block, HttpClient, Sortition};
 use super::settings::RemoteNetworkInfo;
+use crate::repl::remote_data::context;
 
 const SECONDS_BETWEEN_BURN_BLOCKS: u64 = 600;
 const SECONDS_BETWEEN_STACKS_BLOCKS: u64 = 10;
@@ -134,6 +140,7 @@ pub struct Datastore {
     genesis_id: StacksBlockId,
     burn_chain_tip: BurnchainHeaderHash,
     burn_chain_height: u32,
+    tenure_height: u32,
     current_chain_tip: Rc<RefCell<StacksBlockId>>,
     remote_block_info_cache: Rc<RefCell<HashMap<StacksBlockId, Block>>>,
     remote_sortition_cache: Rc<RefCell<HashMap<BurnchainHeaderHash, Sortition>>>,
@@ -141,7 +148,8 @@ pub struct Datastore {
     stacks_chain_height: u32,
     stacks_blocks: HashMap<StacksBlockId, StacksBlockInfo>,
     sortition_lookup: HashMap<SortitionId, BurnchainHeaderHash>,
-    tenure_blocks_height: HashMap<u32, u32>,
+    tenure_height_at_stacks_height: HashMap<u32, u32>,
+    stacks_height_at_tenure_height: HashMap<u32, u32>,
     consensus_hash_lookup: HashMap<ConsensusHash, SortitionId>,
     current_epoch: StacksEpochId,
     current_epoch_start_height: u32,
@@ -375,14 +383,72 @@ impl ClarityDatastore {
     }
 
     #[allow(clippy::result_large_err)]
+    fn populate_context_functions(
+        &mut self,
+        contract_id: &QualifiedContractIdentifier,
+        context_str: Option<String>,
+    ) -> Result<ContractContext> {
+        let contract_src_key = ClarityDatabase::make_metadata_key(
+            StoreType::Contract,
+            ContractDataVarName::ContractSrc.as_str(),
+        );
+        let contract_src =
+            self.get_metadata(contract_id, &contract_src_key)?
+                .ok_or(InterpreterError::Expect(format!(
+                    "No contract source found for contract: {contract_id}",
+                )))?;
+
+        let mut contract_context = context_str
+            .ok_or(InterpreterError::Expect(format!(
+                "No contract context found for contract: {contract_id}",
+            )))
+            .and_then(|s| {
+                serde_json::from_str::<ContractContextResponse>(&s).map_err(|e| {
+                    InterpreterError::Expect(format!("Failed to parse contract context: {e}"))
+                })
+            })?
+            .contract_context;
+        contract_context.functions.clear();
+
+        let analysis = self
+            .get_metadata(contract_id, AnalysisDatabase::storage_key())?
+            .ok_or(InterpreterError::Expect(format!(
+                "No analysis metadata found for contract: {contract_id}",
+            )))
+            .and_then(|s| {
+                serde_json::from_str::<ContractAnalysis>(&s).map_err(|e| {
+                    InterpreterError::Expect(format!("Failed to parse analysis metadata: {e}"))
+                })
+            })?;
+
+        let contract_ast = build_ast_with_rules(
+            contract_id,
+            &contract_src,
+            &mut (),
+            analysis.clarity_version,
+            analysis.epoch,
+            clarity::vm::ast::ASTRules::Typical,
+        )?;
+
+        context::set_functions_in_contract_context(
+            &contract_ast.expressions,
+            &mut contract_context,
+            &analysis.epoch,
+        )?;
+
+        Ok(contract_context)
+    }
+
+    #[allow(clippy::result_large_err)]
     fn fetch_clarity_metadata(
         &mut self,
-        contract: &QualifiedContractIdentifier,
+        contract_id: &QualifiedContractIdentifier,
         key: &str,
     ) -> Result<Option<String>> {
-        let addr = contract.issuer.to_string();
-        let contract = contract.name.to_string();
+        let addr = contract_id.issuer.to_string();
+        let contract = contract_id.name.to_string();
         let tip = self.get_remote_chaintip();
+
         let cache_file_path = PathBuf::from(format!(
             "{}_{}_{}_{}",
             addr,
@@ -397,9 +463,28 @@ impl ClarityDatastore {
         }
 
         let url = format!("/v2/clarity/metadata/{addr}/{contract}/{key}?tip={tip}");
-        let response = self.client.fetch_clarity_data(&url)?;
+        let raw_response = self.client.fetch_clarity_data(&url)?;
 
-        // Save response to cache if successful
+        let contract_context_key = ClarityDatabase::make_metadata_key(
+            StoreType::Contract,
+            ContractDataVarName::Contract.as_str(),
+        );
+        let response = if key == contract_context_key {
+            // the `vm-metadata::9::contract`, returns the contracts Context, including the contract AST.
+            // since node don't have the `clarity-vm/developer-mode` cargo feature enabled,
+            // the AST doesn't contain the spans, which are useful for most debugging purposes.
+            // The solution is to fetch the source code of the contract, and parse it locally,
+            let contract_context = self.populate_context_functions(contract_id, raw_response)?;
+            let contract_context_response = ContractContextResponse { contract_context };
+            Some(
+                serde_json::to_string(&contract_context_response).map_err(|e| {
+                    InterpreterError::Expect(format!("Failed to serialize contract context: {e}"))
+                })?,
+            )
+        } else {
+            raw_response
+        };
+
         if let Some(content) = &response {
             write_file_to_cache(
                 &self.fs_cache_location,
@@ -565,7 +650,7 @@ impl ClarityBackingStore for ClarityDatastore {
         if self.remote_network_info.is_some() && !self.local_accounts.contains(&contract.issuer) {
             let data = self.fetch_clarity_metadata(contract, key);
             if let Ok(Some(value)) = &data {
-                let _ = self.insert_metadata(contract, key, value);
+                self.insert_metadata(contract, key, value)?;
             }
             return data;
         }
@@ -634,7 +719,8 @@ impl Datastore {
         let sortition_lookup = HashMap::from([(burn_block.sortition_id, burn_block_header_hash)]);
         let consensus_hash_lookup =
             HashMap::from([(burn_block.consensus_hash, burn_block.sortition_id)]);
-        let tenure_blocks_height = HashMap::from([(0, 0)]);
+        let tenure_height_at_stacks_height = HashMap::from([(0, 0)]);
+        let stacks_height_at_tenure_height = HashMap::from([(0, 0)]);
         let burn_blocks = HashMap::from([(burn_block_header_hash, burn_block)]);
         let stacks_blocks = HashMap::from([(id, stacks_block)]);
 
@@ -642,6 +728,7 @@ impl Datastore {
             genesis_id: id,
             burn_chain_tip: burn_block_header_hash,
             burn_chain_height,
+            tenure_height: 0,
             current_chain_tip: Rc::clone(&clarity_datastore.current_chain_tip),
             remote_block_info_cache: Rc::clone(&clarity_datastore.remote_block_info_cache),
             remote_sortition_cache: Rc::clone(&clarity_datastore.remote_sortition_cache),
@@ -650,7 +737,8 @@ impl Datastore {
             stacks_blocks,
             sortition_lookup,
             consensus_hash_lookup,
-            tenure_blocks_height,
+            tenure_height_at_stacks_height,
+            stacks_height_at_tenure_height,
             current_epoch: StacksEpochId::Epoch2_05,
             current_epoch_start_height: stacks_chain_height,
             constants,
@@ -715,7 +803,10 @@ impl Datastore {
 
         let sortition_lookup = HashMap::from([(sortition_id, burn_block_header_hash)]);
         let consensus_hash_lookup = HashMap::from([(burn_block.consensus_hash, sortition_id)]);
-        let tenure_blocks_height = HashMap::from([(burn_chain_height, block.tenure_height)]);
+        let tenure_height_at_stacks_height =
+            HashMap::from([(*stacks_chain_height, block.tenure_height)]);
+        let stacks_height_at_tenure_height =
+            HashMap::from([(block.tenure_height, *stacks_chain_height)]);
         let burn_blocks = HashMap::from([(burn_block_header_hash, burn_block)]);
         let stacks_blocks = HashMap::from([(id, stacks_block)]);
 
@@ -723,6 +814,7 @@ impl Datastore {
             genesis_id: id,
             burn_chain_tip: burn_block_header_hash,
             burn_chain_height,
+            tenure_height: block.tenure_height,
             current_chain_tip: Rc::clone(&clarity_datastore.current_chain_tip),
             remote_block_info_cache: Rc::clone(&clarity_datastore.remote_block_info_cache),
             remote_sortition_cache: Rc::clone(&clarity_datastore.remote_sortition_cache),
@@ -731,7 +823,8 @@ impl Datastore {
             stacks_blocks,
             sortition_lookup,
             consensus_hash_lookup,
-            tenure_blocks_height,
+            tenure_height_at_stacks_height,
+            stacks_height_at_tenure_height,
             current_epoch: epoch_for_height(is_mainnet, *stacks_chain_height),
             current_epoch_start_height: *stacks_chain_height,
             constants,
@@ -751,6 +844,17 @@ impl Datastore {
 
     pub fn get_current_burn_block_height(&self) -> u32 {
         self.burn_chain_height
+    }
+
+    fn get_tenure_for_burn_block_height(&self, height: u32) -> u32 {
+        *self
+            .tenure_height_at_stacks_height
+            .get(&height)
+            .unwrap_or(&0)
+    }
+
+    pub fn get_current_tenure(&self) -> u32 {
+        self.get_tenure_for_burn_block_height(self.stacks_chain_height)
     }
 
     fn build_next_stacks_block(&self, clarity_datastore: &ClarityDatastore) -> StacksBlockInfo {
@@ -819,8 +923,9 @@ impl Datastore {
                 next_burn_block_time
             };
 
-            let height = self.burn_chain_height + 1;
-            let burn_block_hashes = BurnBlockHashes::from_height(height);
+            let previous_height = self.burn_chain_height;
+            let next_height = previous_height + 1;
+            let burn_block_hashes = BurnBlockHashes::from_height(next_height);
             let burn_block_header_hash = burn_block_hashes.header_hash;
 
             let burn_block = BurnBlockInfo {
@@ -828,7 +933,7 @@ impl Datastore {
                 vrf_seed: burn_block_hashes.vrf_seed,
                 sortition_id: burn_block_hashes.sortition_id,
                 burn_block_time: next_burn_block_time,
-                burn_chain_height: height,
+                burn_chain_height: next_height,
             };
 
             self.consensus_hash_lookup
@@ -837,11 +942,12 @@ impl Datastore {
                 .insert(burn_block.sortition_id, burn_block_header_hash);
             self.burn_chain_tip = burn_block_header_hash;
             self.burn_blocks.insert(burn_block_header_hash, burn_block);
-            self.burn_chain_height = height;
+            self.burn_chain_height = next_height;
+            self.tenure_height += 1;
             self.advance_stacks_chain_tip(clarity_datastore, 1);
 
-            self.tenure_blocks_height
-                .insert(self.burn_chain_height, self.stacks_chain_height);
+            self.stacks_height_at_tenure_height
+                .insert(self.tenure_height, self.stacks_chain_height);
         }
 
         self.burn_chain_height
@@ -858,6 +964,8 @@ impl Datastore {
             let id = StacksBlockId(bytes);
             let block_info = self.build_next_stacks_block(clarity_datastore);
             self.stacks_blocks.insert(id, block_info);
+            self.tenure_height_at_stacks_height
+                .insert(self.stacks_chain_height, self.tenure_height);
             clarity_datastore
                 .height_at_chain_tip
                 .entry(id)
@@ -1032,7 +1140,16 @@ impl HeadersDB for Datastore {
         _id_bhh: &StacksBlockId,
         tenure_height: u32,
     ) -> Option<u32> {
-        self.tenure_blocks_height.get(&tenure_height).copied()
+        if let Some(height) = self
+            .stacks_height_at_tenure_height
+            .get(&tenure_height)
+            .copied()
+        {
+            return Some(height);
+        }
+
+        // todo: if epoch < 3.0
+        Some(tenure_height)
     }
 
     fn get_miner_address(

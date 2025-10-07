@@ -40,7 +40,7 @@ afterEach(() => {
 
 describe("basic simnet interactions", () => {
   it("initialize simnet", () => {
-    expect(simnet.blockHeight).toBe(1);
+    expect(simnet.blockHeight).toBe(3);
   });
 
   it("can run command", () => {
@@ -57,6 +57,7 @@ describe("basic simnet interactions", () => {
   });
 
   it("can not mine empty stacks block in pre-3.0", () => {
+    simnet.setEpoch("2.5");
     expect(() => simnet.mineEmptyStacksBlock()).toThrowError(
       "use mineEmptyBurnBlock in epoch lower than 3.0",
     );
@@ -77,12 +78,12 @@ describe("basic simnet interactions", () => {
   });
 
   it("can get and set epoch", () => {
-    // should be 2.4 at the beginning because
-    // the latest contract in the manifest is deployed in 2.4
-    expect(simnet.currentEpoch).toBe("2.4");
+    // should be 3.1 at the beginning because
+    // the latest contract in the manifest is deployed in 3.1
+    expect(simnet.currentEpoch).toBe("3.1");
 
-    simnet.setEpoch("2.5");
-    expect(simnet.currentEpoch).toBe("2.5");
+    simnet.setEpoch("3.2");
+    expect(simnet.currentEpoch).toBe("3.2");
 
     // @ts-ignore
     // "0" is an invalid epoch
@@ -93,7 +94,7 @@ describe("basic simnet interactions", () => {
 
   it("can get default clarity version for current epoch", () => {
     const clarityVersion = simnet.getDefaultClarityVersionForCurrentEpoch();
-    expect(clarityVersion).toBe("Clarity 2");
+    expect(clarityVersion).toBe("Clarity 3");
   });
 });
 
@@ -165,9 +166,9 @@ describe("simnet can call contracts function", () => {
       total: {
         writeLength: 44,
         writeCount: 3,
-        readLength: 1466,
+        readLength: 1548,
         readCount: 8,
-        runtime: 15630,
+        runtime: 15712,
       },
       limit: {
         writeLength: 15000000,
@@ -287,10 +288,69 @@ describe("simnet can call contracts function", () => {
     const { result } = simnet.callPublicFn("counter", "call-multiply", [trait], address1);
     expect(result).toStrictEqual(Cl.ok(Cl.uint(4)));
   });
+
+  it("can call boot contracts with testnet address", () => {
+    simnet.setEpoch("3.2");
+    simnet.mineEmptyBurnBlocks(2016); // one full pox cycle
+
+    const { result } = simnet.callReadOnlyFn(
+      "ST000000000000000000002AMW42H.pox-4",
+      "current-pox-reward-cycle",
+      [],
+      address1,
+    );
+    expect(result).toStrictEqual(Cl.uint(1));
+  });
+
+  it("can call boot contracts with mainnet address", () => {
+    simnet.setEpoch("3.2");
+    console.log("epoch :", simnet.currentEpoch);
+    simnet.mineEmptyBurnBlocks(2016); // one full pox cycle
+
+    const { result } = simnet.callReadOnlyFn(
+      "SP000000000000000000002Q6VF78.pox-4",
+      "current-pox-reward-cycle",
+      [],
+      address1,
+    );
+    expect(result).toStrictEqual(Cl.uint(1));
+  });
+
+  it("can report stacks trace", () => {
+    const consoleSpy = vi.spyOn(console, "error");
+
+    expect(() => {
+      const { result } = simnet.callPublicFn(
+        "stacks-trace-test",
+        "call-sub",
+        [Cl.uint(3), Cl.uint(4)],
+        address1,
+      );
+    }).toThrow();
+
+    expect(consoleSpy).toHaveBeenCalledTimes(2);
+    expect(consoleSpy).toHaveBeenCalledWith(`├── ( sub-a n m )  stacks-trace-test:17:3
+│   │ ↳ args: u3 u4
+│   ├── ( sub-b n m )  stacks-trace-test:11:3
+│   │   │ ↳ args: u3 u4
+Error: Runtime error while interpreting ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.stacks-trace-test`);
+
+    expect(consoleSpy).toHaveBeenCalledWith(`\nError occured in stacks-trace-test:5:7
+======================================
+Expression:
+( - n m )
+Error: ArithmeticUnderflow
+ Stack Trace:\u0020
+ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.stacks-trace-test:call-sub
+ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.stacks-trace-test:sub-a
+ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.stacks-trace-test:sub-b
+_native_:native_sub
+`);
+  });
 });
 
 describe("mineBlock and callPublicFunction properly handle block height incrementation", () => {
-  const expectedReturnedBH = 2;
+  const expectedReturnedBH = 3;
 
   it("increases the block height after the call in callPublicFn", () => {
     const { result } = simnet.callPublicFn("block-height-tests", "get-block-height", [], address1);
@@ -327,11 +387,11 @@ describe("simnet can read contracts data vars and maps", () => {
 describe("simnet can get contracts info and deploy contracts", () => {
   it("can get contract interfaces", () => {
     const contractInterfaces = simnet.getContractsInterfaces();
-    expect(contractInterfaces).toHaveLength(nbOfBootContracts + 4);
+    expect(contractInterfaces).toHaveLength(nbOfBootContracts + 5);
 
     const counterInterface = contractInterfaces.get(`${deployerAddr}.counter`);
     expect(counterInterface).not.toBeNull();
-    expect(counterInterface?.functions).toHaveLength(7);
+    expect(counterInterface?.functions).toHaveLength(8);
     expect(counterInterface?.variables).toHaveLength(2);
     expect(counterInterface?.maps).toHaveLength(1);
   });
@@ -351,7 +411,7 @@ describe("simnet can get contracts info and deploy contracts", () => {
     const counterAst = simnet.getContractAST(`${deployerAddr}.counter`);
 
     expect(counterAst).toBeDefined();
-    expect(counterAst.expressions).toHaveLength(11);
+    expect(counterAst.expressions).toHaveLength(12);
 
     const getWithShortAddr = simnet.getContractAST("counter");
     expect(getWithShortAddr).toBeDefined();
@@ -361,7 +421,7 @@ describe("simnet can get contracts info and deploy contracts", () => {
     const counterAst = simnet.getContractAST(`${deployerAddr}.counter`);
 
     expect(counterAst).toBeDefined();
-    expect(counterAst.expressions).toHaveLength(11);
+    expect(counterAst.expressions).toHaveLength(12);
 
     // @ts-ignore
     expect(counterAst.expressions[0].pre_comments[0][0]).toBe("counter contract");
@@ -373,7 +433,7 @@ describe("simnet can get contracts info and deploy contracts", () => {
     expect(res.result).toStrictEqual(Cl.int(42));
 
     const contractInterfaces = simnet.getContractsInterfaces();
-    expect(contractInterfaces).toHaveLength(nbOfBootContracts + 4);
+    expect(contractInterfaces).toHaveLength(nbOfBootContracts + 5);
   });
 
   it("can deploy contracts", () => {
@@ -383,7 +443,7 @@ describe("simnet can get contracts info and deploy contracts", () => {
     expect(deployRes.result).toStrictEqual(Cl.bool(true));
 
     const contractInterfaces = simnet.getContractsInterfaces();
-    expect(contractInterfaces).toHaveLength(nbOfBootContracts + 5);
+    expect(contractInterfaces).toHaveLength(nbOfBootContracts + 6);
 
     const addRes = simnet.callPublicFn("op", "add", [Cl.uint(13), Cl.uint(29)], address1);
     expect(addRes.result).toStrictEqual(Cl.ok(Cl.uint(42)));
@@ -401,12 +461,12 @@ describe("simnet can get contracts info and deploy contracts", () => {
 
     simnet.deployContract("contract1", source, { clarityVersion: 1 }, deployerAddr);
     const contract1Interface = simnet.getContractsInterfaces().get(`${simnet.deployer}.contract1`)!;
-    expect(contract1Interface.epoch).toBe("Epoch24");
+    expect(contract1Interface.epoch).toBe("Epoch31");
     expect(contract1Interface.clarity_version).toBe("Clarity1");
 
     simnet.deployContract("contract2", source, { clarityVersion: 2 }, deployerAddr);
     const contract2Interface = simnet.getContractsInterfaces().get(`${simnet.deployer}.contract2`)!;
-    expect(contract2Interface.epoch).toBe("Epoch24");
+    expect(contract2Interface.epoch).toBe("Epoch31");
     expect(contract2Interface.clarity_version).toBe("Clarity2");
 
     simnet.setEpoch("2.5");
@@ -434,8 +494,8 @@ describe("prints logs", () => {
     const res = simnet.callPublicFn("counter", "increment", [], address1);
     expect(res.result).toStrictEqual(Cl.ok(Cl.bool(true)));
 
-    expect(consoleSpy).toHaveBeenCalledWith('"call increment" (counter:26)');
-    expect(consoleSpy).toHaveBeenCalledWith('"call inner-increment" (counter:15)');
+    expect(consoleSpy).toHaveBeenCalledWith('"call increment" (counter:33)');
+    expect(consoleSpy).toHaveBeenCalledWith('"call inner-increment" (counter:22)');
     consoleSpy.mockRestore();
   });
 
@@ -463,7 +523,7 @@ describe("prints logs", () => {
     expect(result.type).toBe("tuple");
 
     expect(consoleSpy).toHaveBeenCalledTimes(1);
-    expect(consoleSpy).toHaveBeenCalledWith("{ prop-a: 1, prop-b: 0x01 } (contract-4:1)");
+    expect(consoleSpy).toHaveBeenCalledWith("{ prop-a: 1, prop-b: 0x01 } (contract-5:1)");
     consoleSpy.mockRestore();
   });
 });

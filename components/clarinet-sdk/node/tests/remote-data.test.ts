@@ -56,7 +56,7 @@ describe("simnet remote interactions", async () => {
     expect(result).toStrictEqual(Cl.uint(0));
   });
 
-  it("can call a remote contract", async () => {
+  it("can call a remote contract at different height", async () => {
     await simnet.initEmptySession({
       enabled: true,
       api_url,
@@ -100,7 +100,7 @@ describe("simnet remote interactions", async () => {
     const cachePath = path.join(process.cwd(), "./.cache/datastore");
     expect(fs.existsSync(cachePath)).toBe(true);
     const files = fs.readdirSync(cachePath);
-    expect(files).toHaveLength(6);
+    expect(files).toHaveLength(10);
     expect(files).toContain(
       "STJCAB2T9TR2EJM7YS4DM2CGBBVTF7BV237Y8KNV_counter_vm-metadata__9__contract_8b1963abdc117b1b925d8f0390bf5001dec17ad91adc5309c00c7d5ac0b5bfd0.json",
     );

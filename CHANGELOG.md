@@ -1,3 +1,71 @@
+# [3.7.0](https://github.com/hirosystems/clarinet/compare/v3.6.1...v3.7.0) (2025-09-23)
+
+##### New Features
+
+- Show stacks trace on test fail (#1982) (521dd0ed)
+- Warn if falling back to runtime cost perf (#1986) (807bc12b)
+
+##### Bug Fixes
+
+- Add contract-loading-costs to perf.data to match get_costs (#1998) (8b049844)
+- Better rate limiting handling and run all tests on stg (#2001) (988f0569)
+- Clarity2 block-height in info in epoch 3.2 (#1996) (baa15062)
+- Boot contracts deployment (#1990) (3422554b)
+
+##### Refactors
+
+- Remove dead code related to clarity-wasm (#1984) (5fab8df8)
+
+##### Chores
+
+- Update cargo dependencies (#1997) (22f13d02)
+- Remove cbtc example (#1987) (34a8e113)
+- Update new project package.json (#1983) (01ecf788)
+
+# [3.6.1](https://github.com/hirosystems/clarinet/compare/v3.6.0...v3.6.1) (2025-09-11)
+
+##### Bug Fixes
+
+- Tracer stack handling (#1979) (e97c1c1b)
+
+# [3.6.0](https://github.com/hirosystems/clarinet/compare/v3.5.0...v3.6.0) (2025-09-11)
+
+##### New Features
+
+- Show stack trace when a contract call fails (#1974) (47d41a67)
+- Add perf hook to generate cost flame graphs (#1940) (f877b908)
+- Parse contracts locally in mxs (#1947) (742e884b)
+
+##### Documentation Changes
+
+- Update readme contributing section (#1971) (812539ef)
+
+##### Bug Fixes
+
+- Format-ignore handling (#1973) (48fef8b0)
+- 'latest' serialization (#1972) (01df4834)
+- Contract name printed in console (#1962) (195fbe8a)
+- Custom boot contracts LSP (#1958) (06d0c99b)
+
+# [3.5.0](https://github.com/hirosystems/clarinet/compare/v3.4.0...v3.5.0) (2025-08-08)
+
+##### New Features
+
+- Use latest explorer (#1954) (e6a624a5)
+- Custom boot contracts (#1915) (ae34a3dc)
+
+##### Chores
+
+- Make stacks_signer_keys significant for devnet diff (#1950) (017506eb)
+
+##### Other Changes
+
+- Add epoch tests (#1945) (9e78c066)
+
+##### Refactors
+
+- Rework session api reference (#1951) (b38a5ff2)
+
 # [3.4.0](https://github.com/hirosystems/clarinet/compare/v3.3.0...v3.4.0) (2025-07-31)
 
 ##### New Features

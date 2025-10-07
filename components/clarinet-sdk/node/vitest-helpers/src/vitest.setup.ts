@@ -31,12 +31,19 @@ beforeEach(async (ctx) => {
   }
 });
 
-afterEach(async () => {
+afterEach(async (ctx) => {
   const { coverage, costs, initBeforeEach, includeBootContracts, bootContractsPath } =
     global.options.clarinet;
 
+  if (ctx.task.result?.state === "fail") {
+    const stackTrace = simnet.getLastContractCallTrace();
+    if (stackTrace) {
+      console.log(stackTrace);
+    }
+  }
+
   if (initBeforeEach && (coverage || costs)) {
-    const report = simnet.collectReport(includeBootContracts, bootContractsPath || "");
+    const report = simnet.collectReport(includeBootContracts || false, bootContractsPath || "");
     if (coverage) coverageReports.push(report.coverage);
     if (costs) costsReports.push(report.costs);
   }
@@ -55,7 +62,7 @@ afterAll(() => {
     global.options.clarinet;
 
   if (!initBeforeEach && (coverage || costs)) {
-    const report = simnet.collectReport(includeBootContracts, bootContractsPath || "");
+    const report = simnet.collectReport(includeBootContracts || false, bootContractsPath || "");
     if (coverage) coverageReports.push(report.coverage);
     if (costs) costsReports.push(report.costs);
   }

@@ -1,3 +1,4 @@
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 require("mocha/mocha");
 
 export function run(): Promise<void> {

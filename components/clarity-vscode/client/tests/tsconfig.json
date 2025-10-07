@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "commonJS",
+    "esModuleInterop": true,
+    "rootDir": ".",
+    "sourceMap": true,
+    "noImplicitAny": true,
+    "types": ["node", "mocha", "webpack-env"]
+  }
+}

@@ -18,8 +18,8 @@ categories = [
 [dependencies]
 colored = { workspace = true }
 toml = { workspace = true }
-serde = { version = "1", features = ["derive"] }
-serde_json = { version = "1.0.79", features = ["preserve_order"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true, features = ["preserve_order"] }
 tokio = { workspace = true }
 crossterm = { workspace = true }
 ratatui = { workspace = true }
@@ -38,14 +38,13 @@ stacks-network = { path = "../stacks-network" }
 nix = "0.29.0"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-clap = { version = "4.4.8", features = ["derive"] }
+clap = { workspace = true, features = ["derive"] }
 clap_complete = { version = "4.4.4" }
 tower-lsp-server = { version = "0.22.0" }
 segment = { version = "0.2.4", optional = true }
-mac_address = { version = "1.1.2", optional = true }
+mac_address = { version = "1.1.8", optional = true }
 
 [target.'cfg(windows)'.dependencies]
-fwdansi = "1.1.0"
 winapi = { version = "0.3.9", features = [
     "knownfolders",
     "mswsock",
@@ -62,7 +61,7 @@ winapi = { version = "0.3.9", features = [
 ] }
 
 [dev-dependencies]
-tempfile = "3.0.0"
+tempfile = { workspace = true }
 indoc = { workspace = true }
 
 [package.metadata.winres]

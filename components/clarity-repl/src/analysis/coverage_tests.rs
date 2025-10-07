@@ -5,7 +5,7 @@ use crate::repl::SessionSettings;
 
 fn get_coverage_report(contract: &str, snippets: Vec<String>) -> String {
     let mut session = Session::new(SessionSettings::default());
-    session.enable_coverage();
+    session.enable_coverage_hook();
     session.set_test_name("test_scenario".to_string());
 
     let _ = session.eval(contract.into(), false);
@@ -687,7 +687,7 @@ fn filter_iterator() {
 #[test]
 fn multiple_test_files() {
     let mut session = Session::new(SessionSettings::default());
-    session.enable_coverage();
+    session.enable_coverage_hook();
 
     let contract = "(define-read-only (add) (+ 1 2))";
 

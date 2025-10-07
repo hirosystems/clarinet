@@ -1,30 +1,65 @@
 use clarity::vm::contexts::{Environment, LocalContext};
 use clarity::vm::errors::Error;
+use clarity::vm::events::StacksTransactionEvent;
 use clarity::vm::functions::define::DefineFunctions;
 use clarity::vm::functions::NativeFunctions;
-use clarity::vm::types::Value;
+use clarity::vm::types::{
+    PrincipalData, QualifiedContractIdentifier, StandardPrincipalData, Value,
+};
 use clarity::vm::{
     eval, ClarityVersion, EvalHook, EvaluationResult, SymbolicExpression, SymbolicExpressionType,
 };
 
-use crate::repl::interpreter::Txid;
+pub struct TracerErrorOutput {
+    contract_id: QualifiedContractIdentifier,
+    expr: SymbolicExpression,
+    error: String,
+}
+
+impl std::fmt::Display for TracerErrorOutput {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let header = format!(
+            "Error occured in {}:{}:{}",
+            self.contract_id.name, self.expr.span.start_line, self.expr.span.start_column
+        );
+        let header_underline = "=".repeat(header.len());
+        write!(
+            f,
+            "\n{}\n{}\nExpression:\n{}\nError: {}",
+            header, header_underline, self.expr, self.error
+        )
+    }
+}
 
 pub struct TracerHook {
+    pub output: Vec<String>,
+    pub error: Option<TracerErrorOutput>,
     stack: Vec<u64>,
     pending_call_string: Vec<String>,
     pending_args: Vec<Vec<u64>>,
     nb_of_emitted_events: usize,
 }
 
-impl TracerHook {
-    pub fn new(snippet: String) -> Self {
-        println!("{}  {}", snippet, black!("<console>"));
+impl Default for TracerHook {
+    fn default() -> Self {
         Self {
+            output: Vec::new(),
+            error: None,
             stack: vec![u64::MAX],
             pending_call_string: Vec::new(),
             pending_args: Vec::new(),
             nb_of_emitted_events: 0,
         }
+    }
+}
+
+impl TracerHook {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    fn add_to_output(&mut self, s: String) {
+        self.output.push(s);
     }
 }
 
@@ -51,7 +86,9 @@ impl EvalHook for TracerHook {
                             let mut call = format!(
                                 "{}├── {}  {}\n",
                                 "│   ".repeat(
-                                    (self.stack.len() - self.pending_call_string.len())
+                                    self.stack
+                                        .len()
+                                        .saturating_sub(self.pending_call_string.len())
                                         .saturating_sub(1)
                                 ),
                                 expr,
@@ -72,8 +109,11 @@ impl EvalHook for TracerHook {
                                 };
                                 lines.push(format!(
                                     "{}│ {}",
-                                    "│   "
-                                        .repeat(self.stack.len() - self.pending_call_string.len()),
+                                    "│   ".repeat(
+                                        self.stack
+                                            .len()
+                                            .saturating_sub(self.pending_call_string.len())
+                                    ),
                                     purple!("↳ callee: {callee}"),
                                 ));
                             }
@@ -81,8 +121,11 @@ impl EvalHook for TracerHook {
                             if !args.is_empty() {
                                 lines.push(format!(
                                     "{}│ {}",
-                                    "│   "
-                                        .repeat(self.stack.len() - self.pending_call_string.len()),
+                                    "│   ".repeat(
+                                        self.stack
+                                            .len()
+                                            .saturating_sub(self.pending_call_string.len())
+                                    ),
                                     purple!("↳ args:"),
                                 ));
                                 call.push_str(lines.join("\n").as_str());
@@ -90,12 +133,15 @@ impl EvalHook for TracerHook {
                                 self.pending_args
                                     .push(args[2..].iter().map(|arg| arg.id).collect());
                             } else {
-                                println!(
+                                self.add_to_output(format!(
                                     "{}{}",
-                                    "│   "
-                                        .repeat(self.stack.len() - self.pending_call_string.len()),
+                                    "│   ".repeat(
+                                        self.stack
+                                            .len()
+                                            .saturating_sub(self.pending_call_string.len())
+                                    ),
                                     call
-                                );
+                                ));
                             }
                         }
                         _ => return,
@@ -105,7 +151,10 @@ impl EvalHook for TracerHook {
                     let mut call = format!(
                         "{}├── {}  {}\n",
                         "│   ".repeat(
-                            (self.stack.len() - self.pending_call_string.len()).saturating_sub(1)
+                            self.stack
+                                .len()
+                                .saturating_sub(self.pending_call_string.len())
+                                .saturating_sub(1)
                         ),
                         expr,
                         black!(
@@ -118,7 +167,11 @@ impl EvalHook for TracerHook {
                     call.push_str(
                         format!(
                             "{}│ {}",
-                            "│   ".repeat(self.stack.len() - self.pending_call_string.len()),
+                            "│   ".repeat(
+                                self.stack
+                                    .len()
+                                    .saturating_sub(self.pending_call_string.len())
+                            ),
                             purple!("↳ args:"),
                         )
                         .as_str(),
@@ -128,11 +181,15 @@ impl EvalHook for TracerHook {
                         self.pending_args
                             .push(args.iter().map(|arg| arg.id).collect());
                     } else {
-                        println!(
+                        self.add_to_output(format!(
                             "{}{}",
-                            "│   ".repeat(self.stack.len() - self.pending_call_string.len()),
+                            "│   ".repeat(
+                                self.stack
+                                    .len()
+                                    .saturating_sub(self.pending_call_string.len())
+                            ),
                             call
-                        );
+                        ));
                     }
                 }
             }
@@ -147,6 +204,16 @@ impl EvalHook for TracerHook {
         expr: &SymbolicExpression,
         res: &Result<Value, Error>,
     ) {
+        if let Err(e) = res {
+            if self.error.is_none() {
+                self.error = Some(TracerErrorOutput {
+                    contract_id: env.contract_context.contract_identifier.clone(),
+                    expr: expr.clone(),
+                    error: e.to_string(),
+                });
+            }
+        }
+
         // Print events as they are emitted
         let emitted_events = env
             .global_context
@@ -156,18 +223,17 @@ impl EvalHook for TracerHook {
             .collect::<Vec<_>>();
         if emitted_events.len() > self.nb_of_emitted_events {
             for event in emitted_events.iter().skip(self.nb_of_emitted_events) {
-                println!(
+                let event_message = format_event_data(event);
+                self.add_to_output(format!(
                     "{}│ {}",
                     "│   ".repeat(
-                        (self.stack.len() - self.pending_call_string.len()).saturating_sub(1)
+                        self.stack
+                            .len()
+                            .saturating_sub(self.pending_call_string.len())
+                            .saturating_sub(1),
                     ),
-                    black!(
-                        "✸ {}",
-                        event
-                            .json_serialize(0, &Txid([0u8; 32]), true)
-                            .expect("Failed to serialize event")
-                    ),
-                )
+                    black!("✸ {event_message}"),
+                ));
             }
             self.nb_of_emitted_events = emitted_events.len();
         }
@@ -175,13 +241,16 @@ impl EvalHook for TracerHook {
         if let Some(last) = self.stack.last() {
             if *last == expr.id {
                 if let Ok(value) = res {
-                    println!(
+                    self.add_to_output(format!(
                         "{}└── {}",
                         "│   ".repeat(
-                            (self.stack.len() - self.pending_call_string.len()).saturating_sub(1)
+                            self.stack
+                                .len()
+                                .saturating_sub(self.pending_call_string.len())
+                                .saturating_sub(1)
                         ),
                         blue!("{value}")
-                    );
+                    ));
                 }
                 self.stack.pop();
             }
@@ -200,7 +269,8 @@ impl EvalHook for TracerHook {
 
                     // If this was the last argument, print the pending call and pop the stack
                     if rest.is_empty() {
-                        println!("{}", self.pending_call_string.pop().unwrap());
+                        let pending = self.pending_call_string.pop().unwrap();
+                        self.add_to_output(pending.clone());
                         self.pending_args.pop();
                     } else {
                         arg_stack.remove(0);
@@ -219,15 +289,115 @@ impl EvalHook for TracerHook {
                 match &result.result {
                     EvaluationResult::Contract(contract_result) => {
                         if let Some(value) = &contract_result.result {
-                            println!("└── {}", blue!("{value}"));
+                            self.add_to_output(format!("└── {}", blue!("{value}")));
                         }
                     }
                     EvaluationResult::Snippet(snippet_result) => {
-                        println!("└── {}", blue!("{}", snippet_result.result));
+                        self.add_to_output(format!("└── {}", blue!("{}", snippet_result.result)));
                     }
                 };
             }
-            Err(e) => println!("{e}"),
+            Err(e) => {
+                if e.contains("Runtime error while interpreting") {
+                    self.add_to_output(format!("Error: {}", e.split(':').next().unwrap_or(&e)));
+                    return;
+                }
+                self.add_to_output(format!("Error: {}", e));
+            }
         }
     }
+}
+
+fn format_event_data(event: &StacksTransactionEvent) -> String {
+    use clarity::vm::events::*;
+    match event {
+        StacksTransactionEvent::SmartContractEvent(data) => {
+            format!("print event: {}", data.value)
+        }
+        StacksTransactionEvent::STXEvent(stxevent_type) => match stxevent_type {
+            STXEventType::STXTransferEvent(data) => {
+                format!(
+                    "stx transfer event: {} STX from {} to {}",
+                    data.amount,
+                    shorten_principal(&data.sender),
+                    shorten_principal(&data.recipient)
+                )
+            }
+            STXEventType::STXMintEvent(data) => {
+                format!(
+                    "stx mint event: {} STX to {}",
+                    data.amount,
+                    shorten_principal(&data.recipient)
+                )
+            }
+            STXEventType::STXBurnEvent(data) => {
+                format!(
+                    "stx burn event: {} STX from {}",
+                    data.amount,
+                    shorten_principal(&data.sender)
+                )
+            }
+            STXEventType::STXLockEvent(data) => {
+                format!(
+                    "stx lock event: {} STX for {} until {}",
+                    data.locked_amount,
+                    shorten_principal(&data.locked_address),
+                    data.unlock_height
+                )
+            }
+        },
+        StacksTransactionEvent::NFTEvent(nftevent_type) => match nftevent_type {
+            NFTEventType::NFTMintEvent(data) => format!(
+                "nft mint event: mint {} to {}",
+                data.asset_identifier.asset_name,
+                shorten_principal(&data.recipient)
+            ),
+            NFTEventType::NFTTransferEvent(data) => format!(
+                "nft transfer event: transfer {} from {} to {}",
+                data.asset_identifier.asset_name,
+                shorten_principal(&data.sender),
+                shorten_principal(&data.recipient)
+            ),
+            NFTEventType::NFTBurnEvent(data) => format!(
+                "nft burn event: burn {} from {}",
+                data.asset_identifier.asset_name,
+                shorten_principal(&data.sender)
+            ),
+        },
+        StacksTransactionEvent::FTEvent(ftevent_type) => match ftevent_type {
+            FTEventType::FTMintEvent(data) => format!(
+                "ft mint event: mint {} {} to {}",
+                data.amount,
+                data.asset_identifier.asset_name,
+                shorten_principal(&data.recipient)
+            ),
+            FTEventType::FTTransferEvent(data) => format!(
+                "ft transfer event: transfer {} {} from {} to {}",
+                data.amount,
+                data.asset_identifier.asset_name,
+                shorten_principal(&data.sender),
+                shorten_principal(&data.recipient)
+            ),
+            FTEventType::FTBurnEvent(data) => format!(
+                "ft burn event: burn {} {} from {}",
+                data.amount,
+                data.asset_identifier.asset_name,
+                shorten_principal(&data.sender)
+            ),
+        },
+    }
+}
+
+fn shorten_principal(principal: &PrincipalData) -> String {
+    match principal {
+        PrincipalData::Standard(standard) => shorten_standard(standard),
+        PrincipalData::Contract(contract) => {
+            format!("{}.{}", shorten_standard(&contract.issuer), contract.name)
+        }
+    }
+}
+
+fn shorten_standard(principal: &StandardPrincipalData) -> String {
+    let str = principal.to_string();
+    format!("{}...{}", &str[..4], &str[str.len() - 4..])
 }

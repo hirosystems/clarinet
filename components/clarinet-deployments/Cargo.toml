@@ -5,11 +5,11 @@ edition = "2021"
 
 [dependencies]
 colored = { workspace = true }
-base64 = "0.22.1"
-serde = "1"
-serde_json = "1.0.123"
-serde_derive = "1"
-serde_yaml = "0.8.23"
+base64 = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_derive = { workspace = true }
+serde_yaml = { workspace = true }
 strum = { workspace = true, features = ["derive"] }
 rand = { workspace = true }
 reqwest = { workspace = true }
@@ -26,10 +26,10 @@ toml = { workspace = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 bitcoin = "0.31.2"
-bitcoincore-rpc = "0.18.0"
-bitcoincore-rpc-json = "0.18.0"
-base58 = "0.2.0"
-libsecp256k1 = "0.7.0"
+bitcoincore-rpc = { workspace= true }
+bitcoincore-rpc-json = { workspace= true }
+base58 = { workspace = true }
+libsecp256k1 = { workspace = true }
 clarinet-utils = { path = "../clarinet-utils" }
 stacks-codec = { path = "../stacks-codec" }
 stacks-rpc-client = { path = "../stacks-rpc-client" }

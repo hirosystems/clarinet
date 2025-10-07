@@ -118,8 +118,8 @@ describe("simnet.run-snippet and .execute also report coverage", () => {
     simnet.execute("(contract-call? .counter increment)");
 
     const reports = simnet.collectReport(false, "");
-    // line 26, within the increment function, is executed twice
-    expect(reports.coverage).toContain("DA:26,2");
+    // line 33, within the increment function, is executed twice
+    expect(reports.coverage).toContain("DA:33,2");
   });
 
   it("simnet.runSnippet reports coverage", async () => {
@@ -131,7 +131,7 @@ describe("simnet.run-snippet and .execute also report coverage", () => {
     simnet.runSnippet("(contract-call? .counter increment)");
 
     const reports = simnet.collectReport(false, "");
-    // line 26, within the increment function, is executed twice
-    expect(reports.coverage).toContain("DA:26,2");
+    // line 33, within the increment function, is executed twice
+    expect(reports.coverage).toContain("DA:33,2");
   });
 });

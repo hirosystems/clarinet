@@ -32,11 +32,11 @@ fn handle_response<T: DeserializeOwned>(
     Err(format!("http error - status: {status} - message: {msg}"))
 }
 
-fn should_retry_rate_limit(headers: &HeaderMap) -> bool {
+fn is_rate_limited(headers: &HeaderMap) -> (bool, Option<u32>) {
     let remaining = get_uint_header_value(headers, "ratelimit-remaining");
-    let retry_after = get_uint_header_value(headers, "retry-after");
-    // This condition matches the case where the "second" rate limit is hit
-    matches!((remaining, retry_after), (Some(0), Some(1)))
+    // make sure the retry_after is at most 60 seconds
+    let retry_after = get_uint_header_value(headers, "retry-after").map(|v| v.min(60));
+    (matches!(remaining, Some(0)), retry_after)
 }
 
 pub fn http_request<T: DeserializeOwned>(url: &str) -> Result<T, String> {
@@ -65,7 +65,8 @@ pub fn http_request<T: DeserializeOwned>(url: &str) -> Result<T, String> {
         }
 
         let headers = response.headers().clone();
-        if !should_retry_rate_limit(&headers) {
+        let (is_rate_limited, retry_after) = is_rate_limited(&headers);
+        if !is_rate_limited {
             return handle_response(response);
         }
 
@@ -74,6 +75,8 @@ pub fn http_request<T: DeserializeOwned>(url: &str) -> Result<T, String> {
             return handle_response(response);
         }
 
-        std::thread::sleep(Duration::from_secs(1));
+        let retry_delay = retry_after.unwrap_or(1);
+        uprint!("Rate limited, retrying after {retry_delay} seconds...\n");
+        std::thread::sleep(Duration::from_secs(retry_delay as u64));
     }
 }

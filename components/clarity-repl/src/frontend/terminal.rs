@@ -1,4 +1,3 @@
-use clarity::vm::EvaluationResult;
 use rustyline::error::ReadlineError;
 use rustyline::DefaultEditor;
 
@@ -79,26 +78,21 @@ fn complete_input(str: &str) -> Result<Input, (char, char)> {
 
 pub struct Terminal {
     pub session: Session,
-    pub session_wasm: Option<Session>,
+    pub executed: Vec<String>,
 }
 
 impl Terminal {
-    pub fn new(
-        session_settings: SessionSettings,
-        session_wasm_settings: Option<SessionSettings>,
-    ) -> Terminal {
-        let session = Session::new(session_settings);
-        let session_wasm = session_wasm_settings.map(Session::new);
+    pub fn new(session_settings: SessionSettings) -> Terminal {
         Terminal {
-            session,
-            session_wasm,
+            session: Session::new(session_settings),
+            executed: vec![],
         }
     }
 
-    pub fn load(session: Session, session_wasm: Option<Session>) -> Terminal {
+    pub fn load(session: Session) -> Terminal {
         Terminal {
             session,
-            session_wasm,
+            executed: vec![],
         }
     }
 
@@ -131,64 +125,13 @@ impl Terminal {
                     let input = input_buffer.join(" ");
                     match complete_input(&input) {
                         Ok(Input::Complete()) => {
-                            let (reload, output, result) =
-                                self.session.process_console_input(&input);
-
-                            if let Some(session_wasm) = &mut self.session_wasm {
-                                let (_, _, result_wasm) =
-                                    session_wasm.process_console_input(&input);
-
-                                if let (Some(result), Some(result_wasm)) = (result, result_wasm) {
-                                    match (result, result_wasm) {
-                                        (Ok(result), Ok(result_wasm)) => {
-                                            let value = match result.result {
-                                                EvaluationResult::Contract(contract_result) => {
-                                                    contract_result.result
-                                                }
-                                                EvaluationResult::Snippet(snippet_result) => {
-                                                    Some(snippet_result.result)
-                                                }
-                                            };
-                                            let value_wasm = match result_wasm.result {
-                                                EvaluationResult::Contract(contract_result) => {
-                                                    contract_result.result
-                                                }
-                                                EvaluationResult::Snippet(snippet_result) => {
-                                                    Some(snippet_result.result)
-                                                }
-                                            };
-                                            if value != value_wasm {
-                                                dbg!(value);
-                                                dbg!(value_wasm);
-                                                print_clarity_wasm_warning();
-                                            };
-                                        }
-                                        (Ok(result), Err(error_wasm)) => {
-                                            dbg!(result);
-                                            dbg!(error_wasm);
-                                            print_clarity_wasm_warning();
-                                        }
-                                        (Err(error), Ok(result_wasm)) => {
-                                            dbg!(error);
-                                            dbg!(result_wasm);
-                                            print_clarity_wasm_warning();
-                                        }
-                                        (Err(error), Err(error_wasm)) => {
-                                            if error != error_wasm {
-                                                dbg!(error);
-                                                dbg!(error_wasm);
-                                                print_clarity_wasm_warning();
-                                            }
-                                        }
-                                    };
-                                }
-                            }
+                            let (reload, output) = self.session.process_console_input(&input);
 
                             for line in output {
                                 println!("{line}");
                             }
                             prompt = String::from(">> ");
-                            self.session.executed.push(input.to_string());
+                            self.executed.push(input.to_string());
                             let _ = editor.add_history_entry(input);
                             input_buffer.clear();
                             if reload {
@@ -228,13 +171,6 @@ impl Terminal {
             .unwrap();
         reload
     }
-}
-
-pub fn print_clarity_wasm_warning() {
-    println!("{} https://github.com/stacks-network/clarity-wasm/issues/new/choose {}",
-        yellow!("It appears that Clarity-Wasm is returning an unexpected result.\nPlease help improve the Stacks network by reporting this issue at"),
-        yellow!("and include the errors above along with the source code that triggered this.\n")
-    );
 }
 
 #[cfg(test)]

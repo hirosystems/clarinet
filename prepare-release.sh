@@ -76,13 +76,6 @@ update_cargo_toml "./Cargo.toml" "$NEW_VERSION"
 # npm i
 # cd "$ROOT_DIR"
 
-# Update stacks-devnet-js
-echo "Updating stacks-devnet-js..."
-cd components/stacks-devnet-js
-update_package_json "package.json" "$NEW_VERSION"
-npm i
-cd "$ROOT_DIR"
-
 echo "Updating clarity-vscode..."
 cd components/clarity-vscode
 update_package_json "package.json" "$NEW_VERSION"

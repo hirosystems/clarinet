@@ -5,6 +5,7 @@ extern crate serde_derive;
 
 mod chainhooks;
 pub mod chains_coordinator;
+mod command;
 mod event;
 mod log;
 mod orchestrator;

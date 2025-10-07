@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::convert::TryInto;
 use std::fmt;
 use std::path::PathBuf;
@@ -45,7 +46,6 @@ pub struct Account {
 
 #[derive(Clone, Debug, Default)]
 pub struct SessionSettings {
-    pub include_boot_contracts: Vec<String>,
     pub include_costs: bool,
     pub initial_accounts: Vec<Account>,
     pub initial_deployer: Option<Account>,
@@ -53,6 +53,18 @@ pub struct SessionSettings {
     pub repl_settings: Settings,
     pub cache_location: Option<PathBuf>,
     pub epoch_id: Option<StacksEpochId>,
+    pub override_boot_contracts_source: BTreeMap<String, String>,
+}
+
+impl SessionSettings {
+    pub fn get_default_sender(&self) -> StandardPrincipalData {
+        let address = match self.initial_deployer {
+            Some(ref entry) => entry.address.clone(),
+            None => format!("{}", StacksAddress::burn_address(false)),
+        };
+        PrincipalData::parse_standard_principal(&address)
+            .expect("Unable to parse deployer's address")
+    }
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]

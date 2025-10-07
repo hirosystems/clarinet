@@ -24,3 +24,8 @@ epoch = 2.4
 path = 'contracts/block-height-tests.clar'
 clarity_version = 2
 epoch = 2.4
+
+[contracts.stacks-trace-test]
+path = 'contracts/stacks-trace-test.clar'
+clarity_version = 3
+epoch = 3.1

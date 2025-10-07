@@ -26,7 +26,7 @@ const initialSTXBalance = 100_000_000 * 1e6;
 describe("test pox-3", () => {
   const poxContract = `${poxDeployer}.pox-3`;
   beforeEach(async () => {
-    simnet = await initSimnet("tests/fixtures/Clarinet.toml");
+    simnet = await initSimnet("tests/fixtures/LightManifest.toml");
     simnet.setEpoch("2.4");
   });
 

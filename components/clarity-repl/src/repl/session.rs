@@ -4,10 +4,7 @@ use std::fmt::Write as _;
 use std::num::ParseIntError;
 
 use clarity::codec::StacksMessageCodec;
-use clarity::types::chainstate::StacksAddress;
 use clarity::types::StacksEpochId;
-#[cfg(not(target_arch = "wasm32"))]
-use clarity::vm::analysis::ContractAnalysis;
 use clarity::vm::ast::ContractAST;
 use clarity::vm::diagnostic::{Diagnostic, Level};
 use clarity::vm::types::{PrincipalData, QualifiedContractIdentifier, Value};
@@ -18,19 +15,23 @@ use clarity::vm::{
 use colored::Colorize;
 use comfy_table::Table;
 
-use super::boot::{
-    BOOT_CODE_MAINNET, BOOT_CODE_TESTNET, BOOT_MAINNET_PRINCIPAL, BOOT_TESTNET_PRINCIPAL,
-};
 use super::diagnostic::output_diagnostic;
 use super::hooks::logger::LoggerHook;
+use super::hooks::perf::{CostField, PerfHook};
 use super::interpreter::ContractCallError;
 use super::{
     ClarityCodeSource, ClarityContract, ClarityInterpreter, ContractDeployer, Epoch,
     SessionSettings,
 };
 use crate::analysis::coverage::CoverageHook;
+use crate::repl::boot;
 use crate::repl::clarity_values::value_to_string;
+use crate::repl::hooks::tracer::TracerHook;
+use crate::repl::settings::Account;
 use crate::utils::serialize_event;
+
+pub type ExecutionResultMap =
+    BTreeMap<QualifiedContractIdentifier, Result<ExecutionResult, Vec<Diagnostic>>>;
 
 #[derive(Clone, Debug, Serialize)]
 pub struct CostsReport {
@@ -41,51 +42,95 @@ pub struct CostsReport {
     pub cost_result: CostSynthesis,
 }
 
+fn set_up_accounts(accounts: &[Account], interpreter: &mut ClarityInterpreter) {
+    for account in accounts {
+        let Ok(recipient) = PrincipalData::parse(&account.address) else {
+            println!("{}", "Unable to parse address to credit".red());
+            continue;
+        };
+        let _ = interpreter
+            .mint_stx_balance(recipient, account.balance)
+            .inspect_err(|e| println!("{}", e.red()));
+    }
+}
+
+fn deploy_boot_contracts(
+    settings: &SessionSettings,
+    interpreter: &mut ClarityInterpreter,
+) -> ExecutionResultMap {
+    if settings.repl_settings.remote_data.enabled {
+        return BTreeMap::new();
+    }
+    let mut boot_contracts = BTreeMap::new();
+
+    // Load boot contracts (with custom overrides if specified)
+    let boot_contracts_data = if settings.override_boot_contracts_source.is_empty() {
+        boot::BOOT_CONTRACTS_DATA.clone()
+    } else {
+        boot::get_boot_contracts_data_with_overrides(&settings.override_boot_contracts_source)
+    };
+
+    for (contract_id, (contract, ast)) in boot_contracts_data {
+        let result = interpreter.run(&contract, Some(&ast), false, None);
+        if let Err(errs) = &result {
+            for e in errs {
+                ueprint!("Error deploying boot contract {contract_id}: {}", e.message);
+            }
+        }
+        boot_contracts.insert(contract_id, result);
+    }
+    boot_contracts
+}
+
 #[derive(Clone)]
 pub struct Session {
     pub settings: SessionSettings,
+    pub boot_contracts: ExecutionResultMap,
     pub contracts: BTreeMap<QualifiedContractIdentifier, ParsedContract>,
     pub interpreter: ClarityInterpreter,
     pub show_costs: bool,
-    pub executed: Vec<String>,
+    pub last_contract_call_trace: Option<String>,
 
     coverage_hook: Option<CoverageHook>,
     logger_hook: Option<LoggerHook>,
+    perf_hook: Option<PerfHook>,
 }
 
 impl Session {
     pub fn new(settings: SessionSettings) -> Self {
-        let tx_sender = {
-            let address = match settings.initial_deployer {
-                Some(ref entry) => entry.address.clone(),
-                None => format!("{}", StacksAddress::burn_address(false)),
-            };
-            PrincipalData::parse_standard_principal(&address)
-                .expect("Unable to parse deployer's address")
-        };
+        let mut interpreter = ClarityInterpreter::new(
+            settings.get_default_sender(),
+            settings.repl_settings.clone(),
+            settings.cache_location.clone(),
+        );
+
+        set_up_accounts(&settings.initial_accounts, &mut interpreter);
+        let boot_contracts = deploy_boot_contracts(&settings, &mut interpreter);
 
         Self {
-            interpreter: ClarityInterpreter::new(
-                tx_sender,
-                settings.repl_settings.clone(),
-                settings.cache_location.clone(),
-            ),
+            interpreter,
+            boot_contracts,
             contracts: BTreeMap::new(),
             show_costs: false,
             settings,
-            executed: Vec::new(),
+            last_contract_call_trace: None,
 
             coverage_hook: None,
             logger_hook: None,
+            perf_hook: None,
         }
     }
 
-    pub fn enable_coverage(&mut self) {
+    pub fn enable_coverage_hook(&mut self) {
         self.coverage_hook = Some(CoverageHook::new());
     }
 
     pub fn enable_logger_hook(&mut self) {
         self.logger_hook = Some(LoggerHook::new());
+    }
+
+    pub fn enable_performance(&mut self, cost_field: CostField) {
+        self.perf_hook = Some(PerfHook::new(cost_field));
     }
 
     pub fn set_test_name(&mut self, name: String) {
@@ -107,71 +152,8 @@ impl Session {
         }
     }
 
-    pub fn load_boot_contracts(&mut self) {
-        let default_tx_sender = self.interpreter.get_tx_sender();
-
-        let boot_testnet_deployer = BOOT_TESTNET_PRINCIPAL.clone();
-        self.interpreter.set_tx_sender(boot_testnet_deployer);
-        self.deploy_boot_contracts(false);
-
-        let boot_mainnet_deployer = BOOT_MAINNET_PRINCIPAL.clone();
-        self.interpreter.set_tx_sender(boot_mainnet_deployer);
-        self.deploy_boot_contracts(true);
-
-        self.interpreter.set_tx_sender(default_tx_sender);
-    }
-
-    fn deploy_boot_contracts(&mut self, mainnet: bool) {
-        let boot_code = if mainnet {
-            *BOOT_CODE_MAINNET
-        } else {
-            *BOOT_CODE_TESTNET
-        };
-
-        let tx_sender = self.interpreter.get_tx_sender();
-        let deployer = ContractDeployer::Address(tx_sender.to_address());
-
-        for (name, code) in boot_code.iter() {
-            if self
-                .settings
-                .include_boot_contracts
-                .contains(&name.to_string())
-            {
-                let (epoch, clarity_version) = if (*name).eq("pox-4") {
-                    (StacksEpochId::Epoch25, ClarityVersion::Clarity2)
-                } else if (*name).eq("pox-3") {
-                    (StacksEpochId::Epoch24, ClarityVersion::Clarity2)
-                } else if (*name).eq("pox-2") || (*name).eq("costs-3") {
-                    (StacksEpochId::Epoch21, ClarityVersion::Clarity2)
-                } else if (*name).eq("cost-2") {
-                    (StacksEpochId::Epoch2_05, ClarityVersion::Clarity1)
-                } else {
-                    (StacksEpochId::Epoch20, ClarityVersion::Clarity1)
-                };
-
-                let contract = ClarityContract {
-                    code_source: ClarityCodeSource::ContractInMemory(code.to_string()),
-                    name: name.to_string(),
-                    deployer: deployer.clone(),
-                    clarity_version,
-                    epoch: Epoch::Specific(epoch),
-                };
-
-                // Result ignored, boot contracts are trusted to be valid
-                let _ = self.deploy_contract(&contract, false, None);
-            }
-        }
-    }
-
     #[cfg(not(target_arch = "wasm32"))]
-    pub fn process_console_input(
-        &mut self,
-        command: &str,
-    ) -> (
-        bool,
-        Vec<String>,
-        Option<Result<ExecutionResult, Vec<Diagnostic>>>,
-    ) {
+    pub fn process_console_input(&mut self, command: &str) -> (bool, Vec<String>) {
         let mut output = Vec::<String>::new();
 
         let mut reload = false;
@@ -185,6 +167,8 @@ impl Session {
             #[cfg(not(target_arch = "wasm32"))]
             cmd if cmd.starts_with("::trace") => self.trace(&mut output, cmd),
             #[cfg(not(target_arch = "wasm32"))]
+            cmd if cmd.starts_with("::perf") => self.perf(&mut output, cmd),
+            #[cfg(not(target_arch = "wasm32"))]
             cmd if cmd.starts_with("::get_costs") => self.get_costs(&mut output, cmd),
 
             cmd if cmd.starts_with("::") => {
@@ -192,12 +176,12 @@ impl Session {
             }
 
             snippet => {
-                let execution_result = self.run_snippet(&mut output, self.show_costs, snippet);
-                return (false, output, Some(execution_result));
+                let _ = self.run_snippet(&mut output, self.show_costs, snippet);
+                return (false, output);
             }
         }
 
-        (reload, output, None)
+        (reload, output)
     }
 
     pub fn handle_command(&mut self, command: &str) -> String {
@@ -242,6 +226,60 @@ impl Session {
         }
     }
 
+    pub fn desugar_contract_id(
+        deployer: &str,
+        contract: &str,
+    ) -> Result<QualifiedContractIdentifier, String> {
+        let parts_count = contract.split('.').count();
+        if parts_count > 2 {
+            return Err(format!("Invalid contract identifier: {contract}"));
+        }
+
+        let is_qualified = parts_count == 2;
+        let contract_id = if is_qualified {
+            contract.to_string()
+        } else {
+            format!("{}.{}", deployer, contract,)
+        };
+
+        QualifiedContractIdentifier::parse(&contract_id).map_err(|e| e.to_string())
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    fn contract_successfully_stored(
+        &mut self,
+        output: &mut Vec<String>,
+        contract: &ParsedContract,
+    ) {
+        // Handle the successful storage of the contract
+        let snippet = green!(
+            "→ {} contract successfully stored.",
+            contract.contract_identifier
+        );
+        output.push(snippet.to_string());
+        let public_functions: Vec<_> = contract.analysis.public_function_types.keys().collect();
+        let read_only_functions: Vec<_> =
+            contract.analysis.read_only_function_types.keys().collect();
+        if !(public_functions.is_empty() && read_only_functions.is_empty()) {
+            output.push(
+                "Use (contract-call? ...) for invoking the public and read-only functions:"
+                    .to_string(),
+            );
+        }
+
+        if !public_functions.is_empty() {
+            output.push("  Public functions:".to_string());
+            for func in &public_functions {
+                output.push(format!("    - {func}"));
+            }
+        }
+        if !read_only_functions.is_empty() {
+            output.push("  Read-only functions:".to_string());
+            for func in &read_only_functions {
+                output.push(format!("    - {func}"));
+            }
+        }
+    }
+
     #[cfg(not(target_arch = "wasm32"))]
     fn run_snippet(
         &mut self,
@@ -249,21 +287,16 @@ impl Session {
         cost_track: bool,
         cmd: &str,
     ) -> Result<ExecutionResult, Vec<Diagnostic>> {
-        let (mut result, cost, execution_result) = match self.formatted_interpretation(
-            cmd.to_string(),
-            None,
-            cost_track,
-            None,
-        ) {
-            Ok((mut output, result)) => {
-                if let EvaluationResult::Contract(contract_result) = result.result.clone() {
-                    let snippet = green!("→ .{} contract successfully stored. Use (contract-call? ...) for invoking the public functions:", contract_result.contract.contract_identifier);
-                    output.push(snippet.to_string());
-                };
-                (output, result.cost.clone(), Ok(result))
-            }
-            Err((err_output, diagnostics)) => (err_output, None, Err(diagnostics)),
-        };
+        let (mut result, cost, execution_result) =
+            match self.formatted_interpretation(cmd.to_string(), None, cost_track, None) {
+                Ok((mut output, result)) => {
+                    if let EvaluationResult::Contract(contract_result) = result.result.clone() {
+                        self.contract_successfully_stored(&mut output, &contract_result.contract);
+                    };
+                    (output, result.cost.clone(), Ok(result))
+                }
+                Err((err_output, diagnostics)) => (err_output, None, Err(diagnostics)),
+            };
 
         if let Some(cost) = cost {
             let headers = [
@@ -384,8 +417,7 @@ impl Session {
         ) {
             Ok((mut output, result)) => {
                 if let EvaluationResult::Contract(contract_result) = result.result {
-                    let snippet = format!("→ .{} contract successfully stored. Use (contract-call? ...) for invoking the public functions:", contract_result.contract.contract_identifier);
-                    output.push(snippet.green().to_string());
+                    self.contract_successfully_stored(&mut output, &contract_result.contract);
                 };
                 output
             }
@@ -402,7 +434,7 @@ impl Session {
             return output.push("Usage: ::trace <expr>".red().to_string());
         };
 
-        let mut tracer = TracerHook::new(snippet.to_string());
+        let mut tracer = TracerHook::new();
 
         match self.eval_with_hooks(snippet.to_string(), Some(vec![&mut tracer]), false) {
             Ok(_) => (),
@@ -414,34 +446,46 @@ impl Session {
                 }
             }
         };
+
+        println!("{}  {}", snippet, black!("<console>"));
+        println!("{}", tracer.output.join("\n"));
     }
 
     #[cfg(not(target_arch = "wasm32"))]
-    pub fn start(&mut self) -> Result<(String, Vec<(ContractAnalysis, String, String)>), String> {
-        let mut output_err = Vec::<String>::new();
-        let output = Vec::<String>::new();
-        let contracts = vec![]; // This is never modified, remove?
+    pub fn perf(&mut self, output: &mut Vec<String>, cmd: &str) {
+        use super::hooks::perf::{CostField, PerfHook};
 
-        if !self.settings.include_boot_contracts.is_empty() {
-            self.load_boot_contracts();
+        let parts: Vec<&str> = cmd.split_whitespace().collect();
+        if parts.len() < 3 {
+            return output.push("Usage: ::perf <cost_field> <expr>".red().to_string());
         }
 
-        for account in &self.settings.initial_accounts {
-            let Ok(recipient) = PrincipalData::parse(&account.address) else {
-                output_err.push("Unable to parse address to credit".red().to_string());
-                continue;
-            };
+        let cost_field_str = parts[1];
+        let snippet = parts[2..].join(" ");
 
-            _ = self
-                .interpreter
-                .mint_stx_balance(recipient, account.balance)
-                .inspect_err(|e| output_err.push(e.red().to_string()));
-        }
+        let cost_field = CostField::from(cost_field_str);
 
-        match output_err.len() {
-            0 => Ok((output.join("\n"), contracts)),
-            _ => Err(output_err.join("\n")),
-        }
+        let mut perf = PerfHook::new(cost_field);
+
+        match self.eval_with_hooks(snippet.to_string(), Some(vec![&mut perf]), true) {
+            Ok(_) => {
+                output.push(
+                    format!(
+                        "Performance data written to perf.data (tracking {})",
+                        cost_field.name()
+                    )
+                    .green()
+                    .to_string(),
+                );
+            }
+            Err(diagnostics) => {
+                let lines = snippet.lines();
+                let formatted_lines: Vec<String> = lines.map(|l| l.to_string()).collect();
+                for d in diagnostics {
+                    output.append(&mut output_diagnostic(&d, "<snippet>", &formatted_lines));
+                }
+            }
+        };
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -498,6 +542,9 @@ impl Session {
         if let Some(ref mut logger_hook) = self.logger_hook {
             hooks.push(logger_hook);
         }
+        if let Some(ref mut perf_hook) = self.perf_hook {
+            hooks.push(perf_hook);
+        }
 
         if contract.clarity_version > ClarityVersion::default_for_epoch(contract.epoch.resolve()) {
             let diagnostic = Diagnostic {
@@ -536,26 +583,32 @@ impl Session {
     ) -> Result<ExecutionResult, Vec<Diagnostic>> {
         let initial_tx_sender = self.get_tx_sender();
 
-        // Handle fully qualified contract_id and sugared syntax
-        let contract_id_str = if contract.starts_with('S') {
-            contract.to_string()
-        } else {
-            format!("{initial_tx_sender}.{contract}")
-        };
+        let contract_id = Self::desugar_contract_id(&initial_tx_sender, contract).map_err(|e| {
+            vec![Diagnostic {
+                level: Level::Error,
+                message: e,
+                spans: vec![],
+                suggestion: None,
+            }]
+        })?;
 
         self.set_tx_sender(sender);
 
-        let mut hooks: Vec<&mut dyn EvalHook> = vec![];
+        let mut tracer_hook = TracerHook::new();
+        let mut hooks: Vec<&mut dyn EvalHook> = vec![&mut tracer_hook];
         if let Some(ref mut coverage_hook) = self.coverage_hook {
             hooks.push(coverage_hook);
         }
         if let Some(ref mut logger_hook) = self.logger_hook {
             hooks.push(logger_hook);
         }
+        if let Some(ref mut perf_hook) = self.perf_hook {
+            hooks.push(perf_hook);
+        }
 
         let current_epoch = self.interpreter.datastore.get_current_epoch();
-        let execution = match self.interpreter.call_contract_fn(
-            &QualifiedContractIdentifier::parse(&contract_id_str).unwrap(),
+        let contract_call_result = self.interpreter.call_contract_fn(
+            &contract_id,
             method,
             args,
             current_epoch,
@@ -563,32 +616,34 @@ impl Session {
             track_costs,
             allow_private,
             hooks,
-        ) {
-            Ok(result) => result,
-            Err(e) => {
-                self.set_tx_sender(&initial_tx_sender);
-                let user_friendly_message = match e {
-                    ContractCallError::NoSuchContract(_) => {
-                        format!("Contract '{contract_id_str}' does not exist")
-                    }
-                    ContractCallError::NoSuchFunction(_) => {
-                        format!("Method '{method}' does not exist on contract '{contract_id_str}'")
-                    }
-                    ContractCallError::Uncategorized(message) => {
-                        format!("Error calling contract function '{method}': {message}")
-                    }
-                };
-                return Err(vec![Diagnostic {
-                    level: Level::Error,
-                    message: user_friendly_message,
-                    spans: vec![],
-                    suggestion: None,
-                }]);
-            }
-        };
+        );
         self.set_tx_sender(&initial_tx_sender);
+        self.last_contract_call_trace = Some(tracer_hook.output.join("\n"));
 
-        Ok(execution)
+        contract_call_result.map_err(|e| {
+            ueprint!("{}", tracer_hook.output.join("\n"));
+            if let Some(traced_error) = tracer_hook.error {
+                ueprint!("{}", traced_error);
+            }
+            let contract_id_str = contract_id.to_string();
+            let user_friendly_message = match e {
+                ContractCallError::NoSuchContract(_) => {
+                    format!("Contract '{contract_id_str}' does not exist")
+                }
+                ContractCallError::NoSuchFunction(_) => {
+                    format!("Method '{method}' does not exist on contract '{contract_id_str}'")
+                }
+                ContractCallError::Uncategorized(message) => {
+                    format!("Error calling contract function '{method}': {message}")
+                }
+            };
+            vec![Diagnostic {
+                level: Level::Error,
+                message: user_friendly_message,
+                spans: vec![],
+                suggestion: None,
+            }]
+        })
     }
 
     /// Run a snippet as a contract deployment
@@ -614,6 +669,9 @@ impl Session {
         }
         if let Some(ref mut logger_hook) = self.logger_hook {
             hooks.push(logger_hook);
+        }
+        if let Some(ref mut perf_hook) = self.perf_hook {
+            hooks.push(perf_hook);
         }
 
         let result = self
@@ -751,6 +809,12 @@ impl Session {
         output.push(format!(
             "{}",
             "::trace <expr>\t\t\t\tGenerate an execution trace for <expr>".yellow()
+        ));
+        #[cfg(not(target_arch = "wasm32"))]
+        output.push(format!(
+            "{}",
+            "::perf <cost_field> <expr>\t\tGenerate performance data tracking specific cost field"
+                .yellow()
         ));
         #[cfg(not(target_arch = "wasm32"))]
         output.push(format!(
@@ -1058,19 +1122,17 @@ impl Session {
     pub fn get_contracts(&self) -> Option<String> {
         use super::boot::{BOOT_MAINNET_ADDRESS, BOOT_TESTNET_ADDRESS, SBTC_MAINNET_ADDRESS};
 
-        if self.contracts.is_empty() {
-            return None;
-        }
-
-        let mut table = Table::new();
-        table.add_row(["Contract identifier", "Public functions"]);
-        let contracts = self.contracts.clone();
-        for (contract_id, contract) in contracts.iter() {
-            let contract_id_str = contract_id.to_string();
-            if !contract_id_str.starts_with(BOOT_TESTNET_ADDRESS)
-                && !contract_id_str.starts_with(BOOT_MAINNET_ADDRESS)
-                && !contract_id_str.starts_with(SBTC_MAINNET_ADDRESS)
-            {
+        let contracts: Vec<_> = self
+            .contracts
+            .iter()
+            .filter(|(contract_id, _)| {
+                let contract_id_str = contract_id.to_string();
+                !contract_id_str.starts_with(BOOT_TESTNET_ADDRESS)
+                    && !contract_id_str.starts_with(BOOT_MAINNET_ADDRESS)
+                    && !contract_id_str.starts_with(SBTC_MAINNET_ADDRESS)
+            })
+            .map(|(contract_id, contract)| {
+                let contract_id_str = contract_id.to_string();
                 let mut formatted_methods = vec![];
                 for (method_name, method_args) in contract.function_args.iter() {
                     let formatted_args = if method_args.is_empty() {
@@ -1083,9 +1145,18 @@ impl Session {
                     formatted_methods.push(format!("({method_name}{formatted_args})"));
                 }
                 let formatted_spec = formatted_methods.join("\n").to_string();
-                table.add_row(vec![&contract_id_str, &formatted_spec]);
-            }
+
+                [contract_id_str, formatted_spec]
+            })
+            .collect();
+
+        if contracts.is_empty() {
+            return None;
         }
+
+        let mut table = Table::new();
+        table.add_row(["Contract identifier", "Public functions"]);
+        table.add_rows(contracts);
         Some(table.to_string())
     }
 
@@ -1164,6 +1235,20 @@ impl Session {
             ),
         }
     }
+
+    pub fn get_performance_data(&self) -> Option<String> {
+        if let Some(ref perf_hook) = self.perf_hook {
+            perf_hook.get_buffer_data()
+        } else {
+            None
+        }
+    }
+
+    pub fn clear_performance_buffer(&mut self) {
+        if let Some(ref mut perf_hook) = self.perf_hook {
+            perf_hook.clear_buffer();
+        }
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -1194,7 +1279,7 @@ fn decode_hex(byte_string: &str) -> Result<Vec<u8>, DecodeHexError> {
         .chars()
         .filter(|c| !c.is_whitespace())
         .collect();
-    if byte_string_filtered.len() % 2 != 0 {
+    if !byte_string_filtered.len().is_multiple_of(2) {
         return Err(DecodeHexError::OddLength);
     }
     let result: Result<Vec<u8>, ParseIntError> = (0..byte_string_filtered.len())
@@ -1246,7 +1331,7 @@ mod tests {
     #[test]
     fn initial_accounts() {
         let address = "ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5";
-        let mut session = Session::new(SessionSettings {
+        let session = Session::new(SessionSettings {
             initial_accounts: vec![Account {
                 address: address.to_owned(),
                 balance: 1000000,
@@ -1254,7 +1339,6 @@ mod tests {
             }],
             ..Default::default()
         });
-        let _ = session.start();
         let balance = session.interpreter.get_balance_for_account(address, "STX");
         assert_eq!(balance, 1000000);
     }
@@ -1511,13 +1595,9 @@ mod tests {
 
     #[test]
     fn evaluate_at_block() {
-        let settings = SessionSettings {
-            include_boot_contracts: vec!["costs".into(), "costs-2".into(), "costs-3".into()],
-            ..Default::default()
-        };
+        let settings = SessionSettings::default();
 
         let mut session = Session::new(settings);
-        session.start().expect("session could not start");
 
         session.handle_command("::set_epoch 2.5");
 
@@ -1602,7 +1682,6 @@ mod tests {
     fn can_deploy_a_contract() {
         let settings = SessionSettings::default();
         let mut session = Session::new(settings);
-        session.start().expect("session could not start");
         session.update_epoch(DEFAULT_EPOCH);
 
         // deploy default contract
@@ -1613,13 +1692,9 @@ mod tests {
 
     #[test]
     fn can_call_boot_contract_fn() {
-        let settings = SessionSettings {
-            include_boot_contracts: vec!["pox-4".into()],
-            ..Default::default()
-        };
+        let settings = SessionSettings::default();
         let mut session = Session::new(settings);
         session.update_epoch(StacksEpochId::Epoch25);
-        session.load_boot_contracts();
 
         // call pox4 get-info
         let result = session.call_contract_fn(
@@ -1651,7 +1726,6 @@ mod tests {
     fn can_call_public_contract_fn() {
         let settings = SessionSettings::default();
         let mut session = Session::new(settings);
-        session.start().expect("session could not start");
         session.update_epoch(DEFAULT_EPOCH);
 
         // deploy default contract
@@ -1683,9 +1757,7 @@ mod tests {
     fn current_block_info_is_none() {
         let settings = SessionSettings::default();
         let mut session = Session::new(settings);
-        session.start().expect("session could not start");
         session.update_epoch(StacksEpochId::Epoch25);
-
         session.advance_chain_tip(5);
         let result = run_session_snippet(&mut session, "(get-block-info? time block-height)");
         assert_eq!(result, Value::none());
@@ -1695,7 +1767,6 @@ mod tests {
     fn block_time_is_realistic_in_epoch_2_5() {
         let settings = SessionSettings::default();
         let mut session = Session::new(settings);
-        session.start().expect("session could not start");
         session.update_epoch(StacksEpochId::Epoch25);
 
         session.advance_chain_tip(4);
@@ -1717,7 +1788,6 @@ mod tests {
     fn burn_block_height_behavior_epoch2_5() {
         let settings = SessionSettings::default();
         let mut session = Session::new(settings);
-        session.start().expect("session could not start");
         session.update_epoch(StacksEpochId::Epoch25);
 
         let snippet = [
@@ -1751,7 +1821,6 @@ mod tests {
     fn get_burn_block_info_past() {
         let settings = SessionSettings::default();
         let mut session = Session::new(settings);
-        session.start().expect("session could not start");
         session.update_epoch(StacksEpochId::Epoch30);
 
         session.advance_burn_chain_tip(10);
@@ -1778,7 +1847,6 @@ mod tests {
         // https://github.com/stacks-network/stacks-core/pull/5524
         let settings = SessionSettings::default();
         let mut session = Session::new(settings);
-        session.start().expect("session could not start");
         session.update_epoch(StacksEpochId::Epoch30);
 
         let snippet = [
@@ -1812,7 +1880,6 @@ mod tests {
     fn burn_block_height_behavior_epoch3_0_contract_in_2_5() {
         let settings = SessionSettings::default();
         let mut session = Session::new(settings);
-        session.start().expect("session could not start");
         session.update_epoch(StacksEpochId::Epoch25);
 
         let snippet = [
@@ -1859,8 +1926,6 @@ mod tests {
         let settings = SessionSettings::default();
         let mut session = Session::new(settings);
         let sender = "ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5";
-        session.start().expect("session could not start");
-
         let result = session.process_console_input(&format!("::set_tx_sender    {sender}"));
         assert!(result.1[0].contains(sender));
 
@@ -1872,7 +1937,6 @@ mod tests {
     fn test_call_contract_fn_undefined_function() {
         let settings = SessionSettings::default();
         let mut session = Session::new(settings);
-        session.start().expect("session could not start");
         session.update_epoch(DEFAULT_EPOCH);
 
         // deploy a simple contract

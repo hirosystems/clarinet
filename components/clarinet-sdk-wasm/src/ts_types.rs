@@ -2,8 +2,7 @@ use js_sys::wasm_bindgen;
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen(typescript_custom_section)]
-const EPOCH_STRING: &'static str =
-    r#"export type EpochString = "2.0" | "2.05" | "2.1" | "2.2" | "2.3" | "2.4" | "2.5" | "3.0""#;
+const EPOCH_STRING: &'static str = r#"export type EpochString = "2.0" | "2.05" | "2.1" | "2.2" | "2.3" | "2.4" | "2.5" | "3.0" | "3.1" | "3.2""#;
 
 // CONTRACT AST
 

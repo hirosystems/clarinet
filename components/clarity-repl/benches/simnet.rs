@@ -159,7 +159,7 @@ fn simnet_save(bencher: Bencher) {
         );
         assert_eq!(result, ClarityValue::okay_true());
 
-        if i % 1000 == 0 {
+        if i.is_multiple_of(1000) {
             #[allow(unused_variables)]
             let elapsed = std::time::Instant::now().duration_since(start);
             // println!("{}: {}", i, elapsed.as_millis());
@@ -229,7 +229,7 @@ fn simnet_save_read_at_block(bencher: Bencher) {
             session.interpreter.get_block_height()
         );
 
-        if i % 1000 == 0 {
+        if i.is_multiple_of(1000) {
             #[allow(unused_variables)]
             let elapsed = std::time::Instant::now().duration_since(start);
             // println!("{}: {}", i, elapsed.as_millis());

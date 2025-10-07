@@ -27,10 +27,11 @@ use clarity_repl::clarity::vm::analysis::AnalysisDatabase;
 use clarity_repl::clarity::vm::costs::LimitedCostTracker;
 use clarity_repl::clarity::vm::types::QualifiedContractIdentifier;
 use clarity_repl::clarity::ClarityVersion;
+use clarity_repl::frontend::Terminal;
 use clarity_repl::repl::diagnostic::output_diagnostic;
 use clarity_repl::repl::settings::{ApiUrl, RemoteDataSettings};
 use clarity_repl::repl::{ClarityCodeSource, ClarityContract, ContractDeployer, DEFAULT_EPOCH};
-use clarity_repl::{analysis, repl, Terminal};
+use clarity_repl::{analysis, repl};
 use stacks_network::{self, DevnetOrchestrator};
 use toml;
 
@@ -1066,7 +1067,7 @@ pub fn main() {
                             std::process::exit(1);
                         }
 
-                        Terminal::load(artifacts.session, None)
+                        Terminal::load(artifacts.session)
                     }
                     None => {
                         let remote_data_settings = RemoteDataSettings {
@@ -1077,7 +1078,7 @@ pub fn main() {
                         };
                         let mut settings = repl::SessionSettings::default();
                         settings.repl_settings.remote_data = remote_data_settings.clone();
-                        Terminal::new(settings, None)
+                        Terminal::new(settings)
                     }
                 };
                 let reload = terminal.start();
@@ -1095,7 +1096,7 @@ pub fn main() {
 
                         #[cfg(feature = "telemetry")]
                         let mut debug_count = 0;
-                        for command in terminal.session.executed {
+                        for command in terminal.executed {
                             if command.starts_with("::debug") {
                                 debug_count += 1;
                             }

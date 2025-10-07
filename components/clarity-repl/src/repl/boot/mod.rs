@@ -57,6 +57,7 @@ pub static SBTC_TOKEN_MAINNET_ADDRESS: LazyLock<QualifiedContractIdentifier> =
     });
 
 use std::collections::BTreeMap;
+use std::fs;
 use std::sync::LazyLock;
 
 use clarity::types::StacksEpochId;
@@ -171,19 +172,7 @@ pub static BOOT_CONTRACTS_DATA: LazyLock<
     );
     for (deployer, boot_code) in deploy.iter() {
         for (name, code) in boot_code.iter() {
-            let (epoch, clarity_version) = match *name {
-                "pox-4" | "signers" | "signers-voting" => {
-                    (StacksEpochId::Epoch25, ClarityVersion::Clarity2)
-                }
-                "pox-3" => (StacksEpochId::Epoch24, ClarityVersion::Clarity2),
-                "pox-2" | "costs-3" => (StacksEpochId::Epoch21, ClarityVersion::Clarity2),
-                "costs-2" => (StacksEpochId::Epoch2_05, ClarityVersion::Clarity1),
-                "genesis" | "lockup" | "bns" | "cost-voting" | "costs" | "pox" => {
-                    (StacksEpochId::Epoch20, ClarityVersion::Clarity1)
-                }
-                _ => panic!("Unknown boot contract: {}", name),
-            };
-
+            let (epoch, clarity_version) = get_boot_contract_epoch_and_clarity_version(name);
             let boot_contract = ClarityContract {
                 code_source: ClarityCodeSource::ContractInMemory(code.to_string()),
                 deployer: ContractDeployer::Address(deployer.to_address()),
@@ -200,3 +189,79 @@ pub static BOOT_CONTRACTS_DATA: LazyLock<
     }
     result
 });
+
+pub fn load_custom_boot_contract(path: &str) -> Result<String, String> {
+    fs::read_to_string(path).map_err(|e| format!("Failed to read boot contract file {path}: {e}"))
+}
+
+/// Get boot contracts data with optional overrides (only existing boot contracts can be overridden)
+pub fn get_boot_contracts_data_with_overrides(
+    overrides: &BTreeMap<String, String>,
+) -> BTreeMap<QualifiedContractIdentifier, (ClarityContract, ContractAST)> {
+    let mut result = BOOT_CONTRACTS_DATA.clone();
+
+    let interpreter = ClarityInterpreter::new(
+        StandardPrincipalData::transient(),
+        Settings::default(),
+        None,
+    );
+
+    for (contract_name, file_path) in overrides {
+        if !BOOT_CONTRACTS_NAMES.contains(&contract_name.as_str()) {
+            eprintln!("Warning: Skipping custom boot contract '{contract_name}' - only existing boot contracts can be overridden. Valid boot contracts are: {BOOT_CONTRACTS_NAMES:?}");
+            continue;
+        }
+
+        let custom_source = match load_custom_boot_contract(file_path) {
+            Ok(source) => source,
+            Err(e) => {
+                eprintln!("Warning: Failed to load custom boot contract {contract_name}: {e}");
+                continue;
+            }
+        };
+
+        // Use standard epoch/version mapping for known boot contracts
+        let (epoch, clarity_version) =
+            get_boot_contract_epoch_and_clarity_version(contract_name.as_str());
+
+        for deployer in [&*BOOT_TESTNET_PRINCIPAL, &*BOOT_MAINNET_PRINCIPAL] {
+            let boot_contract = ClarityContract {
+                code_source: ClarityCodeSource::ContractInMemory(custom_source.clone()),
+                deployer: ContractDeployer::Address(deployer.to_address()),
+                name: contract_name.clone(),
+                epoch: Epoch::Specific(epoch),
+                clarity_version,
+            };
+
+            let (ast, _, _) = interpreter.build_ast(&boot_contract);
+            let contract_id = boot_contract.expect_resolved_contract_identifier(None);
+
+            // Insert the contract (this will replace the existing boot contract)
+            result.insert(contract_id, (boot_contract, ast));
+        }
+    }
+    result
+}
+
+pub fn get_boot_contract_epoch_and_clarity_version(
+    contract_name: &str,
+) -> (StacksEpochId, ClarityVersion) {
+    let (epoch, clarity_version) = match contract_name {
+        "pox-4" | "signers" | "signers-voting" => {
+            (StacksEpochId::Epoch25, ClarityVersion::Clarity2)
+        }
+        "pox-3" => (StacksEpochId::Epoch24, ClarityVersion::Clarity2),
+        "pox-2" | "costs-3" => (StacksEpochId::Epoch21, ClarityVersion::Clarity2),
+        "costs-2" => (StacksEpochId::Epoch2_05, ClarityVersion::Clarity1),
+        "genesis" | "lockup" | "bns" | "cost-voting" | "costs" | "pox" => {
+            (StacksEpochId::Epoch20, ClarityVersion::Clarity1)
+        }
+        _ => {
+            panic!(
+                "Unknown boot contract '{}' - cannot validate",
+                contract_name
+            );
+        }
+    };
+    (epoch, clarity_version)
+}
