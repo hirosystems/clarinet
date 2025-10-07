@@ -226,6 +226,24 @@ impl Session {
         }
     }
 
+    pub fn desugar_contract_id(
+        deployer: &str,
+        contract: &str,
+    ) -> Result<QualifiedContractIdentifier, String> {
+        let parts_count = contract.split('.').count();
+        if parts_count > 2 {
+            return Err(format!("Invalid contract identifier: {contract}"));
+        }
+
+        let is_qualified = parts_count == 2;
+        let contract_id = if is_qualified {
+            contract.to_string()
+        } else {
+            format!("{}.{}", deployer, contract,)
+        };
+
+        QualifiedContractIdentifier::parse(&contract_id).map_err(|e| e.to_string())
+    }
     #[cfg(not(target_arch = "wasm32"))]
     fn contract_successfully_stored(
         &mut self,
@@ -565,12 +583,14 @@ impl Session {
     ) -> Result<ExecutionResult, Vec<Diagnostic>> {
         let initial_tx_sender = self.get_tx_sender();
 
-        // Handle fully qualified contract_id and sugared syntax
-        let contract_id_str = if contract.starts_with('S') {
-            contract.to_string()
-        } else {
-            format!("{initial_tx_sender}.{contract}")
-        };
+        let contract_id = Self::desugar_contract_id(&initial_tx_sender, contract).map_err(|e| {
+            vec![Diagnostic {
+                level: Level::Error,
+                message: e,
+                spans: vec![],
+                suggestion: None,
+            }]
+        })?;
 
         self.set_tx_sender(sender);
 
@@ -588,7 +608,7 @@ impl Session {
 
         let current_epoch = self.interpreter.datastore.get_current_epoch();
         let contract_call_result = self.interpreter.call_contract_fn(
-            &QualifiedContractIdentifier::parse(&contract_id_str).unwrap(),
+            &contract_id,
             method,
             args,
             current_epoch,
@@ -605,6 +625,7 @@ impl Session {
             if let Some(traced_error) = tracer_hook.error {
                 ueprint!("{}", traced_error);
             }
+            let contract_id_str = contract_id.to_string();
             let user_friendly_message = match e {
                 ContractCallError::NoSuchContract(_) => {
                     format!("Contract '{contract_id_str}' does not exist")
