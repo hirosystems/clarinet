@@ -32,7 +32,7 @@ describe("nft basic features", () => {
     });
   });
 
-  it.only("Ensure that nft can be transferred form one account to another", () => {
+  it("Ensure that nft can be transferred form one account to another", () => {
     simnet.callPublicFn(
       "simple-nft",
       "test-mint",
