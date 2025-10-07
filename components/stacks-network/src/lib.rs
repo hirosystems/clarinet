@@ -64,7 +64,7 @@ fn setup_signal_handlers(
             use signal_hook::consts::{SIGINT, SIGTERM};
             use signal_hook::iterator::Signals;
 
-            let mut signals = match Signals::new(&[SIGINT, SIGTERM]) {
+            let mut signals = match Signals::new([SIGINT, SIGTERM]) {
                 Ok(signals) => signals,
                 Err(e) => {
                     eprintln!("Failed to setup signal handlers: {}", e);
@@ -330,47 +330,45 @@ async fn do_run_devnet(
                 return Err(*message);
             }
         }
-    } else {
-        if config.log_tx.is_none() {
-            loop {
-                match devnet_events_rx.recv() {
-                    Ok(DevnetEvent::Log(log)) => {
-                        if let Some(ref log_tx) = config.log_tx {
-                            let _ = log_tx.send(log.clone());
-                        } else {
-                            match log.level {
-                                LogLevel::Debug => config
-                                    .ctx
-                                    .try_log(|logger| slog::debug!(logger, "{}", log.message)),
-                                LogLevel::Info | LogLevel::Success => config
-                                    .ctx
-                                    .try_log(|logger| slog::info!(logger, "{}", log.message)),
-                                LogLevel::Warning => config
-                                    .ctx
-                                    .try_log(|logger| slog::warn!(logger, "{}", log.message)),
-                                LogLevel::Error => config
-                                    .ctx
-                                    .try_log(|logger| slog::error!(logger, "{}", log.message)),
-                            }
+    } else if config.log_tx.is_none() {
+        loop {
+            match devnet_events_rx.recv() {
+                Ok(DevnetEvent::Log(log)) => {
+                    if let Some(ref log_tx) = config.log_tx {
+                        let _ = log_tx.send(log.clone());
+                    } else {
+                        match log.level {
+                            LogLevel::Debug => config
+                                .ctx
+                                .try_log(|logger| slog::debug!(logger, "{}", log.message)),
+                            LogLevel::Info | LogLevel::Success => config
+                                .ctx
+                                .try_log(|logger| slog::info!(logger, "{}", log.message)),
+                            LogLevel::Warning => config
+                                .ctx
+                                .try_log(|logger| slog::warn!(logger, "{}", log.message)),
+                            LogLevel::Error => config
+                                .ctx
+                                .try_log(|logger| slog::error!(logger, "{}", log.message)),
                         }
                     }
-                    Ok(DevnetEvent::BootCompleted(bitcoin_mining_tx)) => {
-                        if !devnet_config.bitcoin_controller_automining_disabled {
-                            let _ = bitcoin_mining_tx.send(BitcoinMiningCommand::Start);
-                        }
-                    }
-                    Ok(DevnetEvent::FatalError(e)) => return Err(e),
-                    Ok(DevnetEvent::Terminate) => return Ok((None, None, None)),
-                    _ => {}
                 }
+                Ok(DevnetEvent::BootCompleted(bitcoin_mining_tx)) => {
+                    if !devnet_config.bitcoin_controller_automining_disabled {
+                        let _ = bitcoin_mining_tx.send(BitcoinMiningCommand::Start);
+                    }
+                }
+                Ok(DevnetEvent::FatalError(e)) => return Err(e),
+                Ok(DevnetEvent::Terminate) => return Ok((None, None, None)),
+                _ => {}
             }
-        } else {
-            return Ok((
-                Some(devnet_events_rx),
-                Some(orchestrator_terminator_tx),
-                Some(chains_coordinator_commands_tx),
-            ));
         }
+    } else {
+        return Ok((
+            Some(devnet_events_rx),
+            Some(orchestrator_terminator_tx),
+            Some(chains_coordinator_commands_tx),
+        ));
     }
 
     Ok((None, None, Some(chains_coordinator_commands_tx)))
