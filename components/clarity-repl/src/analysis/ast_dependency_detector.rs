@@ -259,7 +259,6 @@ impl<'a> ASTDependencyDetector<'a> {
         }
     }
 
-    #[allow(clippy::result_large_err)]
     pub fn order_contracts<'deps>(
         dependencies: &'deps BTreeMap<QualifiedContractIdentifier, DependencySet>,
         contract_epochs: &HashMap<QualifiedContractIdentifier, StacksEpochId>,

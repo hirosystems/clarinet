@@ -2,6 +2,7 @@ use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;
 use std::rc::Rc;
+use std::vec;
 
 use clarity::types::chainstate::{
     BlockHeaderHash, BurnchainHeaderHash, ConsensusHash, SortitionId, StacksAddress, StacksBlockId,
@@ -30,6 +31,9 @@ use super::remote_data::fs::{get_file_from_cache, write_file_to_cache};
 use super::remote_data::{epoch_for_height, Block, HttpClient, Sortition};
 use super::settings::RemoteNetworkInfo;
 use crate::repl::remote_data::context;
+
+// todo: export it from clarity
+const CLARITY_STORAGE_BLOCK_TIME_KEY: &str = "_stx-data::clarity_storage::block_time";
 
 const SECONDS_BETWEEN_BURN_BLOCKS: u64 = 600;
 const SECONDS_BETWEEN_STACKS_BLOCKS: u64 = 10;
@@ -376,7 +380,6 @@ impl ClarityDatastore {
         block_info.index_block_hash.to_string()
     }
 
-    #[allow(clippy::result_large_err)]
     fn fetch_clarity_marf_value(&mut self, key: &str) -> Result<Option<String>> {
         let key_hash = TrieHash::from_key(key);
         let tip = self.get_remote_chaintip();
@@ -384,7 +387,6 @@ impl ClarityDatastore {
         self.client.fetch_clarity_data(&url)
     }
 
-    #[allow(clippy::result_large_err)]
     fn populate_context_functions(
         &mut self,
         contract_id: &QualifiedContractIdentifier,
@@ -440,7 +442,6 @@ impl ClarityDatastore {
         Ok(contract_context)
     }
 
-    #[allow(clippy::result_large_err)]
     fn fetch_clarity_metadata(
         &mut self,
         contract_id: &QualifiedContractIdentifier,
@@ -980,7 +981,15 @@ impl Datastore {
             let bytes = height_to_hashed_bytes(self.stacks_chain_height);
             let id = StacksBlockId(bytes);
             let block_info = self.build_next_stacks_block(clarity_datastore);
+
+            clarity_datastore
+                .put_all_data(vec![(
+                    CLARITY_STORAGE_BLOCK_TIME_KEY.to_string(),
+                    format!("{}", block_info.stacks_block_time),
+                )])
+                .expect("failed to update vm-epoch::block-height");
             self.stacks_blocks.insert(id.clone(), block_info);
+
             self.tenure_height_at_stacks_height
                 .insert(self.stacks_chain_height, self.tenure_height);
             clarity_datastore

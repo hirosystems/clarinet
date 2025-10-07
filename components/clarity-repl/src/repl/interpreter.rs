@@ -938,6 +938,7 @@ mod tests {
     use clarity::util::hash::hex_bytes;
     use clarity::vm::{self, ClarityVersion};
     use clarity_types::types::TupleData;
+    use indoc::indoc;
 
     use super::*;
     use crate::analysis::Settings as AnalysisSettings;
@@ -974,17 +975,22 @@ mod tests {
     }
 
     #[track_caller]
+    fn get_evaluation_result(result: Result<ExecutionResult, ContractCallError>) -> Value {
+        assert!(result.is_ok());
+        let result = result.unwrap();
+        match result.result {
+            EvaluationResult::Contract(_) => unreachable!(),
+            EvaluationResult::Snippet(res) => res.result,
+        }
+    }
+
+    #[track_caller]
     fn assert_execution_result_value(
         result: Result<ExecutionResult, ContractCallError>,
         expected_value: Value,
     ) {
-        assert!(result.is_ok());
-        let result = result.unwrap();
-        let result = match result.result {
-            EvaluationResult::Contract(_) => unreachable!(),
-            EvaluationResult::Snippet(res) => res,
-        };
-        assert_eq!(result.result, expected_value);
+        let result = get_evaluation_result(result);
+        assert_eq!(result, expected_value);
     }
 
     #[track_caller]
@@ -999,10 +1005,8 @@ mod tests {
             .clarity_version(clarity_version)
             .build();
         let deploy_result = deploy_contract(interpreter, &contract);
-        match deploy_result.unwrap().result {
-            EvaluationResult::Contract(_) => unreachable!(),
-            EvaluationResult::Snippet(res) => res.result,
-        }
+        assert!(deploy_result.is_ok());
+        get_evaluation_result(deploy_result)
     }
 
     #[test]
@@ -1952,7 +1956,6 @@ mod tests {
     #[test]
     fn can_call_clarity_4_contract_hash() {
         let mut interpreter = get_interpreter(None);
-
         interpreter.set_current_epoch(StacksEpochId::Epoch33);
 
         let dummy_contract = ClarityContractBuilder::default()
@@ -1988,5 +1991,51 @@ mod tests {
             get_hash_result,
             Value::okay(Value::buff_from(expected_bytes).unwrap()).unwrap(),
         );
+    }
+
+    #[test]
+    fn can_call_clarity_4_block_time() {
+        let mut interpreter = get_interpreter(None);
+        interpreter.set_current_epoch(StacksEpochId::Epoch33);
+        let _ = interpreter.advance_stacks_chain_tip(5);
+
+        let src = indoc!(
+            r#"(define-read-only (get-time) {
+                previous: (get-stacks-block-info? time (- stacks-block-height u1)),
+                current: block-time,
+            })"#
+        );
+        let contract = ClarityContractBuilder::default()
+            .code_source(src.into())
+            .epoch(StacksEpochId::Epoch33)
+            .clarity_version(ClarityVersion::Clarity4)
+            .build();
+        let _ = deploy_contract(&mut interpreter, &contract);
+
+        let get_time = interpreter.call_contract_fn(
+            &contract
+                .expect_resolved_contract_identifier(Some(&StandardPrincipalData::transient())),
+            "get-time",
+            &[],
+            StacksEpochId::Epoch33,
+            ClarityVersion::Clarity4,
+            false,
+            false,
+            vec![],
+        );
+
+        let value = get_evaluation_result(get_time).expect_tuple().unwrap();
+        let previous = value
+            .data_map
+            .get("previous")
+            .and_then(|v| v.clone().expect_optional().unwrap())
+            .and_then(|v| v.clone().expect_u128().ok())
+            .expect("previous to be (some uint)");
+        let current = value
+            .data_map
+            .get("current")
+            .and_then(|v| v.clone().expect_u128().ok())
+            .expect("current to be uint");
+        assert_eq!(previous + 10, current);
     }
 }
