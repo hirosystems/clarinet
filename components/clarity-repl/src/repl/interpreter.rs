@@ -2038,4 +2038,38 @@ mod tests {
             .expect("current to be uint");
         assert_eq!(previous + 10, current);
     }
+
+    #[test]
+    fn can_call_clarity_4_current_contract() {
+        let mut interpreter = get_interpreter(None);
+        interpreter.set_current_epoch(StacksEpochId::Epoch33);
+
+        let contract = ClarityContractBuilder::default()
+            .name("my-contract")
+            .code_source("(define-read-only (gcc) current-contract)".into())
+            .epoch(StacksEpochId::Epoch33)
+            .clarity_version(ClarityVersion::Clarity4)
+            .build();
+        let _ = deploy_contract(&mut interpreter, &contract);
+
+        let result = interpreter.call_contract_fn(
+            &contract
+                .expect_resolved_contract_identifier(Some(&StandardPrincipalData::transient())),
+            "gcc",
+            &[],
+            StacksEpochId::Epoch33,
+            ClarityVersion::Clarity4,
+            false,
+            false,
+            vec![],
+        );
+
+        assert_execution_result_value(
+            result,
+            Value::Principal(PrincipalData::Contract(QualifiedContractIdentifier {
+                issuer: StandardPrincipalData::transient(),
+                name: "my-contract".into(),
+            })),
+        );
+    }
 }
