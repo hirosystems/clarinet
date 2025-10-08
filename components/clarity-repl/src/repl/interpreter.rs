@@ -2002,7 +2002,7 @@ mod tests {
         let src = indoc!(
             r#"(define-read-only (get-time) {
                 previous: (get-stacks-block-info? time (- stacks-block-height u1)),
-                current: block-time,
+                current: stacks-block-time,
             })"#
         );
         let contract = ClarityContractBuilder::default()
