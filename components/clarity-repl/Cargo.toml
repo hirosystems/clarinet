@@ -26,7 +26,7 @@ chrono = { workspace = true }
 colored = { workspace = true }
 regex = { workspace = true }
 reqwest = { workspace = true, features = ["blocking"] }
-schemars = { workspace = true }
+schemars = { workspace = true, optional = true }
 serde = { workspace = true, features = ["derive"] }
 serde_derive = { workspace = true }
 serde_json = { workspace = true, features = ["unbounded_depth"] }
@@ -88,6 +88,7 @@ harness = false
 
 [features]
 default = ["dap"]
+json_schema = ["schemars"]
 dap = [
     "tokio",
     "tokio-util",

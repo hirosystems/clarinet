@@ -31,7 +31,7 @@ wasm-bindgen-futures = { workspace = true }
 web-sys = { workspace = true, features = ["console"] }
 
 [features]
-json_schema = ["schemars"]
+json_schema = ["schemars", "clarity-repl/json_schema"]
 
 [lib]
 name = "clarinet_files"
