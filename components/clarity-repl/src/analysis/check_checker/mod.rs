@@ -10,8 +10,9 @@ use clarity::vm::functions::define::DefineFunctions;
 use clarity::vm::functions::NativeFunctions;
 use clarity::vm::representations::Span;
 use clarity::vm::representations::SymbolicExpressionType::*;
-use clarity::vm::types::TypeSignature;
+use clarity::vm::types::TypeSignatureExt;
 use clarity::vm::{ClarityName, ClarityVersion, SymbolicExpression};
+use clarity_types::types::TypeSignature;
 
 use crate::analysis::annotation::{Annotation, AnnotationKind, WarningKind};
 use crate::analysis::ast_visitor::{traverse, ASTVisitor, TypedVar};

@@ -343,7 +343,9 @@ impl<'a> Aggregator<'a> {
                             | NativeFunctions::FromConsensusBuff
                             | NativeFunctions::ReplaceAt
                             | NativeFunctions::GetStacksBlockInfo
-                            | NativeFunctions::GetTenureInfo => {
+                            | NativeFunctions::GetTenureInfo
+                            | NativeFunctions::ContractHash
+                            | NativeFunctions::ToAscii => {
                                 let inner_content =
                                     self.to_inner_content(list, previous_indentation);
 
