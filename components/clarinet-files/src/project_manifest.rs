@@ -7,6 +7,7 @@ use clarity::vm::ClarityVersion;
 use clarity_repl::repl;
 use clarity_repl::repl::boot::BOOT_CONTRACTS_NAMES;
 use clarity_repl::repl::{ClarityCodeSource, ClarityContract, ContractDeployer};
+#[cfg(feature = "json_schema")]
 use schemars::JsonSchema;
 use serde::ser::SerializeMap;
 use serde::{Deserializer, Serialize, Serializer};
@@ -14,6 +15,7 @@ use serde_json::Value as JsonValue;
 use toml::Value as TomlValue;
 
 use super::FileLocation;
+#[cfg(feature = "json_schema")]
 use crate::schema;
 use crate::FileAccessor;
 
@@ -28,50 +30,52 @@ pub struct ClarityContractMetadata {
     pub epoch: StacksEpochId,
 }
 
-#[derive(Serialize, Deserialize, Debug, JsonSchema)]
-#[schemars(rename_all = "snake_case")]
+#[derive(Serialize, Deserialize, Debug)]
+#[cfg_attr(feature = "json_schema", derive(JsonSchema))]
+#[cfg_attr(feature = "json_schema", schemars(rename_all = "snake_case"))]
 pub struct ProjectConfigFile {
     /// Name of the project
     name: String,
     /// List of project authors
-    #[schemars(skip_serializing_if = "Option::is_none")]
     authors: Option<Vec<String>>,
     /// Project description
-    #[schemars(skip_serializing_if = "Option::is_none")]
     description: Option<String>,
     /// Enable or disable telemetry
     #[serde(default)]
-    #[schemars(skip_serializing_if = "Option::is_none")]
     telemetry: Option<bool>,
     /// External contract dependencies
-    #[schemars(schema_with = "schema::requirements_schema")]
+    #[cfg_attr(
+        feature = "json_schema",
+        schemars(schema_with = "schema::requirements_schema")
+    )]
     requirements: Option<TomlValue>,
     /// List of boot contracts to include
-    #[schemars(skip_serializing_if = "Option::is_none")]
     boot_contracts: Option<Vec<String>>,
     /// Override default boot contract implementations
-    #[schemars(skip_serializing_if = "Option::is_none")]
     override_boot_contracts_source: Option<BTreeMap<String, String>>,
 
     // The fields below have been moved into repl above, but are kept here for
     // backwards compatibility.
-    #[schemars(skip)]
+    #[cfg_attr(feature = "json_schema", schemars(skip))]
     analysis: Option<Vec<clarity_repl::analysis::Pass>>,
     /// Directory for caching build artifacts
     #[serde(default)]
-    #[schemars(skip_serializing_if = "Option::is_none")]
     cache_dir: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug, JsonSchema)]
+#[derive(Serialize, Deserialize, Debug)]
+#[cfg_attr(feature = "json_schema", derive(JsonSchema))]
 pub struct ProjectManifestFile {
     /// Project-level configuration
     project: ProjectConfigFile,
     /// Contract definitions
-    #[schemars(schema_with = "schema::contracts_schema")]
+    #[cfg_attr(
+        feature = "json_schema",
+        schemars(schema_with = "schema::contracts_schema")
+    )]
     contracts: Option<TomlValue>,
     /// REPL and analysis settings
-    #[schemars(schema_with = "schema::repl_schema")]
+    #[cfg_attr(feature = "json_schema", schemars(schema_with = "schema::repl_schema"))]
     repl: Option<repl::SettingsFile>,
 }
 
@@ -206,7 +210,8 @@ impl Serialize for ProjectConfig {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Default, JsonSchema)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Default)]
+#[cfg_attr(feature = "json_schema", derive(JsonSchema))]
 pub struct RequirementConfig {
     /// Contract identifier (e.g., SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.nft-trait)
     pub contract_id: String,

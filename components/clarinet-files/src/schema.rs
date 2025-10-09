@@ -3,6 +3,7 @@ use schemars::{schema_for, JsonSchema};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+#[cfg(feature = "json_schema")]
 use crate::project_manifest::ProjectManifestFile;
 
 /// Generates JSON Schema for Clarinet.toml manifest file.
@@ -12,7 +13,8 @@ pub fn generate_clarinet_manifest_schema() -> Value {
 }
 
 /// Schema definition for contract configuration
-#[derive(Serialize, Deserialize, Debug, Clone, JsonSchema)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[cfg_attr(feature = "json_schema", derive(JsonSchema))]
 pub(crate) struct ContractConfig {
     /// Relative path to the contract file from project root
     path: String,
@@ -21,7 +23,10 @@ pub(crate) struct ContractConfig {
     deployer: Option<String>,
     /// Clarity language version to use
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[schemars(schema_with = "clarity_version_schema")]
+    #[cfg_attr(
+        feature = "json_schema",
+        schemars(schema_with = "clarity_version_schema")
+    )]
     clarity_version: Option<u8>,
     /// Stacks blockchain epoch
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -29,14 +34,15 @@ pub(crate) struct ContractConfig {
 }
 
 /// Epoch can be specified as string or number
-#[derive(Serialize, Deserialize, Debug, Clone, JsonSchema)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[cfg_attr(feature = "json_schema", derive(JsonSchema))]
 #[serde(untagged)]
 pub(crate) enum EpochValue {
     /// String epoch value
-    #[schemars(schema_with = "epoch_string_schema")]
+    #[cfg_attr(feature = "json_schema", schemars(schema_with = "epoch_string_schema"))]
     String(String),
     /// Numeric epoch value
-    #[schemars(schema_with = "epoch_number_schema")]
+    #[cfg_attr(feature = "json_schema", schemars(schema_with = "epoch_number_schema"))]
     Number(f64),
 }
 
@@ -100,15 +106,14 @@ pub(crate) fn repl_schema(gen: &mut schemars::SchemaGenerator) -> schemars::Sche
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::path::PathBuf;
+
+    use super::*;
 
     const SCHEMA_FILENAME: &str = "clarinet-manifest.schema.json";
 
     fn get_schema_path() -> PathBuf {
-        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("schemas")
-            .join(SCHEMA_FILENAME)
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(SCHEMA_FILENAME)
     }
 
     #[test]
