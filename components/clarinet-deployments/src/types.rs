@@ -1380,7 +1380,7 @@ impl TransactionPlanSpecification {
                                     ClarityVersion::Clarity1 => Some(1),
                                     ClarityVersion::Clarity2 => Some(2),
                                     ClarityVersion::Clarity3 => Some(3),
-                                    ClarityVersion::Clarity4 => Some(3),
+                                    ClarityVersion::Clarity4 => Some(4),
                                 },
                             },
                         )
