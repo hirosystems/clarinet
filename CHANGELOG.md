@@ -1,3 +1,9 @@
+# [3.8.1](https://github.com/hirosystems/clarinet/compare/v3.8.0...v3.8.1) (2025-10-10)
+
+##### Chores
+
+- Fix transaction spec contract publish (Clarity 4) (#2020) (8049deab)
+
 # [3.8.0](https://github.com/hirosystems/clarinet/compare/v3.7.0...v3.8.0) (2025-10-09)
 
 ##### New Features
