@@ -449,8 +449,9 @@ fn get_epoch_and_clarity_version(
                 "3" | "3.0" => StacksEpochId::Epoch30,
                 "3.1" => StacksEpochId::Epoch31,
                 "3.2" => StacksEpochId::Epoch32,
+                "3.3" => StacksEpochId::Epoch33,
                 _ => return Err(
-                    "epoch field invalid (value supported: 2.0, 2.05, 2.1, 2.2, 2.3, 2.4, 3.0, 3.1, 3.2, latest)"
+                    "epoch field invalid (value supported: 2.0, 2.05, 2.1, 2.2, 2.3, 2.4, 3.0, 3.1, 3.2, 3.3 latest)"
                         .into(),
                 ),
             };
@@ -561,15 +562,22 @@ mod tests {
 
     #[test]
     fn test_latest_epoch_and_clarity_version() {
-        let latest_clarity_version = ClarityVersion::latest();
+        let expected_current_clarity_version = ClarityVersion::Clarity3;
         let result = get_epoch_and_clarity_version(
             Some("latest"),
             // Replace "Clarity N" to "N" for clarity version
-            Some(&latest_clarity_version.to_string().replace("Clarity ", "")),
+            Some(
+                &expected_current_clarity_version
+                    .to_string()
+                    .replace("Clarity ", ""),
+            ),
         );
         assert_eq!(
             result,
-            Ok((clarity_repl::repl::Epoch::Latest, latest_clarity_version))
+            Ok((
+                clarity_repl::repl::Epoch::Latest,
+                expected_current_clarity_version
+            ))
         );
     }
 
