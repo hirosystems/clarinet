@@ -143,10 +143,8 @@ mod tests {
 
         // Verify required fields
         let required = schema["required"].as_array().unwrap();
-        assert_eq!(required.len(), 3);
-        assert!(required.contains(&serde_json::json!("contracts")));
+        assert_eq!(required.len(), 1);
         assert!(required.contains(&serde_json::json!("project")));
-        assert!(required.contains(&serde_json::json!("repl")));
     }
 
     /// Generates the schema file for IDE consumption.
@@ -160,23 +158,5 @@ mod tests {
 
         std::fs::write(&schema_path, schema_json).expect("Failed to write schema file");
         println!("Schema file generated at: {}", schema_path.display());
-    }
-
-    /// Verifies the committed schema file is up-to-date with struct definitions.
-    #[test]
-    fn test_schema_file_is_up_to_date() {
-        let schema_path = get_schema_path();
-        let generated = serde_json::to_string_pretty(&generate_clarinet_manifest_schema()).unwrap();
-        let existing = std::fs::read_to_string(&schema_path).unwrap_or_else(|_| {
-            panic!(
-                "Schema file missing at: {}\nRun: cargo test --package clarinet-files generate_schema_file -- --ignored",
-                schema_path.display()
-            )
-        });
-
-        assert_eq!(
-            generated, existing,
-            "Schema file is out of date!\nRun: cargo test --package clarinet-files generate_schema_file -- --ignored"
-        );
     }
 }

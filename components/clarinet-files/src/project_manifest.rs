@@ -37,21 +37,26 @@ pub struct ProjectConfigFile {
     /// Name of the project
     name: String,
     /// List of project authors
+    #[serde(default)]
     authors: Option<Vec<String>>,
     /// Project description
+    #[serde(default)]
     description: Option<String>,
     /// Enable or disable telemetry
     #[serde(default)]
     telemetry: Option<bool>,
     /// External contract dependencies
+    #[serde(default)]
     #[cfg_attr(
         feature = "json_schema",
         schemars(schema_with = "schema::requirements_schema")
     )]
     requirements: Option<TomlValue>,
     /// List of boot contracts to include
+    #[serde(default)]
     boot_contracts: Option<Vec<String>>,
     /// Override default boot contract implementations
+    #[serde(default)]
     override_boot_contracts_source: Option<BTreeMap<String, String>>,
 
     // The fields below have been moved into repl above, but are kept here for
@@ -69,12 +74,14 @@ pub struct ProjectManifestFile {
     /// Project-level configuration
     project: ProjectConfigFile,
     /// Contract definitions
+    #[serde(default)]
     #[cfg_attr(
         feature = "json_schema",
         schemars(schema_with = "schema::contracts_schema")
     )]
     contracts: Option<TomlValue>,
     /// REPL and analysis settings
+    #[serde(default)]
     #[cfg_attr(feature = "json_schema", schemars(schema_with = "schema::repl_schema"))]
     repl: Option<repl::SettingsFile>,
 }
