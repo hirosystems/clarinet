@@ -263,9 +263,29 @@ pub struct Session {
     /// written under the name they ran as, so that name cannot be handed out again.
     unsaved_definition_snippets: usize,
 
-    coverage_hook: Option<CoverageHook>,
-    logger_hook: Option<LoggerHook>,
-    perf_hook: Option<PerfHook>,
+    hooks: SessionHooks,
+}
+
+/// The optional hooks a session attaches to every evaluation.
+#[derive(Clone, Default)]
+struct SessionHooks {
+    coverage: Option<CoverageHook>,
+    logger: Option<LoggerHook>,
+    perf: Option<PerfHook>,
+}
+
+impl SessionHooks {
+    /// Borrows only the hooks, so callers can still use the interpreter.
+    fn enabled(&mut self) -> Vec<&mut dyn EvalHook> {
+        [
+            self.coverage.as_mut().map(|hook| hook as &mut dyn EvalHook),
+            self.logger.as_mut().map(|hook| hook as &mut dyn EvalHook),
+            self.perf.as_mut().map(|hook| hook as &mut dyn EvalHook),
+        ]
+        .into_iter()
+        .flatten()
+        .collect()
+    }
 }
 
 impl Session {
@@ -307,30 +327,27 @@ impl Session {
             settings,
             last_contract_call_trace: None,
             unsaved_definition_snippets: 0,
-
-            coverage_hook: None,
-            logger_hook: None,
-            perf_hook: None,
+            hooks: SessionHooks::default(),
         }
     }
 
     pub fn enable_coverage_hook(&mut self) {
-        self.coverage_hook = Some(CoverageHook::new());
+        self.hooks.coverage = Some(CoverageHook::new());
     }
 
     pub fn enable_logger_hook(&mut self) {
         let mode = self.settings.repl_settings.log_print_events;
         if mode != LogPrintEvents::None {
-            self.logger_hook = Some(LoggerHook::new(mode));
+            self.hooks.logger = Some(LoggerHook::new(mode));
         }
     }
 
     pub fn enable_performance(&mut self, cost_field: CostField) {
-        self.perf_hook = Some(PerfHook::new(cost_field));
+        self.hooks.perf = Some(PerfHook::new(cost_field));
     }
 
     pub fn set_test_name(&mut self, name: String) {
-        if let Some(coverage_hook) = &mut self.coverage_hook {
+        if let Some(coverage_hook) = &mut self.hooks.coverage {
             coverage_hook.set_current_test_name(name);
         }
     }
@@ -340,7 +357,7 @@ impl Session {
         asts: &BTreeMap<QualifiedContractIdentifier, ContractAST>,
         contract_paths: &BTreeMap<String, String>,
     ) -> String {
-        if let Some(coverage_hook) = &mut self.coverage_hook {
+        if let Some(coverage_hook) = &mut self.hooks.coverage {
             coverage_hook.collect_lcov_content(asts, contract_paths)
         } else {
             "".to_string()
@@ -758,18 +775,8 @@ impl Session {
                 suggestion: None,
             }]
         })?;
-        let mut hooks: Vec<&mut dyn EvalHook> = vec![];
-        if let Some(hook) = &mut self.coverage_hook {
-            hooks.push(hook);
-        }
-        if let Some(hook) = &mut self.logger_hook {
-            hooks.push(hook);
-        }
-        if let Some(hook) = &mut self.perf_hook {
-            hooks.push(hook);
-        }
         self.interpreter
-            .stx_transfer(amount, recipient, hooks)
+            .stx_transfer(amount, recipient, self.hooks.enabled())
             .map(|execution_result| AnnotatedExecutionResult {
                 execution_result,
                 lint_diagnostics: vec![],
@@ -819,16 +826,7 @@ impl Session {
         let initial_tx_sender = self.get_tx_sender();
         self.set_tx_sender(&contract_id.issuer.to_string());
 
-        let mut hooks: Vec<&mut dyn EvalHook> = vec![];
-        if let Some(ref mut coverage_hook) = self.coverage_hook {
-            hooks.push(coverage_hook);
-        }
-        if let Some(ref mut logger_hook) = self.logger_hook {
-            hooks.push(logger_hook);
-        }
-        if let Some(ref mut perf_hook) = self.perf_hook {
-            hooks.push(perf_hook);
-        }
+        let hooks = self.hooks.enabled();
 
         // Boot contracts bypass this transaction path because they are genesis
         // state and consume no nonce.
@@ -948,15 +946,7 @@ impl Session {
 
         let mut tracer_hook = TracerHook::new();
         let mut hooks: Vec<&mut dyn EvalHook> = vec![&mut tracer_hook];
-        if let Some(ref mut coverage_hook) = self.coverage_hook {
-            hooks.push(coverage_hook);
-        }
-        if let Some(ref mut logger_hook) = self.logger_hook {
-            hooks.push(logger_hook);
-        }
-        if let Some(ref mut perf_hook) = self.perf_hook {
-            hooks.push(perf_hook);
-        }
+        hooks.extend(self.hooks.enabled());
 
         // Taken from the interpreter rather than re-parsed, so the principal
         // charged is exactly the one the call runs as.
@@ -1015,17 +1005,6 @@ impl Session {
         snippet: String,
         cost_track: bool,
     ) -> Result<AnnotatedExecutionResult, Vec<Diagnostic>> {
-        self.eval_with_inclusion(snippet, cost_track, TransactionTerms::default())
-            .map_err(Vec::from)
-    }
-
-    /// Evaluate a snippet while preserving failure inclusion and transaction terms.
-    fn eval_with_inclusion(
-        &mut self,
-        snippet: String,
-        cost_track: bool,
-        terms: TransactionTerms,
-    ) -> Result<AnnotatedExecutionResult, ExecutionError> {
         let current_epoch = self.interpreter.datastore.get_current_epoch();
         let contract = ClarityContract {
             code_source: ClarityCodeSource::ContractInMemory(snippet),
@@ -1038,22 +1017,14 @@ impl Session {
         let contract_identifier =
             contract.expect_resolved_contract_identifier(Some(&self.interpreter.get_tx_sender()));
 
-        let mut hooks: Vec<&mut dyn EvalHook> = vec![];
-        if let Some(ref mut coverage_hook) = self.coverage_hook {
-            hooks.push(coverage_hook);
-        }
-        if let Some(ref mut logger_hook) = self.logger_hook {
-            hooks.push(logger_hook);
-        }
-        if let Some(ref mut perf_hook) = self.perf_hook {
-            hooks.push(perf_hook);
-        }
+        let hooks = self.hooks.enabled();
+        let result = self
+            .interpreter
+            .run(&contract, None, cost_track, Some(hooks));
 
-        let result =
-            self.interpreter
-                .run_with_terms(&contract, None, cost_track, Some(hooks), &terms);
-
-        result.inspect(|result| self.record_snippet_result(contract_identifier, result))
+        result
+            .inspect(|result| self.record_snippet_result(contract_identifier, result))
+            .map_err(Vec::from)
     }
 
     /// Evaluate a Clarity snippet in order to use it as Clarity function arguments
@@ -1781,7 +1752,7 @@ impl Session {
     }
 
     pub fn get_performance_data(&self) -> Option<String> {
-        if let Some(ref perf_hook) = self.perf_hook {
+        if let Some(perf_hook) = &self.hooks.perf {
             perf_hook.get_buffer_data()
         } else {
             None
@@ -1789,7 +1760,7 @@ impl Session {
     }
 
     pub fn clear_performance_buffer(&mut self) {
-        if let Some(ref mut perf_hook) = self.perf_hook {
+        if let Some(perf_hook) = &mut self.hooks.perf {
             perf_hook.clear_buffer();
         }
     }
@@ -3590,7 +3561,7 @@ mod tests {
         let mut session = Session::new_without_boot_contracts(settings);
 
         session.enable_logger_hook();
-        if let Some(hook) = &session.logger_hook {
+        if let Some(hook) = &session.hooks.logger {
             assert_eq!(hook.mode, LogPrintEvents::All);
         } else {
             panic!("logger_hook is None");
