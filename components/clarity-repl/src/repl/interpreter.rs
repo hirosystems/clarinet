@@ -229,6 +229,16 @@ pub enum ContractCallError {
 }
 
 impl ContractCallError {
+    /// What to tell the user, without the variant name `Display` adds.
+    pub fn message(&self) -> &str {
+        match self {
+            ContractCallError::NoSuchContract(message)
+            | ContractCallError::NoSuchFunction(message)
+            | ContractCallError::Uncategorized(message) => message,
+            ContractCallError::PostConditionAborted(reason) => reason,
+        }
+    }
+
     /// Classify the typed error; the formatted message may contain unrelated
     /// nested error names.
     fn from_vm_error(error: &VmExecutionError, message: String) -> Self {
@@ -1144,10 +1154,7 @@ impl ClarityInterpreter {
             },
         )
         .map_err(|failure| ExecutionError {
-            diagnostics: vec![runtime_diagnostic(match failure.error {
-                ContractCallError::PostConditionAborted(reason) => reason.to_string(),
-                error => error.to_string(),
-            })],
+            diagnostics: vec![runtime_diagnostic(failure.error.message())],
             inclusion: failure.inclusion,
         })
     }
@@ -1162,6 +1169,13 @@ impl ClarityInterpreter {
         if recipient == sender {
             return Err(ExecutionError::rejected(vec![runtime_diagnostic(
                 "Invalid TokenTransfer: address tried to send to itself",
+            )]));
+        }
+        // stacks-node rejects this too, but upstream reports every failed
+        // transfer as `InsufficientBalance`; name the real reason.
+        if amount == 0 {
+            return Err(ExecutionError::rejected(vec![runtime_diagnostic(
+                "Invalid TokenTransfer: amount must be positive",
             )]));
         }
         let terms = TransactionTerms {
@@ -1186,7 +1200,15 @@ impl ClarityInterpreter {
                     .map_err(|error| {
                         // stacks-node rejects TokenTransfer execution errors directly;
                         // it does not apply the contract-call inclusion classifier.
-                        ClarityError::BadTransaction(error.to_string())
+                        // With the zero-amount and self-transfer cases ruled out,
+                        // `InsufficientBalance` means exactly that.
+                        let reason = match error {
+                            ClarityError::Interpreter(VmExecutionError::Internal(
+                                VmInternalError::InsufficientBalance,
+                            )) => format!("insufficient unlocked balance to send {amount} uSTX"),
+                            error => error.to_string(),
+                        };
+                        ClarityError::BadTransaction(format!("Invalid TokenTransfer: {reason}"))
                     })?;
                 Ok((
                     EvaluationResult::Snippet(SnippetEvaluationResult { result: value }),
@@ -1195,7 +1217,7 @@ impl ClarityInterpreter {
             },
         )
         .map_err(|failure| ExecutionError {
-            diagnostics: vec![runtime_diagnostic(failure.error.to_string())],
+            diagnostics: vec![runtime_diagnostic(failure.error.message())],
             inclusion: failure.inclusion,
         })
     }
@@ -1245,25 +1267,28 @@ impl ClarityInterpreter {
         let result = if let Some(error) = callback_error {
             Err(rejected(error))
         } else {
-            result.map_err(|error| {
-                let message = format!("Runtime error while interpreting {contract_id}: {error:?}");
-                match error {
-                    ClarityError::Interpreter(error) => {
-                        let message =
-                            format!("Runtime error while interpreting {contract_id}: {error:?}");
-                        ContractCallFailure::from_vm_error(error, message, contract_id, epoch)
-                    }
-                    error => {
-                        let kind = match &error {
-                            ClarityError::AbortedByCallback { reason, .. } => {
-                                ContractCallError::PostConditionAborted(reason.clone())
-                            }
-                            _ => ContractCallError::Uncategorized(message),
-                        };
-                        ContractCallFailure {
-                            error: kind,
-                            inclusion: BlockInclusion::from_runtime_error(error, epoch),
+            result.map_err(|error| match error {
+                ClarityError::Interpreter(error) => {
+                    let message =
+                        format!("Runtime error while interpreting {contract_id}: {error:?}");
+                    ContractCallFailure::from_vm_error(error, message, contract_id, epoch)
+                }
+                error => {
+                    let kind = match &error {
+                        ClarityError::AbortedByCallback { reason, .. } => {
+                            ContractCallError::PostConditionAborted(reason.clone())
                         }
+                        // Already phrased for the user by the payload.
+                        ClarityError::BadTransaction(message) => {
+                            ContractCallError::Uncategorized(message.clone())
+                        }
+                        _ => ContractCallError::Uncategorized(format!(
+                            "Runtime error while interpreting {contract_id}: {error:?}"
+                        )),
+                    };
+                    ContractCallFailure {
+                        error: kind,
+                        inclusion: BlockInclusion::from_runtime_error(error, epoch),
                     }
                 }
             })
@@ -1280,14 +1305,8 @@ impl ClarityInterpreter {
         let (result, mut emitted_events) = match result {
             Ok(result) => result,
             Err(failure) => {
-                let message = match &failure.error {
-                    ContractCallError::PostConditionAborted(reason) => reason.to_string(),
-                    ContractCallError::Uncategorized(message)
-                    | ContractCallError::NoSuchContract(message)
-                    | ContractCallError::NoSuchFunction(message) => message.clone(),
-                };
                 for hook in &mut connection.hooks {
-                    hook.did_complete(Err(message.clone()));
+                    hook.did_complete(Err(failure.error.message().to_string()));
                 }
                 return Err(failure);
             }
