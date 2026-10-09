@@ -26,50 +26,82 @@ pub fn extract_source_range(
     end_line: u32,
     end_column: u32,
 ) -> String {
-    let start_line = u32_to_usize(start_line);
-    let end_line = u32_to_usize(end_line);
-    let start_column = u32_to_usize(start_column);
-    let end_column = u32_to_usize(end_column);
+    SourceLines::new(source).extract_source_range(start_line, start_column, end_line, end_column)
+}
 
-    let lines: Vec<&str> = source.lines().collect();
-    let mut result = String::new();
+pub(crate) struct SourceLines<'a> {
+    pub(crate) lines: Vec<&'a str>,
+}
 
-    for line_idx in start_line..=end_line {
-        if line_idx > lines.len() {
-            break;
-        }
-
-        let line = lines[line_idx - COLUMN_TO_INDEX_OFFSET];
-        let is_first_line = line_idx == start_line;
-        let is_last_line = line_idx == end_line;
-
-        if is_first_line && is_last_line {
-            let start_col = start_column.saturating_sub(COLUMN_TO_INDEX_OFFSET);
-            let end_col = end_column.min(line.len());
-            if start_col < end_col {
-                result.push_str(&line[start_col..end_col]);
-            }
-        } else if is_first_line {
-            let start_col = start_column.saturating_sub(COLUMN_TO_INDEX_OFFSET);
-            if start_col < line.len() {
-                result.push_str(&line[start_col..]);
-            }
-            if !is_last_line {
-                result.push('\n');
-            }
-        } else if is_last_line {
-            let end_col = end_column.min(line.len());
-            if end_col > 0 {
-                result.push_str(&line[..end_col]);
-            }
-        } else {
-            // Middle lines
-            result.push_str(line);
-            result.push('\n');
+impl<'a> SourceLines<'a> {
+    pub(crate) fn new(source: &'a str) -> Self {
+        Self {
+            lines: source.lines().collect(),
         }
     }
 
-    result
+    pub(crate) fn extract_expr_source(&self, expr: &PreSymbolicExpression) -> String {
+        let span = expr.span();
+        self.extract_source_range(
+            span.start_line,
+            span.start_column,
+            span.end_line,
+            span.end_column,
+        )
+    }
+
+    pub(crate) fn extract_source_range(
+        &self,
+        start_line: u32,
+        start_column: u32,
+        end_line: u32,
+        end_column: u32,
+    ) -> String {
+        let start_line = u32_to_usize(start_line);
+        let end_line = u32_to_usize(end_line);
+        let start_column = u32_to_usize(start_column);
+        let end_column = u32_to_usize(end_column);
+
+        let lines = &self.lines;
+        let mut result = String::new();
+
+        for line_idx in start_line..=end_line {
+            if line_idx > lines.len() {
+                break;
+            }
+
+            let line = lines[line_idx - COLUMN_TO_INDEX_OFFSET];
+            let is_first_line = line_idx == start_line;
+            let is_last_line = line_idx == end_line;
+
+            if is_first_line && is_last_line {
+                let start_col = start_column.saturating_sub(COLUMN_TO_INDEX_OFFSET);
+                let end_col = end_column.min(line.len());
+                if start_col < end_col {
+                    result.push_str(&line[start_col..end_col]);
+                }
+            } else if is_first_line {
+                let start_col = start_column.saturating_sub(COLUMN_TO_INDEX_OFFSET);
+                if start_col < line.len() {
+                    result.push_str(&line[start_col..]);
+                }
+                if !is_last_line {
+                    result.push('\n');
+                }
+            } else if is_last_line {
+                let end_col = end_column.min(line.len());
+                if end_col > 0 {
+                    result.push_str(&line[..end_col]);
+                }
+            } else {
+                // Middle lines
+                result.push_str(line);
+                result.push('\n');
+            }
+        }
+
+        result
+    }
 }
 
 pub fn ignored_exprs(exprs: &[PreSymbolicExpression], source: &str) -> String {

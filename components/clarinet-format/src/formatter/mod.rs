@@ -1,7 +1,7 @@
 pub mod helpers;
 pub mod ignored;
 
-use std::cell::RefCell;
+use std::cell::{OnceCell, RefCell};
 use std::collections::HashMap;
 use std::iter::Peekable;
 use std::{fmt, slice};
@@ -13,7 +13,7 @@ use clarity::vm::functions::define::DefineFunctions;
 use clarity::vm::functions::NativeFunctions;
 use clarity::vm::representations::{PreSymbolicExpression, PreSymbolicExpressionType};
 use helpers::t;
-use ignored::{extract_expr_source, extract_source_range, ignored_exprs};
+use ignored::{ignored_exprs, SourceLines};
 
 pub enum Indentation {
     Space(usize),
@@ -127,6 +127,7 @@ pub struct Aggregator<'a> {
     settings: &'a Settings,
     pse: &'a [PreSymbolicExpression],
     source: Option<&'a str>,
+    source_lines: OnceCell<SourceLines<'a>>,
     indentation_str: String,
 
     cache: RefCell<HashMap<(usize, String), String>>,
@@ -144,6 +145,7 @@ impl<'a> Aggregator<'a> {
             settings,
             pse,
             source,
+            source_lines: OnceCell::new(),
             indentation_str,
             cache: RefCell::new(HashMap::new()),
             ignored_exprs: RefCell::new(HashMap::new()),
@@ -181,8 +183,13 @@ impl<'a> Aggregator<'a> {
         formatted
     }
 
+    fn source_lines(&self) -> &SourceLines<'a> {
+        self.source_lines
+            .get_or_init(|| SourceLines::new(self.source.unwrap_or_default()))
+    }
+
     // when format_source_exprs is called on one of these cached expressions the source will be returned as is
-    fn cache_ignored_expression(&self, next_expr: &PreSymbolicExpression, source: &str) {
+    fn cache_ignored_expression(&self, next_expr: &PreSymbolicExpression) {
         let next_expr_span = next_expr.span();
         let next_expr_key = (
             next_expr_span.start_line,
@@ -191,7 +198,7 @@ impl<'a> Aggregator<'a> {
             next_expr_span.end_column,
         );
 
-        let lines: Vec<&str> = source.lines().collect();
+        let lines = &self.source_lines().lines;
         let end_line_usize = usize::try_from(next_expr_span.end_line).unwrap_or(0);
         let end_col = if end_line_usize > 0 && end_line_usize <= lines.len() {
             (lines[end_line_usize - 1].len() + 1) as u32
@@ -199,8 +206,7 @@ impl<'a> Aggregator<'a> {
             next_expr_span.end_column
         };
 
-        let next_expr_extracted = extract_source_range(
-            source,
+        let next_expr_extracted = self.source_lines().extract_source_range(
             next_expr_span.start_line,
             next_expr_span.start_column,
             next_expr_span.end_line,
@@ -242,11 +248,11 @@ impl<'a> Aggregator<'a> {
         }
 
         // if we couldn't extract the source, exit
-        let Some(src) = source else {
+        if source.is_none() {
             return;
-        };
+        }
 
-        self.cache_ignored_expression(next, src);
+        self.cache_ignored_expression(next);
     }
 
     fn format_source_exprs(
@@ -299,14 +305,14 @@ impl<'a> Aggregator<'a> {
             let should_ignore = is_comment(expr) && cur.contains(FORMAT_IGNORE_SYNTAX);
 
             if should_ignore {
-                if let Some(source) = self.source {
+                if self.source.is_some() {
                     if let Some(next) = iter.peek() {
                         if next.match_list().is_some() {
                             let next_expr = iter.next().unwrap();
 
                             let end_line = next_expr.span().end_line;
 
-                            let lines: Vec<&str> = source.lines().collect();
+                            let lines = &self.source_lines().lines;
                             let end_line_usize = usize::try_from(end_line).unwrap_or(0);
                             let end_col = if end_line_usize > 0 && end_line_usize <= lines.len() {
                                 (lines[end_line_usize - 1].len() + 1) as u32
@@ -315,8 +321,7 @@ impl<'a> Aggregator<'a> {
                             };
 
                             // Extract the comment and expression together for output
-                            let extracted = extract_source_range(
-                                source,
+                            let extracted = self.source_lines().extract_source_range(
                                 expr.span().start_line,
                                 expr.span().start_column,
                                 end_line,
@@ -326,7 +331,7 @@ impl<'a> Aggregator<'a> {
                             // cache the next expression so that when format_source_exprs is called on it
                             // (by format_begin or other format functions), we return the original source
                             // instead of formatting it
-                            self.cache_ignored_expression(next_expr, source);
+                            self.cache_ignored_expression(next_expr);
 
                             result.push_str(&extracted);
 
@@ -339,11 +344,11 @@ impl<'a> Aggregator<'a> {
                             prev_end_line = next_expr.span().end_line;
                         } else {
                             // Next expression is not a list, just extract the comment
-                            result.push_str(&extract_expr_source(expr, source));
+                            result.push_str(&self.source_lines().extract_expr_source(expr));
                         }
                     } else {
                         // No next expression, just extract the comment
-                        result.push_str(&extract_expr_source(expr, source));
+                        result.push_str(&self.source_lines().extract_expr_source(expr));
                     }
                 } else {
                     // Fallback if no source available
@@ -1248,7 +1253,7 @@ impl<'a> Aggregator<'a> {
     fn maybe_wrap_item(
         &self,
         item: &PreSymbolicExpression,
-        iter: &mut Peekable<slice::Iter<'a, PreSymbolicExpression>>,
+        iter: &mut Peekable<slice::Iter<'_, PreSymbolicExpression>>,
         acc: &mut String,
         space: &str,
     ) {
@@ -1601,7 +1606,7 @@ impl<'a> Aggregator<'a> {
                         clarity::vm::types::CharType::UTF8(_) => {
                             // utf8 strings use the original source to preserve formatting
                             self.source
-                                .map(|source| extract_expr_source(pse, source))
+                                .map(|_| self.source_lines().extract_expr_source(pse))
                                 .filter(|extracted| !extracted.is_empty())
                                 .unwrap_or_else(|| value.to_string())
                         }
