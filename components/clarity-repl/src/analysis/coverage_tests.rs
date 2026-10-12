@@ -1103,3 +1103,119 @@ fn syntax_lines_do_not_mask_skipped_values() {
     );
     assert_eq!(cov, expect);
 }
+
+#[test]
+fn syntax_lines_follow_argument_evaluation() {
+    let bounded = indoc! {"
+        (define-read-only (run (x (optional (list 10 uint))))
+          (as-max-len?
+            (unwrap! x none)
+            u5))
+    "};
+    let owner = indoc! {"
+        (define-public (run (x (optional principal)))
+          (restrict-assets?
+            (unwrap! x (err u7))
+            ((with-pox)
+             (with-stx
+               u0))
+            u1))
+    "};
+    let nested = indoc! {"
+        (define-read-only (run (x (optional (list 10 uint))))
+          (as-max-len?
+            (unwrap! (as-max-len? (unwrap! x none)
+              u5) none)
+            u3))
+    "};
+    let unsafe_body = indoc! {"
+        (define-public (run (x (optional uint)))
+          (as-contract? (
+            (with-all-assets-unsafe))
+            (unwrap! x (err u8))))
+    "};
+    let allowances = |call| {
+        format!(
+            indoc! {"
+                (define-public (run (x (optional uint)) (y (optional uint)))
+                  ({call} (
+                    (with-stx
+                      (unwrap! x (err u7)))
+                    (with-pox)
+                    (with-staking
+                      u0))
+                    (unwrap! y (err u8))))
+            "},
+            call = call
+        )
+    };
+    let restricted = allowances("restrict-assets? tx-sender");
+    let owned = allowances("as-contract?");
+
+    for (source, inputs, expected_lines) in [
+        (bounded, vec!["none"], vec![(4, 0)]),
+        (
+            bounded,
+            vec!["none", "(some (list u1))", "(some (list u1))"],
+            vec![(4, 2)],
+        ),
+        (owner, vec!["none"], vec![(4, 0), (5, 0), (6, 0)]),
+        (
+            owner,
+            vec!["(some tx-sender)"],
+            vec![(4, 1), (5, 1), (6, 1)],
+        ),
+        (nested, vec!["none"], vec![(4, 0), (5, 0)]),
+        (
+            nested,
+            vec![
+                "none",
+                "(some (list u1 u2 u3 u4 u5 u6))",
+                "(some (list u1))",
+            ],
+            vec![(4, 2), (5, 1)],
+        ),
+        (unsafe_body, vec!["none"], vec![(3, 1)]),
+        (
+            &restricted,
+            vec!["none none"],
+            vec![(3, 1), (5, 0), (6, 0), (7, 0)],
+        ),
+        (
+            &owned,
+            vec!["none none"],
+            vec![(3, 1), (5, 0), (6, 0), (7, 0)],
+        ),
+        (
+            &restricted,
+            vec!["none none", "(some u0) none", "(some u0) (some u1)"],
+            vec![(3, 3), (5, 2), (6, 2), (7, 2), (8, 2)],
+        ),
+        (
+            &owned,
+            vec!["none none", "(some u0) none", "(some u0) (some u1)"],
+            vec![(3, 3), (5, 2), (6, 2), (7, 2), (8, 2)],
+        ),
+    ] {
+        let mut session = Session::new(SessionSettings::default());
+        session.update_epoch(clarinet_defaults::DEFAULT_EPOCH);
+        session.enable_coverage_hook();
+        session.set_test_name("syntax-order".into());
+        session.eval(source.into(), false).unwrap();
+        for input in inputs {
+            session
+                .eval(format!("(contract-call? .contract-0 run {input})"), false)
+                .unwrap();
+        }
+        let (contract_id, contract) = session.contracts.pop_first().unwrap();
+        let asts = BTreeMap::from([(contract_id.clone(), contract.ast)]);
+        let paths = BTreeMap::from([(contract_id.name.to_string(), "/contract-0.clar".into())]);
+        let coverage = session.collect_lcov_content(&asts, &paths);
+        for (line, hits) in expected_lines {
+            let prefix = format!("DA:{line},");
+            let actual = coverage.lines().find(|row| row.starts_with(&prefix));
+            let expected = format!("{prefix}{hits}");
+            assert_eq!(actual, Some(expected.as_str()), "{source}\n{coverage}");
+        }
+    }
+}

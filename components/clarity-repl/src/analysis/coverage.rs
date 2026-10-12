@@ -254,11 +254,23 @@ impl EvalHook for CoverageHook {
     fn did_finish_eval<'a>(
         &mut self,
         _env: &mut clarity::vm::contexts::ExecutionState,
-        _invoke_ctx: &'a clarity::vm::contexts::InvocationContext,
+        invoke_ctx: &'a clarity::vm::contexts::InvocationContext,
         _context: &'a clarity::vm::LocalContext,
-        _expr: &SymbolicExpression,
-        _res: &Result<clarity::vm::ValueRef<'a>, VmExecutionError>,
+        expr: &SymbolicExpression,
+        res: &Result<clarity::vm::ValueRef<'a>, VmExecutionError>,
     ) {
+        if res.is_err() {
+            return;
+        }
+        let Some((NativeFunctions::AsMaxLen, [_, length])) =
+            expr.match_list().and_then(try_parse_native_func)
+        else {
+            return;
+        };
+        let contract = &invoke_ctx.contract_context.contract_identifier;
+        if let Some(report) = self.contracts_coverage.get_mut(contract) {
+            report_syntax(report, length);
+        }
     }
 
     fn did_complete(&mut self, _result: Result<&mut clarity::vm::ExecutionResult, String>) {
@@ -409,6 +421,34 @@ fn retrieve_executable_lines_and_branches(
                                 }
                             }
                         }
+                        NativeFunctions::AsContractSafe | NativeFunctions::RestrictAssets => {
+                            let (allowances, body) = match func {
+                                NativeFunctions::AsContractSafe => (args.first(), args.get(1)),
+                                _ => (args.get(1), args.get(2)),
+                            };
+                            let Some(mut next_value) = body else {
+                                continue;
+                            };
+                            // Names follow their first argument; zero-argument allowances
+                            // follow the next allowance argument or body expression.
+                            for allowance in allowances
+                                .and_then(SymbolicExpression::match_list)
+                                .unwrap_or_default()
+                                .iter()
+                                .rev()
+                            {
+                                let Some((name, values)) =
+                                    allowance.match_list().and_then(|list| list.split_first())
+                                else {
+                                    continue;
+                                };
+                                next_value = values.first().unwrap_or(next_value);
+                                lines
+                                    .entry(name.span.start_line)
+                                    .or_default()
+                                    .push(extract_expr_from_list(next_value).id);
+                            }
+                        }
                         _ => {}
                     };
                 };
@@ -444,10 +484,7 @@ fn report_eval(expr_coverage: &mut ExprCoverage, expr: &SymbolicExpression) {
         report_eval(expr_coverage, func_expr);
     }
     if let Some((func, args)) = try_parse_native_func(children) {
-        for arg in syntax_args(func, args)
-            .iter()
-            .chain(allowance_names(func, args))
-        {
+        for arg in syntax_args(func, args) {
             report_syntax(expr_coverage, arg);
         }
     }
@@ -468,7 +505,6 @@ fn syntax_args(func: NativeFunctions, args: &[SymbolicExpression]) -> &[Symbolic
     use NativeFunctions::*;
     let range = match func {
         ContractCall => 0..2,
-        AsMaxLen => 1..2,
         Fold | Map | Filter | FromConsensusBuff | TupleGet | ContractOf | FetchVar | SetVar
         | FetchEntry | SetEntry | InsertEntry | DeleteEntry | GetTokenBalance | GetAssetOwner
         | TransferToken | TransferAsset | MintAsset | MintToken | GetTokenSupply | BurnToken
@@ -478,29 +514,11 @@ fn syntax_args(func: NativeFunctions, args: &[SymbolicExpression]) -> &[Symbolic
     args.get(range).unwrap_or_default()
 }
 
-/// `as-contract?` and `restrict-assets?` look up each allowance by name and
-/// only evaluate its arguments.
-fn allowance_names(
-    func: NativeFunctions,
-    args: &[SymbolicExpression],
-) -> impl Iterator<Item = &SymbolicExpression> {
-    let allowances = match func {
-        NativeFunctions::AsContractSafe => args.first(),
-        NativeFunctions::RestrictAssets => args.get(1),
-        _ => None,
-    };
-    allowances
-        .and_then(SymbolicExpression::match_list)
-        .unwrap_or_default()
-        .iter()
-        .filter_map(|allowance| allowance.match_list()?.first())
-}
-
 // because list expressions are not considered as evaluated
 // this helpers returns evaluatable expr from list
-fn extract_expr_from_list(expr: &SymbolicExpression) -> SymbolicExpression {
+fn extract_expr_from_list(expr: &SymbolicExpression) -> &SymbolicExpression {
     if let Some(first) = expr.match_list().and_then(|l| l.first()) {
         return extract_expr_from_list(first);
     }
-    expr.to_owned()
+    expr
 }
