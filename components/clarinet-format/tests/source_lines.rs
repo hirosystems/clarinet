@@ -3,6 +3,7 @@ use clarinet_format::formatter::ignored::extract_source_range;
 use clarinet_format::formatter::{Aggregator, ClarityFormatter, Settings};
 use clarity::vm::ast::parser::v2::parse;
 use clarity::vm::ast::stack_depth_checker::StackDepthLimits;
+use clarity::vm::representations::Span;
 
 #[test]
 fn source_range_boundaries() {
@@ -18,12 +19,31 @@ fn source_range_boundaries() {
         ] {
             let (start_line, start_column, end_line, end_column) = range;
             assert_eq!(
-                extract_source_range(&source, start_line, start_column, end_line, end_column),
+                extract_source_range(
+                    &source,
+                    &Span {
+                        start_line,
+                        start_column,
+                        end_line,
+                        end_column
+                    },
+                ),
                 expected
             );
         }
     }
-    assert_eq!(extract_source_range("", 1, 1, 1, 1), "");
+    assert_eq!(
+        extract_source_range(
+            "",
+            &Span {
+                start_line: 1,
+                start_column: 1,
+                end_line: 1,
+                end_column: 1
+            }
+        ),
+        ""
+    );
 }
 
 #[test]

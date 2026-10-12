@@ -11,7 +11,7 @@ use clarity::types::StacksEpochId;
 use clarity::vm::ast::stack_depth_checker::StackDepthLimits;
 use clarity::vm::functions::define::DefineFunctions;
 use clarity::vm::functions::NativeFunctions;
-use clarity::vm::representations::{PreSymbolicExpression, PreSymbolicExpressionType};
+use clarity::vm::representations::{PreSymbolicExpression, PreSymbolicExpressionType, Span};
 use helpers::t;
 use ignored::{ignored_exprs, SourceLines};
 
@@ -206,12 +206,10 @@ impl<'a> Aggregator<'a> {
             next_expr_span.end_column
         };
 
-        let next_expr_extracted = self.source_lines().extract_source_range(
-            next_expr_span.start_line,
-            next_expr_span.start_column,
-            next_expr_span.end_line,
-            end_col,
-        );
+        let next_expr_extracted = self.source_lines().extract_source_range(&Span {
+            end_column: end_col,
+            ..next_expr_span.clone()
+        });
 
         self.ignored_exprs
             .borrow_mut()
@@ -321,12 +319,12 @@ impl<'a> Aggregator<'a> {
                             };
 
                             // Extract the comment and expression together for output
-                            let extracted = self.source_lines().extract_source_range(
-                                expr.span().start_line,
-                                expr.span().start_column,
+                            let extracted = self.source_lines().extract_source_range(&Span {
+                                start_line: expr.span().start_line,
+                                start_column: expr.span().start_column,
                                 end_line,
-                                end_col,
-                            );
+                                end_column: end_col,
+                            });
 
                             // cache the next expression so that when format_source_exprs is called on it
                             // (by format_begin or other format functions), we return the original source
