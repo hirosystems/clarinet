@@ -7,26 +7,19 @@ fn u32_to_usize(val: u32) -> usize {
 /// spans use 1-based index, this const is largely only for this comment
 const COLUMN_TO_INDEX_OFFSET: usize = 1;
 
-/// Extract the original source text using its span
-pub fn extract_expr_source(expr: &PreSymbolicExpression, source: &str) -> String {
-    extract_source_range(source, expr.span())
-}
-
-pub fn extract_source_range(source: &str, span: &Span) -> String {
-    SourceLines::new(source).extract_source_range(span)
-}
-
-pub(crate) struct SourceLines<'a> {
+/// Source split into lines once, so extracting many spans doesn't rescan the source
+pub struct SourceLines<'a> {
     lines: Vec<&'a str>,
 }
 
 impl<'a> SourceLines<'a> {
-    pub(crate) fn new(source: &'a str) -> Self {
+    pub fn new(source: &'a str) -> Self {
         Self {
             lines: source.lines().collect(),
         }
     }
 
+    /// Extract the original source text using its span
     pub(crate) fn extract_expr_source(&self, expr: &PreSymbolicExpression) -> String {
         self.extract_source_range(expr.span())
     }
@@ -43,7 +36,7 @@ impl<'a> SourceLines<'a> {
         })
     }
 
-    pub(crate) fn extract_source_range(&self, span: &Span) -> String {
+    pub fn extract_source_range(&self, span: &Span) -> String {
         let start_line = u32_to_usize(span.start_line);
         let end_line = u32_to_usize(span.end_line);
         let start_column = u32_to_usize(span.start_column);
@@ -86,13 +79,10 @@ impl<'a> SourceLines<'a> {
 pub fn ignored_exprs(exprs: &[PreSymbolicExpression], source: &str) -> String {
     let start = exprs.first().unwrap().span();
     let end = exprs.last().unwrap().span();
-    extract_source_range(
-        source,
-        &Span {
-            start_line: start.start_line,
-            start_column: start.start_column,
-            end_line: end.end_line,
-            end_column: end.end_column,
-        },
-    )
+    SourceLines::new(source).extract_source_range(&Span {
+        start_line: start.start_line,
+        start_column: start.start_column,
+        end_line: end.end_line,
+        end_column: end.end_column,
+    })
 }
