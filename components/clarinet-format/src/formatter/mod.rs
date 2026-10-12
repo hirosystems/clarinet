@@ -131,7 +131,7 @@ pub struct Aggregator<'a> {
     indentation_str: String,
 
     cache: RefCell<HashMap<(usize, String), String>>,
-    ignored_exprs: RefCell<HashMap<(u32, u32, u32, u32), String>>, // Cache for ignored expressions by span
+    ignored_exprs: RefCell<HashMap<Span, String>>,
 }
 
 impl<'a> Aggregator<'a> {
@@ -190,30 +190,9 @@ impl<'a> Aggregator<'a> {
 
     // when format_source_exprs is called on one of these cached expressions the source will be returned as is
     fn cache_ignored_expression(&self, next_expr: &PreSymbolicExpression) {
-        let next_expr_span = next_expr.span();
-        let next_expr_key = (
-            next_expr_span.start_line,
-            next_expr_span.start_column,
-            next_expr_span.end_line,
-            next_expr_span.end_column,
-        );
-
-        let lines = &self.source_lines().lines;
-        let end_line_usize = usize::try_from(next_expr_span.end_line).unwrap_or(0);
-        let end_col = if end_line_usize > 0 && end_line_usize <= lines.len() {
-            (lines[end_line_usize - 1].len() + 1) as u32
-        } else {
-            next_expr_span.end_column
-        };
-
-        let next_expr_extracted = self.source_lines().extract_source_range(&Span {
-            end_column: end_col,
-            ..next_expr_span.clone()
-        });
-
-        self.ignored_exprs
-            .borrow_mut()
-            .insert(next_expr_key, next_expr_extracted);
+        let span = next_expr.span();
+        let source = self.source_lines().extract_through_line_end(span);
+        self.ignored_exprs.borrow_mut().insert(span.clone(), source);
     }
 
     /// Check if an expression is a comment with @format-ignore and cache the next expression if so.
@@ -259,17 +238,9 @@ impl<'a> Aggregator<'a> {
         previous_indentation: &str,
     ) -> String {
         // if this expression was marked as ignored, return the cached source
-        if expressions.len() == 1 {
-            let expr = &expressions[0];
-            let span_key = (
-                expr.span().start_line,
-                expr.span().start_column,
-                expr.span().end_line,
-                expr.span().end_column,
-            );
-            let ignored_cache_ref = self.ignored_exprs.borrow();
-            if let Some(ignored_source) = ignored_cache_ref.get(&span_key) {
-                return ignored_source.clone();
+        if let [expr] = expressions {
+            if let Some(source) = self.ignored_exprs.borrow().get(expr.span()) {
+                return source.clone();
             }
         }
 
@@ -308,22 +279,11 @@ impl<'a> Aggregator<'a> {
                         if next.match_list().is_some() {
                             let next_expr = iter.next().unwrap();
 
-                            let end_line = next_expr.span().end_line;
-
-                            let lines = &self.source_lines().lines;
-                            let end_line_usize = usize::try_from(end_line).unwrap_or(0);
-                            let end_col = if end_line_usize > 0 && end_line_usize <= lines.len() {
-                                (lines[end_line_usize - 1].len() + 1) as u32
-                            } else {
-                                next_expr.span().end_column
-                            };
-
-                            // Extract the comment and expression together for output
-                            let extracted = self.source_lines().extract_source_range(&Span {
+                            // Include the directive and any trailing comment on the expression.
+                            let extracted = self.source_lines().extract_through_line_end(&Span {
                                 start_line: expr.span().start_line,
                                 start_column: expr.span().start_column,
-                                end_line,
-                                end_column: end_col,
+                                ..next_expr.span().clone()
                             });
 
                             // cache the next expression so that when format_source_exprs is called on it

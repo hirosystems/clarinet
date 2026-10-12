@@ -17,7 +17,7 @@ pub fn extract_source_range(source: &str, span: &Span) -> String {
 }
 
 pub(crate) struct SourceLines<'a> {
-    pub(crate) lines: Vec<&'a str>,
+    lines: Vec<&'a str>,
 }
 
 impl<'a> SourceLines<'a> {
@@ -29,6 +29,18 @@ impl<'a> SourceLines<'a> {
 
     pub(crate) fn extract_expr_source(&self, expr: &PreSymbolicExpression) -> String {
         self.extract_source_range(expr.span())
+    }
+
+    pub(crate) fn extract_through_line_end(&self, span: &Span) -> String {
+        let end_column = usize::try_from(span.end_line)
+            .ok()
+            .and_then(|line| line.checked_sub(1))
+            .and_then(|index| self.lines.get(index))
+            .map_or(span.end_column, |line| (line.len() + 1) as u32);
+        self.extract_source_range(&Span {
+            end_column,
+            ..span.clone()
+        })
     }
 
     pub(crate) fn extract_source_range(&self, span: &Span) -> String {
@@ -49,28 +61,20 @@ impl<'a> SourceLines<'a> {
             let is_first_line = line_idx == start_line;
             let is_last_line = line_idx == end_line;
 
-            if is_first_line && is_last_line {
-                let start_col = start_column.saturating_sub(COLUMN_TO_INDEX_OFFSET);
-                let end_col = end_column.min(line.len());
-                if start_col < end_col {
-                    result.push_str(&line[start_col..end_col]);
-                }
-            } else if is_first_line {
-                let start_col = start_column.saturating_sub(COLUMN_TO_INDEX_OFFSET);
-                if start_col < line.len() {
-                    result.push_str(&line[start_col..]);
-                }
-                if !is_last_line {
-                    result.push('\n');
-                }
-            } else if is_last_line {
-                let end_col = end_column.min(line.len());
-                if end_col > 0 {
-                    result.push_str(&line[..end_col]);
-                }
+            let start_col = if is_first_line {
+                start_column.saturating_sub(COLUMN_TO_INDEX_OFFSET)
             } else {
-                // Middle lines
-                result.push_str(line);
+                0
+            };
+            let end_col = if is_last_line {
+                end_column.min(line.len())
+            } else {
+                line.len()
+            };
+            if start_col < end_col {
+                result.push_str(&line[start_col..end_col]);
+            }
+            if !is_last_line {
                 result.push('\n');
             }
         }
