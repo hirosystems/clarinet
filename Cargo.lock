@@ -829,18 +829,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "clarity-events"
-version = "3.24.1"
-dependencies = [
- "clap",
- "clarinet-files",
- "clarity",
- "clarity-repl",
- "serde",
- "serde_json",
-]
-
-[[package]]
 name = "clarity-lsp"
 version = "3.24.1"
 dependencies = [
