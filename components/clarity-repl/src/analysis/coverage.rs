@@ -254,11 +254,23 @@ impl EvalHook for CoverageHook {
     fn did_finish_eval<'a>(
         &mut self,
         _env: &mut clarity::vm::contexts::ExecutionState,
-        _invoke_ctx: &'a clarity::vm::contexts::InvocationContext,
+        invoke_ctx: &'a clarity::vm::contexts::InvocationContext,
         _context: &'a clarity::vm::LocalContext,
-        _expr: &SymbolicExpression,
-        _res: &Result<clarity::vm::ValueRef<'a>, VmExecutionError>,
+        expr: &SymbolicExpression,
+        res: &Result<clarity::vm::ValueRef<'a>, VmExecutionError>,
     ) {
+        if res.is_err() {
+            return;
+        }
+        let Some((NativeFunctions::AsMaxLen, [_, length])) =
+            expr.match_list().and_then(try_parse_native_func)
+        else {
+            return;
+        };
+        let contract = &invoke_ctx.contract_context.contract_identifier;
+        if let Some(report) = self.contracts_coverage.get_mut(contract) {
+            report_syntax(report, length);
+        }
     }
 
     fn did_complete(&mut self, _result: Result<&mut clarity::vm::ExecutionResult, String>) {
@@ -391,6 +403,52 @@ fn retrieve_executable_lines_and_branches(
                             }
                             continue;
                         }
+                        NativeFunctions::Let | NativeFunctions::TupleCons => {
+                            // names are never evaluated: their line runs when their value does
+                            let pairs = match func {
+                                NativeFunctions::Let => args
+                                    .first()
+                                    .and_then(|bindings| bindings.match_list())
+                                    .unwrap_or_default(),
+                                _ => args,
+                            };
+                            for pair in pairs {
+                                if let Some([name, value]) = pair.match_list() {
+                                    lines
+                                        .entry(name.span.start_line)
+                                        .or_default()
+                                        .push(extract_expr_from_list(value).id);
+                                }
+                            }
+                        }
+                        NativeFunctions::AsContractSafe | NativeFunctions::RestrictAssets => {
+                            let (allowances, body) = match func {
+                                NativeFunctions::AsContractSafe => (args.first(), args.get(1)),
+                                _ => (args.get(1), args.get(2)),
+                            };
+                            let Some(mut next_value) = body else {
+                                continue;
+                            };
+                            // Names follow their first argument; zero-argument allowances
+                            // follow the next allowance argument or body expression.
+                            for allowance in allowances
+                                .and_then(SymbolicExpression::match_list)
+                                .unwrap_or_default()
+                                .iter()
+                                .rev()
+                            {
+                                let Some((name, values)) =
+                                    allowance.match_list().and_then(|list| list.split_first())
+                                else {
+                                    continue;
+                                };
+                                next_value = values.first().unwrap_or(next_value);
+                                lines
+                                    .entry(name.span.start_line)
+                                    .or_default()
+                                    .push(extract_expr_from_list(next_value).id);
+                            }
+                        }
                         _ => {}
                     };
                 };
@@ -398,12 +456,10 @@ fn retrieve_executable_lines_and_branches(
                 // don't count list expressions as a whole, just their children
                 frontier.extend(children);
             } else {
-                let line = cur_expr.span.start_line;
-                if let Some(line) = lines.get_mut(&line) {
-                    line.push(cur_expr.id);
-                } else {
-                    lines.insert(line, vec![cur_expr.id]);
-                }
+                lines
+                    .entry(cur_expr.span.start_line)
+                    .or_default()
+                    .push(cur_expr.id);
             }
         }
     }
@@ -420,38 +476,49 @@ fn try_parse_native_func(
 }
 
 fn report_eval(expr_coverage: &mut ExprCoverage, expr: &SymbolicExpression) {
-    if let Some(children) = expr.match_list() {
-        if let Some((func, args)) = try_parse_native_func(children) {
-            // All native function calls recurse on the function name expression
-            // to ensure it gets recorded in coverage
-            if let Some(func_expr) = children.first() {
-                report_eval(expr_coverage, func_expr);
-            }
-
-            match func {
-                NativeFunctions::Fold | NativeFunctions::Map | NativeFunctions::Filter => {
-                    if let Some(iterator_func) = args.first() {
-                        report_eval(expr_coverage, iterator_func);
-                    }
-                }
-                _ => {}
-            }
-            return;
-        }
-        if let Some(func_expr) = children.first() {
-            report_eval(expr_coverage, func_expr);
-        }
+    let Some(children) = expr.match_list() else {
+        *expr_coverage.entry(expr.id).or_default() += 1;
         return;
+    };
+    if let Some(func_expr) = children.first() {
+        report_eval(expr_coverage, func_expr);
     }
-    let count = expr_coverage.entry(expr.id).or_insert(0);
-    *count += 1;
+    if let Some((func, args)) = try_parse_native_func(children) {
+        for arg in syntax_args(func, args) {
+            report_syntax(expr_coverage, arg);
+        }
+    }
+}
+
+fn report_syntax(expr_coverage: &mut ExprCoverage, expr: &SymbolicExpression) {
+    match expr.match_list() {
+        Some(children) => children
+            .iter()
+            .for_each(|child| report_syntax(expr_coverage, child)),
+        None => *expr_coverage.entry(expr.id).or_default() += 1,
+    }
+}
+
+/// Arguments the VM reads as names or types instead of evaluating them. The
+/// eval hook never fires on them, so they are counted along with their call.
+fn syntax_args(func: NativeFunctions, args: &[SymbolicExpression]) -> &[SymbolicExpression] {
+    use NativeFunctions::*;
+    let range = match func {
+        ContractCall => 0..2,
+        Fold | Map | Filter | FromConsensusBuff | TupleGet | ContractOf | FetchVar | SetVar
+        | FetchEntry | SetEntry | InsertEntry | DeleteEntry | GetTokenBalance | GetAssetOwner
+        | TransferToken | TransferAsset | MintAsset | MintToken | GetTokenSupply | BurnToken
+        | BurnAsset | GetBlockInfo | GetBurnBlockInfo | GetStacksBlockInfo | GetTenureInfo => 0..1,
+        _ => return &[],
+    };
+    args.get(range).unwrap_or_default()
 }
 
 // because list expressions are not considered as evaluated
 // this helpers returns evaluatable expr from list
-fn extract_expr_from_list(expr: &SymbolicExpression) -> SymbolicExpression {
+fn extract_expr_from_list(expr: &SymbolicExpression) -> &SymbolicExpression {
     if let Some(first) = expr.match_list().and_then(|l| l.first()) {
         return extract_expr_from_list(first);
     }
-    expr.to_owned()
+    expr
 }
