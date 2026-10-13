@@ -250,7 +250,7 @@ pub trait ASTVisitor<'a> {
                                 ),
                                 // Leave invalid lengths to type checking without
                                 // losing dependencies in or after this expression.
-                                _ => self.traverse_expr(args.get(0).unwrap_or(&DEFAULT_EXPR)),
+                                _ => args.iter().all(|arg| self.traverse_expr(arg)),
                             }
                         }
                         Len => self.traverse_len(expr, args.get(0).unwrap_or(&DEFAULT_EXPR)),
@@ -3059,7 +3059,7 @@ mod tests {
     }
 
     #[test]
-    fn malformed_function_body_preserves_consumer_stop() {
+    fn malformed_expressions_preserve_consumer_stop() {
         struct StopAtMarker {
             visited: Vec<String>,
         }
@@ -3079,10 +3079,16 @@ mod tests {
             }
         }
 
-        let expressions = parse_clarity4("(define-public broken marker) later");
-        let mut visitor = StopAtMarker { visited: vec![] };
-        assert!(!traverse(&mut visitor, &expressions));
-        assert_eq!(visitor.visited, ["marker"]);
+        for source in [
+            "(define-public broken marker) later",
+            "(as-max-len? marker ignored) later",
+            r#"(as-max-len? "hello" marker) later"#,
+        ] {
+            let expressions = parse_clarity4(source);
+            let mut visitor = StopAtMarker { visited: vec![] };
+            assert!(!traverse(&mut visitor, &expressions), "{source}");
+            assert_eq!(visitor.visited, ["marker"], "{source}");
+        }
     }
 
     /// as-contract? with no body is rejected by the type checker (not the parser),
