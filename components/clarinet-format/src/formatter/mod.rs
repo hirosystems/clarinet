@@ -11,9 +11,9 @@ use clarity::types::StacksEpochId;
 use clarity::vm::ast::stack_depth_checker::StackDepthLimits;
 use clarity::vm::functions::define::DefineFunctions;
 use clarity::vm::functions::NativeFunctions;
-use clarity::vm::representations::{PreSymbolicExpression, PreSymbolicExpressionType};
+use clarity::vm::representations::{PreSymbolicExpression, PreSymbolicExpressionType, Span};
 use helpers::t;
-use ignored::{extract_expr_source, extract_source_range, ignored_exprs};
+use ignored::{ignored_exprs, SourceLines};
 
 pub enum Indentation {
     Space(usize),
@@ -127,10 +127,11 @@ pub struct Aggregator<'a> {
     settings: &'a Settings,
     pse: &'a [PreSymbolicExpression],
     source: Option<&'a str>,
+    source_lines: Option<SourceLines<'a>>,
     indentation_str: String,
 
     cache: RefCell<HashMap<(usize, String), String>>,
-    ignored_exprs: RefCell<HashMap<(u32, u32, u32, u32), String>>, // Cache for ignored expressions by span
+    ignored_exprs: RefCell<HashMap<Span, String>>,
 }
 
 impl<'a> Aggregator<'a> {
@@ -144,6 +145,7 @@ impl<'a> Aggregator<'a> {
             settings,
             pse,
             source,
+            source_lines: source.map(SourceLines::new),
             indentation_str,
             cache: RefCell::new(HashMap::new()),
             ignored_exprs: RefCell::new(HashMap::new()),
@@ -182,34 +184,14 @@ impl<'a> Aggregator<'a> {
     }
 
     // when format_source_exprs is called on one of these cached expressions the source will be returned as is
-    fn cache_ignored_expression(&self, next_expr: &PreSymbolicExpression, source: &str) {
-        let next_expr_span = next_expr.span();
-        let next_expr_key = (
-            next_expr_span.start_line,
-            next_expr_span.start_column,
-            next_expr_span.end_line,
-            next_expr_span.end_column,
-        );
-
-        let lines: Vec<&str> = source.lines().collect();
-        let end_line_usize = usize::try_from(next_expr_span.end_line).unwrap_or(0);
-        let end_col = if end_line_usize > 0 && end_line_usize <= lines.len() {
-            (lines[end_line_usize - 1].len() + 1) as u32
-        } else {
-            next_expr_span.end_column
-        };
-
-        let next_expr_extracted = extract_source_range(
-            source,
-            next_expr_span.start_line,
-            next_expr_span.start_column,
-            next_expr_span.end_line,
-            end_col,
-        );
-
-        self.ignored_exprs
-            .borrow_mut()
-            .insert(next_expr_key, next_expr_extracted);
+    fn cache_ignored_expression(
+        &self,
+        source_lines: &SourceLines,
+        next_expr: &PreSymbolicExpression,
+    ) {
+        let span = next_expr.span();
+        let source = source_lines.extract_through_line_end(span);
+        self.ignored_exprs.borrow_mut().insert(span.clone(), source);
     }
 
     /// Check if an expression is a comment with @format-ignore and cache the next expression if so.
@@ -217,7 +199,6 @@ impl<'a> Aggregator<'a> {
         &self,
         expr: &PreSymbolicExpression,
         next_expr: Option<&PreSymbolicExpression>,
-        source: Option<&str>,
         indentation: &str,
     ) {
         if !is_comment(expr) {
@@ -242,11 +223,11 @@ impl<'a> Aggregator<'a> {
         }
 
         // if we couldn't extract the source, exit
-        let Some(src) = source else {
+        let Some(source_lines) = &self.source_lines else {
             return;
         };
 
-        self.cache_ignored_expression(next, src);
+        self.cache_ignored_expression(source_lines, next);
     }
 
     fn format_source_exprs(
@@ -255,17 +236,9 @@ impl<'a> Aggregator<'a> {
         previous_indentation: &str,
     ) -> String {
         // if this expression was marked as ignored, return the cached source
-        if expressions.len() == 1 {
-            let expr = &expressions[0];
-            let span_key = (
-                expr.span().start_line,
-                expr.span().start_column,
-                expr.span().end_line,
-                expr.span().end_column,
-            );
-            let ignored_cache_ref = self.ignored_exprs.borrow();
-            if let Some(ignored_source) = ignored_cache_ref.get(&span_key) {
-                return ignored_source.clone();
+        if let [expr] = expressions {
+            if let Some(source) = self.ignored_exprs.borrow().get(expr.span()) {
+                return source.clone();
             }
         }
 
@@ -299,34 +272,22 @@ impl<'a> Aggregator<'a> {
             let should_ignore = is_comment(expr) && cur.contains(FORMAT_IGNORE_SYNTAX);
 
             if should_ignore {
-                if let Some(source) = self.source {
+                if let Some(source_lines) = &self.source_lines {
                     if let Some(next) = iter.peek() {
                         if next.match_list().is_some() {
                             let next_expr = iter.next().unwrap();
 
-                            let end_line = next_expr.span().end_line;
-
-                            let lines: Vec<&str> = source.lines().collect();
-                            let end_line_usize = usize::try_from(end_line).unwrap_or(0);
-                            let end_col = if end_line_usize > 0 && end_line_usize <= lines.len() {
-                                (lines[end_line_usize - 1].len() + 1) as u32
-                            } else {
-                                next_expr.span().end_column
-                            };
-
-                            // Extract the comment and expression together for output
-                            let extracted = extract_source_range(
-                                source,
-                                expr.span().start_line,
-                                expr.span().start_column,
-                                end_line,
-                                end_col,
-                            );
+                            // Include the directive and any trailing comment on the expression.
+                            let extracted = source_lines.extract_through_line_end(&Span {
+                                start_line: expr.span().start_line,
+                                start_column: expr.span().start_column,
+                                ..next_expr.span().clone()
+                            });
 
                             // cache the next expression so that when format_source_exprs is called on it
                             // (by format_begin or other format functions), we return the original source
                             // instead of formatting it
-                            self.cache_ignored_expression(next_expr, source);
+                            self.cache_ignored_expression(source_lines, next_expr);
 
                             result.push_str(&extracted);
 
@@ -339,11 +300,11 @@ impl<'a> Aggregator<'a> {
                             prev_end_line = next_expr.span().end_line;
                         } else {
                             // Next expression is not a list, just extract the comment
-                            result.push_str(&extract_expr_source(expr, source));
+                            result.push_str(&source_lines.extract_expr_source(expr));
                         }
                     } else {
                         // No next expression, just extract the comment
-                        result.push_str(&extract_expr_source(expr, source));
+                        result.push_str(&source_lines.extract_expr_source(expr));
                     }
                 } else {
                     // Fallback if no source available
@@ -723,7 +684,6 @@ impl<'a> Aggregator<'a> {
             self.check_and_cache_ignored_expression(
                 expr,
                 iter.peek().copied(),
-                self.source,
                 previous_indentation,
             );
             acc.push_str(&self.format_source_exprs(slice::from_ref(expr), previous_indentation));
@@ -748,12 +708,7 @@ impl<'a> Aggregator<'a> {
         let mut iter = exprs[2..].iter().peekable();
         while let Some(expr) = iter.next() {
             let trailing = get_trailing_comment(expr, &mut iter);
-            self.check_and_cache_ignored_expression(
-                expr,
-                iter.peek().copied(),
-                self.source,
-                &space,
-            );
+            self.check_and_cache_ignored_expression(expr, iter.peek().copied(), &space);
 
             acc.push('\n');
             acc.push_str(&space);
@@ -784,12 +739,7 @@ impl<'a> Aggregator<'a> {
             // Add extra newlines based on original blank lines (limit to 1 consecutive blank lines)
             push_blank_lines(&mut acc, prev_end_line, expr.span().start_line);
 
-            self.check_and_cache_ignored_expression(
-                expr,
-                iter.peek().copied(),
-                self.source,
-                &space,
-            );
+            self.check_and_cache_ignored_expression(expr, iter.peek().copied(), &space);
 
             // begin body
             acc.push('\n');
@@ -827,12 +777,7 @@ impl<'a> Aggregator<'a> {
         if break_up {
             while let Some(expr) = iter.next() {
                 let trailing = get_trailing_comment(expr, &mut iter);
-                self.check_and_cache_ignored_expression(
-                    expr,
-                    iter.peek().copied(),
-                    self.source,
-                    &space,
-                );
+                self.check_and_cache_ignored_expression(expr, iter.peek().copied(), &space);
 
                 // Add extra newlines based on original blank lines (limit to 1 consecutive blank lines)
                 push_blank_lines(&mut acc, prev_end_line, expr.span().start_line);
@@ -853,7 +798,6 @@ impl<'a> Aggregator<'a> {
                 self.check_and_cache_ignored_expression(
                     expr,
                     iter.peek().copied(),
-                    self.source,
                     previous_indentation,
                 );
                 acc.push(' ');
@@ -889,12 +833,7 @@ impl<'a> Aggregator<'a> {
 
         while let Some(expr) = iter.next() {
             let trailing = get_trailing_comment(expr, &mut iter);
-            self.check_and_cache_ignored_expression(
-                expr,
-                iter.peek().copied(),
-                self.source,
-                &space,
-            );
+            self.check_and_cache_ignored_expression(expr, iter.peek().copied(), &space);
 
             // Add extra newlines based on original blank lines (limit to 1 consecutive blank lines)
             push_blank_lines(&mut acc, prev_end_line, expr.span().start_line);
@@ -933,12 +872,7 @@ impl<'a> Aggregator<'a> {
                 let mut iter = args.iter().peekable();
                 while let Some(arg) = iter.next() {
                     let trailing = get_trailing_comment(arg, &mut iter);
-                    self.check_and_cache_ignored_expression(
-                        arg,
-                        iter.peek().copied(),
-                        self.source,
-                        &space,
-                    );
+                    self.check_and_cache_ignored_expression(arg, iter.peek().copied(), &space);
                     acc.push('\n');
                     acc.push_str(&double_indent);
                     acc.push_str(&self.format_source_exprs(slice::from_ref(arg), &double_indent));
@@ -960,7 +894,7 @@ impl<'a> Aggregator<'a> {
         for (i, e) in body_exprs.iter().enumerate() {
             // Add extra newlines based on original blank lines (limit to 1 consecutive blank lines)
             push_blank_lines(&mut acc, prev_end_line, e.span().start_line);
-            self.check_and_cache_ignored_expression(e, body_exprs.get(i + 1), self.source, &space);
+            self.check_and_cache_ignored_expression(e, body_exprs.get(i + 1), &space);
 
             acc.push('\n');
             acc.push_str(&space);
@@ -988,12 +922,7 @@ impl<'a> Aggregator<'a> {
         let mut iter = exprs[2..].iter().peekable();
         while let Some(branch) = iter.next() {
             let trailing = get_trailing_comment(branch, &mut iter);
-            self.check_and_cache_ignored_expression(
-                branch,
-                iter.peek().copied(),
-                self.source,
-                &space,
-            );
+            self.check_and_cache_ignored_expression(branch, iter.peek().copied(), &space);
             let is_binding = branch.match_list().is_none() && iter.peek().is_some();
             acc.push_str(&space);
             acc.push_str(&self.format_source_exprs(slice::from_ref(branch), &space));
@@ -1043,12 +972,7 @@ impl<'a> Aggregator<'a> {
         let mut iter = exprs[2..].iter().peekable();
         while let Some(branch) = iter.next() {
             let trailing = get_trailing_comment(branch, &mut iter);
-            self.check_and_cache_ignored_expression(
-                branch,
-                iter.peek().copied(),
-                self.source,
-                &space,
-            );
+            self.check_and_cache_ignored_expression(branch, iter.peek().copied(), &space);
             acc.push('\n');
             acc.push_str(&space);
             acc.push_str(&self.format_source_exprs(slice::from_ref(branch), &space));
@@ -1078,7 +1002,6 @@ impl<'a> Aggregator<'a> {
             self.check_and_cache_ignored_expression(
                 item,
                 iter.peek().copied(),
-                self.source,
                 previous_indentation,
             );
             if differing_lines(exprs) {
@@ -1144,7 +1067,6 @@ impl<'a> Aggregator<'a> {
                         self.check_and_cache_ignored_expression(
                             allowance,
                             iter.peek().copied(),
-                            self.source,
                             &space,
                         );
                         acc.push('\n');
@@ -1169,7 +1091,7 @@ impl<'a> Aggregator<'a> {
         let body_exprs = exprs.get(3..).unwrap_or_default();
         for (i, e) in body_exprs.iter().enumerate() {
             push_blank_lines(&mut acc, prev_end_line, e.span().start_line);
-            self.check_and_cache_ignored_expression(e, body_exprs.get(i + 1), self.source, &space);
+            self.check_and_cache_ignored_expression(e, body_exprs.get(i + 1), &space);
 
             acc.push('\n');
             acc.push_str(&space);
@@ -1248,7 +1170,7 @@ impl<'a> Aggregator<'a> {
     fn maybe_wrap_item(
         &self,
         item: &PreSymbolicExpression,
-        iter: &mut Peekable<slice::Iter<'a, PreSymbolicExpression>>,
+        iter: &mut Peekable<slice::Iter<'_, PreSymbolicExpression>>,
         acc: &mut String,
         space: &str,
     ) {
@@ -1324,12 +1246,7 @@ impl<'a> Aggregator<'a> {
 
         while let Some(item) = iter.next() {
             let trailing = get_trailing_comment(item, &mut iter);
-            self.check_and_cache_ignored_expression(
-                item,
-                iter.peek().copied(),
-                self.source,
-                spacing,
-            );
+            self.check_and_cache_ignored_expression(item, iter.peek().copied(), spacing);
             // Special handling for first item in type signatures: keep "list" and size together
             if is_multiline && is_first_item && is_list_type_sig {
                 // We already added a space after "list", so just add the size value directly
@@ -1409,12 +1326,7 @@ impl<'a> Aggregator<'a> {
                     acc.push('\n');
                     continue;
                 }
-                self.check_and_cache_ignored_expression(
-                    key,
-                    iter.peek().copied(),
-                    self.source,
-                    &space,
-                );
+                self.check_and_cache_ignored_expression(key, iter.peek().copied(), &space);
                 let key_str = self.format_source_exprs(slice::from_ref(key), &space);
                 acc.push_str(&space);
                 acc.push_str(&key_str);
@@ -1458,7 +1370,6 @@ impl<'a> Aggregator<'a> {
                         self.check_and_cache_ignored_expression(
                             value,
                             iter.peek().copied(),
-                            self.source,
                             indent,
                         );
                         // Pass the current indentation level to nested formatting
@@ -1518,7 +1429,6 @@ impl<'a> Aggregator<'a> {
                 self.check_and_cache_ignored_expression(
                     arg,
                     iter.peek().copied(),
-                    self.source,
                     previous_indentation,
                 );
                 let (key, value) = arg
@@ -1600,8 +1510,9 @@ impl<'a> Aggregator<'a> {
                         }
                         clarity::vm::types::CharType::UTF8(_) => {
                             // utf8 strings use the original source to preserve formatting
-                            self.source
-                                .map(|source| extract_expr_source(pse, source))
+                            self.source_lines
+                                .as_ref()
+                                .map(|source_lines| source_lines.extract_expr_source(pse))
                                 .filter(|extracted| !extracted.is_empty())
                                 .unwrap_or_else(|| value.to_string())
                         }
@@ -1675,7 +1586,6 @@ impl<'a> Aggregator<'a> {
                         self.check_and_cache_ignored_expression(
                             arg,
                             iter.peek().copied(),
-                            self.source,
                             &args_indent,
                         );
                         // Preserve comment line positions: add newline before arg when it's on a
@@ -1721,12 +1631,7 @@ impl<'a> Aggregator<'a> {
         // function body expressions
         let body_exprs = exprs.get(2..).unwrap_or_default();
         for (i, expr) in body_exprs.iter().enumerate() {
-            self.check_and_cache_ignored_expression(
-                expr,
-                body_exprs.get(i + 1),
-                self.source,
-                indentation,
-            );
+            self.check_and_cache_ignored_expression(expr, body_exprs.get(i + 1), indentation);
             acc.push('\n');
             acc.push_str(indentation);
             acc.push_str(&self.format_source_exprs(slice::from_ref(expr), indentation))
@@ -1786,7 +1691,7 @@ impl<'a> Aggregator<'a> {
             } else {
                 previous_indentation
             };
-            self.check_and_cache_ignored_expression(expr, list.get(i + 1), self.source, indented);
+            self.check_and_cache_ignored_expression(expr, list.get(i + 1), indented);
             let formatted = self.format_source_exprs(slice::from_ref(expr), indented);
             let trimmed = t(&formatted);
 

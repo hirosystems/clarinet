@@ -49,6 +49,33 @@ mod format_benches {
     }
 }
 
+#[divan::bench(args = [500, 1000, 2000, 4000])]
+fn utf8_literals(bencher: Bencher, count: usize) {
+    let source: String = (0..count)
+        .map(|i| format!("(define-constant c{i} u\"abc\")\n"))
+        .collect();
+    let formatter = ClarityFormatter::new(Settings::default());
+    bencher.bench_local(|| black_box(formatter.format(black_box(&source), None)));
+}
+
+#[divan::bench(args = [500, 1000, 2000, 4000])]
+fn ignored_blocks(bencher: Bencher, count: usize) {
+    let source: String = (0..count)
+        .map(|i| format!(";; @format-ignore\n(define-constant c{i}   (+ 1  2))\n"))
+        .collect();
+    let formatter = ClarityFormatter::new(Settings::default());
+    bencher.bench_local(|| black_box(formatter.format(black_box(&source), None)));
+}
+
+#[divan::bench(args = [500, 1000, 2000, 4000])]
+fn ascii_literals(bencher: Bencher, count: usize) {
+    let source: String = (0..count)
+        .map(|i| format!("(define-constant c{i} \"abc\")\n"))
+        .collect();
+    let formatter = ClarityFormatter::new(Settings::default());
+    bencher.bench_local(|| black_box(formatter.format(black_box(&source), None)));
+}
+
 fn main() {
     divan::main();
 }
