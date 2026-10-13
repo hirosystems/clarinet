@@ -56,16 +56,13 @@
   "readme": "./README.md",
   "dependencies": {
     "@stacks/clarinet-sdk-wasm": "workspace:*",
-    "@stacks/transactions": "7.6.0",
-    "kolorist": "1.8.0",
-    "prompts": "2.4.2"
+    "@stacks/transactions": "7.6.0"
   },
   "devDependencies": {
     "@stacks/encryption": "7.6.0",
     "@stacks/network": "7.6.0",
     "@stacks/stacking": "7.6.0",
     "@types/node": "26.4.0",
-    "@types/prompts": "2.4.9",
     "vitest": "4.1.11"
   }
 }
