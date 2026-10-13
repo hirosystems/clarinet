@@ -1109,12 +1109,14 @@ mod tests {
             Some("util"),
             &mut contracts,
         );
-        let caller = deploy_snippet(
-            &session,
-            r#"(define-read-only (run) (as-max-len? "hello" (contract-call? .util len)))"#,
-            Some("caller"),
-            &mut contracts,
-        );
+        #[rustfmt::skip]
+        let source = indoc!("
+            (define-read-only (run)
+                (as-max-len? \"hello\"
+                    (len (unwrap-panic
+                        (as-max-len? \"nested\" (contract-call? .util len))))))
+        ");
+        let caller = deploy_snippet(&session, source, Some("caller"), &mut contracts);
 
         let dependencies =
             ASTDependencyDetector::detect_dependencies(&contracts, &BTreeMap::new()).unwrap();
