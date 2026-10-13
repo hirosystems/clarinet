@@ -564,6 +564,13 @@ mod tests {
     }
 
     #[test]
+    fn malformed_function_does_not_hide_later_symbols() {
+        let symbols = get_symbols("(define-public broken (ok u1))\n(define-read-only (later) u2)");
+        let names: Vec<_> = symbols.iter().map(|symbol| symbol.name.as_str()).collect();
+        assert_eq!(names, ["later"]);
+    }
+
+    #[test]
     fn test_data_impl_trait() {
         let symbols = get_symbols("(impl-trait 'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.sip-010-trait-ft-standard.sip-010-trait)");
         assert_eq!(
