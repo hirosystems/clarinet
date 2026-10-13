@@ -246,7 +246,9 @@ pub trait ASTVisitor<'a> {
                                     args.get(0).unwrap_or(&DEFAULT_EXPR),
                                     *length,
                                 ),
-                                _ => false,
+                                // Leave invalid lengths to type checking without
+                                // losing dependencies in or after this expression.
+                                _ => self.traverse_expr(args.get(0).unwrap_or(&DEFAULT_EXPR)),
                             }
                         }
                         Len => self.traverse_len(expr, args.get(0).unwrap_or(&DEFAULT_EXPR)),
