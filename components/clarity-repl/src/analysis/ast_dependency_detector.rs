@@ -1061,6 +1061,44 @@ mod tests {
     }
 
     #[test]
+    fn invalid_as_max_len_preserves_dependencies() {
+        let session = Session::new_without_boot_contracts(SessionSettings::default());
+        for length in ["128", "length", ""] {
+            let mut contracts = BTreeMap::new();
+            let util = deploy_snippet(
+                &session,
+                "(define-read-only (echo (value (string-ascii 128))) value)",
+                Some("util"),
+                &mut contracts,
+            );
+            let later = deploy_snippet(
+                &session,
+                "(define-read-only (value) u1)",
+                Some("later"),
+                &mut contracts,
+            );
+            let source = format!(
+                r#"(define-read-only (run)
+                    (begin
+                        (contract-call? .util echo
+                            (unwrap-panic (as-max-len? (contract-call? .util echo "hello") {length})))
+                        (contract-call? .later value)))"#
+            );
+            let caller = deploy_snippet(&session, &source, Some("caller"), &mut contracts);
+
+            let dependencies =
+                ASTDependencyDetector::detect_dependencies(&contracts, &BTreeMap::new()).unwrap();
+            assert!(dependencies[&caller].has_dependency(&util).is_some());
+            assert!(dependencies[&caller].has_dependency(&later).is_some());
+            let ordered =
+                ASTDependencyDetector::order_contracts(&dependencies, &HashMap::new()).unwrap();
+            let position = |id| ordered.iter().position(|contract| *contract == id).unwrap();
+            assert!(position(&util) < position(&caller));
+            assert!(position(&later) < position(&caller));
+        }
+    }
+
+    #[test]
     fn contract_call() {
         let session = Session::new_without_boot_contracts(SessionSettings::default());
         let mut contracts = BTreeMap::new();
