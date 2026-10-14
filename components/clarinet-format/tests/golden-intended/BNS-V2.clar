@@ -1758,9 +1758,10 @@
                 (unwrap-panic (map-get? name-properties {
                     name: name,
                     namespace: namespace,
-                })) {
-                stx-burn: (try! (compute-name-price name (get price-function namespace-props))),
-            })
+                }))
+                {
+                    stx-burn: (try! (compute-name-price name (get price-function namespace-props))),
+                })
         )
         ;; Return success
         (ok true)

@@ -48,11 +48,6 @@ fn settings_from_source(source: &str) -> (Settings, String) {
     (settings, real_source)
 }
 
-fn format_file_with_metadata(source: &str) -> String {
-    let (settings, real_source) = settings_from_source(source);
-    let formatter = ClarityFormatter::new(settings);
-    formatter.format_file(&real_source, None)
-}
 #[test]
 fn test_irl_contracts() {
     let golden_dir = "./tests/golden";
@@ -74,12 +69,12 @@ fn test_irl_contracts() {
                 fs::read_to_string(&intended_path).expect("Failed to read intended file");
 
             // Apply formatting and compare
-            let result = format_file_with_metadata(&src);
+            let (settings, real_source) = settings_from_source(&src);
+            let formatter = ClarityFormatter::new(settings);
+            let result = formatter.format_file(&real_source, None);
             pretty_assertions::assert_eq!(result, intended, "Mismatch in file: {:?}", file_name);
 
             // Format the intended output again with the same settings
-            let (settings, _) = settings_from_source(&src);
-            let formatter = ClarityFormatter::new(settings);
             let reformatted = formatter.format_file(&result, None);
 
             pretty_assertions::assert_eq!(

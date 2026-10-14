@@ -812,8 +812,8 @@
 
         ;; Validate ownership of the given signer key
         (try! (consume-signer-key-authorization pox-addr (- first-reward-cycle u1)
-            "stack-stx" lock-period signer-sig signer-key amount-ustx
-            max-amount auth-id
+            "stack-stx" lock-period signer-sig signer-key amount-ustx max-amount
+            auth-id
         ))
 
         ;; ensure that stacking can be performed
@@ -1300,8 +1300,8 @@
             ;; Verify signature from delegate that allows this sender for this cycle
             ;; 'lock-period' param set to one period, same as aggregation-commit-indexed
             (try! (consume-signer-key-authorization pox-addr reward-cycle
-                "agg-increase" u1 signer-sig signer-key
-                increased-entry-total max-amount auth-id
+                "agg-increase" u1 signer-sig signer-key increased-entry-total
+                max-amount auth-id
             ))
 
             ;; update the pox-address list -- bump the total-ustx

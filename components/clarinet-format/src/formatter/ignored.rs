@@ -24,18 +24,6 @@ impl<'a> SourceLines<'a> {
         self.extract_source_range(expr.span())
     }
 
-    pub(crate) fn extract_through_line_end(&self, span: &Span) -> String {
-        let end_column = usize::try_from(span.end_line)
-            .ok()
-            .and_then(|line| line.checked_sub(1))
-            .and_then(|index| self.lines.get(index))
-            .map_or(span.end_column, |line| (line.len() + 1) as u32);
-        self.extract_source_range(&Span {
-            end_column,
-            ..span.clone()
-        })
-    }
-
     pub fn extract_source_range(&self, span: &Span) -> String {
         let start_line = u32_to_usize(span.start_line);
         let end_line = u32_to_usize(span.end_line);

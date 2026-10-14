@@ -793,14 +793,15 @@
       (fold inner-merkle-proof-verify
         (unwrap-panic (slice? (list u0 u1 u2 u3 u4 u5 u6 u7 u8 u9 u10 u11 u12 u13) u0
           (get tree-depth proof)
-        )) {
-        path: (+ (pow u2 (get tree-depth proof)) (get tx-index proof)),
-        root-hash: merkle-root,
-        proof-hashes: (get hashes proof),
-        cur-hash: reversed-txid,
-        tree-depth: (get tree-depth proof),
-        verified: false,
-      })
+        ))
+        {
+          path: (+ (pow u2 (get tree-depth proof)) (get tx-index proof)),
+          root-hash: merkle-root,
+          proof-hashes: (get hashes proof),
+          cur-hash: reversed-txid,
+          tree-depth: (get tree-depth proof),
+          verified: false,
+        })
     ))
   )
 )
