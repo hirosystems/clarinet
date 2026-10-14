@@ -99,7 +99,9 @@ pub trait ASTVisitor<'a> {
                                         _ => unreachable!(),
                                     }
                                 }
-                                _ => false,
+                                // Leave invalid signatures to analysis while still
+                                // visiting the body and subsequent expressions.
+                                None => self.traverse_expr(args.get(1).unwrap_or(&DEFAULT_EXPR)),
                             }
                         }
                         DefineFunctions::NonFungibleToken => self.traverse_define_nft(
@@ -246,7 +248,9 @@ pub trait ASTVisitor<'a> {
                                     args.get(0).unwrap_or(&DEFAULT_EXPR),
                                     *length,
                                 ),
-                                _ => false,
+                                // Leave invalid lengths to type checking without
+                                // losing dependencies in or after this expression.
+                                _ => args.iter().all(|arg| self.traverse_expr(arg)),
                             }
                         }
                         Len => self.traverse_len(expr, args.get(0).unwrap_or(&DEFAULT_EXPR)),
@@ -3036,6 +3040,55 @@ mod tests {
         let mut counter = AtomCounter::new(target);
         traverse(&mut counter, &exprs);
         counter.count
+    }
+
+    #[test]
+    fn malformed_function_signature_does_not_stop_traversal() {
+        for definition in ["define-private", "define-read-only", "define-public"] {
+            for signature in ["broken", "u1"] {
+                let source = format!("({definition} {signature} marker) marker");
+                let expressions = parse_clarity4(&source);
+                let mut counter = AtomCounter::new("marker");
+                assert!(traverse(&mut counter, &expressions), "{source}");
+                assert_eq!(counter.count, 2, "{source}");
+            }
+
+            let source = format!("({definition}) marker");
+            assert_eq!(count_atom(&source, "marker"), 1, "{source}");
+        }
+    }
+
+    #[test]
+    fn malformed_expressions_preserve_consumer_stop() {
+        struct StopAtMarker {
+            visited: Vec<String>,
+        }
+
+        impl<'a> ASTVisitor<'a> for StopAtMarker {
+            fn get_clarity_version(&self) -> &ClarityVersion {
+                &ClarityVersion::Clarity4
+            }
+
+            fn visit_atom(
+                &mut self,
+                _expr: &'a SymbolicExpression,
+                atom: &'a clarity::vm::ClarityName,
+            ) -> bool {
+                self.visited.push(atom.to_string());
+                atom.as_str() != "marker"
+            }
+        }
+
+        for source in [
+            "(define-public broken marker) later",
+            "(as-max-len? marker ignored) later",
+            r#"(as-max-len? "hello" marker) later"#,
+        ] {
+            let expressions = parse_clarity4(source);
+            let mut visitor = StopAtMarker { visited: vec![] };
+            assert!(!traverse(&mut visitor, &expressions), "{source}");
+            assert_eq!(visitor.visited, ["marker"], "{source}");
+        }
     }
 
     /// as-contract? with no body is rejected by the type checker (not the parser),

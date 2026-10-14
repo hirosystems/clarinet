@@ -994,7 +994,7 @@ impl GraphWalker {
 mod tests {
     use ::clarity::vm::diagnostic::Diagnostic;
     use clarinet_defaults::{DEFAULT_CLARITY_VERSION, DEFAULT_EPOCH};
-    use indoc::indoc;
+    use indoc::{formatdoc, indoc};
 
     use super::*;
     use crate::repl::session::Session;
@@ -1058,6 +1058,72 @@ mod tests {
             }
             Err(_) => panic!("expected success"),
         }
+    }
+
+    #[test]
+    fn invalid_as_max_len_preserves_dependencies() {
+        let session = Session::new_without_boot_contracts(SessionSettings::default());
+        for length in ["128", "length", ""] {
+            let mut contracts = BTreeMap::new();
+            let util = deploy_snippet(
+                &session,
+                "(define-read-only (echo (value (string-ascii 128))) value)",
+                Some("util"),
+                &mut contracts,
+            );
+            let later = deploy_snippet(
+                &session,
+                "(define-read-only (value) u1)",
+                Some("later"),
+                &mut contracts,
+            );
+            #[rustfmt::skip]
+            let source = formatdoc!("
+                (define-read-only (run)
+                    (begin
+                        (contract-call? .util echo
+                            (unwrap-panic (as-max-len? (contract-call? .util echo \"hello\") {length})))
+                        (contract-call? .later value)))
+            ");
+            let caller = deploy_snippet(&session, &source, Some("caller"), &mut contracts);
+
+            let dependencies =
+                ASTDependencyDetector::detect_dependencies(&contracts, &BTreeMap::new()).unwrap();
+            assert!(dependencies[&caller].has_dependency(&util).is_some());
+            assert!(dependencies[&caller].has_dependency(&later).is_some());
+            let ordered =
+                ASTDependencyDetector::order_contracts(&dependencies, &HashMap::new()).unwrap();
+            let position = |id| ordered.iter().position(|contract| *contract == id).unwrap();
+            assert!(position(&util) < position(&caller));
+            assert!(position(&later) < position(&caller));
+        }
+    }
+
+    #[test]
+    fn invalid_as_max_len_length_dependency() {
+        let session = Session::new_without_boot_contracts(SessionSettings::default());
+        let mut contracts = BTreeMap::new();
+        let util = deploy_snippet(
+            &session,
+            "(define-read-only (len) u128)",
+            Some("util"),
+            &mut contracts,
+        );
+        #[rustfmt::skip]
+        let source = indoc!("
+            (define-read-only (run)
+                (as-max-len? \"hello\"
+                    (len (unwrap-panic
+                        (as-max-len? \"nested\" (contract-call? .util len))))))
+        ");
+        let caller = deploy_snippet(&session, source, Some("caller"), &mut contracts);
+
+        let dependencies =
+            ASTDependencyDetector::detect_dependencies(&contracts, &BTreeMap::new()).unwrap();
+        assert!(dependencies[&caller].has_dependency(&util).is_some());
+        let ordered =
+            ASTDependencyDetector::order_contracts(&dependencies, &HashMap::new()).unwrap();
+        assert_eq!(ordered, [&util, &caller]);
     }
 
     #[test]
