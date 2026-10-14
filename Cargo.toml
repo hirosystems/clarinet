@@ -11,7 +11,6 @@ members = [
     "components/clarinet-sdk-wasm",
     "components/clarity-lsp",
     "components/clarity-repl",
-    "components/clarity-events",
     "components/hiro-system-kit",
     "components/observer",
     "components/stacks-network",
