@@ -1480,7 +1480,7 @@ where
     // cloned() here because of the second mutable borrow on iter.next()
     match iter.peek().cloned() {
         Some(next) => {
-            if is_comment(next) && is_same_line(expr, next) {
+            if is_comment(next) && expr.span().end_line == next.span().start_line {
                 iter.next();
                 Some(next)
             } else {
@@ -2745,6 +2745,28 @@ mod tests_formatter {
                 result.contains(";; c\n") || result.contains(";; size\n"),
                 "{result}"
             );
+        }
+    }
+
+    #[test]
+    fn test_multiline_expression_keeps_trailing_comment() {
+        let field = "a".repeat(74);
+        for (src, trailing) in [
+            (
+                format!("(list {{{field}: u1}} ;; trailing\n {{{field}: u2}})"),
+                "} ;; trailing\n",
+            ),
+            (
+                format!("(let ((x {{{field}: u1}}) ;; trailing\n (y {{{field}: u2}})) x)"),
+                "}) ;; trailing\n",
+            ),
+            (
+                format!("{{x: {{{field}: u1}}, ;; trailing\n y: {{{field}: u2}}}}"),
+                "}, ;; trailing\n",
+            ),
+        ] {
+            let result = format_valid_and_stable(&src);
+            assert!(result.contains(trailing), "{result}");
         }
     }
 
