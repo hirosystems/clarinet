@@ -1,11 +1,11 @@
-/// A document IR for pretty-printing, based on the Wadler-Lindig algorithm.
-///
-/// The key idea: describe document *structure* (groups, indentation, possible
-/// line breaks) separately from *layout decisions* (does this group fit on one
-/// line?). A single `Printer` pass then resolves every `Group` node: if its
-/// flat content fits within the remaining line width the group stays flat;
-/// otherwise it breaks.
-///
+//! A document IR for pretty-printing, based on the Wadler-Lindig algorithm.
+//!
+//! The key idea: describe document *structure* (groups, indentation, possible
+//! line breaks) separately from *layout decisions* (does this group fit on one
+//! line?). A single `Printer` pass then resolves every `Group` node: if its
+//! flat content fits within the remaining line width the group stays flat;
+//! otherwise it breaks.
+
 /// A document tree that describes how to pretty-print some content.
 #[derive(Clone)]
 pub enum Doc {
@@ -74,17 +74,19 @@ pub struct Printer<'a> {
 }
 
 impl<'a> Printer<'a> {
-    pub fn new(indent_unit: &'a str, max_width: usize, start_column: usize) -> Self {
+    pub fn new(indent_unit: &'a str, max_width: usize) -> Self {
         Printer {
             indent_unit,
             max_width,
             output: String::new(),
-            column: start_column,
+            column: 0,
         }
     }
 
-    /// Consume the printer and return the rendered string.
+    /// Consume the printer and return the rendered string. Rendering starts at
+    /// the column just after `base_indent`.
     pub fn render(mut self, doc: &Doc, base_indent: &str) -> String {
+        self.column = base_indent.len();
         self.print(doc, base_indent, Mode::Break);
         self.output
     }
@@ -210,7 +212,7 @@ mod tests {
     use super::*;
 
     fn print(doc: &Doc, width: usize) -> String {
-        Printer::new("  ", width, 0).render(doc, "")
+        Printer::new("  ", width).render(doc, "")
     }
 
     #[test]

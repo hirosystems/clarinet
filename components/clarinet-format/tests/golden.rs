@@ -72,16 +72,15 @@ fn test_irl_contracts() {
             let (settings, real_source) = settings_from_source(&src);
             let formatter = ClarityFormatter::new(settings);
             let result = formatter.format_file(&real_source, None);
-            pretty_assertions::assert_eq!(result, intended, "Mismatch in file: {:?}", file_name);
+            pretty_assertions::assert_eq!(result, intended, "Mismatch in file: {file_name:?}");
 
-            // Format the intended output again with the same settings
+            // Format the output again with the same settings
             let reformatted = formatter.format_file(&result, None);
 
             pretty_assertions::assert_eq!(
                 reformatted,
                 intended,
-                "Idempotency failure in file: {:?} — formatting the output again changed it",
-                file_name
+                "Idempotency failure in file: {file_name:?} — formatting the output again changed it"
             );
 
             // parse resulting contract
