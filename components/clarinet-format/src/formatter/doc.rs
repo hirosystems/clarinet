@@ -10,6 +10,7 @@
 #[derive(Clone)]
 pub enum Doc {
     /// Literal text. Must not contain newlines — use `Hardline` for those.
+    // TODO: use Cow to avoid allocating for static text.
     Text(String),
     /// A sequence of documents rendered one after another.
     Concat(Vec<Doc>),
