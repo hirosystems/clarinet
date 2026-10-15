@@ -563,17 +563,13 @@ impl<'a> Aggregator<'a> {
             );
         }
         let mut parts: Vec<Doc> = vec![Doc::text(format!("({func_type} "))];
-        let mut iter = exprs[1..].iter().peekable();
-        while let Some(expr) = iter.next() {
-            let trailing = get_trailing_comment(expr, &mut iter);
-            self.check_and_cache_ignored(expr, iter.peek().copied());
+        for (i, expr) in exprs[1..].iter().enumerate() {
+            if i > 0 {
+                parts.push(Doc::text(" "));
+            }
             parts.push(Doc::verbatim(
                 self.format_source_exprs(slice::from_ref(expr), indent),
             ));
-            if iter.peek().is_some() {
-                parts.push(Doc::text(" "));
-            }
-            self.push_trailing_comment(&mut parts, trailing, indent);
         }
         parts.push(Doc::text(")"));
         self.render_doc(&Doc::concat(parts), indent)

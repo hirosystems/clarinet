@@ -57,18 +57,12 @@ fn definition_comments_do_not_swallow_arguments() {
 
 #[test]
 fn sole_comment_argument_keeps_closing_parenthesis() {
-    for source in ["(foo\n ;; c\n)", "(foo ;; c\n)", "(ok ;; c\n)"] {
-        let name = if source.starts_with("(ok") {
-            "ok"
-        } else {
-            "foo"
-        };
-        let expected = if source.contains("\n ;;") {
-            format!("({name}\n  ;; c\n)")
-        } else {
-            format!("({name} ;; c\n)")
-        };
-        assert_format(source, &expected);
+    for (source, expected) in [
+        ("(foo\n ;; c\n)", "(foo\n  ;; c\n)"),
+        ("(foo ;; c\n)", "(foo ;; c\n)"),
+        ("(ok ;; c\n)", "(ok ;; c\n)"),
+    ] {
+        assert_format(source, expected);
     }
     assert_format("(foo u1)", "(foo u1)");
 }
@@ -119,13 +113,13 @@ fn unusual_tuple_entries_keep_their_source() {
         "(tuple (let))",
     ] {
         assert_eq!(formatter.format_section(source, None).unwrap(), source);
-        assert_eq!(formatter.format_file(source, None), format!("{source}\n"));
+        let file = formatter.format_file(source, None);
+        assert_eq!(file, format!("{source}\n"));
         let ast = parse(source, StackDepthLimits::for_epoch(DEFAULT_EPOCH)).unwrap();
         let formatted = formatter.format_ast(&ast);
         assert_eq!(formatted, source.replace("\n ", "\n"));
         let reparsed = parse(&formatted, StackDepthLimits::for_epoch(DEFAULT_EPOCH)).unwrap();
         assert_eq!(formatter.format_ast(&reparsed), formatted);
-        let file = formatter.format_file(source, None);
         assert_eq!(formatter.format_file(&file, None), file);
     }
 }
