@@ -40,15 +40,14 @@ fn from_metadata(metadata: &str) -> Settings {
         indentation: indent,
     }
 }
-fn format_file_with_metadata(source: &str) -> String {
+fn settings_from_source(source: &str) -> (Settings, String) {
     let mut lines = source.lines();
     let metadata_line = lines.next().unwrap_or_default();
     let settings = from_metadata(metadata_line);
-
     let real_source = lines.collect::<Vec<&str>>().join("\n");
-    let formatter = ClarityFormatter::new(settings);
-    formatter.format_file(&real_source, None)
+    (settings, real_source)
 }
+
 #[test]
 fn test_irl_contracts() {
     let golden_dir = "./tests/golden";
@@ -70,8 +69,20 @@ fn test_irl_contracts() {
                 fs::read_to_string(&intended_path).expect("Failed to read intended file");
 
             // Apply formatting and compare
-            let result = format_file_with_metadata(&src);
-            pretty_assertions::assert_eq!(result, intended, "Mismatch in file: {:?}", file_name);
+            let (settings, real_source) = settings_from_source(&src);
+            let formatter = ClarityFormatter::new(settings);
+            let result = formatter.format_file(&real_source, None);
+            pretty_assertions::assert_eq!(result, intended, "Mismatch in file: {file_name:?}");
+
+            // Format the output again with the same settings
+            let reformatted = formatter.format_file(&result, None);
+
+            pretty_assertions::assert_eq!(
+                reformatted,
+                intended,
+                "Idempotency failure in file: {file_name:?} — formatting the output again changed it"
+            );
+
             // parse resulting contract
             let (_statements, diagnostics, success) =
                 clarity::vm::ast::parser::v2::parse_collect_diagnostics(
