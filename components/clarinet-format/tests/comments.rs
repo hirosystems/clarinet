@@ -2,6 +2,7 @@ use clarinet_defaults::DEFAULT_EPOCH;
 use clarinet_format::formatter::{ClarityFormatter, Settings};
 use clarity::vm::ast::parser::v2::parse;
 use clarity::vm::ast::stack_depth_checker::StackDepthLimits;
+use indoc::{formatdoc, indoc};
 
 fn assert_format(source: &str, expected: &str) {
     let formatter = ClarityFormatter::new(Settings::default());
@@ -28,27 +29,62 @@ fn definition_comments_do_not_swallow_arguments() {
     for (source, expected) in [
         (
             "(define-constant x ;; c\n u1)",
-            "(define-constant\n  x ;; c\n  u1\n)",
+            indoc! {"
+                (define-constant
+                  x ;; c
+                  u1
+                )"},
         ),
         (
             "(define-data-var v (list 10 uint)\n ;; c\n (list))",
-            "(define-data-var\n  v\n  (list 10 uint)\n  ;; c\n  (list)\n)",
+            indoc! {"
+                (define-data-var
+                  v
+                  (list 10 uint)
+                  ;; c
+                  (list)
+                )"},
         ),
         (
             "(define-fungible-token token ;; c\n u10)",
-            "(define-fungible-token\n  token ;; c\n  u10\n)",
+            indoc! {"
+                (define-fungible-token
+                  token ;; c
+                  u10
+                )"},
         ),
         (
             "(define-non-fungible-token token\n ;; c\n uint)",
-            "(define-non-fungible-token\n  token\n  ;; c\n  uint\n)",
+            indoc! {"
+                (define-non-fungible-token
+                  token
+                  ;; c
+                  uint
+                )"},
         ),
         (
             "(define-constant x u1 ;; end\n)",
-            "(define-constant\n  x\n  u1 ;; end\n)",
+            indoc! {"
+                (define-constant
+                  x
+                  u1 ;; end
+                )"},
         ),
         (
-            "(define-constant ;; first\n x\n ;; second\n ;; third\n u1)",
-            "(define-constant\n  ;; first\n  x\n  ;; second\n  ;; third\n  u1\n)",
+            indoc! {"
+                (define-constant ;; first
+                 x
+                 ;; second
+                 ;; third
+                 u1)"},
+            indoc! {"
+                (define-constant
+                  ;; first
+                  x
+                  ;; second
+                  ;; third
+                  u1
+                )"},
         ),
     ] {
         assert_format(source, expected);
@@ -63,8 +99,13 @@ fn last_comment_argument_keeps_closing_parenthesis() {
         ("(ok ;; c\n)", "(ok ;; c\n)"),
         ("(foo u1 ;; c\n)", "(foo u1 ;; c\n)"),
         (
-            "(define-read-only (f)\n  (begin\n    (foo u1 ;; c\n    )\n    (ok u1)))",
-            indoc::indoc! {"
+            indoc! {"
+                (define-read-only (f)
+                  (begin
+                    (foo u1 ;; c
+                    )
+                    (ok u1)))"},
+            indoc! {"
                 (define-read-only (f)
                   (begin
                     (foo u1 ;; c
@@ -81,7 +122,7 @@ fn last_comment_argument_keeps_closing_parenthesis() {
 
 #[test]
 fn trait_method_comments_are_preserved() {
-    let expected = indoc::indoc! {"
+    let expected = indoc! {"
         (define-trait t (
           ;; before
           ;; also before
@@ -104,8 +145,22 @@ fn trait_method_comments_are_preserved() {
 #[test]
 fn comments_between_tuple_entries_are_preserved() {
     assert_format(
-        "(tuple\n ;; before\n (a u1) ;; trailing\n ;; between\n (b u2)\n ;; after\n)",
-        "{\n  ;; before\n  a: u1, ;; trailing\n  ;; between\n  b: u2,\n  ;; after\n}",
+        indoc! {"
+            (tuple
+             ;; before
+             (a u1) ;; trailing
+             ;; between
+             (b u2)
+             ;; after
+            )"},
+        indoc! {"
+            {
+              ;; before
+              a: u1, ;; trailing
+              ;; between
+              b: u2,
+              ;; after
+            }"},
     );
     assert_format("(tuple ;; only comment\n)", "{\n  ;; only comment\n}");
 }
@@ -113,16 +168,35 @@ fn comments_between_tuple_entries_are_preserved() {
 #[test]
 fn commented_tuple_entries_convert_to_sugar() {
     for (source, expected) in [
-        ("(tuple (a ;; c\n u1))", "{\n  a:\n    ;; c\n    u1,\n}"),
+        (
+            "(tuple (a ;; c\n u1))",
+            indoc! {"
+                {
+                  a:
+                    ;; c
+                    u1,
+                }"},
+        ),
         ("(tuple (a u1 ;; c\n))", "{\n  a: u1, ;; c\n}"),
-        ("(tuple (a u1\n ;; after\n))", "{\n  a: u1,\n  ;; after\n}"),
+        (
+            "(tuple (a u1\n ;; after\n))",
+            indoc! {"
+                {
+                  a: u1,
+                  ;; after
+                }"},
+        ),
         (
             "(tuple (a u1 ;; inner\n) ;; outer\n)",
-            "{\n  a: u1, ;; inner\n  ;; outer\n}",
+            indoc! {"
+                {
+                  a: u1, ;; inner
+                  ;; outer
+                }"},
         ),
         (
             "(tuple (a u1) (b ;; first\n ;; second\n u2))",
-            indoc::indoc! {"
+            indoc! {"
                 {
                   a: u1,
                   b:
@@ -133,7 +207,7 @@ fn commented_tuple_entries_convert_to_sugar() {
         ),
         (
             "(define-public (f)\n(ok (tuple (a ;; c\nu1))))",
-            indoc::indoc! {"
+            indoc! {"
                 (define-public (f)
                   (ok {
                     a:
@@ -150,8 +224,18 @@ fn commented_tuple_entries_convert_to_sugar() {
 #[test]
 fn sugar_comments_between_key_and_value_are_preserved() {
     assert_format(
-        "{ a:\n ;; first\n ;; second\n u1 }",
-        "{\n  a:\n    ;; first\n    ;; second\n    u1,\n}",
+        indoc! {"
+            { a:
+             ;; first
+             ;; second
+             u1 }"},
+        indoc! {"
+            {
+              a:
+                ;; first
+                ;; second
+                u1,
+            }"},
     );
 }
 
@@ -192,10 +276,22 @@ fn unusual_nested_tuple_entries_remain_stable() {
 fn ignored_tuple_values_keep_their_source() {
     let formatter = ClarityFormatter::new(Settings::default());
     for value in ["(+   u1   u2)", "(let)"] {
-        let expected = format!("{{\n  a:\n    ;; before\n    ;; @format-ignore\n    {value},\n}}");
+        let expected = formatdoc! {"
+            {{
+              a:
+                ;; before
+                ;; @format-ignore
+                {value},
+            }}"};
         for source in [
-            format!("(tuple (a ;; before\n ;; @format-ignore\n {value}))"),
-            format!("{{ a: ;; before\n ;; @format-ignore\n {value} }}"),
+            formatdoc! {"
+                (tuple (a ;; before
+                 ;; @format-ignore
+                 {value}))"},
+            formatdoc! {"
+                {{ a: ;; before
+                 ;; @format-ignore
+                 {value} }}"},
         ] {
             assert_eq!(
                 formatter.format_file(&source, None),
@@ -209,7 +305,16 @@ fn ignored_tuple_values_keep_their_source() {
         }
     }
     assert_format(
-        "(tuple (a ;; @format-ignore\n ;; ordinary comment\n (+   u1   u2)))",
-        "{\n  a:\n    ;; @format-ignore\n    ;; ordinary comment\n    (+ u1 u2),\n}",
+        indoc! {"
+            (tuple (a ;; @format-ignore
+             ;; ordinary comment
+             (+   u1   u2)))"},
+        indoc! {"
+            {
+              a:
+                ;; @format-ignore
+                ;; ordinary comment
+                (+ u1 u2),
+            }"},
     );
 }
