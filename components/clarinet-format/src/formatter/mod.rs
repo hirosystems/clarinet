@@ -1315,7 +1315,7 @@ impl<'a> Aggregator<'a> {
         indent: &Indent,
     ) -> String {
         // Simple wrappers like (ok expr) are always kept on one line
-        if list.len() == 2 && list[0].match_atom().is_some() {
+        if list.len() == 2 && list[0].match_atom().is_some() && !is_comment(&list[1]) {
             let atom_name = list[0].match_atom().unwrap();
             let is_special_format =
                 NativeFunctions::lookup_by_name(atom_name).is_some_and(|native| {
@@ -1379,7 +1379,9 @@ impl<'a> Aggregator<'a> {
             prev_is_map = text.starts_with('{');
         }
 
-        let break_lines = if !result.contains('\n') {
+        let break_lines = if list.last().is_some_and(is_comment) {
+            true
+        } else if !result.contains('\n') {
             false
         } else {
             let last_line = result

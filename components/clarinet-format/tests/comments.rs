@@ -54,3 +54,21 @@ fn definition_comments_do_not_swallow_arguments() {
         assert_format(source, expected);
     }
 }
+
+#[test]
+fn sole_comment_argument_keeps_closing_parenthesis() {
+    for source in ["(foo\n ;; c\n)", "(foo ;; c\n)", "(ok ;; c\n)"] {
+        let name = if source.starts_with("(ok") {
+            "ok"
+        } else {
+            "foo"
+        };
+        let expected = if source.contains("\n ;;") {
+            format!("({name}\n  ;; c\n)")
+        } else {
+            format!("({name} ;; c\n)")
+        };
+        assert_format(source, &expected);
+    }
+    assert_format("(foo u1)", "(foo u1)");
+}
