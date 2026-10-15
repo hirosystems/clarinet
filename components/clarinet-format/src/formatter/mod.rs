@@ -422,13 +422,8 @@ impl<'a> Aggregator<'a> {
                 NativeFunctions::Begin => self.format_begin(list, indent),
                 NativeFunctions::Match => self.format_match(list, indent),
                 NativeFunctions::TupleCons => {
-                    let can_convert = list[1..].iter().all(|entry| {
-                        is_comment(entry)
-                            || matches!(entry.match_list(), Some([key, value])
-                                if key.match_atom().is_some() && !is_comment(value))
-                    });
-                    if can_convert {
-                        self.format_key_value(&list[1..], indent)
+                    if let Some(formatted) = self.format_key_value(&list[1..], indent) {
+                        formatted
                     } else if let Some(source_lines) = &self.source_lines {
                         source_lines.extract_expr_source(expr)
                     } else {
@@ -1091,7 +1086,6 @@ impl<'a> Aggregator<'a> {
             inline
         } else {
             let nested = indent.indented(&self.indentation_str);
-            let double_indent = nested.indented(&self.indentation_str);
             let mut entry_parts: Vec<Doc> = Vec::new();
             let mut iter = exprs.iter().peekable();
             while let Some(key) = iter.next() {
@@ -1102,37 +1096,49 @@ impl<'a> Aggregator<'a> {
                 }
                 self.check_and_cache_ignored(key, iter.peek().copied());
                 let key_str = self.format_source_exprs(slice::from_ref(key), &nested);
+                let mut comments = Vec::new();
+                while let Some(comment) = iter.next_if(|next| is_comment(next)) {
+                    comments.push(comment);
+                }
                 if let Some(value) = iter.next() {
-                    entry_parts.push(Doc::Hardline);
-                    if is_comment(value) {
-                        entry_parts.push(Doc::verbatim(format!("{key_str}:")));
-                        // Comment between key and value
-                        entry_parts.push(Doc::indent(Doc::concat(vec![
-                            Doc::Hardline,
-                            Doc::verbatim(self.display_pse(value, &nested)),
-                        ])));
-                        if let Some(actual_value) = iter.next() {
-                            let trailing = get_trailing_comment(actual_value, &mut iter);
-                            let value_str = self
-                                .format_source_exprs(slice::from_ref(actual_value), &double_indent);
-                            entry_parts.push(Doc::indent(Doc::concat(vec![
-                                Doc::Hardline,
-                                Doc::verbatim(format!("{value_str},")),
-                            ])));
-                            self.push_trailing_comment(&mut entry_parts, trailing, &nested);
-                        }
-                    } else {
-                        let trailing = get_trailing_comment(value, &mut iter);
-                        self.check_and_cache_ignored(value, iter.peek().copied());
-                        let value_str = self.format_source_exprs(slice::from_ref(value), &nested);
-                        entry_parts.push(Doc::verbatim(format!("{key_str}: {value_str},")));
-                        self.push_trailing_comment(&mut entry_parts, trailing, indent);
-                    }
+                    let trailing = get_trailing_comment(value, &mut iter);
+                    self.check_and_cache_ignored(value, iter.peek().copied());
+                    entry_parts.extend(self.entry_doc(key_str, comments, value, &nested));
+                    self.push_trailing_comment(&mut entry_parts, trailing, &nested);
                 }
             }
 
             self.render_doc(&block(Doc::text("{"), entry_parts, "}"), indent)
         }
+    }
+
+    /// A `key: value,` line of a multiline tuple. Comments between the key and
+    /// the value go on their own lines, with the value below them.
+    fn entry_doc(
+        &mut self,
+        key: String,
+        comments: impl IntoIterator<Item = &'a PreSymbolicExpression>,
+        value: &'a PreSymbolicExpression,
+        nested: &Indent,
+    ) -> Vec<Doc> {
+        let mut comment_parts = Vec::new();
+        for comment in comments {
+            comment_parts.push(Doc::Hardline);
+            comment_parts.push(Doc::verbatim(self.display_pse(comment, nested)));
+        }
+        if comment_parts.is_empty() {
+            let fvalue = self.format_source_exprs(slice::from_ref(value), nested);
+            return vec![Doc::Hardline, Doc::verbatim(format!("{key}: {fvalue},"))];
+        }
+        let double_indent = nested.indented(&self.indentation_str);
+        let fvalue = self.format_source_exprs(slice::from_ref(value), &double_indent);
+        comment_parts.push(Doc::Hardline);
+        comment_parts.push(Doc::verbatim(format!("{fvalue},")));
+        vec![
+            Doc::Hardline,
+            Doc::verbatim(format!("{key}:")),
+            Doc::indent(Doc::concat(comment_parts)),
+        ]
     }
 
     /// Without source, preserve unusual tuple entries without interpreting their
@@ -1155,9 +1161,19 @@ impl<'a> Aggregator<'a> {
         result
     }
 
-    // used for (tuple (n1  1)) syntax
-    // Note: Converted to a { a: 1 } style map
-    fn format_key_value(&mut self, exprs: &'a [PreSymbolicExpression], indent: &Indent) -> String {
+    /// `(tuple (n1 1))` converted to `{ n1: 1 }`, or `None` if an entry isn't a
+    /// key and a single value.
+    fn format_key_value(
+        &mut self,
+        exprs: &'a [PreSymbolicExpression],
+        indent: &Indent,
+    ) -> Option<String> {
+        if !exprs
+            .iter()
+            .all(|entry| is_comment(entry) || split_tuple_entry(entry).is_some())
+        {
+            return None;
+        }
         let inline = match exprs {
             [entry] => match entry.match_list().and_then(|list| list.split_first()) {
                 Some((key, value)) => self.inline_entry(key, value, indent),
@@ -1165,32 +1181,38 @@ impl<'a> Aggregator<'a> {
             },
             _ => None,
         };
-        if let Some(inline) = inline {
-            inline
-        } else {
-            let nested = indent.indented(&self.indentation_str);
-            let mut entry_parts: Vec<Doc> = Vec::new();
-            let mut iter = exprs.iter().peekable();
-            while let Some(arg) = iter.next() {
-                if is_comment(arg) {
-                    entry_parts.push(Doc::Hardline);
-                    entry_parts.push(Doc::verbatim(self.display_pse(arg, &nested)));
-                    continue;
-                }
-                let trailing = get_trailing_comment(arg, &mut iter);
-                self.check_and_cache_ignored(arg, iter.peek().copied());
-                let (key, value) = arg
-                    .match_list()
-                    .and_then(|list| list.split_first())
-                    .unwrap();
-                let fkey = self.display_pse(key, &nested);
-                let fvalue = self.format_source_exprs(value, &nested);
-                entry_parts.push(Doc::Hardline);
-                entry_parts.push(Doc::verbatim(format!("{fkey}: {fvalue},")));
-                self.push_trailing_comment(&mut entry_parts, trailing, &nested);
-            }
-            self.render_doc(&block(Doc::text("{"), entry_parts, "}"), indent)
+        if inline.is_some() {
+            return inline;
         }
+        let nested = indent.indented(&self.indentation_str);
+        let mut entry_parts: Vec<Doc> = Vec::new();
+        let mut iter = exprs.iter().peekable();
+        while let Some(arg) = iter.next() {
+            if is_comment(arg) {
+                entry_parts.push(Doc::Hardline);
+                entry_parts.push(Doc::verbatim(self.display_pse(arg, &nested)));
+                continue;
+            }
+            let trailing = get_trailing_comment(arg, &mut iter);
+            self.check_and_cache_ignored(arg, iter.peek().copied());
+            let TupleEntry {
+                key,
+                before,
+                value,
+                after,
+            } = split_tuple_entry(arg)?;
+            let fkey = self.display_pse(key, &nested);
+            entry_parts.extend(self.entry_doc(fkey, before, value, &nested));
+            for comment in after.iter().chain(trailing) {
+                if comment.span().start_line == value.span().end_line {
+                    entry_parts.push(Doc::text(" "));
+                } else {
+                    entry_parts.push(Doc::Hardline);
+                }
+                entry_parts.push(Doc::verbatim(self.display_pse(comment, &nested)));
+            }
+        }
+        Some(self.render_doc(&block(Doc::text("{"), entry_parts, "}"), indent))
     }
 
     // This prints leaves of the PSE tree
@@ -1523,6 +1545,28 @@ where
         }
         _ => None,
     }
+}
+
+/// A `(key ;; c value ;; c)` tuple entry, split around its value.
+struct TupleEntry<'a> {
+    key: &'a PreSymbolicExpression,
+    before: &'a [PreSymbolicExpression],
+    value: &'a PreSymbolicExpression,
+    after: &'a [PreSymbolicExpression],
+}
+
+/// `None` unless `entry` is a key atom followed by one value and any comments.
+fn split_tuple_entry(entry: &PreSymbolicExpression) -> Option<TupleEntry<'_>> {
+    let (key, rest) = entry.match_list()?.split_first()?;
+    key.match_atom()?;
+    let pos = rest.iter().position(|expr| !is_comment(expr))?;
+    let (before, after) = (&rest[..pos], &rest[pos + 1..]);
+    after.iter().all(is_comment).then_some(TupleEntry {
+        key,
+        before,
+        value: &rest[pos],
+        after,
+    })
 }
 
 fn contains_comments(exprs: &[PreSymbolicExpression]) -> bool {

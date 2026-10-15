@@ -56,11 +56,23 @@ fn definition_comments_do_not_swallow_arguments() {
 }
 
 #[test]
-fn sole_comment_argument_keeps_closing_parenthesis() {
+fn last_comment_argument_keeps_closing_parenthesis() {
     for (source, expected) in [
         ("(foo\n ;; c\n)", "(foo\n  ;; c\n)"),
         ("(foo ;; c\n)", "(foo ;; c\n)"),
         ("(ok ;; c\n)", "(ok ;; c\n)"),
+        ("(foo u1 ;; c\n)", "(foo u1 ;; c\n)"),
+        (
+            "(define-read-only (f)\n  (begin\n    (foo u1 ;; c\n    )\n    (ok u1)))",
+            indoc::indoc! {"
+                (define-read-only (f)
+                  (begin
+                    (foo u1 ;; c
+                    )
+                    (ok u1)
+                  )
+                )"},
+        ),
     ] {
         assert_format(source, expected);
     }
@@ -99,17 +111,62 @@ fn comments_between_tuple_entries_are_preserved() {
 }
 
 #[test]
+fn commented_tuple_entries_convert_to_sugar() {
+    for (source, expected) in [
+        ("(tuple (a ;; c\n u1))", "{\n  a:\n    ;; c\n    u1,\n}"),
+        ("(tuple (a u1 ;; c\n))", "{\n  a: u1, ;; c\n}"),
+        ("(tuple (a u1\n ;; after\n))", "{\n  a: u1,\n  ;; after\n}"),
+        (
+            "(tuple (a u1 ;; inner\n) ;; outer\n)",
+            "{\n  a: u1, ;; inner\n  ;; outer\n}",
+        ),
+        (
+            "(tuple (a u1) (b ;; first\n ;; second\n u2))",
+            indoc::indoc! {"
+                {
+                  a: u1,
+                  b:
+                    ;; first
+                    ;; second
+                    u2,
+                }"},
+        ),
+        (
+            "(define-public (f)\n(ok (tuple (a ;; c\nu1))))",
+            indoc::indoc! {"
+                (define-public (f)
+                  (ok {
+                    a:
+                      ;; c
+                      u1,
+                  })
+                )"},
+        ),
+    ] {
+        assert_format(source, expected);
+    }
+}
+
+#[test]
+fn sugar_comments_between_key_and_value_are_preserved() {
+    assert_format(
+        "{ a:\n ;; first\n ;; second\n u1 }",
+        "{\n  a:\n    ;; first\n    ;; second\n    u1,\n}",
+    );
+}
+
+#[test]
 fn unusual_tuple_entries_keep_their_source() {
     let formatter = ClarityFormatter::new(Settings::default());
     for source in [
         "(tuple (a u1 u2))",
-        "(tuple (a ;; c\n u1))",
-        "(tuple (a u1 ;; c\n))",
+        "(tuple (a ;; c\n u1 u2))",
+        "(tuple (a ;; c\n))",
+        "(tuple (a u1) (b ;; c\n))",
         "(tuple (a))",
         "(tuple ())",
         "(tuple u1)",
         "(tuple ((some a) u1))",
-        "(tuple (a u1) (b ;; first\n ;; second\n u2))",
         "(tuple (let))",
     ] {
         assert_eq!(formatter.format_section(source, None).unwrap(), source);
@@ -126,7 +183,7 @@ fn unusual_tuple_entries_keep_their_source() {
 
 #[test]
 fn unusual_nested_tuple_entries_remain_stable() {
-    let source = "(define-constant x (tuple (a ;; c\nu1))) ;; outer";
+    let source = "(define-constant x (tuple (a ;; c\nu1 u2))) ;; outer";
     assert_format(source, source);
     assert_format("(tuple (a (tuple (b u1 u2))))", "{ a: (tuple (b u1 u2)) }");
 }
