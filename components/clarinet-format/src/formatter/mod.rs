@@ -517,19 +517,15 @@ impl<'a> Aggregator<'a> {
                     }
                 }
 
-                if let (Some(comment), Some(last_item)) = (trailing, method_list.last()) {
-                    method_doc.push(Doc::verbatim(
-                        self.spaced_comment(last_item, comment, indent),
-                    ));
-                }
-
                 method_parts.push(Doc::indent(Doc::concat(method_doc)));
                 method_parts.push(Doc::Hardline);
                 method_parts.push(Doc::text(")"));
-
-                if iter.peek().is_some() {
-                    method_parts.push(Doc::Hardline);
-                }
+                self.push_trailing_comment(&mut method_parts, trailing, &nested);
+            } else if is_comment(expr) {
+                method_parts.push(Doc::verbatim(self.display_pse(expr, &nested)));
+            }
+            if iter.peek().is_some() {
+                method_parts.push(Doc::Hardline);
             }
         }
 

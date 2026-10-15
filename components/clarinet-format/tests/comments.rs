@@ -72,3 +72,25 @@ fn sole_comment_argument_keeps_closing_parenthesis() {
     }
     assert_format("(foo u1)", "(foo u1)");
 }
+
+#[test]
+fn trait_method_comments_are_preserved() {
+    let expected = indoc::indoc! {"
+        (define-trait t (
+          ;; before
+          ;; also before
+          (first
+            (uint)
+            (response uint uint)
+          ) ;; trailing
+          ;; between
+          (second
+            ()
+            (response bool uint)
+          )
+          ;; after
+        ))"};
+    assert_format(expected, expected);
+    let comments_only = "(define-trait t (\n  ;; only comment\n))";
+    assert_format(comments_only, comments_only);
+}
