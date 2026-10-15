@@ -167,13 +167,12 @@ fn post_condition_abort(
 
 /// Report a failed execution to the eval hooks, leaving them installed.
 fn notify_hooks_of_failure(global_context: &mut GlobalContext, error: &str) {
-    let Some(mut eval_hooks) = global_context.eval_hooks.take() else {
+    let Some(eval_hooks) = &mut global_context.eval_hooks else {
         return;
     };
     for hook in eval_hooks.iter_mut() {
         hook.did_complete(Err(error.to_string()));
     }
-    global_context.eval_hooks = Some(eval_hooks);
 }
 
 /// A failed `ClarityInterpreter::run`.
