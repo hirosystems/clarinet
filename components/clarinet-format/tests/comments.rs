@@ -94,3 +94,12 @@ fn trait_method_comments_are_preserved() {
     let comments_only = "(define-trait t (\n  ;; only comment\n))";
     assert_format(comments_only, comments_only);
 }
+
+#[test]
+fn comments_between_tuple_entries_are_preserved() {
+    assert_format(
+        "(tuple\n ;; before\n (a u1) ;; trailing\n ;; between\n (b u2)\n ;; after\n)",
+        "{\n  ;; before\n  a: u1, ;; trailing\n  ;; between\n  b: u2,\n  ;; after\n}",
+    );
+    assert_format("(tuple ;; only comment\n)", "{\n  ;; only comment\n}");
+}

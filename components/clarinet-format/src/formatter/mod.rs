@@ -1142,6 +1142,11 @@ impl<'a> Aggregator<'a> {
             let mut entry_parts: Vec<Doc> = Vec::new();
             let mut iter = exprs.iter().peekable();
             while let Some(arg) = iter.next() {
+                if is_comment(arg) {
+                    entry_parts.push(Doc::Hardline);
+                    entry_parts.push(Doc::verbatim(self.display_pse(arg, &nested)));
+                    continue;
+                }
                 let trailing = get_trailing_comment(arg, &mut iter);
                 self.check_and_cache_ignored(arg, iter.peek().copied());
                 let (key, value) = arg
