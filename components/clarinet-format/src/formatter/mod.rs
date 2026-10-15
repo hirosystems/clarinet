@@ -1,9 +1,10 @@
+pub mod doc;
 pub mod helpers;
 pub mod ignored;
 
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::iter::Peekable;
+use std::ops::Deref;
 use std::{fmt, slice};
 
 use clarinet_defaults::DEFAULT_EPOCH;
@@ -12,8 +13,9 @@ use clarity::vm::ast::stack_depth_checker::StackDepthLimits;
 use clarity::vm::functions::define::DefineFunctions;
 use clarity::vm::functions::NativeFunctions;
 use clarity::vm::representations::{PreSymbolicExpression, PreSymbolicExpressionType, Span};
+use doc::{Doc, Printer};
 use helpers::t;
-use ignored::{ignored_exprs, SourceLines};
+use ignored::SourceLines;
 
 pub enum Indentation {
     Space(usize),
@@ -63,6 +65,45 @@ impl Default for Settings {
     }
 }
 
+/// The indentation string at one nesting level.
+struct Indent {
+    string: String,
+}
+
+impl Indent {
+    fn new(base: &str) -> Self {
+        Indent {
+            string: base.to_string(),
+        }
+    }
+
+    fn empty() -> Self {
+        Indent {
+            string: String::new(),
+        }
+    }
+
+    /// Create a new Indent one level deeper.
+    fn indented(&self, indent_unit: &str) -> Self {
+        let mut string = self.string.clone();
+        string.push_str(indent_unit);
+        Indent { string }
+    }
+}
+
+impl Deref for Indent {
+    type Target = str;
+    fn deref(&self) -> &str {
+        &self.string
+    }
+}
+
+impl fmt::Display for Indent {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str(&self.string)
+    }
+}
+
 pub struct ClarityFormatter {
     settings: Settings,
 }
@@ -78,7 +119,7 @@ impl ClarityFormatter {
             StackDepthLimits::for_epoch(epoch.unwrap_or(DEFAULT_EPOCH)),
         )
         .unwrap();
-        let agg = Aggregator::new(&self.settings, &pse, Some(trimmed_source));
+        let mut agg = Aggregator::new(&self.settings, &pse, Some(trimmed_source));
         let result = agg.generate();
 
         // make sure the file ends with a newline
@@ -86,7 +127,7 @@ impl ClarityFormatter {
     }
     /// formatting an AST without a source file
     pub fn format_ast(&self, pse: &[PreSymbolicExpression]) -> String {
-        let agg = Aggregator::new(&self.settings, pse, None);
+        let mut agg = Aggregator::new(&self.settings, pse, None);
         agg.generate()
     }
     /// Alias `format_file` to `format`
@@ -110,7 +151,7 @@ impl ClarityFormatter {
         // `previous_indentation` for format_source_exprs
         let indentation_level = source.chars().take_while(|c| c.is_whitespace()).count();
         let leading_spaces = &source[..indentation_level];
-        let agg = Aggregator::new(&self.settings, &pse, Some(source));
+        let mut agg = Aggregator::new(&self.settings, &pse, Some(source));
 
         let result = agg.generate();
         Ok(if leading_spaces.is_empty() {
@@ -130,8 +171,9 @@ pub struct Aggregator<'a> {
     source_lines: Option<SourceLines<'a>>,
     indentation_str: String,
 
-    cache: RefCell<HashMap<(usize, String), String>>,
-    ignored_exprs: RefCell<HashMap<Span, String>>,
+    // Keyed by slice pointer, length and indent
+    cache: HashMap<(usize, usize, String), String>,
+    ignored_exprs: HashMap<Span, String>,
 }
 
 impl<'a> Aggregator<'a> {
@@ -147,36 +189,42 @@ impl<'a> Aggregator<'a> {
             source,
             source_lines: source.map(SourceLines::new),
             indentation_str,
-            cache: RefCell::new(HashMap::new()),
-            ignored_exprs: RefCell::new(HashMap::new()),
+            cache: HashMap::new(),
+            ignored_exprs: HashMap::new(),
         }
     }
-    pub fn generate(&self) -> String {
-        self.cache.borrow_mut().clear();
-        self.ignored_exprs.borrow_mut().clear();
+
+    /// Render a Doc tree to a String using the current settings.
+    fn render_doc(&self, doc: &Doc, indent: &Indent) -> String {
+        Printer::new(&self.indentation_str, self.settings.max_line_length).render(doc, indent)
+    }
+
+    pub fn generate(&mut self) -> String {
+        self.cache.clear();
+        self.ignored_exprs.clear();
         // this handles if we're formatting a section of code rather than the whole file
-        let indentation_level = match self.source {
-            Some(source) => source.chars().take_while(|c| c.is_whitespace()).count(),
+        let indent = match self.source {
+            Some(source) => {
+                let level = source.chars().take_while(|c| c.is_whitespace()).count();
+                Indent::new(&source[..level])
+            }
             None => {
-                (self
+                let level = (self
                     .pse
                     .first()
                     .map_or(0, |expr| expr.span().start_column.saturating_sub(1)))
-                    as usize
+                    as usize;
+                Indent::new(&" ".repeat(level))
             }
         };
-        let previous_indentation = match self.source {
-            Some(source) => &source[..indentation_level],
-            None => &" ".repeat(indentation_level),
-        };
 
-        let formatted = self.format_source_exprs(self.pse, previous_indentation);
+        let formatted = self.format_source_exprs(self.pse, &indent);
         // If we're formatting an AST without a source and there's indentation,
         // we need to ensure it's applied to the beginning of the output
-        if self.source.is_none() && indentation_level > 0 {
+        if self.source.is_none() && !indent.is_empty() {
             // Only add indentation if we're formatting a top-level expression
             if self.pse.len() == 1 && formatted.starts_with('(') {
-                return format!("{previous_indentation}{formatted}");
+                return format!("{indent}{formatted}");
             }
         }
 
@@ -184,77 +232,94 @@ impl<'a> Aggregator<'a> {
     }
 
     // when format_source_exprs is called on one of these cached expressions the source will be returned as is
-    fn cache_ignored_expression(
-        &self,
-        source_lines: &SourceLines,
-        next_expr: &PreSymbolicExpression,
-    ) {
-        let span = next_expr.span();
-        let source = source_lines.extract_through_line_end(span);
-        self.ignored_exprs.borrow_mut().insert(span.clone(), source);
-    }
-
-    /// Check if an expression is a comment with @format-ignore and cache the next expression if so.
-    fn check_and_cache_ignored_expression(
-        &self,
-        expr: &PreSymbolicExpression,
-        next_expr: Option<&PreSymbolicExpression>,
-        indentation: &str,
-    ) {
-        if !is_comment(expr) {
-            return;
-        }
-
-        let formatted_comment = self.display_pse(expr, indentation);
-        // in the case of 2 lines of @format-ignore
-        // ;; @format-ignore
-        // ;; @format-ignore
-        if !formatted_comment.contains(FORMAT_IGNORE_SYNTAX) {
-            return;
-        }
-
-        // if @format-ignore is placed on the last line of an expression
-        let Some(next) = next_expr else {
-            return;
-        };
-
-        if next.match_list().is_none() {
-            return;
-        }
-
-        // if we couldn't extract the source, exit
+    fn cache_ignored_expression(&mut self, next_expr: &PreSymbolicExpression) {
         let Some(source_lines) = &self.source_lines else {
             return;
         };
+        // Only the expression: callers add its trailing comment themselves
+        let source = source_lines.extract_expr_source(next_expr);
+        self.ignored_exprs.insert(next_expr.span().clone(), source);
+    }
 
-        self.cache_ignored_expression(source_lines, next);
+    /// Handle a `@format-ignore` comment: append the comment and the following
+    /// expression to `result` as raw source text.
+    /// Returns the `end_line` of the last processed expression (for blank-line tracking).
+    fn emit_format_ignored<'b>(
+        &mut self,
+        comment_expr: &'a PreSymbolicExpression,
+        iter: &mut Peekable<impl Iterator<Item = &'b PreSymbolicExpression>>,
+        result: &mut String,
+        indent: &Indent,
+    ) -> u32
+    where
+        'a: 'b,
+    {
+        let next_list = iter
+            .peek()
+            .copied()
+            .filter(|next| next.match_list().is_some());
+        let (Some(source_lines), Some(next_expr)) = (&self.source_lines, next_list) else {
+            // Without source, or with no list to ignore, this is a plain comment
+            let comment = match &self.source_lines {
+                Some(source_lines) => source_lines.extract_expr_source(comment_expr),
+                None => self.display_pse(comment_expr, indent),
+            };
+            result.push_str(&comment);
+            if iter.peek().is_some() {
+                result.push('\n');
+            }
+            return comment_expr.span().end_line;
+        };
+        iter.next();
+
+        // Keep the directive, the expression and its trailing comment verbatim
+        let last = get_trailing_comment(next_expr, iter).unwrap_or(next_expr);
+        result.push_str(&source_lines.extract_source_range(&Span {
+            start_line: comment_expr.span().start_line,
+            start_column: comment_expr.span().start_column,
+            ..last.span().clone()
+        }));
+        if iter.peek().is_some() {
+            result.push('\n');
+        }
+
+        last.span().end_line
+    }
+
+    /// If `expr` is a `@format-ignore` comment and `next_expr` is a list,
+    /// cache the next expression so it's returned verbatim by `format_source_exprs`.
+    fn check_and_cache_ignored(
+        &mut self,
+        expr: &PreSymbolicExpression,
+        next_expr: Option<&PreSymbolicExpression>,
+    ) {
+        if let Some(next) =
+            next_expr.filter(|next| is_format_ignore(expr) && next.match_list().is_some())
+        {
+            self.cache_ignored_expression(next);
+        }
     }
 
     fn format_source_exprs(
-        &self,
-        expressions: &[PreSymbolicExpression],
-        previous_indentation: &str,
+        &mut self,
+        expressions: &'a [PreSymbolicExpression],
+        indent: &Indent,
     ) -> String {
         // if this expression was marked as ignored, return the cached source
         if let [expr] = expressions {
-            if let Some(source) = self.ignored_exprs.borrow().get(expr.span()) {
+            if let Some(source) = self.ignored_exprs.get(expr.span()) {
                 return source.clone();
             }
         }
 
-        // Cache by slice pointer and indentation
         let key = (
             expressions.as_ptr() as usize,
-            previous_indentation.to_string(),
+            expressions.len(),
+            indent.to_string(),
         );
 
-        // Check if we have a cached result
-        let cached_result = {
-            let cache_ref = self.cache.borrow();
-            cache_ref.get(&key).cloned()
-        };
-        if let Some(result) = cached_result {
-            return result;
+        if let Some(result) = self.cache.get(&key) {
+            return result.clone();
         }
         // Track the end line of the previous expression
         let mut prev_end_line = 0;
@@ -265,64 +330,10 @@ impl<'a> Aggregator<'a> {
 
         while let Some(expr) = iter.next() {
             let trailing_comment = get_trailing_comment(expr, &mut iter);
-            let cur = self.display_pse(expr, previous_indentation);
 
-            // Only check for @format-ignore in comments, not in the entire formatted output
-            // This prevents re-processing when extracted blocks contain @format-ignore
-            let should_ignore = is_comment(expr) && cur.contains(FORMAT_IGNORE_SYNTAX);
-
-            if should_ignore {
-                if let Some(source_lines) = &self.source_lines {
-                    if let Some(next) = iter.peek() {
-                        if next.match_list().is_some() {
-                            let next_expr = iter.next().unwrap();
-
-                            // Include the directive and any trailing comment on the expression.
-                            let extracted = source_lines.extract_through_line_end(&Span {
-                                start_line: expr.span().start_line,
-                                start_column: expr.span().start_column,
-                                ..next_expr.span().clone()
-                            });
-
-                            // cache the next expression so that when format_source_exprs is called on it
-                            // (by format_begin or other format functions), we return the original source
-                            // instead of formatting it
-                            self.cache_ignored_expression(source_lines, next_expr);
-
-                            result.push_str(&extracted);
-
-                            // If there's another expression after the ignored one, we need to add a newline
-                            // since extract_source_range doesn't include the newline after the last line
-                            if iter.peek().is_some() {
-                                result.push('\n');
-                            }
-
-                            prev_end_line = next_expr.span().end_line;
-                        } else {
-                            // Next expression is not a list, just extract the comment
-                            result.push_str(&source_lines.extract_expr_source(expr));
-                        }
-                    } else {
-                        // No next expression, just extract the comment
-                        result.push_str(&source_lines.extract_expr_source(expr));
-                    }
-                } else {
-                    // Fallback if no source available
-                    result.push_str(&cur);
-                    if let Some(next) = iter.peek() {
-                        if next.match_list().is_some() {
-                            let next_expr = iter.next().unwrap();
-                            result.push('\n');
-                            result.push_str(&ignored_exprs(
-                                std::slice::from_ref(next_expr),
-                                self.source.unwrap_or_default(),
-                            ));
-                            result.push('\n');
-                            prev_end_line = next_expr.span().end_line; // keep going after the ignored one
-                        }
-                    }
-                }
-                continue; // keep going after the ignored one
+            if is_format_ignore(expr) {
+                prev_end_line = self.emit_format_ignored(expr, &mut iter, &mut result, indent);
+                continue;
             }
 
             if prev_end_line > 0
@@ -335,230 +346,104 @@ impl<'a> Aggregator<'a> {
                     result.push('\n');
                 }
             }
-            if let Some(list) = expr.match_list() {
+            let (formatted, is_define) = if let Some(list) = expr.match_list() {
                 if let Some(atom_name) = list.split_first().and_then(|(f, _)| f.match_atom()) {
-                    let formatted = if let Some(native) = NativeFunctions::lookup_by_name(atom_name)
-                    {
-                        match native {
-                            NativeFunctions::Let => self.format_let(list, previous_indentation),
-                            NativeFunctions::Begin => self.format_begin(list, previous_indentation),
-                            NativeFunctions::Match =>
-                              if contains_comments(list) {
-                                self.match_with_comments(list, previous_indentation)
-                              } else {
-                                self.format_match(list, previous_indentation)
-                              },
-                            NativeFunctions::TupleCons => {
-                                // if the kv map is defined with (tuple (c 1)) then we strip the
-                                // ClarityName("tuple") out first and convert it to key/value syntax
-                                self.format_key_value(&list[1..], previous_indentation)
-                            }
-                            NativeFunctions::If => self.format_if(list, previous_indentation),
-                            NativeFunctions::And | NativeFunctions::Or => {
-                                self.format_booleans(list, previous_indentation)
-                            }
-
-                            NativeFunctions::ListCons => self.format_list(list, previous_indentation),
-
-                            | NativeFunctions::RestrictAssets => self.format_restrict_assets(list, previous_indentation),
-                            // everything else that's not special cased
-                            NativeFunctions::Add
-                            | NativeFunctions::Subtract
-                            | NativeFunctions::Multiply
-                            | NativeFunctions::Divide
-                            | NativeFunctions::CmpGeq
-                            | NativeFunctions::CmpLeq
-                            | NativeFunctions::CmpLess
-                            | NativeFunctions::CmpGreater
-                            | NativeFunctions::ToInt
-                            | NativeFunctions::ToUInt
-                            | NativeFunctions::Modulo
-                            | NativeFunctions::Power
-                            | NativeFunctions::Sqrti
-                            | NativeFunctions::Log2
-                            | NativeFunctions::BitwiseXor
-                            | NativeFunctions::Not
-                            | NativeFunctions::Equals
-                            | NativeFunctions::Map
-                            | NativeFunctions::Fold
-                            | NativeFunctions::Append
-                            | NativeFunctions::Concat
-                            | NativeFunctions::AsMaxLen
-                            | NativeFunctions::Len
-                            | NativeFunctions::ElementAt
-                            | NativeFunctions::ElementAtAlias
-                            | NativeFunctions::IndexOf
-                            | NativeFunctions::IndexOfAlias
-                            | NativeFunctions::BuffToIntLe
-                            | NativeFunctions::BuffToUIntLe
-                            | NativeFunctions::BuffToIntBe
-                            | NativeFunctions::BuffToUIntBe
-                            | NativeFunctions::IsStandard
-                            | NativeFunctions::PrincipalDestruct
-                            | NativeFunctions::PrincipalConstruct
-                            | NativeFunctions::StringToInt
-                            | NativeFunctions::StringToUInt
-                            | NativeFunctions::IntToAscii
-                            | NativeFunctions::IntToUtf8
-                            | NativeFunctions::FetchVar
-                            | NativeFunctions::FetchEntry // map-get?
-                            | NativeFunctions::SetEntry // map-set?
-                            | NativeFunctions::SetVar
-                            | NativeFunctions::InsertEntry
-                            | NativeFunctions::DeleteEntry
-                            | NativeFunctions::TupleGet
-                            | NativeFunctions::TupleMerge
-                            | NativeFunctions::Hash160
-                            | NativeFunctions::Sha256
-                            | NativeFunctions::Sha512
-                            | NativeFunctions::Sha512Trunc256
-                            | NativeFunctions::Keccak256
-                            | NativeFunctions::Secp256k1Recover
-                            | NativeFunctions::Secp256k1Verify
-                            | NativeFunctions::Print
-                            | NativeFunctions::ContractCall
-                            | NativeFunctions::AsContract
-                            | NativeFunctions::ContractOf
-                            | NativeFunctions::PrincipalOf
-                            | NativeFunctions::AtBlock
-                            | NativeFunctions::GetBlockInfo
-                            | NativeFunctions::GetBurnBlockInfo
-                            | NativeFunctions::ConsError
-                            | NativeFunctions::ConsOkay
-                            | NativeFunctions::ConsSome
-                            | NativeFunctions::DefaultTo
-                            | NativeFunctions::Asserts
-                            | NativeFunctions::UnwrapRet
-                            | NativeFunctions::UnwrapErrRet
-                            | NativeFunctions::Unwrap
-                            | NativeFunctions::UnwrapErr
-                            | NativeFunctions::TryRet
-                            | NativeFunctions::IsOkay
-                            | NativeFunctions::IsNone
-                            | NativeFunctions::IsErr
-                            | NativeFunctions::IsSome
-                            | NativeFunctions::Filter
-                            | NativeFunctions::GetTokenBalance
-                            | NativeFunctions::GetAssetOwner
-                            | NativeFunctions::TransferToken
-                            | NativeFunctions::TransferAsset
-                            | NativeFunctions::MintAsset
-                            | NativeFunctions::MintToken
-                            | NativeFunctions::GetTokenSupply
-                            | NativeFunctions::BurnToken
-                            | NativeFunctions::BurnAsset
-                            | NativeFunctions::GetStxBalance
-                            | NativeFunctions::StxTransfer
-                            | NativeFunctions::StxTransferMemo
-                            | NativeFunctions::StxBurn
-                            | NativeFunctions::StxGetAccount
-                            | NativeFunctions::BitwiseAnd
-                            | NativeFunctions::BitwiseOr
-                            | NativeFunctions::BitwiseNot
-                            | NativeFunctions::BitwiseLShift
-                            | NativeFunctions::BitwiseRShift
-                            | NativeFunctions::BitwiseXor2
-                            | NativeFunctions::Slice
-                            | NativeFunctions::ToConsensusBuff
-                            | NativeFunctions::FromConsensusBuff
-                            | NativeFunctions::ReplaceAt
-                            | NativeFunctions::GetStacksBlockInfo
-                            | NativeFunctions::GetTenureInfo
-                            | NativeFunctions::AsContractSafe
-                            | NativeFunctions::AllowanceAll
-                            | NativeFunctions::AllowanceWithStacking
-                            | NativeFunctions::AllowanceWithStx
-                            | NativeFunctions::AllowanceWithFt
-                            | NativeFunctions::AllowanceWithNft
-                            | NativeFunctions::Secp256r1Verify
-                            | NativeFunctions::ContractHash
-                            | NativeFunctions::ToAscii
-                            | NativeFunctions::VerifyMerkleProof
-                            | NativeFunctions::GetBitcoinTxOutput
-                            | NativeFunctions::Ed25519Verify
-                            | NativeFunctions::Secp256k1Decompress
-                            | NativeFunctions::AllowanceWithStaking
-                            | NativeFunctions::AllowanceWithPox => {
-                                let inner_content =
-                                    self.to_inner_content(list, previous_indentation);
-
-                                let mut out = inner_content;
-                                if let Some(comment) = trailing_comment {
-                                    out.push(' ');
-                                    out.push_str(
-                                        &self.display_pse(comment, previous_indentation),
-                                    );
-                                    out.push('\n');
-                                } else if let Some(next) = iter.peek() {
-                                    if list[0].span().end_line != next.span().end_line {
-                                        out.push('\n');
-                                    } else {
-                                        out.push(' ');
-                                    }
-                                }
-                                out
-                            }
-                        }
-                    } else if let Some(define) = DefineFunctions::lookup_by_name(atom_name) {
-                        let formatted = match define {
-                            DefineFunctions::PublicFunction
-                            | DefineFunctions::ReadOnlyFunction
-                            | DefineFunctions::PrivateFunction => self.function(list),
-                            DefineFunctions::Constant
-                            | DefineFunctions::PersistedVariable
-                            | DefineFunctions::FungibleToken
-                            | DefineFunctions::ImplTrait
-                            | DefineFunctions::UseTrait
-                            | DefineFunctions::NonFungibleToken => {
-                                self.format_constant(list, previous_indentation)
-                            }
-                            DefineFunctions::Map => self.format_map(list, previous_indentation),
-                            DefineFunctions::Trait => self.define_trait(list, previous_indentation),
-                        };
-                        if let Some(comment) = trailing_comment {
-                            let mut out = formatted;
-                            out.push(' ');
-                            out.push_str(&self.display_pse(comment, previous_indentation));
-                            out.push('\n');
-                            out
-                        } else if formatted.ends_with('\n') {
-                            formatted
-                        } else {
-                            let mut out = formatted;
-                            out.push('\n');
-                            out
-                        }
-                    } else {
-                        self.to_inner_content(list, previous_indentation)
-                    };
-                    // if it's a top level expression, newline it
-                    if previous_indentation.is_empty() && (result.ends_with(")")) {
-                        result.push('\n');
-                    }
-                    result.push_str(&formatted);
-                    prev_end_line = expr.span().end_line;
-                    continue;
-                }
-            }
-            let current = self.display_pse(expr, previous_indentation);
-            let mut between = " ";
-            if let Some(next) = iter.peek() {
-                if !is_same_line(expr, next) || is_comment(expr) {
-                    between = "\n";
+                    (
+                        self.format_list_call(atom_name, list, indent),
+                        is_define_fn(atom_name),
+                    )
+                } else {
+                    // list without a leading atom
+                    (self.display_pse(expr, indent), false)
                 }
             } else {
-                // no next expression to space out
-                between = "";
+                (self.display_pse(expr, indent), false)
+            };
+
+            // Top-level lists each start on their own line
+            if (trailing_comment.is_some() || expr.match_list().is_some())
+                && indent.is_empty()
+                && result.ends_with(')')
+            {
+                result.push('\n');
+            }
+
+            if let Some(comment) = trailing_comment {
+                // A define ends with a newline, and the comment goes before it
+                result.push_str(formatted.strip_suffix('\n').unwrap_or(&formatted));
+                result.push(' ');
+                result.push_str(&self.display_pse(comment, indent));
+                result.push('\n');
+            } else if is_define {
+                // Define-level expressions always get a trailing newline
+                result.push_str(&formatted);
+                if !formatted.ends_with('\n') {
+                    result.push('\n');
+                }
+            } else if expr.match_list().is_some() {
+                result.push_str(&formatted);
+                if let Some(next) = iter.peek() {
+                    if !is_same_line(expr, next) {
+                        result.push('\n');
+                    } else {
+                        result.push(' ');
+                    }
+                }
+            } else {
+                // Non-list expressions (atoms, values, etc.)
+                result.push_str(&formatted);
+                if let Some(next) = iter.peek() {
+                    if !is_same_line(expr, next) || is_comment(expr) {
+                        result.push('\n');
+                    } else {
+                        result.push(' ');
+                    }
+                }
             }
 
             prev_end_line = expr.span().end_line;
-
-            result.push_str(&current);
-            result.push_str(between);
         }
         // Cache the result
-        self.cache.borrow_mut().insert(key, result.clone());
+        self.cache.insert(key, result.clone());
         result
+    }
+
+    /// Dispatch a list expression `(fn-name ...)` to the appropriate formatter.
+    fn format_list_call(
+        &mut self,
+        atom_name: &str,
+        list: &'a [PreSymbolicExpression],
+        indent: &Indent,
+    ) -> String {
+        if let Some(native) = NativeFunctions::lookup_by_name(atom_name) {
+            match native {
+                NativeFunctions::Let => self.format_let(list, indent),
+                NativeFunctions::Begin => self.format_begin(list, indent),
+                NativeFunctions::Match => self.format_match(list, indent),
+                NativeFunctions::TupleCons => self.format_key_value(&list[1..], indent),
+                NativeFunctions::If => self.format_if(list, indent),
+                NativeFunctions::And | NativeFunctions::Or => self.format_booleans(list, indent),
+                NativeFunctions::ListCons => self.format_list(list, indent),
+                NativeFunctions::RestrictAssets => self.format_restrict_assets(list, indent),
+                _ => self.format_inner_content(list, indent),
+            }
+        } else if let Some(define) = DefineFunctions::lookup_by_name(atom_name) {
+            match define {
+                DefineFunctions::PublicFunction
+                | DefineFunctions::ReadOnlyFunction
+                | DefineFunctions::PrivateFunction => self.function(list),
+                DefineFunctions::Constant
+                | DefineFunctions::PersistedVariable
+                | DefineFunctions::FungibleToken
+                | DefineFunctions::ImplTrait
+                | DefineFunctions::UseTrait
+                | DefineFunctions::NonFungibleToken => self.format_constant(list, indent),
+                DefineFunctions::Map => self.format_map(list, indent),
+                DefineFunctions::Trait => self.define_trait(list, indent),
+            }
+        } else {
+            self.format_inner_content(list, indent)
+        }
     }
 
     // (define-trait trait-name (
@@ -568,541 +453,428 @@ impl<'a> Aggregator<'a> {
     //   )
     //   (func2-name (arg1-type arg2-type ...) (return-type))
     // )
-    fn define_trait(&self, exprs: &[PreSymbolicExpression], previous_indentation: &str) -> String {
-        let mut acc = "(define-trait ".to_string();
-        let indentation = &self.indentation_str;
-        let space = format!("{indentation}{previous_indentation}");
-
-        // name
-        acc.push_str(&self.format_source_exprs(slice::from_ref(&exprs[1]), previous_indentation));
-
-        // methods
+    fn define_trait(&mut self, exprs: &'a [PreSymbolicExpression], indent: &Indent) -> String {
+        let nested = indent.indented(&self.indentation_str);
+        let name = self.format_source_exprs(slice::from_ref(&exprs[1]), indent);
         let methods = exprs[2].match_list().unwrap();
 
         if methods.is_empty() {
             let is_multiline = exprs[1].span().end_line != exprs[2].span().start_line;
-
             if is_multiline {
-                // Preserve multiline format with potential trailing comments
-                acc.push('\n');
-                acc.push_str(&space);
-                acc.push_str(&self.display_pse(&exprs[2], &space));
-
-                // Check for trailing comments after the empty methods list
+                let mut parts: Vec<Doc> = vec![Doc::text("(define-trait "), Doc::verbatim(name)];
+                parts.push(Doc::indent(Doc::concat(vec![
+                    Doc::Hardline,
+                    Doc::verbatim(self.display_pse(&exprs[2], &nested)),
+                ])));
                 if exprs.len() > 3 && is_comment(&exprs[3]) {
-                    acc.push(' ');
-                    acc.push_str(&self.display_pse(&exprs[3], previous_indentation));
+                    parts.push(Doc::text(" "));
+                    parts.push(Doc::verbatim(self.display_pse(&exprs[3], indent)));
                 }
-
-                acc.push('\n');
+                parts.push(Doc::Hardline);
+                parts.push(Doc::text(")"));
+                return self.render_doc(&Doc::concat(parts), indent);
             } else {
-                acc.push_str(" ()");
+                return self.render_doc(
+                    &Doc::concat(vec![
+                        Doc::text("(define-trait "),
+                        Doc::verbatim(name),
+                        Doc::text(" ())"),
+                    ]),
+                    indent,
+                );
             }
-
-            acc.push(')');
-            return acc;
         }
 
-        acc.push_str(" (");
-        acc.push('\n');
-        acc.push_str(&space);
+        let double_indent = nested.indented(&self.indentation_str);
+        let mut method_parts: Vec<Doc> = Vec::new();
 
         let mut iter = methods.iter().peekable();
         while let Some(expr) = iter.next() {
             let trailing = get_trailing_comment(expr, &mut iter);
 
             if let Some(method_list) = expr.match_list() {
-                acc.push('(');
+                let mut method_doc: Vec<Doc> = vec![Doc::text("(")];
 
-                // method name
                 if let Some(method_name) = method_list.first() {
-                    acc.push_str(&self.display_pse(method_name, previous_indentation));
+                    method_doc.push(Doc::verbatim(self.display_pse(method_name, indent)));
                 }
-
-                let double_indent = format!("{space}{indentation}");
 
                 let mut items_iter = method_list.iter().skip(1).peekable();
-
                 while let Some(arg) = items_iter.next() {
                     if let Some(element_list) = arg.match_list() {
-                        // Found either args or return type
-                        acc.push('\n');
-                        acc.push_str(&double_indent);
-                        acc.push_str(&self.display_list(element_list, &double_indent));
+                        method_doc.push(Doc::Hardline);
+                        method_doc.push(Doc::verbatim(
+                            self.display_list(element_list, &double_indent),
+                        ));
 
-                        if let Some(next_item) = items_iter.peek() {
-                            if is_comment(next_item) {
-                                let count =
-                                    next_item.span().start_column - arg.span().end_column - 1;
-                                push_spaces(&mut acc, count);
-                                acc.push_str(&self.display_pse(next_item, previous_indentation));
-                                items_iter.next();
-                            }
+                        if let Some(comment) = items_iter.next_if(|next| is_comment(next)) {
+                            method_doc
+                                .push(Doc::verbatim(self.spaced_comment(arg, comment, indent)));
                         }
                     } else if is_comment(arg) {
-                        // standalone comments
-                        acc.push('\n');
-                        acc.push_str(&double_indent);
-                        acc.push_str(&self.display_pse(arg, previous_indentation));
+                        method_doc.push(Doc::Hardline);
+                        method_doc.push(Doc::verbatim(self.display_pse(arg, indent)));
                     }
                 }
 
-                if let Some(comment) = trailing {
-                    if let Some(last_item) = method_list.last() {
-                        let count = comment.span().start_column - last_item.span().end_column - 1;
-                        push_spaces(&mut acc, count);
-                        acc.push_str(&self.display_pse(comment, previous_indentation));
-                    }
+                if let (Some(comment), Some(last_item)) = (trailing, method_list.last()) {
+                    method_doc.push(Doc::verbatim(
+                        self.spaced_comment(last_item, comment, indent),
+                    ));
                 }
 
-                acc.push('\n');
-                acc.push_str(&space);
-                acc.push(')');
+                method_parts.push(Doc::indent(Doc::concat(method_doc)));
+                method_parts.push(Doc::Hardline);
+                method_parts.push(Doc::text(")"));
 
                 if iter.peek().is_some() {
-                    acc.push('\n');
-                    acc.push_str(&space);
+                    method_parts.push(Doc::Hardline);
                 }
             }
         }
 
-        acc.push('\n');
-        acc.push_str("))");
-        acc
+        method_parts.insert(0, Doc::Hardline);
+        let open = Doc::concat(vec![
+            Doc::text("(define-trait "),
+            Doc::verbatim(name),
+            Doc::text(" ("),
+        ]);
+        self.render_doc(&block(open, method_parts, "))"), indent)
     }
 
-    fn format_constant(
-        &self,
-        exprs: &[PreSymbolicExpression],
-        previous_indentation: &str,
-    ) -> String {
-        let func_type = self.display_pse(exprs.first().unwrap(), "");
-        let mut acc = format!("({func_type} ");
+    fn format_constant(&mut self, exprs: &'a [PreSymbolicExpression], indent: &Indent) -> String {
+        let func_type = self.display_pse(exprs.first().unwrap(), &Indent::empty());
+        let mut parts: Vec<Doc> = vec![Doc::text(format!("({func_type} "))];
         let mut iter = exprs[1..].iter().peekable();
         while let Some(expr) = iter.next() {
             let trailing = get_trailing_comment(expr, &mut iter);
-            self.check_and_cache_ignored_expression(
-                expr,
-                iter.peek().copied(),
-                previous_indentation,
-            );
-            acc.push_str(&self.format_source_exprs(slice::from_ref(expr), previous_indentation));
+            self.check_and_cache_ignored(expr, iter.peek().copied());
+            parts.push(Doc::verbatim(
+                self.format_source_exprs(slice::from_ref(expr), indent),
+            ));
             if iter.peek().is_some() {
-                acc.push(' ');
+                parts.push(Doc::text(" "));
             }
-            if let Some(comment) = trailing {
-                acc.push(' ');
-                acc.push_str(&self.display_pse(comment, previous_indentation));
-            }
+            self.push_trailing_comment(&mut parts, trailing, indent);
         }
-        acc.push(')');
-        acc
+        parts.push(Doc::text(")"));
+        self.render_doc(&Doc::concat(parts), indent)
     }
 
-    fn format_map(&self, exprs: &[PreSymbolicExpression], previous_indentation: &str) -> String {
-        let func_type = self.display_pse(exprs.first().unwrap(), "");
-        let mut acc = format!("({func_type} ");
-        let indentation = &self.indentation_str;
-        let space = format!("{indentation}{previous_indentation}");
-        acc.push_str(&self.format_source_exprs(slice::from_ref(&exprs[1]), previous_indentation));
-        let mut iter = exprs[2..].iter().peekable();
-        while let Some(expr) = iter.next() {
-            let trailing = get_trailing_comment(expr, &mut iter);
-            self.check_and_cache_ignored_expression(expr, iter.peek().copied(), &space);
+    fn format_map(&mut self, exprs: &'a [PreSymbolicExpression], indent: &Indent) -> String {
+        let func_type = self.display_pse(exprs.first().unwrap(), &Indent::empty());
+        let nested = indent.indented(&self.indentation_str);
+        let name = self.format_source_exprs(slice::from_ref(&exprs[1]), indent);
 
-            acc.push('\n');
-            acc.push_str(&space);
-            acc.push_str(&self.format_source_exprs(slice::from_ref(expr), &space));
-            if let Some(comment) = trailing {
-                acc.push(' ');
-                acc.push_str(&self.display_pse(comment, previous_indentation));
-            }
-        }
-        acc.push('\n');
-        acc.push_str(previous_indentation);
-        acc.push(')');
-        acc
+        let body = self.lines_doc(&exprs[2..], &nested, false);
+        let open = Doc::concat(vec![
+            Doc::text(format!("({func_type} ")),
+            Doc::verbatim(name),
+        ]);
+        self.render_doc(&block(open, body, ")"), indent)
     }
 
     // *begin* never on one line
-    fn format_begin(&self, exprs: &[PreSymbolicExpression], previous_indentation: &str) -> String {
-        let mut acc = "(begin".to_string();
-        let indentation = &self.indentation_str;
-        let space = format!("{previous_indentation}{indentation}");
-
-        let mut iter = exprs.get(1..).unwrap_or_default().iter().peekable();
-        let mut prev_end_line = None;
-
-        while let Some(expr) = iter.next() {
-            let trailing = get_trailing_comment(expr, &mut iter);
-
-            // Add extra newlines based on original blank lines (limit to 1 consecutive blank lines)
-            push_blank_lines(&mut acc, prev_end_line, expr.span().start_line);
-
-            self.check_and_cache_ignored_expression(expr, iter.peek().copied(), &space);
-
-            // begin body
-            acc.push('\n');
-            acc.push_str(&space);
-            acc.push_str(&self.format_source_exprs(slice::from_ref(expr), &space));
-            if let Some(comment) = trailing {
-                acc.push(' ');
-                acc.push_str(&self.display_pse(comment, previous_indentation));
-            }
-
-            prev_end_line = Some(expr.span().end_line);
-        }
-        acc.push('\n');
-        acc.push_str(previous_indentation);
-        acc.push(')');
-        acc
+    fn format_begin(&mut self, exprs: &'a [PreSymbolicExpression], indent: &Indent) -> String {
+        let nested = indent.indented(&self.indentation_str);
+        let body = self.lines_doc(&exprs[1..], &nested, true);
+        self.render_doc(&block(Doc::text("(begin"), body, ")"), indent)
     }
 
     // formats (and ..) and (or ...)
     // if given more than BOOLEAN_BREAK_LIMIT expressions it will break it onto new lines
-    fn format_booleans(
-        &self,
-        exprs: &[PreSymbolicExpression],
-        previous_indentation: &str,
-    ) -> String {
-        let func_type = self.display_pse(exprs.first().unwrap(), previous_indentation);
-        let mut acc = format!("({func_type}");
-        let indentation = &self.indentation_str;
-        let space = format!("{previous_indentation}{indentation}");
-        let break_up =
-            without_comments_len(&exprs[1..]) > BOOLEAN_BREAK_LIMIT || differing_lines(exprs);
-        let mut iter = exprs.get(1..).unwrap_or_default().iter().peekable();
-        let mut prev_end_line = None;
+    fn format_booleans(&mut self, exprs: &'a [PreSymbolicExpression], indent: &Indent) -> String {
+        let func_type = self.display_pse(exprs.first().unwrap(), indent);
+        let nested = indent.indented(&self.indentation_str);
+        let break_up = without_comments_len(&exprs[1..]) > BOOLEAN_BREAK_LIMIT
+            || contains_comments(&exprs[1..])
+            || !self.booleans_fit_on_one_line(&func_type, &exprs[1..], indent);
 
-        if break_up {
-            while let Some(expr) = iter.next() {
-                let trailing = get_trailing_comment(expr, &mut iter);
-                self.check_and_cache_ignored_expression(expr, iter.peek().copied(), &space);
-
-                // Add extra newlines based on original blank lines (limit to 1 consecutive blank lines)
-                push_blank_lines(&mut acc, prev_end_line, expr.span().start_line);
-
-                acc.push('\n');
-                acc.push_str(&space);
-                acc.push_str(&self.format_source_exprs(slice::from_ref(expr), &space));
-                if let Some(comment) = trailing {
-                    acc.push(' ');
-                    acc.push_str(&self.display_pse(comment, previous_indentation));
-                }
-
-                prev_end_line = Some(expr.span().end_line);
-            }
+        let doc = if break_up {
+            let body = self.lines_doc(&exprs[1..], &nested, true);
+            block(Doc::text(format!("({func_type}")), body, ")")
         } else {
-            while let Some(expr) = iter.next() {
-                let trailing = get_trailing_comment(expr, &mut iter);
-                self.check_and_cache_ignored_expression(
-                    expr,
-                    iter.peek().copied(),
-                    previous_indentation,
-                );
-                acc.push(' ');
-                acc.push_str(
-                    &self.format_source_exprs(slice::from_ref(expr), previous_indentation),
-                );
-                if let Some(comment) = trailing {
-                    acc.push(' ');
-                    acc.push_str(&self.display_pse(comment, previous_indentation));
-                    acc.push('\n');
-                    acc.push_str(&space)
-                }
+            // No comments here: they force `break_up`
+            let mut parts = vec![Doc::text(format!("({func_type}"))];
+            for expr in &exprs[1..] {
+                parts.push(Doc::text(" "));
+                parts.push(Doc::verbatim(
+                    self.format_source_exprs(slice::from_ref(expr), indent),
+                ));
             }
-        }
-        if break_up {
-            acc.push('\n');
-            acc.push_str(previous_indentation);
-        }
-        acc.push(')');
-        acc
+            parts.push(Doc::text(")"));
+            Doc::concat(parts)
+        };
+        self.render_doc(&doc, indent)
     }
 
-    fn format_if(&self, exprs: &[PreSymbolicExpression], previous_indentation: &str) -> String {
+    /// Whether `(and a b)` / `(or a b)` fits on one line with no multi-line argument.
+    fn booleans_fit_on_one_line(
+        &mut self,
+        func_type: &str,
+        args: &'a [PreSymbolicExpression],
+        indent: &Indent,
+    ) -> bool {
+        let mut flat_width = indent.len() + 1 + func_type.len() + 1; // "(or" + ")"
+        for arg in args {
+            let formatted = self.format_source_exprs(slice::from_ref(arg), indent);
+            if formatted.contains('\n') {
+                return false;
+            }
+            flat_width += formatted.len() + 1; // " arg"
+            if flat_width > self.settings.max_line_length {
+                return false;
+            }
+        }
+        true
+    }
+
+    fn format_if(&mut self, exprs: &'a [PreSymbolicExpression], indent: &Indent) -> String {
         let opening = exprs.first().unwrap();
-        let func_type = self.display_pse(opening, previous_indentation);
-        let indentation = &self.indentation_str;
-        let space = format!("{indentation}{previous_indentation}");
+        let func_type = self.display_pse(opening, indent);
+        let nested = indent.indented(&self.indentation_str);
 
-        let mut acc = format!("({func_type} ");
-        let mut iter = exprs[1..].iter().peekable();
-        let mut index = 0;
-        let mut prev_end_line = None;
-
-        while let Some(expr) = iter.next() {
-            let trailing = get_trailing_comment(expr, &mut iter);
-            self.check_and_cache_ignored_expression(expr, iter.peek().copied(), &space);
-
-            // Add extra newlines based on original blank lines (limit to 1 consecutive blank lines)
-            push_blank_lines(&mut acc, prev_end_line, expr.span().start_line);
-
-            if index > 0 {
-                acc.push('\n');
-                acc.push_str(&space);
-            }
-            acc.push_str(&self.format_source_exprs(slice::from_ref(expr), &space));
-            if let Some(comment) = trailing {
-                acc.push(' ');
-                acc.push_str(&self.display_pse(comment, previous_indentation));
-            }
-
-            index += 1;
-            prev_end_line = Some(expr.span().end_line);
+        let mut body = self.lines_doc(&exprs[1..], &nested, true);
+        // The condition stays on the `(if` line
+        if let Some(first_break) = body.first_mut() {
+            *first_break = Doc::text(" ");
         }
-        acc.push('\n');
-        acc.push_str(previous_indentation);
-        acc.push(')');
-
-        acc
+        self.render_doc(
+            &block(Doc::text(format!("({func_type}")), body, ")"),
+            indent,
+        )
     }
 
-    fn format_let(&self, exprs: &[PreSymbolicExpression], previous_indentation: &str) -> String {
-        let mut acc = "(let (".to_string();
-        let indentation = &self.indentation_str;
-        let space = format!("{previous_indentation}{indentation}");
+    fn format_let(&mut self, exprs: &'a [PreSymbolicExpression], indent: &Indent) -> String {
+        let nested = indent.indented(&self.indentation_str);
+        let mut parts: Vec<Doc> = vec![Doc::text("(let (")];
 
         if let Some(args) = exprs[1].match_list() {
             if args.len() == 1 {
-                acc.push_str(&self.format_source_exprs(slice::from_ref(&args[0]), &space));
-                acc.push(')');
+                parts.push(Doc::verbatim(
+                    self.format_source_exprs(slice::from_ref(&args[0]), &nested),
+                ));
+                parts.push(Doc::text(")"));
             } else {
-                let double_indent = format!("{space}{indentation}");
-                let mut iter = args.iter().peekable();
-                while let Some(arg) = iter.next() {
-                    let trailing = get_trailing_comment(arg, &mut iter);
-                    self.check_and_cache_ignored_expression(arg, iter.peek().copied(), &space);
-                    acc.push('\n');
-                    acc.push_str(&double_indent);
-                    acc.push_str(&self.format_source_exprs(slice::from_ref(arg), &double_indent));
-                    if let Some(comment) = trailing {
-                        acc.push(' ');
-                        acc.push_str(&self.display_pse(comment, previous_indentation));
-                    }
-                }
-                // close the args paren
-                acc.push('\n');
-                acc.push_str(previous_indentation);
-                acc.push_str(indentation);
-                acc.push(')');
+                let double_indent = nested.indented(&self.indentation_str);
+                let binding_parts = self.lines_doc(args, &double_indent, false);
+                // Double-indent for bindings, close paren at single-indent
+                parts.push(Doc::indent(Doc::concat(vec![
+                    Doc::indent(Doc::concat(binding_parts)),
+                    Doc::Hardline,
+                    Doc::text(")"),
+                ])));
             }
         }
-        // start the let body
+
+        parts.push(self.body_doc(exprs.get(2..).unwrap_or_default(), &nested));
+        parts.push(Doc::Hardline);
+        parts.push(Doc::text(")"));
+
+        let doc = Doc::concat(parts);
+        self.render_doc(&doc, indent)
+    }
+
+    /// Body expressions one per line at `indent`, keeping at most one blank
+    /// line between them.
+    fn body_doc(&mut self, body_exprs: &'a [PreSymbolicExpression], indent: &Indent) -> Doc {
+        let mut body_parts: Vec<Doc> = Vec::new();
         let mut prev_end_line = None;
-        let body_exprs = exprs.get(2..).unwrap_or_default();
         for (i, e) in body_exprs.iter().enumerate() {
-            // Add extra newlines based on original blank lines (limit to 1 consecutive blank lines)
-            push_blank_lines(&mut acc, prev_end_line, e.span().start_line);
-            self.check_and_cache_ignored_expression(e, body_exprs.get(i + 1), &space);
-
-            acc.push('\n');
-            acc.push_str(&space);
-            acc.push_str(&self.format_source_exprs(slice::from_ref(e), &space));
-
+            body_parts.push(line_break(prev_end_line, e));
+            self.check_and_cache_ignored(e, body_exprs.get(i + 1));
+            body_parts.push(Doc::verbatim(
+                self.format_source_exprs(slice::from_ref(e), indent),
+            ));
             prev_end_line = Some(e.span().end_line);
         }
-        acc.push('\n');
-        acc.push_str(previous_indentation);
-        acc.push(')');
-        acc
+        Doc::indent(Doc::concat(body_parts))
+    }
+
+    /// Each expression on its own line at `indent`, followed by its trailing
+    /// comment. With `keep_blank_lines`, keeps at most one blank line from the
+    /// source between expressions.
+    fn lines_doc(
+        &mut self,
+        exprs: &'a [PreSymbolicExpression],
+        indent: &Indent,
+        keep_blank_lines: bool,
+    ) -> Vec<Doc> {
+        let mut parts: Vec<Doc> = Vec::new();
+        let mut prev_end_line = None;
+        let mut iter = exprs.iter().peekable();
+        while let Some(expr) = iter.next() {
+            let trailing = get_trailing_comment(expr, &mut iter);
+            self.check_and_cache_ignored(expr, iter.peek().copied());
+            parts.push(line_break(prev_end_line, expr));
+            parts.push(Doc::verbatim(
+                self.format_source_exprs(slice::from_ref(expr), indent),
+            ));
+            self.push_trailing_comment(&mut parts, trailing, indent);
+            if keep_blank_lines {
+                prev_end_line = Some(expr.span().end_line);
+            }
+        }
+        parts
+    }
+
+    /// Appends ` <comment>` if there is a trailing comment.
+    fn push_trailing_comment(
+        &mut self,
+        parts: &mut Vec<Doc>,
+        trailing: Option<&'a PreSymbolicExpression>,
+        indent: &Indent,
+    ) {
+        if let Some(comment) = trailing {
+            parts.push(Doc::text(" "));
+            parts.push(Doc::verbatim(self.display_pse(comment, indent)));
+        }
+    }
+
+    /// `comment` preceded by the spaces that separate it from `item` in the source.
+    fn spaced_comment(
+        &mut self,
+        item: &PreSymbolicExpression,
+        comment: &'a PreSymbolicExpression,
+        indent: &Indent,
+    ) -> String {
+        let mut text = String::new();
+        let count = comment
+            .span()
+            .start_column
+            .saturating_sub(item.span().end_column + 1);
+        push_spaces(&mut text, count);
+        text.push_str(&self.display_pse(comment, indent));
+        text
     }
 
     // * match *
     // always multiple lines
-    fn format_match(&self, exprs: &[PreSymbolicExpression], previous_indentation: &str) -> String {
-        let mut acc = "(match ".to_string();
-        let indentation = &self.indentation_str;
-        let space = format!("{previous_indentation}{indentation}");
+    fn format_match(&mut self, exprs: &'a [PreSymbolicExpression], indent: &Indent) -> String {
+        let nested = indent.indented(&self.indentation_str);
 
         // value to match on
-        acc.push_str(&self.format_source_exprs(slice::from_ref(&exprs[1]), previous_indentation));
-        acc.push('\n');
+        let match_value = self.format_source_exprs(slice::from_ref(&exprs[1]), indent);
 
+        // With comments, each branch part goes on its own line
+        if contains_comments(exprs) {
+            let branch_parts = self.lines_doc(&exprs[2..], &nested, false);
+            let open = Doc::concat(vec![Doc::text("(match "), Doc::verbatim(match_value)]);
+            return self.render_doc(&block(open, branch_parts, ")"), indent);
+        }
+
+        let mut branch_parts: Vec<Doc> = Vec::new();
         let mut iter = exprs[2..].iter().peekable();
         while let Some(branch) = iter.next() {
             let trailing = get_trailing_comment(branch, &mut iter);
-            self.check_and_cache_ignored_expression(branch, iter.peek().copied(), &space);
+            self.check_and_cache_ignored(branch, iter.peek().copied());
             let is_binding = branch.match_list().is_none() && iter.peek().is_some();
-            acc.push_str(&space);
-            acc.push_str(&self.format_source_exprs(slice::from_ref(branch), &space));
+
+            branch_parts.push(Doc::Hardline);
+            branch_parts.push(Doc::verbatim(
+                self.format_source_exprs(slice::from_ref(branch), &nested),
+            ));
 
             // If this is a binding pattern, add the next expression on the same line
             if is_binding {
                 if let Some(expr_part) = iter.next() {
                     let expr_trailing = get_trailing_comment(expr_part, &mut iter);
-                    acc.push(' ');
-                    acc.push_str(&self.format_source_exprs(slice::from_ref(expr_part), &space));
-                    if let Some(comment) = expr_trailing {
-                        acc.push(' ');
-                        acc.push_str(&self.display_pse(comment, previous_indentation));
-                    }
+                    branch_parts.push(Doc::text(" "));
+                    branch_parts.push(Doc::verbatim(
+                        self.format_source_exprs(slice::from_ref(expr_part), &nested),
+                    ));
+                    self.push_trailing_comment(&mut branch_parts, expr_trailing, indent);
                 }
             }
-            if let Some(comment) = trailing {
-                acc.push(' ');
-                acc.push_str(&self.display_pse(comment, previous_indentation));
-            }
-
-            if iter.peek().is_some() {
-                acc.push('\n');
-            }
+            self.push_trailing_comment(&mut branch_parts, trailing, indent);
         }
-        acc.push('\n');
-        acc.push_str(previous_indentation);
-        acc.push(')');
-        acc
+
+        let open = Doc::concat(vec![Doc::text("(match "), Doc::verbatim(match_value)]);
+        self.render_doc(&block(open, branch_parts, ")"), indent)
     }
 
-    /// Special case for match with comments in line.
-    /// aligns all bindings and values
-    fn match_with_comments(
-        &self,
-        exprs: &[PreSymbolicExpression],
-        previous_indentation: &str,
-    ) -> String {
-        let mut acc = "(match ".to_string();
-        let indentation = &self.indentation_str;
-        let space = format!("{previous_indentation}{indentation}");
-
-        // value to match on
-        acc.push_str(&self.format_source_exprs(slice::from_ref(&exprs[1]), previous_indentation));
-        // branches evenly spaced
-
-        let mut iter = exprs[2..].iter().peekable();
-        while let Some(branch) = iter.next() {
-            let trailing = get_trailing_comment(branch, &mut iter);
-            self.check_and_cache_ignored_expression(branch, iter.peek().copied(), &space);
-            acc.push('\n');
-            acc.push_str(&space);
-            acc.push_str(&self.format_source_exprs(slice::from_ref(branch), &space));
-            if let Some(comment) = trailing {
-                acc.push(' ');
-                acc.push_str(&self.display_pse(comment, previous_indentation));
-            }
-        }
-        acc.push('\n');
-        acc.push_str(previous_indentation);
-        acc.push(')');
-        acc
-    }
-
-    // strictly used for display_pse. Sort of a dumbed down version of format_list
-    fn display_list(&self, exprs: &[PreSymbolicExpression], previous_indentation: &str) -> String {
-        let indentation = &self.indentation_str;
-        let space = format!("{previous_indentation}{indentation}");
-        let mut acc = "(".to_string();
-
-        if differing_lines(exprs) {
-            acc.push('\n');
-        }
-        let mut iter = exprs[0..].iter().peekable();
+    /// Format a list of expressions as `(item1 item2 ...)`.
+    /// Breaks to multi-line if it contains a comment or any line would
+    /// exceed `max_line_length`.
+    fn display_list(&mut self, exprs: &'a [PreSymbolicExpression], indent: &Indent) -> String {
+        let mut items: Vec<String> = Vec::new();
+        let mut iter = exprs.iter().peekable();
         while let Some(item) = iter.next() {
             let trailing = get_trailing_comment(item, &mut iter);
-            self.check_and_cache_ignored_expression(
-                item,
-                iter.peek().copied(),
-                previous_indentation,
-            );
-            if differing_lines(exprs) {
-                acc.push_str(&space)
-            }
-            let value = self.format_source_exprs(slice::from_ref(item), previous_indentation);
-            let start_line = item.span().start_line;
-            acc.push_str(&value);
+            self.check_and_cache_ignored(item, iter.peek().copied());
+            let mut text = self.format_source_exprs(slice::from_ref(item), indent);
             if let Some(comment) = trailing {
-                let count = comment
-                    .span()
-                    .start_column
-                    .saturating_sub(item.span().end_column + 1);
-                push_spaces(&mut acc, count);
-                acc.push_str(&self.display_pse(comment, previous_indentation));
+                text.push_str(&self.spaced_comment(item, comment, indent));
             }
-            if let Some(next) = iter.peek() {
-                if start_line != next.span().start_line {
-                    acc.push('\n')
-                } else {
-                    acc.push(' ')
+            items.push(text);
+        }
+
+        // A comment runs to the end of its line, so it always forces a break
+        let should_break = contains_comments(exprs)
+            || !fits_inline(
+                &items,
+                indent.len() + 1, // opening paren
+                self.settings.max_line_length,
+            );
+
+        let doc = if should_break {
+            let mut body: Vec<Doc> = Vec::new();
+            for item in items {
+                body.push(Doc::Hardline);
+                body.push(Doc::verbatim(item));
+            }
+            block(Doc::text("("), body, ")")
+        } else {
+            let mut parts = vec![Doc::text("(")];
+            for (i, item) in items.into_iter().enumerate() {
+                if i > 0 {
+                    parts.push(Doc::text(" "));
                 }
+                parts.push(Doc::verbatim(item));
             }
-        }
-        if differing_lines(exprs) {
-            acc.push('\n');
-            acc.push_str(previous_indentation);
-        }
-        acc.push(')');
-        acc
+            parts.push(Doc::text(")"));
+            Doc::concat(parts)
+        };
+        self.render_doc(&doc, indent)
     }
 
     fn format_restrict_assets(
-        &self,
-        exprs: &[PreSymbolicExpression],
-        previous_indentation: &str,
+        &mut self,
+        exprs: &'a [PreSymbolicExpression],
+        indent: &Indent,
     ) -> String {
-        let mut acc = "(restrict-assets? ".to_string();
-        let indentation = &self.indentation_str;
-        let space = format!("{previous_indentation}{indentation}");
+        let nested = indent.indented(&self.indentation_str);
+        let owner = self.format_source_exprs(slice::from_ref(&exprs[1]), indent);
 
-        // asset-owner
-        acc.push_str(&self.format_source_exprs(slice::from_ref(&exprs[1]), previous_indentation));
+        let mut parts: Vec<Doc> = vec![Doc::text("(restrict-assets? "), Doc::verbatim(owner)];
 
         // allowances
         if let Some(allowances_list) = exprs.get(2) {
             if let Some(allowances) = allowances_list.match_list() {
                 if allowances.len() == 1 {
-                    // Single allowance, format on single line
-                    acc.push(' ');
-                    acc.push_str(&self.format_source_exprs(
-                        slice::from_ref(allowances_list),
-                        previous_indentation,
+                    parts.push(Doc::text(" "));
+                    parts.push(Doc::verbatim(
+                        self.format_source_exprs(slice::from_ref(allowances_list), indent),
                     ));
                 } else {
-                    // Multiple allowances, format like let bind
-                    acc.push(' ');
-                    acc.push('(');
-                    let double_indent = format!("{space}{indentation}");
-                    let mut iter = allowances.iter().peekable();
-                    while let Some(allowance) = iter.next() {
-                        let trailing = get_trailing_comment(allowance, &mut iter);
-                        self.check_and_cache_ignored_expression(
-                            allowance,
-                            iter.peek().copied(),
-                            &space,
-                        );
-                        acc.push('\n');
-                        acc.push_str(&double_indent);
-                        acc.push_str(
-                            &self.format_source_exprs(slice::from_ref(allowance), &double_indent),
-                        );
-                        if let Some(comment) = trailing {
-                            acc.push(' ');
-                            acc.push_str(&self.display_pse(comment, previous_indentation));
-                        }
-                    }
-                    acc.push('\n');
-                    acc.push_str(&space);
-                    acc.push(')');
+                    let double_indent = nested.indented(&self.indentation_str);
+                    let allowance_parts = self.lines_doc(allowances, &double_indent, false);
+                    parts.push(Doc::text(" ("));
+                    parts.push(Doc::indent(Doc::concat(vec![
+                        Doc::indent(Doc::concat(allowance_parts)),
+                        Doc::Hardline,
+                        Doc::text(")"),
+                    ])));
                 }
             }
         }
 
-        // body expressions
-        let mut prev_end_line = None;
-        let body_exprs = exprs.get(3..).unwrap_or_default();
-        for (i, e) in body_exprs.iter().enumerate() {
-            push_blank_lines(&mut acc, prev_end_line, e.span().start_line);
-            self.check_and_cache_ignored_expression(e, body_exprs.get(i + 1), &space);
+        parts.push(self.body_doc(exprs.get(3..).unwrap_or_default(), &nested));
+        parts.push(Doc::Hardline);
+        parts.push(Doc::text(")"));
 
-            acc.push('\n');
-            acc.push_str(&space);
-            acc.push_str(&self.format_source_exprs(slice::from_ref(e), &space));
-
-            prev_end_line = Some(e.span().end_line);
-        }
-        acc.push('\n');
-        acc.push_str(previous_indentation);
-        acc.push(')');
-        acc
+        let doc = Doc::concat(parts);
+        self.render_doc(&doc, indent)
     }
 
     /// Check if an expression represents a signed integer (for list type size detection)
@@ -1128,360 +900,263 @@ impl<'a> Aggregator<'a> {
 
     /// Estimate the length of a list if formatted on a single line
     fn estimate_list_length(
-        &self,
-        exprs: &[PreSymbolicExpression],
+        &mut self,
+        exprs: &'a [PreSymbolicExpression],
         start_index: usize,
         prefix_len: usize,
     ) -> usize {
         let mut estimated_len = prefix_len;
+        let empty = Indent::empty();
         for item in &exprs[start_index..] {
-            let display = self.display_pse(item, "");
+            let display = self.display_pse(item, &empty);
             estimated_len += display.len() + 1; // display + space
         }
         estimated_len + 1 // closing paren
     }
 
-    /// Format the size value for a list type signature, keeping it on the same line as "list"
-    fn format_list_type_size(
-        &self,
-        size_expr: &PreSymbolicExpression,
-        acc: &mut String,
-        previous_indentation: &str,
-        trailing_comment: Option<&PreSymbolicExpression>,
-    ) {
-        // Use display_pse directly to avoid preserving source line breaks
-        let size_value = self.display_pse(size_expr, previous_indentation);
-        // Ensure no newlines in the size value (defensive, but display_pse should be clean)
-        let size_value_clean = size_value.trim().replace('\n', " ").replace('\r', "");
-        acc.push_str(&size_value_clean);
-
-        // Handle trailing comment
-        if let Some(comment) = trailing_comment {
-            let count = comment
-                .span()
-                .start_column
-                .saturating_sub(size_expr.span().end_column + 1);
-            push_spaces(acc, count);
-            acc.push_str(&self.display_pse(comment, previous_indentation));
+    /// `{ key: value }` on one line, or `None` if a comment or a multi-line
+    /// value forces multiline, or the line is too long. Tuple sugar and
+    /// `(tuple ...)` both use this, so converting one to the other keeps the layout.
+    fn inline_entry(
+        &mut self,
+        key: &'a PreSymbolicExpression,
+        value: &'a [PreSymbolicExpression],
+        indent: &Indent,
+    ) -> Option<String> {
+        if is_comment(key) || contains_comments(value) {
+            return None;
         }
+        let nested = indent.indented(&self.indentation_str);
+        // Formatted as the multiline layout would, so that reuses the cached result
+        let fvalue = self.format_source_exprs(value, &nested);
+        let fkey = self.display_pse(key, indent);
+        // "{ " + "key: " + "value, " + " }"
+        let width = indent.len() + fkey.len() + fvalue.len() + 8;
+        if fvalue.contains('\n') || width > self.settings.max_line_length {
+            return None;
+        }
+        let doc = Doc::concat(vec![
+            Doc::text("{ "),
+            Doc::verbatim(fkey),
+            Doc::text(": "),
+            Doc::verbatim(fvalue),
+            Doc::text(" }"),
+        ]);
+        Some(self.render_doc(&doc, indent))
     }
 
-    /// Helper to wrap an item to a new line if needed
-    fn maybe_wrap_item(
-        &self,
-        item: &PreSymbolicExpression,
-        iter: &mut Peekable<slice::Iter<'_, PreSymbolicExpression>>,
-        acc: &mut String,
-        space: &str,
-    ) {
-        let current_line_len = chars_since_last_newline(acc);
-        let item_display = self.display_pse(item, "");
-        let item_len = item_display.len();
-
-        // Check if adding this item and the next would exceed max_line_length
-        if let Some(next) = iter.peek() {
-            let next_display = self.display_pse(next, "");
-            let next_len = next_display.len();
-            // current line + space + this item + space + next item
-            let would_exceed =
-                (current_line_len + 1 + item_len + 1 + next_len) > self.settings.max_line_length;
-            if would_exceed {
-                acc.push('\n');
-                acc.push_str(space);
-            } else {
-                acc.push(' ');
-            }
-        } else {
-            // Last item, see if it fits
-            if (current_line_len + 1 + item_len) > self.settings.max_line_length {
-                acc.push('\n');
-                acc.push_str(space);
-            } else {
-                acc.push(' ');
-            }
-        }
-    }
-
-    fn format_list(&self, exprs: &[PreSymbolicExpression], previous_indentation: &str) -> String {
-        let indentation = &self.indentation_str;
-        let space = format!("{previous_indentation}{indentation}");
-        let mut start_index = 0;
-        let mut acc = "(".to_string();
-
-        let is_list_cons = self.display_pse(&exprs[0], previous_indentation) == "list";
-        if is_list_cons {
-            start_index = 1;
-            acc.push_str("list");
-        }
+    /// Format `(list ...)` expressions with greedy line-wrapping.
+    fn format_list(&mut self, exprs: &'a [PreSymbolicExpression], indent: &Indent) -> String {
+        let nested = indent.indented(&self.indentation_str);
+        let is_list_cons = self.display_pse(&exprs[0], indent) == "list";
+        let start_index = usize::from(is_list_cons);
 
         let is_list_type_sig = self.is_list_type_signature(exprs);
 
-        // Determine if list should be multiline based on if it fits on one line
-        let is_multiline = if is_list_cons && exprs.len() > start_index {
-            let estimated_len = self.estimate_list_length(exprs, start_index, 6); // "(list "
-            previous_indentation.len() + estimated_len > self.settings.max_line_length
-        } else {
-            let estimated_len = self.estimate_list_length(exprs, start_index, 1); // opening paren
-            previous_indentation.len() + estimated_len > self.settings.max_line_length
+        // A comment runs to the end of its line, so it forces multiline
+        let is_multiline = contains_comments(&exprs[start_index..]) || {
+            let prefix_len = if is_list_cons { 6 } else { 1 }; // "(list " or "("
+            let estimated_len = self.estimate_list_length(exprs, start_index, prefix_len);
+            indent.len() + estimated_len > self.settings.max_line_length
         };
 
-        // Add space or newline after "list" or opening paren
-        if is_multiline && !is_list_type_sig {
-            // For regular multiline lists, break after "list"
-            acc.push('\n');
-        } else if is_list_cons && exprs.len() > 1 {
-            // For single-line or type signatures, add space after "list"
-            acc.push(' ');
+        let spacing = if is_multiline { &nested } else { indent };
+
+        struct ListItem {
+            text: String,
+            trailing_comment: Option<String>,
+            is_comment: bool,
         }
+        let mut items: Vec<ListItem> = Vec::new();
+        let mut type_sig_size: Option<String> = None;
 
         let mut iter = exprs[start_index..].iter().peekable();
-        let mut is_first_item = true;
-
-        // Normal handling for all other items
-        let spacing = if is_multiline {
-            &space
-        } else {
-            previous_indentation
-        };
-
         while let Some(item) = iter.next() {
             let trailing = get_trailing_comment(item, &mut iter);
-            self.check_and_cache_ignored_expression(item, iter.peek().copied(), spacing);
-            // Special handling for first item in type signatures: keep "list" and size together
+            self.check_and_cache_ignored(item, iter.peek().copied());
+
+            // The size of a multiline type signature stays on the `(list` line
+            let is_first_item = type_sig_size.is_none() && items.is_empty();
             if is_multiline && is_first_item && is_list_type_sig {
-                // We already added a space after "list", so just add the size value directly
-                self.format_list_type_size(item, &mut acc, previous_indentation, trailing);
-                is_first_item = false;
+                let size_value = self.display_pse(item, indent);
+                let mut size_text = size_value.trim().replace('\n', " ").replace('\r', "");
+                if let Some(comment) = trailing {
+                    size_text.push_str(&self.spaced_comment(item, comment, indent));
+                }
+                type_sig_size = Some(size_text);
                 continue;
             }
-            let value = self.format_source_exprs(slice::from_ref(item), spacing);
 
-            // In multiline mode, check if we need to wrap to a new line before this item
-            if is_multiline {
-                if is_first_item {
-                    // We already added newline after "list", just add spacing
-                    acc.push_str(&space);
-                } else {
-                    // For type signatures, always break before the type
-                    if is_list_type_sig {
-                        acc.push('\n');
-                        acc.push_str(&space);
+            let text = self.format_source_exprs(slice::from_ref(item), spacing);
+            let trailing_comment = trailing.map(|c| self.spaced_comment(item, c, indent));
+            items.push(ListItem {
+                text,
+                trailing_comment,
+                is_comment: is_comment(item),
+            });
+        }
+
+        if !is_multiline {
+            // Single line, so there are no comments
+            let mut parts = vec![Doc::text(if is_list_cons { "(list" } else { "(" })];
+            for (i, item) in items.into_iter().enumerate() {
+                if i > 0 || is_list_cons {
+                    parts.push(Doc::text(" "));
+                }
+                parts.push(Doc::verbatim(item.text));
+            }
+            parts.push(Doc::text(")"));
+            return self.render_doc(&Doc::concat(parts), indent);
+        }
+
+        // Multiline
+        let mut open = vec![Doc::text(if is_list_cons { "(list" } else { "(" })];
+        let mut body: Vec<Doc> = Vec::new();
+
+        if is_list_type_sig {
+            // Type sig: (list <size>\n  <type>\n)
+            if let Some(size_text) = type_sig_size {
+                open.push(Doc::text(" "));
+                open.push(Doc::verbatim(size_text));
+            }
+            for item in items {
+                body.push(Doc::Hardline);
+                body.push(Doc::verbatim(item.text));
+                if let Some(c) = item.trailing_comment {
+                    body.push(Doc::verbatim(c));
+                }
+            }
+        } else {
+            // Greedy wrapping with one item of lookahead
+            body.push(Doc::Hardline);
+            let mut col = nested.len(); // column after first hardline + indent
+            let mut after_comment = false;
+
+            let mut items = items.into_iter().enumerate().peekable();
+            while let Some((i, item)) = items.next() {
+                if i > 0 {
+                    // Wrap unless this item and the next both fit on the current line
+                    let next_len = items.peek().map_or(0, |(_, n)| n.text.len() + 1);
+                    let would_exceed =
+                        col + 1 + item.text.len() + next_len > self.settings.max_line_length;
+                    // Multiline items and standalone comments always get their own line
+                    if after_comment || item.is_comment || item.text.contains('\n') || would_exceed
+                    {
+                        body.push(Doc::Hardline);
+                        col = nested.len();
                     } else {
-                        // Check if we need to wrap before this item
-                        self.maybe_wrap_item(item, &mut iter, &mut acc, &space);
+                        body.push(Doc::text(" "));
+                        col += 1;
                     }
                 }
-            } else if !is_first_item {
-                // Single-line
-                acc.push(' ');
-            }
 
-            acc.push_str(&value);
-            is_first_item = false;
-
-            if let Some(comment) = trailing {
-                let count = comment
-                    .span()
-                    .start_column
-                    .saturating_sub(item.span().end_column + 1);
-                push_spaces(&mut acc, count);
-                acc.push_str(&self.display_pse(comment, previous_indentation));
+                col = last_line_len(&item.text, col);
+                after_comment = item.is_comment || item.trailing_comment.is_some();
+                body.push(Doc::verbatim(item.text));
+                if let Some(c) = item.trailing_comment {
+                    col += c.len();
+                    body.push(Doc::verbatim(c));
+                }
             }
         }
 
-        if is_multiline {
-            acc.push('\n');
-            acc.push_str(previous_indentation);
-        }
-        acc.push(')');
-        let trimmed = t(&acc);
-        if trimmed.len() == acc.len() {
-            acc
-        } else {
-            trimmed.to_string()
-        }
+        self.render_doc(&block(Doc::concat(open), body, ")"), indent)
     }
 
     // used for { n1: 1 } syntax
     fn format_key_value_sugar(
-        &self,
-        exprs: &[PreSymbolicExpression],
-        previous_indentation: &str,
+        &mut self,
+        exprs: &'a [PreSymbolicExpression],
+        indent: &Indent,
     ) -> String {
-        let indentation = &self.indentation_str;
-        let space = format!("{previous_indentation}{indentation}");
-        let double_indent = format!("{space}{indentation}");
-        let over_2_kvs = without_comments_len(exprs) > 2;
-        let mut acc = "{".to_string();
-
-        // differing_lines breaks determinism but is a good way to break up
-        // complex values in maps
-        if over_2_kvs || differing_lines(exprs) {
-            acc.push('\n');
+        let inline = match exprs {
+            [key, value] => self.inline_entry(key, slice::from_ref(value), indent),
+            _ => None,
+        };
+        if let Some(inline) = inline {
+            inline
+        } else {
+            let nested = indent.indented(&self.indentation_str);
+            let double_indent = nested.indented(&self.indentation_str);
+            let mut entry_parts: Vec<Doc> = Vec::new();
             let mut iter = exprs.iter().peekable();
             while let Some(key) = iter.next() {
                 if is_comment(key) {
-                    acc.push_str(&space);
-                    acc.push_str(&self.display_pse(key, previous_indentation));
-                    acc.push('\n');
+                    entry_parts.push(Doc::Hardline);
+                    entry_parts.push(Doc::verbatim(self.display_pse(key, indent)));
                     continue;
                 }
-                self.check_and_cache_ignored_expression(key, iter.peek().copied(), &space);
-                let key_str = self.format_source_exprs(slice::from_ref(key), &space);
-                acc.push_str(&space);
-                acc.push_str(&key_str);
-                acc.push(':');
+                self.check_and_cache_ignored(key, iter.peek().copied());
+                let key_str = self.format_source_exprs(slice::from_ref(key), &nested);
                 if let Some(value) = iter.next() {
+                    entry_parts.push(Doc::Hardline);
                     if is_comment(value) {
-                        acc.push('\n');
-                        acc.push_str(&space);
-                        acc.push_str(indentation);
-                        acc.push_str(&self.display_pse(value, &space));
-                        acc.push('\n');
-                        // Try to get the actual value after the comment
+                        entry_parts.push(Doc::verbatim(format!("{key_str}:")));
+                        // Comment between key and value
+                        entry_parts.push(Doc::indent(Doc::concat(vec![
+                            Doc::Hardline,
+                            Doc::verbatim(self.display_pse(value, &nested)),
+                        ])));
                         if let Some(actual_value) = iter.next() {
-                            // comment implies next indent level which we don't
-                            // want if this is a normal value
-                            let indent = if is_comment(value) {
-                                &double_indent
-                            } else {
-                                &space
-                            };
                             let trailing = get_trailing_comment(actual_value, &mut iter);
-                            let value_str =
-                                self.format_source_exprs(slice::from_ref(actual_value), indent);
-                            acc.push_str(indent);
-                            acc.push_str(&value_str);
-                            acc.push(',');
-
-                            // Add trailing comment if present
-                            if let Some(comment) = trailing {
-                                acc.push(' ');
-                                acc.push_str(&self.display_pse(comment, &space));
-                            }
+                            let value_str = self
+                                .format_source_exprs(slice::from_ref(actual_value), &double_indent);
+                            entry_parts.push(Doc::indent(Doc::concat(vec![
+                                Doc::Hardline,
+                                Doc::verbatim(format!("{value_str},")),
+                            ])));
+                            self.push_trailing_comment(&mut entry_parts, trailing, &nested);
                         }
                     } else {
                         let trailing = get_trailing_comment(value, &mut iter);
-                        let indent = if is_comment(value) {
-                            &double_indent
-                        } else {
-                            &space
-                        };
-                        self.check_and_cache_ignored_expression(
-                            value,
-                            iter.peek().copied(),
-                            indent,
-                        );
-                        // Pass the current indentation level to nested formatting
-                        let value_str = self.format_source_exprs(slice::from_ref(value), indent);
-                        acc.push(' ');
-                        acc.push_str(&value_str);
-                        acc.push(',');
-
-                        if let Some(comment) = trailing {
-                            acc.push(' ');
-                            acc.push_str(&self.display_pse(comment, previous_indentation));
-                        }
+                        self.check_and_cache_ignored(value, iter.peek().copied());
+                        let value_str = self.format_source_exprs(slice::from_ref(value), &nested);
+                        entry_parts.push(Doc::verbatim(format!("{key_str}: {value_str},")));
+                        self.push_trailing_comment(&mut entry_parts, trailing, indent);
                     }
-                    acc.push('\n');
                 }
             }
-            acc.push_str(previous_indentation);
-        } else {
-            // for cases where we keep it on the same line with 1 k/v pair
-            let fkey = self.display_pse(&exprs[0], previous_indentation);
-            acc.push(' ');
-            acc.push_str(&fkey);
-            acc.push_str(": ");
-            acc.push_str(
-                &self.format_source_exprs(slice::from_ref(&exprs[1]), previous_indentation),
-            );
-            acc.push(' ');
-        }
 
-        acc.push('}');
-        acc
+            self.render_doc(&block(Doc::text("{"), entry_parts, "}"), indent)
+        }
     }
 
     // used for (tuple (n1  1)) syntax
     // Note: Converted to a { a: 1 } style map
-    // TODO: This should be rolled into format_key_value_sugar, but the PSE
-    // structure is different so it would take some finagling
-    fn format_key_value(
-        &self,
-        exprs: &[PreSymbolicExpression],
-        previous_indentation: &str,
-    ) -> String {
-        let indentation = &self.indentation_str;
-        let space = format!("{previous_indentation}{indentation}");
-
-        let mut acc = String::with_capacity(previous_indentation.len() + 64);
-        acc.push_str(previous_indentation);
-        acc.push('{');
-
-        // for cases where we keep it on the same line with 1 k/v pair
-        let multiline = exprs.len() > 1;
-        if multiline {
-            acc.push('\n');
+    fn format_key_value(&mut self, exprs: &'a [PreSymbolicExpression], indent: &Indent) -> String {
+        let inline = match exprs {
+            [entry] => match entry.match_list().and_then(|list| list.split_first()) {
+                Some((key, value)) => self.inline_entry(key, value, indent),
+                None => None,
+            },
+            _ => None,
+        };
+        if let Some(inline) = inline {
+            inline
+        } else {
+            let nested = indent.indented(&self.indentation_str);
+            let mut entry_parts: Vec<Doc> = Vec::new();
             let mut iter = exprs.iter().peekable();
             while let Some(arg) = iter.next() {
                 let trailing = get_trailing_comment(arg, &mut iter);
-                self.check_and_cache_ignored_expression(
-                    arg,
-                    iter.peek().copied(),
-                    previous_indentation,
-                );
+                self.check_and_cache_ignored(arg, iter.peek().copied());
                 let (key, value) = arg
                     .match_list()
                     .and_then(|list| list.split_first())
                     .unwrap();
-                let fkey = self.display_pse(key, previous_indentation);
-
-                acc.push_str(&space);
-                acc.push_str(&fkey);
-                acc.push_str(": ");
-                acc.push_str(&self.format_source_exprs(value, previous_indentation));
-                acc.push(',');
-                if let Some(comment) = trailing {
-                    acc.push(' ');
-                    acc.push_str(&self.display_pse(comment, previous_indentation));
-                }
-                acc.push('\n');
+                let fkey = self.display_pse(key, &nested);
+                let fvalue = self.format_source_exprs(value, &nested);
+                entry_parts.push(Doc::Hardline);
+                entry_parts.push(Doc::verbatim(format!("{fkey}: {fvalue},")));
+                self.push_trailing_comment(&mut entry_parts, trailing, &nested);
             }
-            acc.push_str(previous_indentation);
-        } else {
-            // for cases where we keep it on the same line with 1 k/v pair
-            let (key, value) = exprs[0]
-                .match_list()
-                .and_then(|list| list.split_first())
-                .unwrap();
-            let fkey = self.display_pse(key, previous_indentation);
-            acc.push(' ');
-            acc.push_str(&fkey);
-            acc.push_str(": ");
-            acc.push_str(&self.format_source_exprs(value, previous_indentation));
-            acc.push(' ');
+            self.render_doc(&block(Doc::text("{"), entry_parts, "}"), indent)
         }
-
-        acc.push('}');
-        acc
     }
 
     // This prints leaves of the PSE tree
-    fn display_pse(&self, pse: &PreSymbolicExpression, previous_indentation: &str) -> String {
-        let key = (
-            pse as *const PreSymbolicExpression as usize,
-            previous_indentation.to_string(),
-        );
-
-        let cached_result = {
-            let cache_ref = self.cache.borrow();
-            cache_ref.get(&key).cloned()
-        };
-        if let Some(result) = cached_result {
-            return result;
-        }
-        let result = match pse.pre_expr {
+    fn display_pse(&mut self, pse: &'a PreSymbolicExpression, indent: &Indent) -> String {
+        match pse.pre_expr {
             PreSymbolicExpressionType::Atom(ref value) => t(value).to_string(),
             PreSymbolicExpressionType::AtomValue(ref value) => match value {
                 clarity::vm::types::Value::Principal(c) => {
@@ -1521,11 +1196,9 @@ impl<'a> Aggregator<'a> {
                 clarity::vm::types::Value::Sequence(_) => value.to_string(),
                 _ => value.to_string(),
             },
-            PreSymbolicExpressionType::List(ref items) => {
-                self.display_list(items, previous_indentation)
-            }
+            PreSymbolicExpressionType::List(ref items) => self.display_list(items, indent),
             PreSymbolicExpressionType::Tuple(ref items) => {
-                self.format_key_value_sugar(items, previous_indentation)
+                self.format_key_value_sugar(items, indent)
             }
             PreSymbolicExpressionType::SugaredContractIdentifier(ref name) => {
                 format!(".{name}")
@@ -1549,200 +1222,158 @@ impl<'a> Aggregator<'a> {
             PreSymbolicExpressionType::Placeholder(ref placeholder) => {
                 placeholder.to_string() // Placeholder is for if parsing fails
             }
-        };
-        self.cache.borrow_mut().insert(key, result.clone());
-
-        result
+        }
     }
 
-    // * functions
-
     // Top level define-<function> should have a line break above and after (except on first line)
-    // options always on new lines
-    // Functions Always on multiple lines, even if short
-    fn function(&self, exprs: &[PreSymbolicExpression]) -> String {
-        let func_type = self.display_pse(exprs.first().unwrap(), "");
-        let indentation = &self.indentation_str;
+    // Functions always on multiple lines, even if short
+    fn function(&mut self, exprs: &'a [PreSymbolicExpression]) -> String {
+        let empty = Indent::empty();
+        let func_type = self.display_pse(exprs.first().unwrap(), &empty);
+        let one_indent = empty.indented(&self.indentation_str);
+        let args_indent = one_indent.indented(&self.indentation_str);
 
-        let mut acc = format!("({func_type} (");
+        let mut parts: Vec<Doc> = vec![Doc::text(format!("({func_type} ("))];
 
         // function name and arguments
         if let Some(def) = exprs.get(1).and_then(|f| f.match_list()) {
             if let Some((name, args)) = def.split_first() {
-                acc.push_str(&self.display_pse(name, ""));
+                parts.push(Doc::verbatim(self.display_pse(name, &empty)));
 
-                let args_indent = format!("{indentation}{indentation}");
-
-                // Keep everything on one line if there's only one argument
                 if args.len() == 1 {
-                    acc.push(' ');
-                    acc.push_str(&self.format_source_exprs(slice::from_ref(&args[0]), ""));
-                    acc.push(')');
+                    parts.push(Doc::text(" "));
+                    parts.push(Doc::verbatim(
+                        self.format_source_exprs(slice::from_ref(&args[0]), &empty),
+                    ));
+                    parts.push(Doc::text(")"));
                 } else {
+                    let mut arg_parts: Vec<Doc> = Vec::new();
                     let mut iter = args.iter().peekable();
                     let mut prev_end_line = 0u32;
                     while let Some(arg) = iter.next() {
                         let trailing = get_trailing_comment(arg, &mut iter);
-                        self.check_and_cache_ignored_expression(
-                            arg,
-                            iter.peek().copied(),
-                            &args_indent,
-                        );
-                        // Preserve comment line positions: add newline before arg when it's on a
-                        // different line than the previous (comments must never be moved), or when
-                        // it's a list arg (each gets own line), or when it's the first arg
+                        self.check_and_cache_ignored(arg, iter.peek().copied());
                         let need_newline = prev_end_line == 0
                             || arg.match_list().is_some()
                             || arg.span().start_line > prev_end_line;
                         if need_newline {
-                            acc.push('\n');
-                            acc.push_str(&args_indent);
+                            arg_parts.push(Doc::Hardline);
                         }
-                        if arg.match_list().is_some() {
-                            // expr args
-                            acc.push_str(
-                                &self.format_source_exprs(slice::from_ref(arg), &args_indent),
-                            )
-                        } else {
-                            // atom args (includes standalone comments)
-                            acc.push_str(
-                                &self.format_source_exprs(slice::from_ref(arg), &args_indent),
-                            )
-                        }
-                        if let Some(comment) = trailing {
-                            acc.push(' ');
-                            acc.push_str(&self.display_pse(comment, ""));
-                            prev_end_line = comment.span().end_line;
-                        } else {
-                            prev_end_line = arg.span().end_line;
-                        }
+                        arg_parts.push(Doc::verbatim(
+                            self.format_source_exprs(slice::from_ref(arg), &args_indent),
+                        ));
+                        self.push_trailing_comment(&mut arg_parts, trailing, &empty);
+                        prev_end_line = trailing.unwrap_or(arg).span().end_line;
                     }
+                    // Args at double indent
+                    parts.push(Doc::indent(Doc::indent(Doc::concat(arg_parts))));
                     if args.is_empty() {
-                        acc.push(')');
+                        parts.push(Doc::text(")"));
                     } else {
-                        acc.push('\n');
-                        acc.push_str(indentation);
-                        acc.push(')');
+                        // Close args paren at single indent
+                        parts.push(Doc::indent(Doc::concat(vec![
+                            Doc::Hardline,
+                            Doc::text(")"),
+                        ])));
                     }
                 }
             }
         }
 
         // function body expressions
+        let mut body_parts: Vec<Doc> = Vec::new();
         let body_exprs = exprs.get(2..).unwrap_or_default();
         for (i, expr) in body_exprs.iter().enumerate() {
-            self.check_and_cache_ignored_expression(expr, body_exprs.get(i + 1), indentation);
-            acc.push('\n');
-            acc.push_str(indentation);
-            acc.push_str(&self.format_source_exprs(slice::from_ref(expr), indentation))
+            self.check_and_cache_ignored(expr, body_exprs.get(i + 1));
+            body_parts.push(Doc::Hardline);
+            body_parts.push(Doc::verbatim(
+                self.format_source_exprs(slice::from_ref(expr), &one_indent),
+            ));
         }
-        acc.push_str("\n)\n");
-        acc
+        parts.push(Doc::indent(Doc::concat(body_parts)));
+        parts.push(Doc::Hardline);
+        parts.push(Doc::text(")"));
+        parts.push(Doc::Hardline);
+
+        self.render_doc(&Doc::concat(parts), &empty)
     }
 
-    // This code handles the line width wrapping and happens near the bottom of the
-    // traversal
-    // TODO: Fix this horrible abomination
-    fn to_inner_content(
-        &self,
-        list: &[PreSymbolicExpression],
-        previous_indentation: &str,
+    /// Format a generic function call as `(fn-name arg1 arg2 ...)`.
+    /// Items are placed on the current line if they fit, wrapped to the next
+    /// line (with increased indentation) otherwise.
+    fn format_inner_content(
+        &mut self,
+        list: &'a [PreSymbolicExpression],
+        indent: &Indent,
     ) -> String {
-        let mut result = String::new();
-        let mut current_line_width = previous_indentation.len();
-        let mut first_on_line = true;
-        let mut broken_up = false;
-        let indentation = &self.indentation_str;
-        let base_indent = format!("{previous_indentation}{indentation}");
-
-        // Check if this is a simple wrapper expression
-        let is_simple_wrapper = list.len() == 2 && list[0].match_atom().is_some();
-
-        // Special handling for simple wrappers to avoid unnecessary line breaks
-        if is_simple_wrapper {
+        // Simple wrappers like (ok expr) are always kept on one line
+        if list.len() == 2 && list[0].match_atom().is_some() {
             let atom_name = list[0].match_atom().unwrap();
-            let is_special_format = if let Some(native) = NativeFunctions::lookup_by_name(atom_name)
-            {
-                matches!(
-                    native,
-                    NativeFunctions::Let
-                        | NativeFunctions::Begin
-                        | NativeFunctions::Match
-                        | NativeFunctions::TupleCons
-                        | NativeFunctions::If
-                )
-            } else {
-                false
-            };
+            let is_special_format =
+                NativeFunctions::lookup_by_name(atom_name).is_some_and(|native| {
+                    matches!(
+                        native,
+                        NativeFunctions::Let
+                            | NativeFunctions::Begin
+                            | NativeFunctions::Match
+                            | NativeFunctions::TupleCons
+                            | NativeFunctions::If
+                    )
+                });
 
             if !is_special_format {
-                // For simple wrappers like (ok ...), format compactly
-                let fn_name =
-                    self.format_source_exprs(slice::from_ref(&list[0]), previous_indentation);
-                let arg = self.format_source_exprs(slice::from_ref(&list[1]), previous_indentation);
-
+                let fn_name = self.format_source_exprs(slice::from_ref(&list[0]), indent);
+                let arg = self.format_source_exprs(slice::from_ref(&list[1]), indent);
                 return format!("({} {})", fn_name.trim(), arg.trim());
             }
         }
-        // TODO: this should ignore comment length
+
+        let base_indent = indent.indented(&self.indentation_str);
+        let mut result = String::new();
+        let mut current_line_width = indent.len();
+        let mut prev_multiline = false;
+        let mut prev_is_map = false;
         for (i, expr) in list.iter().enumerate() {
-            let indented = if first_on_line {
-                &base_indent
-            } else {
-                previous_indentation
-            };
-            self.check_and_cache_ignored_expression(expr, list.get(i + 1), indented);
-            let formatted = self.format_source_exprs(slice::from_ref(expr), indented);
+            let indented = if i == 0 { &base_indent } else { indent };
+            self.check_and_cache_ignored(expr, list.get(i + 1));
+            let mut formatted = self.format_source_exprs(slice::from_ref(expr), indented);
             let trimmed = t(&formatted);
 
-            let expr_width = trimmed.len();
-
-            if !first_on_line {
-                // Don't break before an opening brace of a map
-                let is_map_opening = trimmed.starts_with("{");
-
-                // Check if we need a line break to preserve comment/expr line positions:
-                // - current expr is a comment on a different line than previous
-                // - previous expr is a comment on a different line than current (comment stays alone)
+            if i > 0 {
+                let is_map_opening = trimmed.starts_with('{');
                 let prev = &list[i - 1];
                 let on_different_line_in_source = (is_comment(expr)
                     && prev.span().start_line != expr.span().start_line)
                     || (is_comment(prev) && prev.span().start_line != expr.span().start_line);
 
-                // Add line break if comment/expr was on different lines in source
-                // or if the line would be too long
+                // `} {` keeps a map next to the multi-line map before it, as in
+                // `(map-set m { .. } { .. })`; anything else after a multi-line
+                // argument starts a new line
                 if on_different_line_in_source
+                    || (prev_multiline && !(is_map_opening && prev_is_map))
                     || (!is_map_opening
-                        && (current_line_width + expr_width + 1 > self.settings.max_line_length))
+                        && (current_line_width + trimmed.len() + 1 > self.settings.max_line_length))
                 {
                     result.push('\n');
                     result.push_str(&base_indent);
-                    current_line_width = base_indent.len() + indentation.len();
-                    broken_up = true;
+                    current_line_width = base_indent.len();
+                    formatted = self.format_source_exprs(slice::from_ref(expr), &base_indent);
                 } else {
                     result.push(' ');
                     current_line_width += 1;
                 }
             }
 
-            if broken_up {
-                // reformat with increased indent in the case we broke up the code on max width
-                let formatted = self.format_source_exprs(slice::from_ref(expr), &base_indent);
-                let trimmed = t(&formatted);
-                result.push_str(trimmed);
-            } else {
-                result.push_str(trimmed);
-            }
-
-            current_line_width += expr_width;
-            first_on_line = false;
-            broken_up = false;
+            let text = t(&formatted);
+            result.push_str(text);
+            current_line_width = last_line_len(text, current_line_width);
+            prev_multiline = text.contains('\n');
+            prev_is_map = text.starts_with('{');
         }
 
         let break_lines = if !result.contains('\n') {
             false
         } else {
-            // Find the last line without collecting all lines into a vector
             let last_line = result
                 .rfind('\n')
                 .map(|pos| &result[pos + 1..])
@@ -1750,16 +1381,40 @@ impl<'a> Aggregator<'a> {
             let trimmed = last_line.trim();
             !(trimmed == ")" || trimmed == "}")
         };
-        let mut out = String::with_capacity(result.len() + previous_indentation.len() + 4);
+        let mut out = String::with_capacity(result.len() + indent.len() + 4);
         out.push('(');
         out.push_str(&result);
         if break_lines {
             out.push('\n');
-            out.push_str(previous_indentation);
+            out.push_str(indent);
         }
         out.push(')');
         out
     }
+}
+
+/// `open`, then `body` one level deeper, then `close` on its own line.
+fn block(open: Doc, body: Vec<Doc>, close: &str) -> Doc {
+    Doc::concat(vec![
+        open,
+        Doc::indent(Doc::concat(body)),
+        Doc::Hardline,
+        Doc::text(close),
+    ])
+}
+
+/// The line break before `expr`: a blank line if the source has one after
+/// `prev_end_line`, otherwise a single newline.
+fn line_break(prev_end_line: Option<u32>, expr: &PreSymbolicExpression) -> Doc {
+    if has_blank_line(prev_end_line, expr.span().start_line) {
+        Doc::BlankLine
+    } else {
+        Doc::Hardline
+    }
+}
+
+fn is_format_ignore(pse: &PreSymbolicExpression) -> bool {
+    matches!(&pse.pre_expr, PreSymbolicExpressionType::Comment(text) if text.contains(FORMAT_IGNORE_SYNTAX))
 }
 
 fn is_comment(pse: &PreSymbolicExpression) -> bool {
@@ -1769,11 +1424,38 @@ fn is_comment(pse: &PreSymbolicExpression) -> bool {
 fn without_comments_len(exprs: &[PreSymbolicExpression]) -> usize {
     exprs.iter().filter(|expr| !is_comment(expr)).count()
 }
-// if the exprs are already broken onto different lines, return true
-fn differing_lines(exprs: &[PreSymbolicExpression]) -> bool {
-    !exprs
-        .windows(2)
-        .all(|window| window[0].span().start_line == window[1].span().start_line)
+/// Whether `items`, joined by single spaces from column `start`, keep the
+/// lines they share (and the closing paren) within `max_width`. Inner lines of
+/// a multi-line item don't depend on this layout, so they aren't counted.
+fn fits_inline(items: &[String], start: usize, max_width: usize) -> bool {
+    let mut col = start;
+    for (i, item) in items.iter().enumerate() {
+        let separator = usize::from(i > 0);
+        if col + separator + first_line_len(item) > max_width {
+            return false;
+        }
+        col = last_line_len(item, col + separator);
+    }
+    col < max_width
+}
+
+/// Length of the first line of a (possibly multi-line) string.
+fn first_line_len(s: &str) -> usize {
+    s.find('\n').unwrap_or(s.len())
+}
+
+/// After appending `s` to output at column `col`, return the new column.
+/// If `s` contains newlines, returns length of last line; otherwise `col + s.len()`.
+fn last_line_len(s: &str, col: usize) -> usize {
+    if let Some(pos) = s.rfind('\n') {
+        s.len() - pos - 1
+    } else {
+        col + s.len()
+    }
+}
+
+fn is_define_fn(atom_name: &str) -> bool {
+    DefineFunctions::lookup_by_name(atom_name).is_some()
 }
 
 fn is_same_line(expr1: &PreSymbolicExpression, expr2: &PreSymbolicExpression) -> bool {
@@ -1791,7 +1473,7 @@ where
     // cloned() here because of the second mutable borrow on iter.next()
     match iter.peek().cloned() {
         Some(next) => {
-            if is_comment(next) && is_same_line(expr, next) {
+            if is_comment(next) && expr.span().end_line == next.span().start_line {
                 iter.next();
                 Some(next)
             } else {
@@ -1834,25 +1516,10 @@ fn comment_piece(text: &str, pse: &PreSymbolicExpression) -> String {
     }
 }
 
-fn chars_since_last_newline(acc: &str) -> usize {
-    if let Some(last_newline_pos) = acc.rfind('\n') {
-        acc.len() - last_newline_pos - 1
-    } else {
-        acc.len()
-    }
-}
-
-// Helper to insert at most one blank line if there are blank lines between two expressions
-fn push_blank_lines(acc: &mut String, prev_end_line: Option<u32>, curr_start_line: u32) {
-    if let Some(prev_end) = prev_end_line {
-        if curr_start_line > prev_end {
-            let blank_lines = curr_start_line.saturating_sub(prev_end + 1);
-            let extra_newlines = std::cmp::min(blank_lines, 1);
-            for _ in 0..extra_newlines {
-                acc.push('\n');
-            }
-        }
-    }
+/// Returns true if there's at least one blank line between the previous expression's
+/// end line and the current expression's start line.
+fn has_blank_line(prev_end_line: Option<u32>, curr_start_line: u32) -> bool {
+    prev_end_line.is_some_and(|prev_end| curr_start_line > prev_end + 1)
 }
 
 #[cfg(test)]
@@ -3023,5 +2690,174 @@ mod tests_formatter {
         );
         let result = format_with_default(src);
         assert_eq!(src, result);
+    }
+
+    /// Formats `src` as a file and checks the output parses and is stable.
+    fn format_valid_and_stable(src: &str) -> String {
+        let formatter = ClarityFormatter::new(Settings::default());
+        let result = formatter.format_file(src, None);
+        clarity::vm::ast::parser::v2::parse(&result, StackDepthLimits::for_epoch(DEFAULT_EPOCH))
+            .unwrap_or_else(|e| panic!("invalid output for {src:?}:\n{result}\n{e}"));
+        assert_eq!(
+            formatter.format_file(&result, None),
+            result,
+            "not idempotent"
+        );
+        result
+    }
+
+    #[test]
+    fn test_standalone_comment_breaks_list() {
+        let src = "(define-trait t ((f (uint\n ;; field\n uint) (response uint uint))))";
+        let expected = indoc!(
+            r#"
+            (define-trait t (
+              (f
+                (
+                  uint
+                  ;; field
+                  uint
+                )
+                (response uint uint)
+              )
+            ))
+            "#
+        );
+        assert_eq!(format_valid_and_stable(src), expected);
+    }
+
+    #[test]
+    fn test_comment_in_list_cons() {
+        for src in [
+            "(define-constant l (list u1\n ;; c\n u2))",
+            "(define-constant l (list u1 ;; c\n u2))",
+            "(define-constant l (list 10 ;; size\n uint))",
+        ] {
+            let result = format_valid_and_stable(src);
+            assert!(
+                result.contains(";; c\n") || result.contains(";; size\n"),
+                "{result}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_multiline_expression_keeps_trailing_comment() {
+        let field = "a".repeat(74);
+        for (src, trailing) in [
+            (
+                format!("(list {{{field}: u1}} ;; trailing\n {{{field}: u2}})"),
+                "} ;; trailing\n",
+            ),
+            (
+                format!("(let ((x {{{field}: u1}}) ;; trailing\n (y {{{field}: u2}})) x)"),
+                "}) ;; trailing\n",
+            ),
+            (
+                format!("{{x: {{{field}: u1}}, ;; trailing\n y: {{{field}: u2}}}}"),
+                "}, ;; trailing\n",
+            ),
+            (
+                "(define-private (f)\n  (ok u1)) ;; trailing\n(define-private (g) (ok u2))"
+                    .to_string(),
+                "\n) ;; trailing\n",
+            ),
+        ] {
+            let result = format_valid_and_stable(&src);
+            assert!(result.contains(trailing), "{result}");
+        }
+    }
+
+    #[test]
+    fn test_tuple_constructor_matches_sugar_layout() {
+        for (constructor, sugar) in [
+            (
+                "(define-constant X (tuple (a { a: u1, b: u2 })))",
+                "(define-constant X { a: { a: u1, b: u2 } })",
+            ),
+            (
+                "(define-constant X (tuple (a (begin u1))))",
+                "(define-constant X { a: (begin u1) })",
+            ),
+            (
+                "(define-constant X (tuple (a u1)))",
+                "(define-constant X { a: u1 })",
+            ),
+        ] {
+            assert_eq!(
+                format_valid_and_stable(constructor),
+                format_valid_and_stable(sugar)
+            );
+        }
+    }
+
+    #[test]
+    fn test_format_ignore_trailing_comment() {
+        let src = "(begin ;; @format-ignore\n (foo   1) ;; trailing\n (ok true))";
+        let result = format_valid_and_stable(src);
+        assert_eq!(result.matches(";; trailing").count(), 1, "{result}");
+
+        let src = ";; @format-ignore\n(foo   1) ;; trailing\n(bar)";
+        let result = format_valid_and_stable(src);
+        assert_eq!(result.matches(";; trailing").count(), 1, "{result}");
+    }
+
+    #[test]
+    fn test_format_ignore_before_non_list() {
+        let src = "(define-constant x (list\n ;; @format-ignore\n u1\n u2))";
+        let result = format_valid_and_stable(src);
+        assert!(!result.contains("@format-ignoreu1"), "{result}");
+
+        let src = ";; @format-ignore\n;; @format-ignore\n(foo   1)";
+        let result = format_valid_and_stable(src);
+        assert_eq!(result, format!("{src}\n"));
+    }
+
+    #[test]
+    fn test_format_ignore_without_source() {
+        let src =
+            ";; @format-ignore\n(define-read-only (foo) (ok u1))\n(define-read-only (bar) (ok u2))";
+        let ast =
+            clarity::vm::ast::parser::v2::parse(src, StackDepthLimits::for_epoch(DEFAULT_EPOCH))
+                .unwrap();
+        let formatter = ClarityFormatter::new(Settings::default());
+        let result = formatter.format_ast(&ast);
+        let reparsed = clarity::vm::ast::parser::v2::parse(
+            &result,
+            StackDepthLimits::for_epoch(DEFAULT_EPOCH),
+        )
+        .unwrap();
+        assert_eq!(reparsed.len(), ast.len(), "{result}");
+    }
+
+    #[test]
+    fn test_lists_without_leading_atom_are_separated() {
+        let src = "(foo)\n((bar))\n((baz))";
+        let result = format_valid_and_stable(src);
+        assert_eq!(result, "(foo)\n((bar))\n((baz))\n");
+    }
+
+    #[test]
+    fn test_begin_in_tuple_is_multiline() {
+        let result = format_valid_and_stable("(define-constant X { a: (begin 1) })");
+        assert_eq!(
+            result,
+            indoc!(
+                r#"
+                (define-constant X {
+                  a: (begin
+                    1
+                  ),
+                })
+                "#
+            )
+        );
+    }
+
+    #[test]
+    fn test_map_after_multiline_arg() {
+        let src = "(map-set name-properties { name: name, namespace: namespace } (merge (unwrap-panic (map-get? name-properties { name: name, namespace: namespace })) {stx-burn: (try! (compute-name-price name (get price-function namespace-props)))}))";
+        let result = format_valid_and_stable(src);
+        assert!(!result.contains("})) {"), "{result}");
     }
 }
