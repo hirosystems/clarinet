@@ -369,7 +369,8 @@ impl<'a> Aggregator<'a> {
             }
 
             if let Some(comment) = trailing_comment {
-                result.push_str(&formatted);
+                // A define ends with a newline, and the comment goes before it
+                result.push_str(formatted.strip_suffix('\n').unwrap_or(&formatted));
                 result.push(' ');
                 result.push_str(&self.display_pse(comment, indent));
                 result.push('\n');
@@ -913,28 +914,35 @@ impl<'a> Aggregator<'a> {
         estimated_len + 1 // closing paren
     }
 
-    /// Estimate the width of key-value sugar `{ k1: v1, k2: v2 }` on a single line.
-    /// Returns `None` if a comment or a multi-line value forces multiline.
-    fn estimate_kv_width(
+    /// `{ key: value }` on one line, or `None` if a comment or a multi-line
+    /// value forces multiline, or the line is too long. Tuple sugar and
+    /// `(tuple ...)` both use this, so converting one to the other keeps the layout.
+    fn inline_entry(
         &mut self,
-        exprs: &'a [PreSymbolicExpression],
+        key: &'a PreSymbolicExpression,
+        value: &'a [PreSymbolicExpression],
         indent: &Indent,
-    ) -> Option<usize> {
-        let nested = indent.indented(&self.indentation_str);
-        // "{ " + entries + " }"
-        let mut width = indent.len() + 4;
-        for expr in exprs {
-            if is_comment(expr) {
-                return None;
-            }
-            // Formatted as the multiline layout would, so that reuses the cached result
-            let formatted = self.format_source_exprs(slice::from_ref(expr), &nested);
-            if formatted.contains('\n') {
-                return None;
-            }
-            width += formatted.len() + 2; // "key: " or "value, "
+    ) -> Option<String> {
+        if is_comment(key) || contains_comments(value) {
+            return None;
         }
-        Some(width)
+        let nested = indent.indented(&self.indentation_str);
+        // Formatted as the multiline layout would, so that reuses the cached result
+        let fvalue = self.format_source_exprs(value, &nested);
+        let fkey = self.display_pse(key, indent);
+        // "{ " + "key: " + "value, " + " }"
+        let width = indent.len() + fkey.len() + fvalue.len() + 8;
+        if fvalue.contains('\n') || width > self.settings.max_line_length {
+            return None;
+        }
+        let doc = Doc::concat(vec![
+            Doc::text("{ "),
+            Doc::verbatim(fkey),
+            Doc::text(": "),
+            Doc::verbatim(fvalue),
+            Doc::text(" }"),
+        ]);
+        Some(self.render_doc(&doc, indent))
     }
 
     /// Format `(list ...)` expressions with greedy line-wrapping.
@@ -1061,17 +1069,14 @@ impl<'a> Aggregator<'a> {
         exprs: &'a [PreSymbolicExpression],
         indent: &Indent,
     ) -> String {
-        let nested = indent.indented(&self.indentation_str);
-        let fits_on_one_line = without_comments_len(exprs) <= 2
-            && self
-                .estimate_kv_width(exprs, indent)
-                .is_some_and(|width| width <= self.settings.max_line_length);
-
-        if let ([key, value], true) = (exprs, fits_on_one_line) {
-            let fkey = self.display_pse(key, indent);
-            let fvalue = self.format_source_exprs(slice::from_ref(value), &nested);
-            self.render_doc(&inline_entry(fkey, fvalue), indent)
+        let inline = match exprs {
+            [key, value] => self.inline_entry(key, slice::from_ref(value), indent),
+            _ => None,
+        };
+        if let Some(inline) = inline {
+            inline
         } else {
+            let nested = indent.indented(&self.indentation_str);
             let double_indent = nested.indented(&self.indentation_str);
             let mut entry_parts: Vec<Doc> = Vec::new();
             let mut iter = exprs.iter().peekable();
@@ -1119,10 +1124,17 @@ impl<'a> Aggregator<'a> {
     // used for (tuple (n1  1)) syntax
     // Note: Converted to a { a: 1 } style map
     fn format_key_value(&mut self, exprs: &'a [PreSymbolicExpression], indent: &Indent) -> String {
-        let nested = indent.indented(&self.indentation_str);
-        let multiline = exprs.len() > 1;
-
-        if multiline {
+        let inline = match exprs {
+            [entry] => match entry.match_list().and_then(|list| list.split_first()) {
+                Some((key, value)) => self.inline_entry(key, value, indent),
+                None => None,
+            },
+            _ => None,
+        };
+        if let Some(inline) = inline {
+            inline
+        } else {
+            let nested = indent.indented(&self.indentation_str);
             let mut entry_parts: Vec<Doc> = Vec::new();
             let mut iter = exprs.iter().peekable();
             while let Some(arg) = iter.next() {
@@ -1139,14 +1151,6 @@ impl<'a> Aggregator<'a> {
                 self.push_trailing_comment(&mut entry_parts, trailing, &nested);
             }
             self.render_doc(&block(Doc::text("{"), entry_parts, "}"), indent)
-        } else {
-            let (key, value) = exprs[0]
-                .match_list()
-                .and_then(|list| list.split_first())
-                .unwrap();
-            let fkey = self.display_pse(key, indent);
-            let fvalue = self.format_source_exprs(value, indent);
-            self.render_doc(&inline_entry(fkey, fvalue), indent)
         }
     }
 
@@ -1396,17 +1400,6 @@ fn block(open: Doc, body: Vec<Doc>, close: &str) -> Doc {
         Doc::indent(Doc::concat(body)),
         Doc::Hardline,
         Doc::text(close),
-    ])
-}
-
-/// `{ key: value }` on one line.
-fn inline_entry(key: String, value: String) -> Doc {
-    Doc::concat(vec![
-        Doc::text("{ "),
-        Doc::verbatim(key),
-        Doc::text(": "),
-        Doc::verbatim(value),
-        Doc::text(" }"),
     ])
 }
 
@@ -2764,9 +2757,37 @@ mod tests_formatter {
                 format!("{{x: {{{field}: u1}}, ;; trailing\n y: {{{field}: u2}}}}"),
                 "}, ;; trailing\n",
             ),
+            (
+                "(define-private (f)\n  (ok u1)) ;; trailing\n(define-private (g) (ok u2))"
+                    .to_string(),
+                "\n) ;; trailing\n",
+            ),
         ] {
             let result = format_valid_and_stable(&src);
             assert!(result.contains(trailing), "{result}");
+        }
+    }
+
+    #[test]
+    fn test_tuple_constructor_matches_sugar_layout() {
+        for (constructor, sugar) in [
+            (
+                "(define-constant X (tuple (a { a: u1, b: u2 })))",
+                "(define-constant X { a: { a: u1, b: u2 } })",
+            ),
+            (
+                "(define-constant X (tuple (a (begin u1))))",
+                "(define-constant X { a: (begin u1) })",
+            ),
+            (
+                "(define-constant X (tuple (a u1)))",
+                "(define-constant X { a: u1 })",
+            ),
+        ] {
+            assert_eq!(
+                format_valid_and_stable(constructor),
+                format_valid_and_stable(sugar)
+            );
         }
     }
 
