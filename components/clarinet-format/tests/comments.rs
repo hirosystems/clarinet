@@ -187,3 +187,29 @@ fn unusual_nested_tuple_entries_remain_stable() {
     assert_format(source, source);
     assert_format("(tuple (a (tuple (b u1 u2))))", "{ a: (tuple (b u1 u2)) }");
 }
+
+#[test]
+fn ignored_tuple_values_keep_their_source() {
+    let formatter = ClarityFormatter::new(Settings::default());
+    for value in ["(+   u1   u2)", "(let)"] {
+        let expected = format!("{{\n  a:\n    ;; before\n    ;; @format-ignore\n    {value},\n}}");
+        for source in [
+            format!("(tuple (a ;; before\n ;; @format-ignore\n {value}))"),
+            format!("{{ a: ;; before\n ;; @format-ignore\n {value} }}"),
+        ] {
+            assert_eq!(
+                formatter.format_file(&source, None),
+                format!("{expected}\n")
+            );
+            assert_eq!(formatter.format_section(&source, None).unwrap(), expected);
+            assert_eq!(
+                formatter.format_file(&expected, None),
+                format!("{expected}\n")
+            );
+        }
+    }
+    assert_format(
+        "(tuple (a ;; @format-ignore\n ;; ordinary comment\n (+   u1   u2)))",
+        "{\n  a:\n    ;; @format-ignore\n    ;; ordinary comment\n    (+ u1 u2),\n}",
+    );
+}

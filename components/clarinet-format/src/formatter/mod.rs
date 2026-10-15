@@ -1122,7 +1122,9 @@ impl<'a> Aggregator<'a> {
         nested: &Indent,
     ) -> Vec<Doc> {
         let mut comment_parts = Vec::new();
-        for comment in comments {
+        let mut comments = comments.into_iter().peekable();
+        while let Some(comment) = comments.next() {
+            self.check_and_cache_ignored(comment, comments.peek().copied().or(Some(value)));
             comment_parts.push(Doc::Hardline);
             comment_parts.push(Doc::verbatim(self.display_pse(comment, nested)));
         }
