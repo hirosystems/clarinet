@@ -349,7 +349,7 @@ impl<'a> Aggregator<'a> {
             let (formatted, is_define) = if let Some(list) = expr.match_list() {
                 if let Some(atom_name) = list.split_first().and_then(|(f, _)| f.match_atom()) {
                     (
-                        self.format_list_call(atom_name, list, indent),
+                        self.format_list_call(expr, atom_name, list, indent),
                         is_define_fn(atom_name),
                     )
                 } else {
@@ -411,6 +411,7 @@ impl<'a> Aggregator<'a> {
     /// Dispatch a list expression `(fn-name ...)` to the appropriate formatter.
     fn format_list_call(
         &mut self,
+        expr: &'a PreSymbolicExpression,
         atom_name: &str,
         list: &'a [PreSymbolicExpression],
         indent: &Indent,
@@ -420,7 +421,20 @@ impl<'a> Aggregator<'a> {
                 NativeFunctions::Let => self.format_let(list, indent),
                 NativeFunctions::Begin => self.format_begin(list, indent),
                 NativeFunctions::Match => self.format_match(list, indent),
-                NativeFunctions::TupleCons => self.format_key_value(&list[1..], indent),
+                NativeFunctions::TupleCons => {
+                    let can_convert = list[1..].iter().all(|entry| {
+                        is_comment(entry)
+                            || matches!(entry.match_list(), Some([key, value])
+                                if key.match_atom().is_some() && !is_comment(value))
+                    });
+                    if can_convert {
+                        self.format_key_value(&list[1..], indent)
+                    } else if let Some(source_lines) = &self.source_lines {
+                        source_lines.extract_expr_source(expr)
+                    } else {
+                        self.preserve_list_syntax(expr, indent)
+                    }
+                }
                 NativeFunctions::If => self.format_if(list, indent),
                 NativeFunctions::And | NativeFunctions::Or => self.format_booleans(list, indent),
                 NativeFunctions::ListCons => self.format_list(list, indent),
@@ -1123,6 +1137,26 @@ impl<'a> Aggregator<'a> {
 
             self.render_doc(&block(Doc::text("{"), entry_parts, "}"), indent)
         }
+    }
+
+    /// Without source, preserve unusual tuple entries without interpreting their
+    /// leading atoms as function calls or dropping extra arguments.
+    fn preserve_list_syntax(&mut self, expr: &'a PreSymbolicExpression, indent: &Indent) -> String {
+        let Some(items) = expr.match_list() else {
+            return self.display_pse(expr, indent);
+        };
+        let mut result = String::from("(");
+        for (i, item) in items.iter().enumerate() {
+            if i > 0 && !is_comment(&items[i - 1]) {
+                result.push(' ');
+            }
+            result.push_str(&self.preserve_list_syntax(item, indent));
+            if is_comment(item) {
+                result.push('\n');
+            }
+        }
+        result.push(')');
+        result
     }
 
     // used for (tuple (n1  1)) syntax

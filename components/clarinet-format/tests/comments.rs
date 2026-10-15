@@ -103,3 +103,36 @@ fn comments_between_tuple_entries_are_preserved() {
     );
     assert_format("(tuple ;; only comment\n)", "{\n  ;; only comment\n}");
 }
+
+#[test]
+fn unusual_tuple_entries_keep_their_source() {
+    let formatter = ClarityFormatter::new(Settings::default());
+    for source in [
+        "(tuple (a u1 u2))",
+        "(tuple (a ;; c\n u1))",
+        "(tuple (a u1 ;; c\n))",
+        "(tuple (a))",
+        "(tuple ())",
+        "(tuple u1)",
+        "(tuple ((some a) u1))",
+        "(tuple (a u1) (b ;; first\n ;; second\n u2))",
+        "(tuple (let))",
+    ] {
+        assert_eq!(formatter.format_section(source, None).unwrap(), source);
+        assert_eq!(formatter.format_file(source, None), format!("{source}\n"));
+        let ast = parse(source, StackDepthLimits::for_epoch(DEFAULT_EPOCH)).unwrap();
+        let formatted = formatter.format_ast(&ast);
+        assert_eq!(formatted, source.replace("\n ", "\n"));
+        let reparsed = parse(&formatted, StackDepthLimits::for_epoch(DEFAULT_EPOCH)).unwrap();
+        assert_eq!(formatter.format_ast(&reparsed), formatted);
+        let file = formatter.format_file(source, None);
+        assert_eq!(formatter.format_file(&file, None), file);
+    }
+}
+
+#[test]
+fn unusual_nested_tuple_entries_remain_stable() {
+    let source = "(define-constant x (tuple (a ;; c\nu1))) ;; outer";
+    assert_format(source, source);
+    assert_format("(tuple (a (tuple (b u1 u2))))", "{ a: (tuple (b u1 u2)) }");
+}
