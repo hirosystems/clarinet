@@ -544,6 +544,14 @@ impl<'a> Aggregator<'a> {
 
     fn format_constant(&mut self, exprs: &'a [PreSymbolicExpression], indent: &Indent) -> String {
         let func_type = self.display_pse(exprs.first().unwrap(), &Indent::empty());
+        if contains_comments(&exprs[1..]) {
+            let nested = indent.indented(&self.indentation_str);
+            let body = self.lines_doc(&exprs[1..], &nested, false);
+            return self.render_doc(
+                &block(Doc::text(format!("({func_type}")), body, ")"),
+                indent,
+            );
+        }
         let mut parts: Vec<Doc> = vec![Doc::text(format!("({func_type} "))];
         let mut iter = exprs[1..].iter().peekable();
         while let Some(expr) = iter.next() {
