@@ -71,7 +71,7 @@ fn source_extraction_preserves_literals_and_ignored_blocks() {
             if newline == "\r\n" {
                 // The parser rejects CRLF; verify extraction using LF-parsed spans.
                 let ast = parse(source, StackDepthLimits::for_epoch(DEFAULT_EPOCH)).unwrap();
-                let aggregator = Aggregator::new(&settings, &ast, Some(&input));
+                let mut aggregator = Aggregator::new(&settings, &ast, Some(&input));
                 assert_eq!(aggregator.generate().trim_end(), source);
                 continue;
             }
