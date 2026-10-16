@@ -576,7 +576,7 @@ impl<'a> Aggregator<'a> {
 
     fn trait_method_doc(&mut self, method: &'a PreSymbolicExpression, indent: &Indent) -> Doc {
         let Some(expressions) = method.match_list() else {
-            return Doc::verbatim(self.display_pse(method, indent));
+            return Doc::verbatim(self.preserve_syntax(method, indent));
         };
         if expressions.is_empty() {
             return Doc::text("()");
@@ -585,7 +585,7 @@ impl<'a> Aggregator<'a> {
         let sequence = Sequence::from(expressions);
         let mut body = Vec::new();
         let mut previous = None;
-        for item in &sequence.items {
+        for (index, item) in sequence.items.iter().enumerate() {
             body.push(self.trait_item_prefix(
                 item.comments,
                 previous,
@@ -596,8 +596,14 @@ impl<'a> Aggregator<'a> {
                 },
                 &nested,
             ));
-            // A signature component is syntax, not a call selected by its first atom.
-            body.push(Doc::verbatim(self.display_pse(item.expression, &nested)));
+            // Only the name, parameters, and return type have defined formatting.
+            // Extra components must not dispatch nested lists as function calls.
+            let formatted = if index < 3 {
+                self.display_pse(item.expression, &nested)
+            } else {
+                self.preserve_syntax(item.expression, &nested)
+            };
+            body.push(Doc::verbatim(formatted));
             previous = Some(item.expression);
         }
         body.push(self.comment_gap_doc(sequence.end_comments, previous, &nested));
@@ -608,7 +614,7 @@ impl<'a> Aggregator<'a> {
         if let Some(source_lines) = &self.source_lines {
             source_lines.extract_expr_source(expr)
         } else {
-            self.preserve_list_syntax(expr, indent)
+            self.preserve_syntax(expr, indent)
         }
     }
 
@@ -1210,21 +1216,27 @@ impl<'a> Aggregator<'a> {
 
     /// Without source, preserve unrecognized syntax without interpreting nested
     /// lists as function calls or dropping extra arguments.
-    fn preserve_list_syntax(&mut self, expr: &'a PreSymbolicExpression, indent: &Indent) -> String {
-        let Some(items) = expr.match_list() else {
-            return self.display_pse(expr, indent);
+    fn preserve_syntax(&mut self, expr: &'a PreSymbolicExpression, indent: &Indent) -> String {
+        let (items, open, close, tuple) = match &expr.pre_expr {
+            PreSymbolicExpressionType::List(items) => (items, "(", ')', false),
+            PreSymbolicExpressionType::Tuple(items) => (items, "{", '}', true),
+            _ => return self.display_pse(expr, indent),
         };
-        let mut result = String::from("(");
+        let mut result = String::from(open);
+        let mut is_key = true;
         for (i, item) in items.iter().enumerate() {
             if i > 0 && !is_comment(&items[i - 1]) {
                 result.push(' ');
             }
-            result.push_str(&self.preserve_list_syntax(item, indent));
+            result.push_str(&self.preserve_syntax(item, indent));
             if is_comment(item) {
                 result.push('\n');
+            } else if tuple {
+                result.push(if is_key { ':' } else { ',' });
+                is_key = !is_key;
             }
         }
-        result.push(')');
+        result.push(close);
         result
     }
 

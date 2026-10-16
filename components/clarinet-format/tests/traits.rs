@@ -239,8 +239,43 @@ fn tuple_as_trait_method_preserves_malformed_nested_calls() {
 }
 
 #[test]
+fn tuple_as_trait_parameters_preserves_malformed_nested_calls() {
+    assert_preserved(
+        "(define-trait t ((f {x: (let)} (response uint uint))))",
+        Settings::default(),
+        None,
+    );
+}
+
+#[test]
+fn tuple_as_trait_return_type_preserves_malformed_nested_calls() {
+    assert_preserved(
+        "(define-trait t ((f () {x: (let)})))",
+        Settings::default(),
+        None,
+    );
+}
+
+#[test]
 fn malformed_trait_with_extra_tuple_preserves_malformed_nested_calls() {
     assert_preserved("(define-trait t () {x: (let)})", Settings::default(), None);
+}
+
+#[test]
+fn malformed_trait_fallback_preserves_nested_tuple_comments() {
+    assert_preserved(
+        indoc! {"
+            (define-trait t () {
+              ;; before key
+              x:
+                ;; before value
+                (let {y: (match)}), ;; after value
+              z: {nested: (define-map)}
+              ;; after fields
+            })"},
+        Settings::default(),
+        None,
+    );
 }
 
 #[test]
