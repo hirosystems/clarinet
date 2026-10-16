@@ -1205,6 +1205,69 @@ impl SDK {
         Ok(execution_result_to_transaction_res(&execution))
     }
 
+    /// Execute a signed transaction at the current tip, then advance on inclusion.
+    #[wasm_bindgen(js_name=broadcastTransaction)]
+    pub fn broadcast_transaction(&mut self, raw_hex: &str) -> String {
+        use clarity_repl::repl::raw_transaction::{
+            RawFailureKind, RawTransactionOutcome, RawTransactionResult,
+        };
+        let outcome = self.get_session_mut().broadcast_transaction(raw_hex);
+        if outcome.is_included() {
+            self.get_session_mut().advance_chain_tip(1);
+        }
+        let metadata_json =
+            |metadata: &clarity_repl::repl::raw_transaction::RawTransactionMetadata| {
+                json!({
+                    "txid": metadata.txid,
+                    "fee": metadata.fee.to_string(),
+                    "nonce": metadata.nonce.to_string(),
+                })
+            };
+        let response = match outcome {
+            RawTransactionOutcome::Rejected { metadata, error } => {
+                json!({ "status": "rejected", "transaction": metadata.as_ref().map(metadata_json), "error": error })
+            }
+            RawTransactionOutcome::Included { metadata, result } => {
+                let transaction = metadata_json(&metadata);
+                match result {
+                    RawTransactionResult::Success(execution) => {
+                        if let EvaluationResult::Contract(result) = &execution.result {
+                            if let Some(interface) = &result.contract.analysis.contract_interface {
+                                self.contracts_interfaces.insert(
+                                    result.contract.analysis.contract_identifier.clone(),
+                                    interface.clone(),
+                                );
+                            }
+                        }
+                        json!({ "status": "success", "transaction": transaction, "execution": execution_result_to_transaction_res(&execution) })
+                    }
+                    RawTransactionResult::Failure {
+                        kind,
+                        error,
+                        output,
+                        events,
+                        cost,
+                    } => {
+                        let status = match kind {
+                            RawFailureKind::Response => "abort_by_response",
+                            RawFailureKind::Runtime => "runtime_error",
+                            RawFailureKind::Analysis => "analysis_error",
+                            RawFailureKind::PostCondition => "abort_by_post_condition",
+                        };
+                        let events: Vec<_> = events
+                            .iter()
+                            .map(|event| json!(serialize_event(event)).to_string())
+                            .collect();
+                        json!({ "status": status, "transaction": transaction, "error": error,
+                            "result": output.as_deref().map(clarity_values::to_raw_value),
+                            "events": json!(events).to_string(), "costs": json!(cost).to_string() })
+                    }
+                }
+            }
+        };
+        response.to_string()
+    }
+
     #[wasm_bindgen(js_name=deployContract)]
     pub fn deploy_contract(&mut self, args: &DeployContractArgs) -> Result<TransactionRes, String> {
         self.inner_deploy_contract(args, true)

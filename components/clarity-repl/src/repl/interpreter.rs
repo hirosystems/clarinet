@@ -823,7 +823,7 @@ impl ClarityInterpreter {
             .is_some_and(|data| data.is_mainnet)
     }
 
-    fn transaction_config(&self, epoch: StacksEpochId) -> TransactionConfig {
+    pub(super) fn transaction_config(&self, epoch: StacksEpochId) -> TransactionConfig {
         let mainnet = self.is_mainnet();
         let chain_id = if mainnet {
             CHAIN_ID_MAINNET
@@ -868,7 +868,7 @@ impl ClarityInterpreter {
         Ok((db, cost_tracker))
     }
 
-    fn get_transaction_connection<'db, 'hooks>(
+    pub(super) fn get_transaction_connection<'db, 'hooks>(
         &'db mut self,
         epoch: StacksEpochId,
         cost_track: bool,
@@ -1633,7 +1633,7 @@ impl ClarityInterpreter {
         Ok(execution_result)
     }
 
-    fn process_events(
+    pub(super) fn process_events(
         emitted_events: &mut Vec<StacksTransactionEvent>,
     ) -> (
         Vec<StacksTransactionEvent>,
@@ -1876,7 +1876,7 @@ impl ClarityInterpreter {
         self.datastore.get_current_burn_block_height()
     }
 
-    fn credit_token(&mut self, account: String, token: String, value: u128) {
+    pub(super) fn credit_token(&mut self, account: String, token: String, value: u128) {
         self.accounts.insert(account.clone());
         match self.tokens.entry(token) {
             Entry::Occupied(balances) => {
@@ -1894,7 +1894,7 @@ impl ClarityInterpreter {
         };
     }
 
-    fn debit_token(&mut self, account: String, token: String, value: u128) {
+    pub(super) fn debit_token(&mut self, account: String, token: String, value: u128) {
         self.accounts.insert(account.clone());
         match self.tokens.entry(token) {
             Entry::Occupied(balances) => {
@@ -1910,6 +1910,14 @@ impl ClarityInterpreter {
                 v.insert(balances);
             }
         };
+    }
+
+    pub(super) fn set_stx_reporting_balance(&mut self, account: String, balance: u128) {
+        self.accounts.insert(account.clone());
+        self.tokens
+            .entry("STX".into())
+            .or_default()
+            .insert(account, balance);
     }
 
     pub fn get_assets_maps(&self) -> BTreeMap<String, BTreeMap<String, u128>> {

@@ -798,6 +798,29 @@ impl Session {
             .map_err(Vec::from)
     }
 
+    pub fn broadcast_transaction(
+        &mut self,
+        raw_hex: &str,
+    ) -> super::raw_transaction::RawTransactionOutcome {
+        use super::raw_transaction::{RawTransactionOutcome, RawTransactionResult};
+        let outcome = self
+            .interpreter
+            .broadcast_transaction(raw_hex, self.hooks.enabled());
+        if let RawTransactionOutcome::Included {
+            result: RawTransactionResult::Success(execution),
+            ..
+        } = &outcome
+        {
+            if let EvaluationResult::Contract(result) = &execution.result {
+                self.contracts.insert(
+                    result.contract.analysis.contract_identifier.clone(),
+                    result.contract.clone(),
+                );
+            }
+        }
+        outcome
+    }
+
     pub fn deploy_contract(
         &mut self,
         contract: &ClarityContract,

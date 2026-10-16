@@ -34,6 +34,54 @@ from calling the Clarity `stx-transfer?` function inside a contract, which retai
 its ordinary response semantics. Private calls remain a simnet convenience and
 use the same transaction frame.
 
+## Signed transactions
+
+`simnet.broadcastTransaction(rawHex)` accepts a complete signed Stacks transaction
+serialized by Stacks.js. It verifies signatures, network/epoch rules, and origin
+and sponsor nonces; charges the fee from unlocked STX; and executes native STX
+transfers, public contract calls, or deployments. Ordinary simnet uses testnet
+transactions. Supply an explicit fee and nonce when constructing a transaction
+so Stacks.js does not fetch them from a remote node.
+
+```ts
+const transaction = await makeSTXTokenTransfer({
+  network: "testnet",
+  senderKey,
+  recipient,
+  amount: 100n,
+  fee: 10n,
+  nonce: simnet.getAccountNonce(sender),
+});
+const outcome = simnet.broadcastTransaction(transaction.serialize());
+if (outcome.status === "success") {
+  console.log(outcome.transaction.txid, outcome.execution.result);
+}
+```
+
+The result is a discriminated union:
+
+- `success`: includes `transaction` metadata and the usual parsed `execution`.
+- `abort_by_response`, `abort_by_post_condition`, `runtime_error`, or
+  `analysis_error`: included failures retain the fee and nonce charges. Results
+  include transaction metadata, an error message, an optional Clarity `result`,
+  attempted events, and costs. Aborted payload writes and asset-cache updates
+  are rolled back; attempted events do not imply committed asset movement.
+- `rejected`: nothing is charged or executed permanently. `transaction` is
+  present if decoding succeeded, otherwise `null`.
+
+`transaction` contains `txid` (64 lowercase hex characters, without `0x`), `fee`
+and `nonce` (both `bigint`). The ID is calculated from the complete signed
+transaction and matches Stacks.js. Replaying an included transaction is rejected
+by nonce validation. Included submissions execute at the current tip and then
+advance the chain by one block; rejections do not advance it.
+
+Raw payloads execute exactly as signed: contract source, boot addresses,
+post-conditions, and transfer memo bytes are not rewritten. Private calls and
+coinbase, tenure-change, and poison-microblock payloads are unsupported. Existing
+convenience calls remain unsigned and fee-free. `mineBlock` behavior is unchanged;
+raw batch entries and batch alignment are separate work. This method does not
+submit to a network or emulate a mempool.
+
 ## Contributing
 
 The clarinet-sdk requires a few steps to be built and tested locally.
