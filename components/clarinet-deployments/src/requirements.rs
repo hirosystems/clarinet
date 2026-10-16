@@ -146,12 +146,47 @@ async fn fetch_contract(
     deployer: &str,
     name: &str,
 ) -> Result<Contract, String> {
+    fetch_contract_if_published(api_base_url, deployer, name)
+        .await?
+        .ok_or_else(|| {
+            format!(
+                "Unable to retrieve contract {api_base_url}/extended/v1/contract/{deployer}.{name}: {}",
+                reqwest::StatusCode::NOT_FOUND
+            )
+        })
+}
+
+/// Fetch the source of `contract_id` from the network its address belongs
+/// to, or `None` if no such contract is published there.
+pub async fn fetch_published_source(
+    contract_id: &QualifiedContractIdentifier,
+    api_base_url: Option<&str>,
+) -> Result<Option<String>, String> {
+    let api_base_url =
+        api_base_url.unwrap_or_else(|| default_api_base_url(contract_id.issuer.is_mainnet()));
+    let contract = fetch_contract_if_published(
+        api_base_url,
+        &contract_id.issuer.to_address(),
+        contract_id.name.as_str(),
+    )
+    .await?;
+    Ok(contract.map(|contract| contract.source_code))
+}
+
+async fn fetch_contract_if_published(
+    api_base_url: &str,
+    deployer: &str,
+    name: &str,
+) -> Result<Option<Contract>, String> {
     let url = format!("{api_base_url}/extended/v1/contract/{deployer}.{name}");
     let response = reqwest::get(&url)
         .await
         .map_err(|e| format!("Unable to retrieve contract {url}: {e}"))?;
 
     let status = response.status();
+    if status == reqwest::StatusCode::NOT_FOUND {
+        return Ok(None);
+    }
     if !status.is_success() {
         return Err(format!("Unable to retrieve contract {url}: {status}"));
     }
@@ -159,6 +194,7 @@ async fn fetch_contract(
     response
         .json()
         .await
+        .map(Some)
         .map_err(|e| format!("Unable to parse contract json data {url}: {e}"))
 }
 
