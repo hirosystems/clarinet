@@ -16,19 +16,16 @@ pub fn check_entry_points(
     mut check: impl FnMut(&str, &str, &[PreSymbolicExpression]),
 ) {
     let formatter = ClarityFormatter::new(settings);
-    let ast = parse_source(source);
-    for (mode, formatted) in [
-        ("file", formatter.format_file(source, None)),
-        ("section", formatter.format_section(source, None).unwrap()),
-        ("ast", formatter.format_ast(&ast)),
-    ] {
-        let reparsed = parse_source(&formatted);
-        check(mode, &formatted, &reparsed);
-        let repeated = match mode {
-            "file" => formatter.format_file(&formatted, None),
-            "section" => formatter.format_section(&formatted, None).unwrap(),
-            _ => formatter.format_ast(&reparsed),
-        };
-        assert_eq!(repeated, formatted, "{mode}: {source}");
+    let modes: [(&str, &dyn Fn(&str) -> String); 3] = [
+        ("file", &|source| formatter.format_file(source, None)),
+        ("section", &|source| {
+            formatter.format_section(source, None).unwrap()
+        }),
+        ("ast", &|source| formatter.format_ast(&parse_source(source))),
+    ];
+    for (mode, format) in modes {
+        let formatted = format(source);
+        check(mode, &formatted, &parse_source(&formatted));
+        assert_eq!(format(&formatted), formatted, "{mode}: {source}");
     }
 }

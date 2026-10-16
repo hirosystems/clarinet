@@ -1,7 +1,7 @@
 mod common;
 
 use clarinet_format::formatter::{ClarityFormatter, Settings};
-use common::{check_entry_points, parse_source};
+use common::check_entry_points;
 use indoc::{formatdoc, indoc};
 
 fn assert_format(source: &str, expected: &str) {
@@ -205,7 +205,6 @@ fn sugar_comments_between_key_and_value_are_preserved() {
 
 #[test]
 fn unusual_tuple_entries_keep_their_source() {
-    let formatter = ClarityFormatter::new(Settings::default());
     for source in [
         "(tuple (a u1 u2))",
         "(tuple (a ;; c\n u1 u2))",
@@ -217,15 +216,12 @@ fn unusual_tuple_entries_keep_their_source() {
         "(tuple ((some a) u1))",
         "(tuple (let))",
     ] {
-        assert_eq!(formatter.format_section(source, None).unwrap(), source);
-        let file = formatter.format_file(source, None);
-        assert_eq!(file, format!("{source}\n"));
-        let ast = parse_source(source);
-        let formatted = formatter.format_ast(&ast);
-        assert_eq!(formatted, source.replace("\n ", "\n"));
-        let reparsed = parse_source(&formatted);
-        assert_eq!(formatter.format_ast(&reparsed), formatted);
-        assert_eq!(formatter.format_file(&file, None), file);
+        // Without source to copy, the AST entry point falls back to plain syntax.
+        let from_ast = source.replace("\n ", "\n");
+        check_entry_points(source, Settings::default(), |mode, formatted, _| {
+            let expected = if mode == "ast" { &from_ast } else { source };
+            assert_eq!(formatted.trim_end(), expected, "{mode}: {source}");
+        });
     }
 }
 

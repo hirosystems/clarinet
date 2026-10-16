@@ -475,7 +475,7 @@ impl<'a> Aggregator<'a> {
         let multiline_header =
             empty_multiline || !name.comments.is_empty() || !methods.comments.is_empty();
         let header_indent = if multiline_header { &nested } else { indent };
-        let header = vec![
+        let header = Doc::concat(vec![
             self.trait_item_prefix(
                 name.comments,
                 Some(keyword.expression),
@@ -493,9 +493,13 @@ impl<'a> Aggregator<'a> {
                 },
                 header_indent,
             ),
-            self.trait_methods_doc(method_list, header_indent),
-        ];
-        let header = Doc::concat(header);
+            self.trait_list_doc(
+                method_list,
+                header_indent,
+                Doc::Hardline,
+                |this, _, method, nested| this.trait_method_doc(method, nested),
+            ),
+        ]);
         let mut parts = vec![
             Doc::text("(define-trait"),
             if multiline_header {
@@ -557,18 +561,27 @@ impl<'a> Aggregator<'a> {
         ])
     }
 
-    fn trait_methods_doc(&mut self, methods: &'a [PreSymbolicExpression], indent: &Indent) -> Doc {
-        if methods.is_empty() {
+    /// Lay out a trait list with one item per line, keeping every comment.
+    fn trait_list_doc(
+        &mut self,
+        expressions: &'a [PreSymbolicExpression],
+        indent: &Indent,
+        first_separator: Doc,
+        mut item_doc: impl FnMut(&mut Self, usize, &'a PreSymbolicExpression, &Indent) -> Doc,
+    ) -> Doc {
+        if expressions.is_empty() {
             return Doc::text("()");
         }
         let nested = indent.indented(&self.indentation_str);
-        let sequence = Sequence::from(methods);
+        let sequence = Sequence::from(expressions);
+        let mut first_separator = Some(first_separator);
         let mut body = Vec::new();
         let mut previous = None;
-        for method in &sequence.items {
-            body.push(self.trait_item_prefix(method.comments, previous, Doc::Hardline, &nested));
-            body.push(self.trait_method_doc(method.expression, &nested));
-            previous = Some(method.expression);
+        for (index, item) in sequence.items.iter().enumerate() {
+            let separator = first_separator.take().unwrap_or(Doc::Hardline);
+            body.push(self.trait_item_prefix(item.comments, previous, separator, &nested));
+            body.push(item_doc(self, index, item.expression, &nested));
+            previous = Some(item.expression);
         }
         body.push(self.comment_gap_doc(sequence.end_comments, previous, &nested));
         block(Doc::text("("), body, ")")
@@ -578,42 +591,23 @@ impl<'a> Aggregator<'a> {
         let Some(expressions) = method.match_list() else {
             return Doc::verbatim(self.preserve_syntax(method, indent));
         };
-        if expressions.is_empty() {
-            return Doc::text("()");
-        }
-        let nested = indent.indented(&self.indentation_str);
-        let sequence = Sequence::from(expressions);
-        let mut body = Vec::new();
-        let mut previous = None;
-        for (index, item) in sequence.items.iter().enumerate() {
-            body.push(self.trait_item_prefix(
-                item.comments,
-                previous,
-                if previous.is_none() {
-                    Doc::text("")
+        self.trait_list_doc(
+            expressions,
+            indent,
+            Doc::text(""),
+            |this, index, item, nested| {
+                // Only the name, parameters, and return type have defined formatting,
+                // and none of them is a tuple. Anything else must not dispatch nested
+                // lists as function calls.
+                let defined =
+                    index < 3 && !matches!(item.pre_expr, PreSymbolicExpressionType::Tuple(_));
+                Doc::verbatim(if defined {
+                    this.display_pse(item, nested)
                 } else {
-                    Doc::Hardline
-                },
-                &nested,
-            ));
-            // Only the name, parameters, and return type have defined formatting,
-            // and none of them is a tuple. Anything else must not dispatch nested
-            // lists as function calls.
-            let defined = index < 3
-                && !matches!(
-                    item.expression.pre_expr,
-                    PreSymbolicExpressionType::Tuple(_)
-                );
-            let formatted = if defined {
-                self.display_pse(item.expression, &nested)
-            } else {
-                self.preserve_syntax(item.expression, &nested)
-            };
-            body.push(Doc::verbatim(formatted));
-            previous = Some(item.expression);
-        }
-        body.push(self.comment_gap_doc(sequence.end_comments, previous, &nested));
-        block(Doc::text("("), body, ")")
+                    this.preserve_syntax(item, nested)
+                })
+            },
+        )
     }
 
     fn preserve_expr(&mut self, expr: &'a PreSymbolicExpression, indent: &Indent) -> String {
