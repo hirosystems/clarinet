@@ -225,6 +225,25 @@ fn unexpected_trait_components_are_kept() {
 }
 
 #[test]
+fn unexpected_tuple_in_trait_signature_preserves_malformed_nested_calls() {
+    assert_preserved(
+        "(define-trait t ((f () (response uint uint) {x: (let)})))",
+        Settings::default(),
+        None,
+    );
+}
+
+#[test]
+fn tuple_as_trait_method_preserves_malformed_nested_calls() {
+    assert_preserved("(define-trait t ({x: (let)}))", Settings::default(), None);
+}
+
+#[test]
+fn malformed_trait_with_extra_tuple_preserves_malformed_nested_calls() {
+    assert_preserved("(define-trait t () {x: (let)})", Settings::default(), None);
+}
+
+#[test]
 fn comments_in_trait_gaps_preserve_structure_and_order() {
     // Every subset of the header, method-list, and method-signature gaps. Two
     // comments per gap catch consumers that accidentally handle only the first.
