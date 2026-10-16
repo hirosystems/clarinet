@@ -548,13 +548,12 @@ impl<'a> Aggregator<'a> {
         separator: Doc,
         indent: &Indent,
     ) -> Doc {
+        if comments.is_empty() {
+            return separator;
+        }
         Doc::concat(vec![
             self.comment_gap_doc(comments, previous, indent),
-            if comments.is_empty() {
-                separator
-            } else {
-                Doc::Hardline
-            },
+            Doc::Hardline,
         ])
     }
 
@@ -1209,8 +1208,8 @@ impl<'a> Aggregator<'a> {
         ]
     }
 
-    /// Without source, preserve unusual tuple entries without interpreting their
-    /// leading atoms as function calls or dropping extra arguments.
+    /// Without source, preserve unrecognized syntax without interpreting nested
+    /// lists as function calls or dropping extra arguments.
     fn preserve_list_syntax(&mut self, expr: &'a PreSymbolicExpression, indent: &Indent) -> String {
         let Some(items) = expr.match_list() else {
             return self.display_pse(expr, indent);
