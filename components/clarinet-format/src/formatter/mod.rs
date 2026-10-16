@@ -596,9 +596,15 @@ impl<'a> Aggregator<'a> {
                 },
                 &nested,
             ));
-            // Only the name, parameters, and return type have defined formatting.
-            // Extra components must not dispatch nested lists as function calls.
-            let formatted = if index < 3 {
+            // Only the name, parameters, and return type have defined formatting,
+            // and none of them is a tuple. Anything else must not dispatch nested
+            // lists as function calls.
+            let defined = index < 3
+                && !matches!(
+                    item.expression.pre_expr,
+                    PreSymbolicExpressionType::Tuple(_)
+                );
+            let formatted = if defined {
                 self.display_pse(item.expression, &nested)
             } else {
                 self.preserve_syntax(item.expression, &nested)
@@ -1214,8 +1220,8 @@ impl<'a> Aggregator<'a> {
         ]
     }
 
-    /// Without source, preserve unrecognized syntax without interpreting nested
-    /// lists as function calls or dropping extra arguments.
+    /// Preserve unrecognized syntax without interpreting nested lists as function
+    /// calls or dropping extra arguments.
     fn preserve_syntax(&mut self, expr: &'a PreSymbolicExpression, indent: &Indent) -> String {
         let (items, open, close, tuple) = match &expr.pre_expr {
             PreSymbolicExpressionType::List(items) => (items, "(", ')', false),
