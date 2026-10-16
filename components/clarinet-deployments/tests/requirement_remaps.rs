@@ -162,7 +162,9 @@ fn requirement_publishes(deployment: &DeploymentSpecification) -> Vec<String> {
 fn contract_remaps(deployment: &DeploymentSpecification) -> BTreeMap<String, String> {
     deployment
         .contract_remaps
-        .iter()
+        .as_ref()
+        .into_iter()
+        .flatten()
         .map(|(src, dst)| (src.to_string(), dst.to_string()))
         .collect()
 }
@@ -237,8 +239,8 @@ async fn requirement_without_override_is_still_redeployed() {
 
     assert_eq!(requirement_publishes(&deployment), vec![NFT_TRAIT]);
     assert!(
-        deployment.contract_remaps.is_empty(),
-        "a plan that references no remapped contract records no remaps"
+        deployment.contract_remaps.is_none(),
+        "a plan that references no remapped contract omits the remap section"
     );
     let content = deployment.to_file_content(project.dir.path()).unwrap();
     assert!(!String::from_utf8(content)
@@ -318,6 +320,35 @@ async fn remaps_referenced_by_a_redeployed_requirement_are_recorded() {
     );
 }
 
+/// A redeployed requirement that reaches a remapped contract only through a
+/// relative reference still records the remap.
+#[tokio::test]
+async fn relative_references_select_their_remap() {
+    let wrapper = "SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.wrapper";
+    let base = "SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.base";
+    let canonical = "ST1NXBK3K5YYMD6FD41MVNP3JS1GABZ8TRVX023PT.canonical-base";
+    let project = Project::new(
+        &format!(
+            "\n[[project.requirements]]\ncontract_id = \"{wrapper}\"\n\n[[project.requirements]]\ncontract_id = \"{base}\"\ntestnet = \"{canonical}\"\n"
+        ),
+        None,
+    );
+    let wrapper_source = "(define-read-only (call-base) (contract-call? .base get-one))";
+    let server = mock_contract_sources(&[
+        (wrapper, wrapper_source),
+        (base, REQUIREMENT_SOURCE),
+        (canonical, REQUIREMENT_SOURCE),
+    ])
+    .await;
+    let deployment = project.generate(StacksNetwork::Testnet, &server).await;
+
+    assert_eq!(requirement_publishes(&deployment), vec![wrapper]);
+    assert_eq!(
+        contract_remaps(&deployment),
+        BTreeMap::from([(base.to_string(), canonical.to_string())])
+    );
+}
+
 #[tokio::test]
 async fn opting_out_of_default_remaps_redeploys_sbtc() {
     let sbtc_deposit = format!("{SBTC_MAINNET_DEPLOYER}.sbtc-deposit");
@@ -332,7 +363,11 @@ async fn opting_out_of_default_remaps_redeploys_sbtc() {
     let deployment = project.generate(StacksNetwork::Testnet, &server).await;
 
     assert_eq!(requirement_publishes(&deployment), vec![sbtc_deposit]);
-    assert!(deployment.contract_remaps.is_empty());
+    // Empty rather than absent, so deploying skips the legacy sBTC rewrite.
+    let content = deployment.to_file_content(project.dir.path()).unwrap();
+    assert!(String::from_utf8(content)
+        .unwrap()
+        .contains("contract-remaps: {}"));
 }
 
 #[tokio::test]

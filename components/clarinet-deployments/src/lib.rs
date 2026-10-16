@@ -1485,14 +1485,22 @@ pub async fn generate_default_deployment_with_cache(
     // Only record the remaps whose source ID appears in a source the plan
     // publishes: rewriting is textual, so a reference used as data counts as
     // much as a dependency, and projects that never mention a default-remapped
-    // contract keep an unchanged plan.
-    let published_sources: Vec<&str> = transactions
+    // contract keep an unchanged plan. A requirement's relative references
+    // are qualified first, as the encoder does before rewriting.
+    let published_sources: Vec<String> = transactions
         .values()
         .flatten()
         .chain(contracts.values())
         .filter_map(|tx| match tx {
-            TransactionSpecification::ContractPublish(spec) => Some(spec.source.as_str()),
-            TransactionSpecification::RequirementPublish(spec) => Some(spec.source.as_str()),
+            TransactionSpecification::ContractPublish(spec) => Some(spec.source.clone()),
+            TransactionSpecification::RequirementPublish(spec) => Some(
+                source_remap::qualify_remapped_relative_references(
+                    &spec.source,
+                    &spec.contract_id,
+                    &remaps,
+                )
+                .unwrap_or_else(|| spec.source.clone()),
+            ),
             _ => None,
         })
         .collect();
@@ -1613,7 +1621,12 @@ pub async fn generate_default_deployment_with_cache(
         },
         plan: TransactionPlanSpecification { batches },
         contracts: contracts_map,
-        contract_remaps,
+        // `None` keeps a testnet plan's legacy sBTC seed; an empty section
+        // turns it off for a project that opted out of the defaults.
+        contract_remaps: (!contract_remaps.is_empty()
+            || (matches!(network, StacksNetwork::Testnet)
+                && !manifest.project.default_contract_remaps))
+            .then_some(contract_remaps),
     };
 
     // Check for custom boot contract validation errors and return error if any
@@ -2147,7 +2160,7 @@ mod tests {
             bitcoin_node: None,
             genesis: None,
             contracts: BTreeMap::new(),
-            contract_remaps: BTreeMap::new(),
+            contract_remaps: None,
             plan: TransactionPlanSpecification {
                 batches: vec![TransactionsBatchSpecification {
                     id: 0,
@@ -2350,7 +2363,7 @@ mod tests {
                 }],
             },
             contracts: BTreeMap::new(),
-            contract_remaps: BTreeMap::new(),
+            contract_remaps: None,
         }
     }
 

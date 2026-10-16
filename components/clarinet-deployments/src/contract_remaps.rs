@@ -7,8 +7,8 @@ use clarinet_files::{ProjectManifest, StacksNetwork};
 use clarity::vm::types::QualifiedContractIdentifier;
 use clarity_repl::repl::boot::{SBTC_BOOT_CONTRACTS, SBTC_TESTNET_ADDRESS_PRINCIPAL};
 
-use crate::requirements::fetch_published_source;
-use crate::source_remap::remap_contract_ids;
+use crate::requirements::{fetch_published_source, verification_client};
+use crate::source_remap::{qualify_remapped_relative_references, remap_contract_ids};
 use crate::types::ContractRemaps;
 
 /// Well-known contracts and where they are deployed on `network`.
@@ -78,8 +78,6 @@ pub fn resolve_contract_remaps(
 /// Warnings for project remaps whose destination is not published, or whose
 /// published source differs from the contract it stands in for.
 ///
-/// The canonical source is compared after applying `all_remaps`, so a copy
-/// that only differs by pointing at the remapped contracts still matches.
 /// Best effort: a network failure becomes a warning too, so an offline plan
 /// generation still succeeds.
 pub async fn check_requirement_remaps(
@@ -88,25 +86,17 @@ pub async fn check_requirement_remaps(
     all_remaps: &ContractRemaps,
     api_base_url: Option<&str>,
 ) -> Vec<String> {
-    let normalize = |source: &str| {
-        remap_contract_ids(
-            source,
-            all_remaps
-                .iter()
-                .map(|(src, dst)| (src.to_string(), dst.to_string())),
-        )
-    };
+    let client = verification_client();
     let mut warnings = vec![];
     for (contract_id, remap) in remaps {
-        match fetch_published_source(remap, api_base_url).await {
+        match fetch_published_source(&client, remap, api_base_url).await {
             Ok(None) => warnings.push(format!(
                 "requirement {contract_id} is remapped to {remap}, which is not published"
             )),
             Ok(Some(remap_source)) => {
-                if sources
-                    .get(contract_id)
-                    .is_some_and(|source| normalize(source) != remap_source)
-                {
+                if sources.get(contract_id).is_some_and(|source| {
+                    !is_remapped_copy(source, &remap_source, contract_id, all_remaps)
+                }) {
                     warnings.push(format!("requirement {contract_id} is remapped to {remap}, whose source differs; check that it provides the same interface"));
                 }
             }
@@ -116,6 +106,29 @@ pub async fn check_requirement_remaps(
         }
     }
     warnings
+}
+
+/// Whether `remap_source` is `source` pointed at the remapped contracts.
+///
+/// Whoever deployed the copy may have kept relative references (`.base`) or
+/// qualified them to their remap destination, so either form matches.
+fn is_remapped_copy(
+    source: &str,
+    remap_source: &str,
+    contract_id: &QualifiedContractIdentifier,
+    all_remaps: &ContractRemaps,
+) -> bool {
+    let normalize = |source: &str| {
+        remap_contract_ids(
+            source,
+            all_remaps
+                .iter()
+                .map(|(src, dst)| (src.to_string(), dst.to_string())),
+        )
+    };
+    normalize(source) == remap_source
+        || qualify_remapped_relative_references(source, contract_id, all_remaps)
+            .is_some_and(|qualified| normalize(&qualified) == remap_source)
 }
 
 #[cfg(test)]
@@ -215,6 +228,27 @@ mod tests {
             warnings[1].contains(".other, whose source differs"),
             "{warnings:?}"
         );
+    }
+
+    #[test]
+    fn a_copy_may_keep_or_qualify_relative_references() {
+        let id = |id: &str| parse_contract_id(id).unwrap();
+        let wrapper = id("SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.wrapper");
+        let remaps = ContractRemaps::from([(
+            id("SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.base"),
+            id("ST1NXBK3K5YYMD6FD41MVNP3JS1GABZ8TRVX023PT.canonical-base"),
+        )]);
+        let source = "(contract-call? .base f)";
+        let qualified =
+            "(contract-call? 'ST1NXBK3K5YYMD6FD41MVNP3JS1GABZ8TRVX023PT.canonical-base f)";
+        assert!(is_remapped_copy(source, source, &wrapper, &remaps));
+        assert!(is_remapped_copy(source, qualified, &wrapper, &remaps));
+        assert!(!is_remapped_copy(
+            source,
+            "(contract-call? .other f)",
+            &wrapper,
+            &remaps
+        ));
     }
 
     #[tokio::test]

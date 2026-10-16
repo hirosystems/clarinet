@@ -7,6 +7,78 @@
 
 use std::cmp::Reverse;
 
+use clarity::types::StacksEpochId;
+use clarity::vm::ast::parser;
+use clarity::vm::ast::stack_depth_checker::StackDepthLimits;
+use clarity::vm::representations::{
+    ContractName, PreSymbolicExpression, PreSymbolicExpressionType,
+};
+use clarity::vm::types::QualifiedContractIdentifier;
+
+use crate::types::ContractRemaps;
+
+/// Qualify the relative references (`.name`, `.name.trait`) to contracts in
+/// `remaps`, so the textual rewrite can reach them. Only parsed references are
+/// touched, and they keep the original ID so the rewrite picks the destination.
+pub(crate) fn qualify_remapped_relative_references(
+    source: &str,
+    original_contract_id: &QualifiedContractIdentifier,
+    remaps: &ContractRemaps,
+) -> Option<String> {
+    let names: Vec<_> = remaps
+        .keys()
+        .filter(|id| id.issuer == original_contract_id.issuer)
+        .map(|id| &id.name)
+        .collect();
+    if names.is_empty() {
+        return None;
+    }
+    let expressions =
+        parser::v2::parse(source, StackDepthLimits::for_epoch(StacksEpochId::latest())).ok()?;
+    let mut positions = vec![];
+    collect_relative_positions(&expressions, &names, &mut positions);
+    if positions.is_empty() {
+        return None;
+    }
+
+    let prefix = format!("'{}", original_contract_id.issuer);
+    let mut qualified = String::new();
+    let (mut line, mut column) = (1, 1);
+    for c in source.chars() {
+        if positions.contains(&(line, column)) {
+            qualified.push_str(&prefix);
+        }
+        qualified.push(c);
+        (line, column) = if c == '\n' {
+            (line + 1, 1)
+        } else {
+            (line, column + 1)
+        };
+    }
+    Some(qualified)
+}
+
+fn collect_relative_positions(
+    expressions: &[PreSymbolicExpression],
+    names: &[&ContractName],
+    positions: &mut Vec<(u32, u32)>,
+) {
+    for expression in expressions {
+        match &expression.pre_expr {
+            PreSymbolicExpressionType::SugaredContractIdentifier(name)
+            | PreSymbolicExpressionType::SugaredFieldIdentifier(name, _)
+                if names.contains(&name) =>
+            {
+                positions.push((expression.span.start_line, expression.span.start_column));
+            }
+            PreSymbolicExpressionType::List(items) | PreSymbolicExpressionType::Tuple(items) => {
+                collect_relative_positions(items, names, positions);
+            }
+            _ => {}
+        }
+    }
+}
+
 /// Whether `c` can continue a Stacks address or contract name.
 fn is_identifier_char(c: char) -> bool {
     c.is_ascii_alphanumeric() || matches!(c, '-' | '_')
@@ -189,5 +261,29 @@ mod tests {
             &format!("(define-constant c 'X{NFT_TRAIT})"),
             NFT_TRAIT
         ));
+    }
+
+    #[test]
+    fn only_parsed_relative_references_to_remapped_contracts_are_qualified() {
+        let original = QualifiedContractIdentifier::parse(&format!("{DEPLOYER}.wrapper")).unwrap();
+        let base = format!("{DEPLOYER}.base");
+        let remaps = ContractRemaps::from([(
+            QualifiedContractIdentifier::parse(&base).unwrap(),
+            QualifiedContractIdentifier::parse(NFT_TRAIT).unwrap(),
+        )]);
+        let source = |base: &str| {
+            format!(
+                "(impl-trait {base}.sample)\n(contract-call? {base} f)\n\
+                 (define-constant c .base-v2) ;; .base\n(define-constant s \".base\")"
+            )
+        };
+        assert_eq!(
+            qualify_remapped_relative_references(&source(".base"), &original, &remaps),
+            Some(source(&format!("'{base}")))
+        );
+        assert_eq!(
+            qualify_remapped_relative_references("(contract-call? .other f)", &original, &remaps),
+            None
+        );
     }
 }
