@@ -218,9 +218,14 @@ fn unusual_tuple_entries_keep_their_source() {
     ] {
         // Without source to copy, the AST entry point falls back to plain syntax.
         let from_ast = source.replace("\n ", "\n");
+        let from_file = format!("{source}\n");
         check_entry_points(source, Settings::default(), |mode, formatted, _| {
-            let expected = if mode == "ast" { &from_ast } else { source };
-            assert_eq!(formatted.trim_end(), expected, "{mode}: {source}");
+            let expected = match mode {
+                "file" => &from_file,
+                "ast" => &from_ast,
+                _ => source,
+            };
+            assert_eq!(formatted, expected, "{mode}: {source}");
         });
     }
 }
