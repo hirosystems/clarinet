@@ -1,8 +1,8 @@
-use clarinet_defaults::DEFAULT_EPOCH;
-use clarinet_format::formatter::{ClarityFormatter, Indentation, Settings};
-use clarity::vm::ast::parser::v2::parse;
-use clarity::vm::ast::stack_depth_checker::StackDepthLimits;
+mod common;
+
+use clarinet_format::formatter::{Indentation, Settings};
 use clarity::vm::representations::{PreSymbolicExpression, PreSymbolicExpressionType};
+use common::{check_entry_points, parse_source};
 use indoc::indoc;
 
 #[derive(Debug, Default, PartialEq)]
@@ -33,30 +33,16 @@ impl Contents {
 }
 
 fn assert_preserved(source: &str, settings: Settings, expected: Option<&str>) {
-    let parse = |source: &str| parse(source, StackDepthLimits::for_epoch(DEFAULT_EPOCH)).unwrap();
-    let ast = parse(source);
     let mut original = Contents::default();
-    original.collect(&ast);
-    let formatter = ClarityFormatter::new(settings);
-    for (mode, formatted) in [
-        ("file", formatter.format_file(source, None)),
-        ("section", formatter.format_section(source, None).unwrap()),
-        ("ast", formatter.format_ast(&ast)),
-    ] {
+    original.collect(&parse_source(source));
+    check_entry_points(source, settings, |mode, formatted, reparsed| {
         if let Some(expected) = expected {
             assert_eq!(formatted.trim_end(), expected, "{mode}: {source}");
         }
-        let reparsed = parse(&formatted);
         let mut actual = Contents::default();
-        actual.collect(&reparsed);
+        actual.collect(reparsed);
         assert_eq!(actual, original, "{mode}: {source}\nformatted: {formatted}");
-        let repeated = match mode {
-            "file" => formatter.format_file(&formatted, None),
-            "section" => formatter.format_section(&formatted, None).unwrap(),
-            _ => formatter.format_ast(&reparsed),
-        };
-        assert_eq!(repeated, formatted, "{mode}: {source}");
-    }
+    });
 }
 
 #[test]
@@ -137,18 +123,104 @@ fn comments_before_method_names_preserve_the_names() {
 }
 
 #[test]
-fn unusual_trait_forms_preserve_all_syntax() {
-    for source in [
-        "(define-trait)",
-        "(define-trait t)",
-        "(define-trait t uint)",
-        "(define-trait t () extra)",
-        "(define-trait t (unexpected))",
-        "(define-trait t (() (f uint (response uint uint) extra)))",
-        "(define-trait t ((;; only comment\n)))",
-        "(define-trait t ;; name\n uint ;; tail\n)",
+fn trait_method_comments_are_preserved() {
+    let expected = indoc! {"
+        (define-trait t (
+          ;; before
+          ;; also before
+          (first
+            (uint)
+            (response uint uint)
+          ) ;; trailing
+          ;; between
+          (second
+            ()
+            (response bool uint)
+          )
+          ;; after
+        ))"};
+    assert_preserved(expected, Settings::default(), Some(expected));
+    let comments_only = "(define-trait t (\n  ;; only comment\n))";
+    assert_preserved(comments_only, Settings::default(), Some(comments_only));
+}
+
+#[test]
+fn multiline_trait_headers_indent_wrapped_signatures() {
+    assert_preserved(
+        "(define-trait t ;; methods\n ((transfer (uint principal principal (optional (buff 34)) (optional principal) (optional principal)) (response bool uint))))",
+        Settings::default(),
+        Some(indoc! {"
+            (define-trait t ;; methods
+              (
+                (transfer
+                  (
+                    uint
+                    principal
+                    principal
+                    (optional (buff 34))
+                    (optional principal)
+                    (optional principal)
+                  )
+                  (response bool uint)
+                )
+              )
+            )"}),
+    );
+}
+
+#[test]
+fn malformed_trait_definitions_keep_their_source() {
+    // Without source to copy, the AST entry point falls back to plain list syntax.
+    for (source, from_ast) in [
+        ("(define-trait)", "(define-trait)"),
+        ("(define-trait  t)", "(define-trait t)"),
+        ("(define-trait t  uint)", "(define-trait t uint)"),
+        ("(define-trait t ()  extra)", "(define-trait t () extra)"),
+        (
+            "(define-trait t ;; name\n uint ;; tail\n)",
+            "(define-trait t ;; name\nuint ;; tail\n)",
+        ),
     ] {
-        assert_preserved(source, Settings::default(), None);
+        check_entry_points(source, Settings::default(), |mode, formatted, _| {
+            let expected = if mode == "ast" { from_ast } else { source };
+            assert_eq!(formatted.trim_end(), expected, "{mode}: {source}");
+        });
+    }
+}
+
+#[test]
+fn unexpected_trait_components_are_kept() {
+    for (source, expected) in [
+        (
+            "(define-trait t (unexpected))",
+            indoc! {"
+                (define-trait t (
+                  unexpected
+                ))"},
+        ),
+        (
+            "(define-trait t (() (f uint (response uint uint) extra)))",
+            indoc! {"
+                (define-trait t (
+                  ()
+                  (f
+                    uint
+                    (response uint uint)
+                    extra
+                  )
+                ))"},
+        ),
+        (
+            "(define-trait t ((;; only comment\n)))",
+            indoc! {"
+                (define-trait t (
+                  (
+                    ;; only comment
+                  )
+                ))"},
+        ),
+    ] {
+        assert_preserved(source, Settings::default(), Some(expected));
     }
 }
 

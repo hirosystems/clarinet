@@ -1,27 +1,13 @@
-use clarinet_defaults::DEFAULT_EPOCH;
+mod common;
+
 use clarinet_format::formatter::{ClarityFormatter, Settings};
-use clarity::vm::ast::parser::v2::parse;
-use clarity::vm::ast::stack_depth_checker::StackDepthLimits;
+use common::{check_entry_points, parse_source};
 use indoc::{formatdoc, indoc};
 
 fn assert_format(source: &str, expected: &str) {
-    let formatter = ClarityFormatter::new(Settings::default());
-    let parse = |source: &str| parse(source, StackDepthLimits::for_epoch(DEFAULT_EPOCH)).unwrap();
-    let ast = parse(source);
-    for (mode, formatted) in [
-        ("file", formatter.format_file(source, None)),
-        ("section", formatter.format_section(source, None).unwrap()),
-        ("ast", formatter.format_ast(&ast)),
-    ] {
+    check_entry_points(source, Settings::default(), |mode, formatted, _| {
         assert_eq!(formatted.trim_end(), expected, "{mode}: {source}");
-        let reparsed = parse(&formatted);
-        let repeated = match mode {
-            "file" => formatter.format_file(&formatted, None),
-            "section" => formatter.format_section(&formatted, None).unwrap(),
-            _ => formatter.format_ast(&reparsed),
-        };
-        assert_eq!(repeated, formatted, "{mode}: {source}");
-    }
+    });
 }
 
 #[test]
@@ -118,28 +104,6 @@ fn last_comment_argument_keeps_closing_parenthesis() {
         assert_format(source, expected);
     }
     assert_format("(foo u1)", "(foo u1)");
-}
-
-#[test]
-fn trait_method_comments_are_preserved() {
-    let expected = indoc! {"
-        (define-trait t (
-          ;; before
-          ;; also before
-          (first
-            (uint)
-            (response uint uint)
-          ) ;; trailing
-          ;; between
-          (second
-            ()
-            (response bool uint)
-          )
-          ;; after
-        ))"};
-    assert_format(expected, expected);
-    let comments_only = "(define-trait t (\n  ;; only comment\n))";
-    assert_format(comments_only, comments_only);
 }
 
 #[test]
@@ -256,10 +220,10 @@ fn unusual_tuple_entries_keep_their_source() {
         assert_eq!(formatter.format_section(source, None).unwrap(), source);
         let file = formatter.format_file(source, None);
         assert_eq!(file, format!("{source}\n"));
-        let ast = parse(source, StackDepthLimits::for_epoch(DEFAULT_EPOCH)).unwrap();
+        let ast = parse_source(source);
         let formatted = formatter.format_ast(&ast);
         assert_eq!(formatted, source.replace("\n ", "\n"));
-        let reparsed = parse(&formatted, StackDepthLimits::for_epoch(DEFAULT_EPOCH)).unwrap();
+        let reparsed = parse_source(&formatted);
         assert_eq!(formatter.format_ast(&reparsed), formatted);
         assert_eq!(formatter.format_file(&file, None), file);
     }
