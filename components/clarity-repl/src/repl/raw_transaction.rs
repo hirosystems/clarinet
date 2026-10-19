@@ -1,5 +1,8 @@
 //! Signed transaction admission and execution over the shared Clarity frame.
 
+use std::collections::BTreeSet;
+use std::{iter, mem};
+
 use clarity::vm::clarity::{ClarityConnection, ClarityError, TransactionConnection};
 use clarity::vm::database::ClarityDatabase;
 use clarity::vm::events::StacksTransactionEvent;
@@ -9,7 +12,10 @@ use clarity::vm::{
     ClarityVersion, ContractEvaluationResult, CostSynthesis, EvaluationResult, ExecutionResult,
     ParsedContract, SnippetEvaluationResult,
 };
-use clarity_types::types::{BuffData, PrincipalData, QualifiedContractIdentifier};
+use clarity_types::effects::AssetMap;
+use clarity_types::types::{
+    BoundedErrorString, BuffData, PrincipalData, QualifiedContractIdentifier, ResponseData,
+};
 use clarity_types::Value;
 use stacks_codec::transaction::{
     StacksTransaction, TransactionAuthVerificationMode, TransactionPayload, TransactionVersion,
@@ -17,7 +23,7 @@ use stacks_codec::transaction::{
 };
 use stacks_codec::StacksMessageCodec;
 
-use super::interpreter::{BlockInclusion, ClarityInterpreter, NonceCharge};
+use super::interpreter::{public_function_args, BlockInclusion, ClarityInterpreter, NonceCharge};
 use super::post_conditions::PostConditionCheck;
 use super::transaction::SimnetTransactionConnection;
 
@@ -86,8 +92,7 @@ impl ClarityInterpreter {
             fee: tx.get_tx_fee(),
             nonce: tx.get_origin_nonce(),
         };
-        let result = self.execute_raw_transaction(&tx, hooks);
-        match result {
+        match self.execute_raw_transaction(&tx, hooks) {
             Ok(result) => RawTransactionOutcome::Included { metadata, result },
             Err(error) => RawTransactionOutcome::Rejected {
                 metadata: Some(metadata),
@@ -163,8 +168,7 @@ impl ClarityInterpreter {
             tx,
             &origin,
             sponsor.as_ref(),
-            &conditions,
-            &mut callback_error,
+            conditions.abort_callback(epoch, &mut callback_error),
             &mut analysis_failure,
         );
         let cost = CostSynthesis::from_cost_tracker(connection.cost_tracker());
@@ -209,59 +213,27 @@ impl ClarityInterpreter {
         if let Some(error) = callback_error {
             result = Err(error);
         }
+        let (mut credits, mut debits) = (vec![], vec![]);
+        if let Ok(RawTransactionResult::Success(execution)) = &mut result {
+            (execution.events, credits, debits) = Self::process_events(&mut execution.events);
+        }
         // STX reporting must come from committed balances, including remote
         // accounts that were never seeded in the local asset mirror.
-        let mut credits = vec![];
-        let mut debits = vec![];
-        if let Ok(RawTransactionResult::Success(execution)) = &mut result {
-            let (events, payload_credits, payload_debits) =
-                Self::process_events(&mut execution.events);
-            execution.events = events;
-            credits = payload_credits;
-            debits = payload_debits;
-        }
-        let stx_accounts: std::collections::BTreeSet<_> = credits
-            .iter()
-            .chain(&debits)
-            .filter(|(_, token, _)| token == "STX")
-            .map(|(account, _, _)| account.clone())
-            .chain(std::iter::once(payer.to_string()))
+        let is_stx = |(_, token, _): &mut (String, String, u128)| token == "STX";
+        let stx_accounts: BTreeSet<_> = credits
+            .extract_if(.., is_stx)
+            .chain(debits.extract_if(.., is_stx))
+            .map(|(account, ..)| account)
+            .chain(iter::once(payer.to_string()))
             .collect();
         let mut stx_balances = vec![];
         if result.is_ok() {
-            for account in stx_accounts {
-                let balance = PrincipalData::parse(&account)
-                    .map_err(|e| e.to_string())
-                    .and_then(|principal| {
-                        connection
-                            .db()
-                            .get_account_stx_balance(&principal)
-                            .and_then(|balance| balance.get_total_balance())
-                            .map_err(|e| e.to_string())
-                    });
-                match balance {
-                    Ok(balance) => stx_balances.push((account, balance)),
-                    Err(error) => {
-                        result = Err(error);
-                        break;
-                    }
-                }
+            match commit_accounts(connection.db(), stx_accounts, nonces) {
+                Ok(balances) => stx_balances = balances,
+                Err(error) => result = Err(error),
             }
         }
-        if result.is_ok() {
-            for (principal, nonce) in nonces {
-                if let Err(error) = connection.db().set_account_nonce(&principal, nonce) {
-                    result = Err(error.to_string());
-                    break;
-                }
-            }
-        }
-        let inclusion = if result.is_ok() {
-            BlockInclusion::Included
-        } else {
-            BlockInclusion::Rejected
-        };
-        connection.settle(&NonceCharge::Free, inclusion)?;
+        connection.settle(&NonceCharge::Free, BlockInclusion::from(result.is_ok()))?;
         match &mut result {
             Ok(RawTransactionResult::Success(execution)) => connection.did_complete(Ok(execution)),
             Ok(RawTransactionResult::Failure { error, .. }) | Err(error) => {
@@ -271,32 +243,30 @@ impl ClarityInterpreter {
         drop(connection);
         let mut result = result?;
         // Only committed payload events update the reporting mirror.
-        for (account, token, amount) in credits.into_iter().filter(|(_, token, _)| token != "STX") {
+        for (account, token, amount) in credits {
             self.credit_token(account, token, amount);
         }
-        for (account, token, amount) in debits.into_iter().filter(|(_, token, _)| token != "STX") {
+        for (account, token, amount) in debits {
             self.debit_token(account, token, amount);
         }
         for (account, balance) in stx_balances {
             self.set_stx_reporting_balance(account, balance);
         }
-        if let RawTransactionResult::Success(execution) = &result {
+        if let RawTransactionResult::Success(execution) = &mut result {
             if let EvaluationResult::Snippet(SnippetEvaluationResult {
-                result: Value::Response(response),
-            }) = &execution.result
+                result:
+                    output @ Value::Response(ResponseData {
+                        committed: false, ..
+                    }),
+            }) = &mut execution.result
             {
-                if !response.committed {
-                    result = RawTransactionResult::Failure {
-                        kind: RawFailureKind::Response,
-                        error: "contract returned an error response".into(),
-                        output: Some(Box::new(Value::Response(response.clone()))),
-                        events: execution.events.clone(),
-                        cost: execution
-                            .cost
-                            .clone()
-                            .expect("raw transactions track costs"),
-                    };
-                }
+                result = RawTransactionResult::Failure {
+                    kind: RawFailureKind::Response,
+                    error: "contract returned an error response".into(),
+                    output: Some(Box::new(mem::replace(output, Value::none()))),
+                    events: mem::take(&mut execution.events),
+                    cost: execution.cost.take().expect("raw transactions track costs"),
+                };
             }
         }
         Ok(result)
@@ -361,24 +331,39 @@ fn admit(
     Ok(nonces)
 }
 
+/// Read the committed STX balances to report, then charge the admitted nonces.
+fn commit_accounts(
+    db: &mut ClarityDatabase,
+    stx_accounts: BTreeSet<String>,
+    nonces: Vec<(PrincipalData, u64)>,
+) -> Result<Vec<(String, u128)>, String> {
+    let balances = stx_accounts
+        .into_iter()
+        .map(|account| {
+            let principal = PrincipalData::parse(&account).map_err(|e| e.to_string())?;
+            let balance = db
+                .get_account_stx_balance(&principal)
+                .and_then(|balance| balance.get_total_balance())
+                .map_err(|e| e.to_string())?;
+            Ok((account, balance))
+        })
+        .collect::<Result<_, String>>()?;
+    for (principal, nonce) in nonces {
+        db.set_account_nonce(&principal, nonce)
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(balances)
+}
+
 fn execute_payload(
     connection: &mut SimnetTransactionConnection,
     tx: &StacksTransaction,
     origin: &PrincipalData,
     sponsor: Option<&PrincipalData>,
-    conditions: &PostConditionCheck,
-    callback_error: &mut Option<String>,
+    callback: impl FnOnce(&AssetMap, &mut ClarityDatabase) -> Option<BoundedErrorString>,
     analysis_failure: &mut bool,
 ) -> Result<(EvaluationResult, Vec<StacksTransactionEvent>), ClarityError> {
     let epoch = connection.get_epoch();
-    let callback = |assets: &_, _: &mut ClarityDatabase| match conditions.evaluate(assets, epoch) {
-        Ok(reason) => reason,
-        Err(error) => {
-            let reason = clarity_types::types::BoundedErrorString::from_display(&error);
-            *callback_error = Some(error);
-            Some(reason)
-        }
-    };
     let budget = ResourceBudget::unlimited();
     match &tx.payload {
         TransactionPayload::TokenTransfer(recipient, amount, memo) => {
@@ -440,22 +425,7 @@ fn execute_payload(
                 &budget,
             )?;
             let stored = connection.with_clarity_db_readonly(|db| db.get_contract(&id))?;
-            let function_args = stored
-                .functions
-                .iter()
-                .filter(|(_, f)| f.is_public())
-                .map(|(name, function)| {
-                    (
-                        name.to_string(),
-                        function
-                            .get_arguments()
-                            .iter()
-                            .zip(function.get_arg_types())
-                            .map(|(name, ty)| format!("({name} {ty})"))
-                            .collect(),
-                    )
-                })
-                .collect();
+            let function_args = public_function_args(&stored);
             connection.save_analysis(&id, &analysis)?;
             let contract = ParsedContract {
                 contract_identifier: id.to_string(),
@@ -491,6 +461,10 @@ mod tests {
         .unwrap()
     }
 
+    fn principal(fixtures: &Json, key: &str) -> PrincipalData {
+        PrincipalData::parse(fixtures[key].as_str().unwrap()).unwrap()
+    }
+
     fn session(fixtures: &Json) -> Session {
         let mut session = Session::new(SessionSettings {
             epoch_id: Some(StacksEpochId::Epoch34),
@@ -499,10 +473,7 @@ mod tests {
         for key in ["sender", "sponsor"] {
             session
                 .interpreter
-                .mint_stx_balance(
-                    PrincipalData::parse(fixtures[key].as_str().unwrap()).unwrap(),
-                    1_000_000,
-                )
+                .mint_stx_balance(principal(fixtures, key), 1_000_000)
                 .unwrap();
         }
         session
@@ -546,7 +517,7 @@ mod tests {
                 metadata.txid,
                 fixtures["transactions"][name]["txid"].as_str().unwrap()
             );
-            let sender = PrincipalData::parse(fixtures["sender"].as_str().unwrap()).unwrap();
+            let sender = principal(&fixtures, "sender");
             assert_eq!(session.interpreter.get_nonce(&sender).unwrap(), 1);
             assert!(!broadcast(&mut session, &fixtures, name).is_included());
         }
@@ -564,7 +535,7 @@ mod tests {
             "insufficient_fee",
         ] {
             let mut session = session(&fixtures);
-            let sender = PrincipalData::parse(fixtures["sender"].as_str().unwrap()).unwrap();
+            let sender = principal(&fixtures, "sender");
             let outcome = broadcast(&mut session, &fixtures, name);
             assert!(!outcome.is_included(), "{name}: {outcome:?}");
             assert_eq!(balance(&mut session, &sender), 1_000_000);
@@ -589,7 +560,7 @@ mod tests {
                 ),
                 "{name}: {outcome:?}"
             );
-            let sender = PrincipalData::parse(fixtures["sender"].as_str().unwrap()).unwrap();
+            let sender = principal(&fixtures, "sender");
             assert_eq!(balance(&mut session, &sender), 999_980);
             assert_eq!(session.interpreter.get_nonce(&sender).unwrap(), 2);
         }
@@ -599,17 +570,18 @@ mod tests {
     fn nonce_overflow_rejects_before_fee_debit() {
         let fixtures = fixtures();
         let mut session = session(&fixtures);
-        let sender = PrincipalData::parse(fixtures["sender"].as_str().unwrap()).unwrap();
+        let sender = principal(&fixtures, "sender");
         session.interpreter.force_nonce(&sender, u64::MAX);
         assert!(!broadcast(&mut session, &fixtures, "overflow_nonce").is_included());
         assert_eq!(balance(&mut session, &sender), 1_000_000);
         assert_eq!(session.interpreter.get_nonce(&sender).unwrap(), u64::MAX);
     }
+
     #[test]
     fn locked_stx_cannot_pay_fees() {
         let fixtures = fixtures();
         let mut session = session(&fixtures);
-        let sender = PrincipalData::parse(fixtures["sender"].as_str().unwrap()).unwrap();
+        let sender = principal(&fixtures, "sender");
         let epoch = session.interpreter.datastore.get_current_epoch();
         {
             let mut context = session
@@ -634,7 +606,7 @@ mod tests {
             epoch_id: Some(StacksEpochId::Epoch34),
             ..SessionSettings::default()
         });
-        let sender = PrincipalData::parse(fixtures["sender"].as_str().unwrap()).unwrap();
+        let sender = principal(&fixtures, "sender");
         {
             let mut context = session
                 .interpreter
@@ -652,6 +624,7 @@ mod tests {
             999_890
         );
     }
+
     #[test]
     fn unsupported_signed_payload_is_rejected() {
         use stacks_codec::transaction::CoinbasePayload;

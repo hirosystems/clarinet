@@ -17,6 +17,7 @@ use clarity::types::Address;
 use clarity::vm::analysis::contract_interface_builder::{
     ContractInterface, ContractInterfaceFunction, ContractInterfaceFunctionAccess,
 };
+use clarity::vm::events::StacksTransactionEvent;
 use clarity::vm::types::{PrincipalData, QualifiedContractIdentifier, StandardPrincipalData};
 use clarity::vm::{ClarityVersion, EvaluationResult, ExecutionResult, SymbolicExpression};
 use clarity_repl::repl::boot::{
@@ -305,6 +306,15 @@ pub struct SessionReport {
     pub costs: String,
 }
 
+/// Events as the SDK parses them: a JSON array of JSON-encoded events.
+fn serialize_events(events: &[StacksTransactionEvent]) -> String {
+    let events: Vec<_> = events
+        .iter()
+        .map(|event| json!(serialize_event(event)).to_string())
+        .collect();
+    json!(events).to_string()
+}
+
 pub fn execution_result_to_transaction_res(execution: &ExecutionResult) -> TransactionRes {
     let result = match &execution.result {
         EvaluationResult::Snippet(result) => clarity_values::to_raw_value(&result.result),
@@ -313,15 +323,9 @@ pub fn execution_result_to_transaction_res(execution: &ExecutionResult) -> Trans
             _ => "0x03".into(),
         },
     };
-    let events_as_strings = execution
-        .events
-        .iter()
-        .map(|e| json!(serialize_event(e)).to_string())
-        .collect::<Vec<String>>();
-
     TransactionRes {
         result,
-        events: json!(events_as_strings).to_string(),
+        events: serialize_events(&execution.events),
         costs: json!(execution.cost).to_string(),
         performance: None,
     }
@@ -1209,20 +1213,19 @@ impl SDK {
     #[wasm_bindgen(js_name=broadcastTransaction)]
     pub fn broadcast_transaction(&mut self, raw_hex: &str) -> String {
         use clarity_repl::repl::raw_transaction::{
-            RawFailureKind, RawTransactionOutcome, RawTransactionResult,
+            RawFailureKind, RawTransactionMetadata, RawTransactionOutcome, RawTransactionResult,
         };
         let outcome = self.get_session_mut().broadcast_transaction(raw_hex);
         if outcome.is_included() {
             self.get_session_mut().advance_chain_tip(1);
         }
-        let metadata_json =
-            |metadata: &clarity_repl::repl::raw_transaction::RawTransactionMetadata| {
-                json!({
-                    "txid": metadata.txid,
-                    "fee": metadata.fee.to_string(),
-                    "nonce": metadata.nonce.to_string(),
-                })
-            };
+        let metadata_json = |metadata: &RawTransactionMetadata| {
+            json!({
+                "txid": metadata.txid,
+                "fee": metadata.fee.to_string(),
+                "nonce": metadata.nonce.to_string(),
+            })
+        };
         let response = match outcome {
             RawTransactionOutcome::Rejected { metadata, error } => {
                 json!({ "status": "rejected", "transaction": metadata.as_ref().map(metadata_json), "error": error })
@@ -1231,13 +1234,8 @@ impl SDK {
                 let transaction = metadata_json(&metadata);
                 match result {
                     RawTransactionResult::Success(execution) => {
-                        if let EvaluationResult::Contract(result) = &execution.result {
-                            if let Some(interface) = &result.contract.analysis.contract_interface {
-                                self.contracts_interfaces.insert(
-                                    result.contract.analysis.contract_identifier.clone(),
-                                    interface.clone(),
-                                );
-                            }
+                        if let Some((id, interface)) = contract_interface_from_result(&execution) {
+                            self.contracts_interfaces.insert(id, interface);
                         }
                         json!({ "status": "success", "transaction": transaction, "execution": execution_result_to_transaction_res(&execution) })
                     }
@@ -1254,13 +1252,9 @@ impl SDK {
                             RawFailureKind::Analysis => "analysis_error",
                             RawFailureKind::PostCondition => "abort_by_post_condition",
                         };
-                        let events: Vec<_> = events
-                            .iter()
-                            .map(|event| json!(serialize_event(event)).to_string())
-                            .collect();
                         json!({ "status": status, "transaction": transaction, "error": error,
                             "result": output.as_deref().map(clarity_values::to_raw_value),
-                            "events": json!(events).to_string(), "costs": json!(cost).to_string() })
+                            "events": serialize_events(&events), "costs": json!(cost).to_string() })
                     }
                 }
             }

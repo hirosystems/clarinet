@@ -29,6 +29,29 @@ async function transfer(name, extra = {}) {
     ...extra,
   });
 }
+const withSponsor = (transaction, { key = sponsorKey, nonce = 0n } = {}) =>
+  sponsorTransaction({
+    transaction,
+    sponsorPrivateKey: key,
+    sponsorNonce: nonce,
+    fee: 10n,
+    network: "testnet",
+  });
+const call = (functionName, extra = {}) =>
+  makeContractCall({
+    ...options,
+    nonce: 1n,
+    contractAddress: sender,
+    contractName: "raw",
+    functionName,
+    functionArgs: [],
+    postConditionMode: "allow",
+    ...extra,
+  });
+const abortConditions = {
+  postConditionMode: "deny",
+  postConditions: [Pc.principal(sender).willSendEq(101).ustx()],
+};
 await transfer("transfer");
 await transfer("wrong_nonce", { nonce: 1n });
 await transfer("overflow_nonce", { nonce: 18446744073709551615n });
@@ -38,21 +61,9 @@ await transfer("self", { recipient: sender });
 await transfer("insufficient", { amount: 1000001n });
 await transfer("insufficient_fee", { fee: 1000001n });
 await transfer("sponsored", { sponsored: true });
-txs.sponsored = await sponsorTransaction({
-  transaction: txs.sponsored,
-  sponsorPrivateKey: sponsorKey,
-  sponsorNonce: 0n,
-  fee: 10n,
-  network: "testnet",
-});
+txs.sponsored = await withSponsor(txs.sponsored);
 await transfer("same_sponsor", { sponsored: true });
-txs.same_sponsor = await sponsorTransaction({
-  transaction: txs.same_sponsor,
-  sponsorPrivateKey: senderKey,
-  sponsorNonce: 0n,
-  fee: 10n,
-  network: "testnet",
-});
+txs.same_sponsor = await withSponsor(txs.same_sponsor, { key: senderKey });
 txs.deploy = await makeContractDeploy({
   ...options,
   contractName: "raw",
@@ -66,41 +77,10 @@ txs.bad_deploy = await makeContractDeploy({
   clarityVersion: 3,
 });
 for (const name of ["increment", "fail", "crash", "send"]) {
-  txs[name] = await makeContractCall({
-    ...options,
-    nonce: 1n,
-    contractAddress: sender,
-    contractName: "raw",
-    functionName: name,
-    functionArgs: [],
-    postConditionMode: "allow",
-  });
+  txs[name] = await call(name);
 }
-txs.abort = await makeContractCall({
-  ...options,
-  nonce: 1n,
-  contractAddress: sender,
-  contractName: "raw",
-  functionName: "send",
-  functionArgs: [],
-  postConditions: [Pc.principal(sender).willSendEq(101).ustx()],
-});
-txs.sponsored_call = await sponsorTransaction({
-  transaction: await makeContractCall({
-    ...options,
-    nonce: 1n,
-    sponsored: true,
-    contractAddress: sender,
-    contractName: "raw",
-    functionName: "increment",
-    functionArgs: [],
-    postConditionMode: "allow",
-  }),
-  sponsorPrivateKey: sponsorKey,
-  sponsorNonce: 0n,
-  fee: 10n,
-  network: "testnet",
-});
+txs.abort = await call("send", abortConditions);
+txs.sponsored_call = await withSponsor(await call("increment", { sponsored: true }));
 txs.duplicate_deploy = await makeContractDeploy({
   ...options,
   nonce: 1n,
@@ -113,48 +93,14 @@ txs.abort_deploy = await makeContractDeploy({
   contractName: "aborted",
   codeBody: `(define-data-var count uint u42) (stx-transfer? u100 tx-sender '${sponsor})`,
   clarityVersion: 3,
-  postConditions: [Pc.principal(sender).willSendEq(101).ustx()],
+  ...abortConditions,
 });
-txs.sponsor_context = await sponsorTransaction({
-  transaction: await makeContractCall({
-    ...options,
-    nonce: 1n,
-    sponsored: true,
-    contractAddress: sender,
-    contractName: "raw",
-    functionName: "payer",
-    functionArgs: [],
-    postConditionMode: "allow",
-  }),
-  sponsorPrivateKey: sponsorKey,
-  sponsorNonce: 0n,
-  fee: 10n,
-  network: "testnet",
-});
-txs.sponsored_abort = await sponsorTransaction({
-  transaction: await makeContractCall({
-    ...options,
-    nonce: 1n,
-    sponsored: true,
-    contractAddress: sender,
-    contractName: "raw",
-    functionName: "send",
-    functionArgs: [],
-    postConditions: [Pc.principal(sender).willSendEq(101).ustx()],
-  }),
-  sponsorPrivateKey: sponsorKey,
-  sponsorNonce: 0n,
-  fee: 10n,
-  network: "testnet",
-});
+txs.sponsor_context = await withSponsor(await call("payer", { sponsored: true }));
+txs.sponsored_abort = await withSponsor(
+  await call("send", { sponsored: true, ...abortConditions }),
+);
 await transfer("bad_sponsor_nonce", { sponsored: true });
-txs.bad_sponsor_nonce = await sponsorTransaction({
-  transaction: txs.bad_sponsor_nonce,
-  sponsorPrivateKey: sponsorKey,
-  sponsorNonce: 1n,
-  fee: 10n,
-  network: "testnet",
-});
+txs.bad_sponsor_nonce = await withSponsor(txs.bad_sponsor_nonce, { nonce: 1n });
 const fixtures = {
   sender,
   sponsor,
