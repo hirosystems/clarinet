@@ -18,8 +18,8 @@ use clarity_types::types::{
 };
 use clarity_types::Value;
 use stacks_codec::transaction::{
-    StacksTransaction, TransactionAuthVerificationMode, TransactionPayload, TransactionVersion,
-    MAX_TRANSACTION_LEN,
+    StacksTransaction, TransactionAuthVerificationMode, TransactionContractCall,
+    TransactionPayload, TransactionVersion, MAX_TRANSACTION_LEN,
 };
 use stacks_codec::StacksMessageCodec;
 
@@ -32,6 +32,8 @@ pub struct RawTransactionMetadata {
     pub txid: String,
     pub fee: u64,
     pub nonce: u64,
+    /// Preserve the signed call for SDK cost reports without decoding it again.
+    pub contract_call: Option<TransactionContractCall>,
 }
 
 #[derive(Debug)]
@@ -91,6 +93,10 @@ impl ClarityInterpreter {
             txid: tx.txid().to_string(),
             fee: tx.get_tx_fee(),
             nonce: tx.get_origin_nonce(),
+            contract_call: match &tx.payload {
+                TransactionPayload::ContractCall(call) => Some(call.clone()),
+                _ => None,
+            },
         };
         match self.execute_raw_transaction(&tx, hooks) {
             Ok(result) => RawTransactionOutcome::Included { metadata, result },

@@ -1231,6 +1231,32 @@ impl SDK {
                 json!({ "status": "rejected", "transaction": metadata.as_ref().map(metadata_json), "error": error })
             }
             RawTransactionOutcome::Included { metadata, result } => {
+                // Like convenience calls, report returned responses (including err),
+                // but not VM errors or post-condition aborts.
+                let cost = match &result {
+                    RawTransactionResult::Success(execution) => execution.cost.as_ref(),
+                    RawTransactionResult::Failure {
+                        kind: RawFailureKind::Response,
+                        cost,
+                        ..
+                    } => Some(cost),
+                    _ => None,
+                };
+                if self.options.track_costs {
+                    if let (Some(call), Some(cost)) = (&metadata.contract_call, cost) {
+                        self.costs_reports.push(CostsReport {
+                            test_name: self.current_test_name.clone(),
+                            contract_id: call.to_clarity_contract_id().to_string(),
+                            method: call.function_name.to_string(),
+                            args: call
+                                .function_args
+                                .iter()
+                                .map(clarity_values::value_to_string)
+                                .collect(),
+                            cost_result: cost.clone(),
+                        });
+                    }
+                }
                 let transaction = metadata_json(&metadata);
                 match result {
                     RawTransactionResult::Success(execution) => {

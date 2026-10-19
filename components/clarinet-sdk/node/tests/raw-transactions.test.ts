@@ -1,4 +1,4 @@
-import { Cl, deserializeTransaction } from "@stacks/transactions";
+import { Cl, deserializeTransaction, makeContractCall } from "@stacks/transactions";
 import { beforeEach, expect, it } from "vitest";
 import { initSimnet, type Simnet } from "..";
 import fixtures from "./fixtures/raw-transactions/transactions.json";
@@ -32,6 +32,78 @@ it("executes signed bytes, preserves the memo and canonical ID, and rejects repl
   expect(broadcast("transfer").status).toBe("rejected");
   expect(balance(sender)).toBe(999890n);
   expect(simnet.blockHeight).toBe(height + 1);
+});
+
+it.each([true, false])(
+  "reports raw call costs only when tracking is enabled (%s)",
+  async (trackCosts) => {
+    simnet = await initSimnet("tests/fixtures/Clarinet.toml", true, {
+      trackCosts,
+      trackCoverage: false,
+    });
+    simnet.setEpoch("3.4");
+    simnet.mintSTX(sender, 1000000n);
+    simnet.setCurrentTestName("signed transfer call");
+    const contractAddress = simnet.deployer;
+    const transaction = await makeContractCall({
+      network: "testnet",
+      senderKey: "1".padStart(64, "0") + "01",
+      contractAddress,
+      contractName: "counter",
+      functionName: "transfer-100",
+      functionArgs: [Cl.principal(sponsor)],
+      nonce: simnet.getAccountNonce(sender),
+      fee: 10n,
+      postConditionMode: "allow",
+    });
+    const result = simnet.broadcastTransaction(transaction.serialize());
+    expect(result.status).toBe("success");
+    if (result.status !== "success") throw new Error(result.status);
+    // A rejected replay must not add another report.
+    expect(simnet.broadcastTransaction(transaction.serialize()).status).toBe("rejected");
+    const reports = JSON.parse(simnet.collectReport(false, "").costs);
+    expect(reports).toHaveLength(trackCosts ? 1 : 0);
+    if (trackCosts) {
+      expect(reports[0]).toMatchObject({
+        test_name: "signed transfer call",
+        contract_id: `${contractAddress}.counter`,
+        method: "transfer-100",
+        args: [`'${sponsor}`],
+        cost_result: { total: { runtime: result.execution.costs!.total.runtime } },
+      });
+      expect(reports[0].cost_result.total.runtime).toBeGreaterThan(0);
+    }
+    expect(JSON.parse(simnet.collectReport(false, "").costs)).toEqual([]);
+  },
+);
+
+it("reports returned err responses like convenience calls, excluding other payloads", async () => {
+  simnet = await initSimnet("tests/fixtures/Clarinet.toml", true, {
+    trackCosts: true,
+    trackCoverage: false,
+  });
+  simnet.setEpoch("3.4");
+  simnet.mintSTX(sender, 1000000n);
+  broadcast("transfer");
+  expect(JSON.parse(simnet.collectReport(false, "").costs)).toEqual([]);
+  // Use a fresh session so the fixed deployment fixture has the expected nonce.
+  simnet = await initSimnet("tests/fixtures/Clarinet.toml", true, {
+    trackCosts: true,
+    trackCoverage: false,
+  });
+  simnet.setEpoch("3.4");
+  simnet.mintSTX(sender, 1000000n);
+  simnet.setCurrentTestName("signed err response");
+  expect(broadcast("deploy").status).toBe("success");
+  expect(broadcast("fail").status).toBe("abort_by_response");
+  const reports = JSON.parse(simnet.collectReport(false, "").costs);
+  expect(reports).toHaveLength(1);
+  expect(reports[0]).toMatchObject({
+    test_name: "signed err response",
+    contract_id: `${sender}.raw`,
+    method: "fail",
+    args: [],
+  });
 });
 
 it.each([
