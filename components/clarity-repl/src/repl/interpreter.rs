@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::btree_map::Entry;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
@@ -470,8 +471,11 @@ impl ClarityInterpreter {
         }
 
         let (ast, mut diagnostics, success) = match cached_ast {
-            Some(ast) => (ast.clone(), vec![], true),
-            None => self.build_ast(contract),
+            Some(ast) => (Cow::Borrowed(ast), vec![], true),
+            None => {
+                let (ast, diagnostics, success) = self.build_ast(contract);
+                (Cow::Owned(ast), diagnostics, success)
+            }
         };
 
         let code_source = contract.expect_in_memory_code_source();
@@ -502,7 +506,7 @@ impl ClarityInterpreter {
         let execution = if terms != &TransactionTerms::default() {
             self.execute_deployment(
                 contract,
-                &ast,
+                ast,
                 analysis,
                 cost_track,
                 eval_hooks.unwrap_or_default(),
@@ -1143,7 +1147,7 @@ impl ClarityInterpreter {
     fn execute_deployment(
         &mut self,
         contract: &ClarityContract,
-        ast: &ContractAST,
+        ast: Cow<'_, ContractAST>,
         analysis: ContractAnalysis,
         track_costs: bool,
         hooks: Vec<&mut dyn EvalHook>,
@@ -1161,7 +1165,7 @@ impl ClarityInterpreter {
                 let (_, events) = connection.initialize_smart_contract(
                     &id,
                     contract.clarity_version,
-                    ast,
+                    &ast,
                     source,
                     None,
                     callback,
@@ -1190,7 +1194,7 @@ impl ClarityInterpreter {
                     contract_identifier: id.to_string(),
                     code: source.to_string(),
                     function_args: functions,
-                    ast: ast.clone(),
+                    ast: ast.into_owned(),
                     analysis,
                 };
                 Ok((
