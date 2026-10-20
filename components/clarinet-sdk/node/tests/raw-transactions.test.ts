@@ -4,7 +4,7 @@ import {
   makeContractCall,
   makeContractDeploy,
 } from "@stacks/transactions";
-import { beforeEach, expect, it } from "vitest";
+import { beforeEach, expect, it, vi } from "vitest";
 import { initSimnet, type Simnet } from "..";
 import fixtures from "./fixtures/raw-transactions/transactions.json";
 
@@ -38,6 +38,48 @@ it("executes signed bytes, preserves the memo and canonical ID, and rejects repl
   expect(balance(sender)).toBe(999890n);
   expect(simnet.blockHeight).toBe(height + 1);
 });
+
+it.each([false, true])(
+  "updates raw contract call traces, including failures (%s)",
+  async (fail) => {
+    simnet.callPublicFn("stacks-trace-test", "call-sub", [Cl.uint(9), Cl.uint(1)], sender);
+    expect(simnet.getLastContractCallTrace()).toContain("args: u9 u1");
+    const transaction = await makeContractCall({
+      network: "testnet",
+      senderKey: "1".padStart(64, "0") + "01",
+      contractAddress: simnet.deployer,
+      contractName: "stacks-trace-test",
+      functionName: "call-sub",
+      functionArgs: [Cl.uint(fail ? 3 : 4), Cl.uint(fail ? 4 : 3)],
+      nonce: simnet.getAccountNonce(sender),
+      fee: 10n,
+      postConditionMode: "allow",
+    });
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const result = simnet.broadcastTransaction(transaction.serialize());
+      expect(result.status).toBe(fail ? "runtime_error" : "success");
+      const trace = simnet.getLastContractCallTrace();
+      expect(trace).toContain(fail ? "args: u3 u4" : "args: u4 u3");
+      expect(trace).not.toContain("args: u9 u1");
+      if (fail) {
+        expect(consoleSpy).toHaveBeenCalledWith(trace);
+        expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining("ArithmeticUnderflow"));
+      } else {
+        expect(consoleSpy).not.toHaveBeenCalled();
+      }
+      // Undecodable input isn't a contract call and preserves the last call's trace.
+      expect(simnet.broadcastTransaction("xyz").status).toBe("rejected");
+      expect(simnet.getLastContractCallTrace()).toBe(trace);
+      // A decoded call rejected at admission replaces the old execution trace.
+      expect(simnet.broadcastTransaction(transaction.serialize()).status).toBe("rejected");
+      expect(simnet.getLastContractCallTrace()).not.toBe(trace);
+      expect(simnet.getLastContractCallTrace()).not.toContain("args:");
+    } finally {
+      consoleSpy.mockRestore();
+    }
+  },
+);
 
 it.each([true, false])(
   "returns raw call performance only when tracking is enabled (%s)",

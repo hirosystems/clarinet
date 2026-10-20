@@ -826,10 +826,36 @@ impl Session {
         &mut self,
         raw_hex: &str,
     ) -> super::raw_transaction::RawTransactionOutcome {
-        use super::raw_transaction::{RawTransactionOutcome, RawTransactionResult};
-        let outcome = self
-            .interpreter
-            .broadcast_transaction(raw_hex, self.hooks.enabled());
+        use super::raw_transaction::{RawFailureKind, RawTransactionOutcome, RawTransactionResult};
+        let mut tracer = TracerHook::new();
+        let mut hooks: Vec<&mut dyn EvalHook> = vec![&mut tracer];
+        hooks.extend(self.hooks.enabled());
+        let outcome = self.interpreter.broadcast_transaction(raw_hex, hooks);
+        let metadata = match &outcome {
+            RawTransactionOutcome::Included { metadata, .. } => Some(metadata),
+            RawTransactionOutcome::Rejected { metadata, .. } => metadata.as_ref(),
+        };
+        if metadata.is_some_and(|metadata| metadata.contract_call.is_some()) {
+            let trace = tracer.output.join("\n");
+            // An err response is a normal return, as with convenience calls.
+            if !matches!(
+                &outcome,
+                RawTransactionOutcome::Included {
+                    result: RawTransactionResult::Success(_)
+                        | RawTransactionResult::Failure {
+                            kind: RawFailureKind::Response,
+                            ..
+                        },
+                    ..
+                }
+            ) {
+                ueprint!("{trace}");
+                if let Some(error) = tracer.error {
+                    ueprint!("{error}");
+                }
+            }
+            self.last_contract_call_trace = Some(trace);
+        }
         if let RawTransactionOutcome::Included {
             result: RawTransactionResult::Success(execution),
             ..
