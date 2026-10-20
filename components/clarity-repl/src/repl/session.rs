@@ -806,9 +806,13 @@ impl Session {
         let undo = self
             .interpreter
             .datastore
-            .checkpoint_next_block(&mut self.interpreter.clarity_datastore);
+            .checkpoint_next_block(&self.interpreter.clarity_datastore);
+        self.interpreter.clarity_datastore.begin_write_journal();
         self.advance_chain_tip(1);
         let outcome = self.broadcast_transaction(raw_hex);
+        self.interpreter
+            .clarity_datastore
+            .finish_write_journal(outcome.is_included());
         if !outcome.is_included() {
             undo.restore(
                 &mut self.interpreter.clarity_datastore,

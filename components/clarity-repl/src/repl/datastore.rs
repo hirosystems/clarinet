@@ -72,6 +72,7 @@ pub struct ClarityDatastore {
     current_chain_tip: Rc<RefCell<StacksBlockId>>,
     store: HashMap<String, BTreeMap<u32, String>>,
     metadata: HashMap<(String, String), String>,
+    write_journal: Option<WriteJournal>,
     height_at_chain_tip: HashMap<StacksBlockId, u32>,
     chain_tip_at_height: HashMap<u32, StacksBlockId>,
 
@@ -95,6 +96,7 @@ impl Clone for ClarityDatastore {
             current_chain_tip: Rc::clone(&self.current_chain_tip),
             store: self.store.clone(),
             metadata: self.metadata.clone(),
+            write_journal: None,
             height_at_chain_tip: self.height_at_chain_tip.clone(),
             chain_tip_at_height: self.chain_tip_at_height.clone(),
             remote_network_info: self.remote_network_info.clone(),
@@ -198,39 +200,11 @@ impl<K: Eq + std::hash::Hash, V: Clone> EntryUndo<K, V> {
     }
 }
 
-struct ValueUndo {
-    key: &'static str,
-    height: u32,
-    previous: Option<String>,
-}
-
-impl ValueUndo {
-    fn capture(store: &ClarityDatastore, key: &'static str, height: u32) -> Self {
-        Self {
-            key,
-            height,
-            previous: store
-                .store
-                .get(key)
-                .and_then(|values| values.get(&height))
-                .cloned(),
-        }
-    }
-
-    fn restore(self, store: &mut ClarityDatastore) {
-        if let Some(value) = self.previous {
-            store
-                .store
-                .entry(self.key.to_string())
-                .or_default()
-                .insert(self.height, value);
-        } else if let Some(values) = store.store.get_mut(self.key) {
-            values.remove(&self.height);
-            if values.is_empty() {
-                store.store.remove(self.key);
-            }
-        }
-    }
+/// Original values for each distinct write during a tentative block.
+#[derive(Default)]
+struct WriteJournal {
+    data: HashMap<(String, u32), Option<String>>,
+    metadata: HashMap<(String, String), Option<String>>,
 }
 
 struct BurnAdvanceUndo {
@@ -241,11 +215,9 @@ struct BurnAdvanceUndo {
     consensus: EntryUndo<ConsensusHash, SortitionId>,
     sortition: EntryUndo<SortitionId, BurnchainHeaderHash>,
     stacks_height: EntryUndo<u32, u32>,
-    tenure_value: ValueUndo,
 }
 
-/// Undo only one block's advancement. Rejected payload writes are rolled back
-/// separately by the transaction frame before this record is applied.
+/// Restore block tables and tips; VM storage is covered by the write journal.
 pub(super) struct BlockAdvanceUndo {
     open_tip: StacksBlockId,
     current_tip: StacksBlockId,
@@ -254,7 +226,6 @@ pub(super) struct BlockAdvanceUndo {
     tenure: EntryUndo<u32, u32>,
     height_at_tip: EntryUndo<StacksBlockId, u32>,
     tip_at_height: EntryUndo<u32, StacksBlockId>,
-    block_time: Option<ValueUndo>,
     burn: Option<BurnAdvanceUndo>,
 }
 
@@ -265,16 +236,12 @@ impl BlockAdvanceUndo {
             .restore(&mut blocks.tenure_height_at_stacks_height);
         self.height_at_tip.restore(&mut store.height_at_chain_tip);
         self.tip_at_height.restore(&mut store.chain_tip_at_height);
-        if let Some(time) = self.block_time {
-            time.restore(store);
-        }
         if let Some(burn) = self.burn {
             burn.block.restore(&mut blocks.burn_blocks);
             burn.consensus.restore(&mut blocks.consensus_hash_lookup);
             burn.sortition.restore(&mut blocks.sortition_lookup);
             burn.stacks_height
                 .restore(&mut blocks.stacks_height_at_tenure_height);
-            burn.tenure_value.restore(store);
             blocks.burn_chain_tip = burn.tip;
             blocks.burn_chain_height = burn.height;
             blocks.tenure_height = burn.tenure;
@@ -338,6 +305,7 @@ impl ClarityDatastore {
             current_chain_tip: Rc::new(RefCell::new(id.clone())),
             store: HashMap::new(),
             metadata: HashMap::new(),
+            write_journal: None,
             height_at_chain_tip: HashMap::from([(id.clone(), height)]),
             chain_tip_at_height: HashMap::from([(height, id)]),
 
@@ -371,6 +339,7 @@ impl ClarityDatastore {
             current_chain_tip: Rc::new(RefCell::new(id.clone())),
             store: HashMap::new(),
             metadata: HashMap::new(),
+            write_journal: None,
             height_at_chain_tip: HashMap::from([(id.clone(), height)]),
             chain_tip_at_height: HashMap::from([(height, id)]),
             remote_network_info: Some(remote_network_info),
@@ -453,8 +422,51 @@ impl ClarityDatastore {
         false
     }
 
+    pub(super) fn begin_write_journal(&mut self) {
+        assert!(
+            self.write_journal.is_none(),
+            "nested datastore write journal"
+        );
+        self.write_journal = Some(WriteJournal::default());
+    }
+
+    pub(super) fn finish_write_journal(&mut self, included: bool) {
+        let journal = self
+            .write_journal
+            .take()
+            .expect("active datastore write journal");
+        if included {
+            return;
+        }
+        // Each entry holds its pre-checkpoint value, so restoration order is immaterial.
+        for ((key, height), previous) in journal.data {
+            if let Some(value) = previous {
+                self.store.entry(key).or_default().insert(height, value);
+            } else if let Some(values) = self.store.get_mut(&key) {
+                values.remove(&height);
+                if values.is_empty() {
+                    self.store.remove(&key);
+                }
+            }
+        }
+        for (key, previous) in journal.metadata {
+            EntryUndo { key, previous }.restore(&mut self.metadata);
+        }
+    }
+
     fn put(&mut self, key: &str, value: &str) {
         let height = self.get_current_block_height();
+        if let Some(journal) = &mut self.write_journal {
+            journal
+                .data
+                .entry((key.to_string(), height))
+                .or_insert_with(|| {
+                    self.store
+                        .get(key)
+                        .and_then(|values| values.get(&height))
+                        .cloned()
+                });
+        }
         self.store
             .entry(key.to_string())
             .or_default()
@@ -765,8 +777,14 @@ impl ClarityBackingStore for ClarityDatastore {
         key: &str,
         value: &str,
     ) -> Result<(), VmExecutionError> {
-        self.metadata
-            .insert((contract.to_string(), key.to_string()), value.to_string());
+        let key = (contract.to_string(), key.to_string());
+        if let Some(journal) = &mut self.write_journal {
+            journal
+                .metadata
+                .entry(key.clone())
+                .or_insert_with(|| self.metadata.get(&key).cloned());
+        }
+        self.metadata.insert(key, value.to_string());
         Ok(())
     }
 
@@ -1036,7 +1054,7 @@ impl Datastore {
     }
 
     /// Capture the bounded set of entries touched by advancing one simnet block.
-    pub(super) fn checkpoint_next_block(&self, store: &mut ClarityDatastore) -> BlockAdvanceUndo {
+    pub(super) fn checkpoint_next_block(&self, store: &ClarityDatastore) -> BlockAdvanceUndo {
         let height = self.stacks_chain_height + 1;
         let tip = StacksBlockId(height_to_hashed_bytes(height));
         let burn = (self.current_epoch < StacksEpochId::Epoch30).then(|| {
@@ -1052,7 +1070,6 @@ impl Datastore {
                     &self.stacks_height_at_tenure_height,
                     self.tenure_height + 1,
                 ),
-                tenure_value: ValueUndo::capture(store, "_stx-data::tenure_height", height),
             }
         });
         let current_tip = store.current_chain_tip.borrow().clone();
@@ -1064,11 +1081,6 @@ impl Datastore {
             tenure: EntryUndo::capture(&self.tenure_height_at_stacks_height, height),
             height_at_tip: EntryUndo::capture(&store.height_at_chain_tip, tip),
             tip_at_height: EntryUndo::capture(&store.chain_tip_at_height, height),
-            // advance_stacks_chain_tip writes the timestamp before switching tips.
-            block_time: self.current_epoch.uses_marfed_block_time().then(|| {
-                let current_height = store.get_current_block_height();
-                ValueUndo::capture(store, CLARITY_STORAGE_BLOCK_TIME_KEY, current_height)
-            }),
             burn,
         }
     }
@@ -1626,6 +1638,42 @@ mod tests {
     }
 
     #[test]
+    fn write_journal_restores_first_values_and_retains_included_writes() {
+        let (mut store, _) = get_datastores();
+        let contract =
+            QualifiedContractIdentifier::parse("ST000000000000000000002AMW42H.journal").unwrap();
+        store.put("existing", "original");
+        store
+            .insert_metadata(&contract, "existing", "original")
+            .unwrap();
+        let data = store.store.clone();
+        let metadata = store.metadata.clone();
+        for included in [false, true] {
+            store.begin_write_journal();
+            for value in ["first", "last"] {
+                for key in ["existing", "new"] {
+                    store.put(key, value);
+                    store.insert_metadata(&contract, key, value).unwrap();
+                }
+            }
+            store.finish_write_journal(included);
+            assert!(store.write_journal.is_none());
+            if included {
+                for key in ["existing", "new"] {
+                    assert_eq!(store.get_data(key).unwrap().as_deref(), Some("last"));
+                    assert_eq!(
+                        store.get_metadata(&contract, key).unwrap().as_deref(),
+                        Some("last")
+                    );
+                }
+            } else {
+                assert_eq!(store.store, data);
+                assert_eq!(store.metadata, metadata);
+            }
+        }
+    }
+
+    #[test]
     fn rejected_block_restores_advancement_entries() {
         use crate::repl::{Session, SessionSettings};
 
@@ -1641,6 +1689,14 @@ mod tests {
                 );
             }
         }
+
+        let fixtures: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../clarinet-sdk/node/tests/fixtures/raw-transactions/transactions.json"
+        ))
+        .unwrap();
+        let wrong_nonce = fixtures["transactions"]["wrong_nonce"]["hex"]
+            .as_str()
+            .unwrap();
 
         for epoch in [
             StacksEpochId::Epoch2_05,
@@ -1666,10 +1722,17 @@ mod tests {
             }
             let store = session.interpreter.clarity_datastore.clone();
             let blocks = session.interpreter.datastore.clone();
-            for _ in 0..2 {
-                assert!(!session
-                    .broadcast_transaction_in_next_block("xyz")
-                    .is_included());
+            for raw in ["xyz", wrong_nonce, wrong_nonce] {
+                let outcome = session.broadcast_transaction_in_next_block(raw);
+                assert!(!outcome.is_included());
+                if raw == wrong_nonce {
+                    assert!(format!("{outcome:?}").contains("origin nonce mismatch"));
+                }
+                assert!(session
+                    .interpreter
+                    .clarity_datastore
+                    .write_journal
+                    .is_none());
                 let actual = &session.interpreter.clarity_datastore;
                 assert_eq!(actual.store, store.store);
                 assert_eq!(actual.metadata, store.metadata);
@@ -1716,6 +1779,36 @@ mod tests {
             assert_entries_eq(
                 &session.interpreter.datastore.stacks_blocks,
                 &expected.interpreter.datastore.stacks_blocks,
+            );
+            // A leaked epoch value at the rejected height would shadow this
+            // transition, including when that block is later read historically.
+            let next_epoch = if epoch < StacksEpochId::Epoch30 {
+                StacksEpochId::Epoch30
+            } else {
+                StacksEpochId::Epoch41
+            };
+            // Use a fresh rejection to exercise precisely that boundary.
+            assert!(!session
+                .broadcast_transaction_in_next_block(wrong_nonce)
+                .is_included());
+            session
+                .interpreter
+                .datastore
+                .set_current_epoch(&mut session.interpreter.clarity_datastore, next_epoch);
+            let historical_tip = session.interpreter.clarity_datastore.get_open_chain_tip();
+            session.advance_chain_tip(1);
+            session
+                .interpreter
+                .clarity_datastore
+                .set_block_hash(historical_tip)
+                .unwrap();
+            assert_eq!(
+                session
+                    .interpreter
+                    .clarity_datastore
+                    .get_data("vm-epoch::epoch-version")
+                    .unwrap(),
+                Some(format!("{:08x}", next_epoch as u32)),
             );
         }
     }
