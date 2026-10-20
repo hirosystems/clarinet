@@ -95,6 +95,7 @@ impl fmt::Display for ApiUrl {
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[cfg_attr(feature = "json_schema", derive(JsonSchema))]
 #[serde(rename_all = "kebab-case")]
 pub enum LogPrintEvents {
     All,

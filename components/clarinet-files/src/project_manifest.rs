@@ -60,6 +60,10 @@ pub struct ProjectConfigFile {
     /// Directory for caching build artifacts
     #[serde(default = "default_cache_dir")]
     cache_dir: String,
+    /// Removed list of analysis passes, only captured to warn about it
+    #[serde(default, skip_serializing)]
+    #[cfg_attr(feature = "json_schema", schemars(skip))]
+    analysis: Option<serde::de::IgnoredAny>,
 }
 
 fn default_cache_dir() -> String {
@@ -363,6 +367,9 @@ impl ProjectManifest {
         manifest_location: &Path,
         allow_remote_data_fetching: bool,
     ) -> Result<ProjectManifest, String> {
+        if project_manifest_file.project.analysis.is_some() {
+            clarity_repl::ueprint!("Warning: `analysis` in [project] is no longer supported and will be ignored. Configure lints in [linter.lints]");
+        }
         if project_manifest_file
             .repl
             .as_ref()

@@ -99,16 +99,13 @@ impl From<&LintName> for AnalysisPassFn {
 }
 
 #[derive(Debug, Default, Clone, Deserialize, Serialize, PartialEq)]
-#[cfg_attr(feature = "json_schema", derive(JsonSchema))]
 pub struct Settings {
     lints: HashMap<LintName, ClarityDiagnosticLevel>,
     /// Compiled glob patterns for files to include in analysis.
     #[serde(skip)]
-    #[cfg_attr(feature = "json_schema", schemars(skip))]
     include: Vec<Pattern>,
     /// Compiled glob patterns for files to exclude from analysis.
     #[serde(skip)]
-    #[cfg_attr(feature = "json_schema", schemars(skip))]
     exclude: Vec<Pattern>,
 }
 
