@@ -1275,12 +1275,7 @@ impl SDK {
                         events,
                         cost,
                     } => {
-                        let status = match kind {
-                            RawFailureKind::Response => "abort_by_response",
-                            RawFailureKind::Runtime => "runtime_error",
-                            RawFailureKind::Analysis => "analysis_error",
-                            RawFailureKind::PostCondition => "abort_by_post_condition",
-                        };
+                        let status: &'static str = kind.into();
                         json!({ "status": status, "transaction": transaction, "error": error,
                             "result": output.as_deref().map(clarity_values::to_raw_value),
                             "events": serialize_events(&events), "costs": json!(cost).to_string() })

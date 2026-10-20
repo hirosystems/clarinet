@@ -60,11 +60,15 @@ pub enum RawTransactionResult {
     },
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, strum::IntoStaticStr)]
 pub enum RawFailureKind {
+    #[strum(serialize = "abort_by_response")]
     Response,
+    #[strum(serialize = "runtime_error")]
     Runtime,
+    #[strum(serialize = "analysis_error")]
     Analysis,
+    #[strum(serialize = "abort_by_post_condition")]
     PostCondition,
 }
 
