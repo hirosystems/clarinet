@@ -40,6 +40,43 @@ it("executes signed bytes, preserves the memo and canonical ID, and rejects repl
 });
 
 it.each([true, false])(
+  "returns raw call performance only when tracking is enabled (%s)",
+  async (trackPerformance) => {
+    simnet = await initSimnet("tests/fixtures/Clarinet.toml", true, {
+      trackCosts: false,
+      trackCoverage: false,
+      trackPerformance,
+    });
+    simnet.enablePerformance("runtime");
+    simnet.setEpoch("3.4");
+    simnet.mintSTX(sender, 2000000n);
+    const transaction = await makeContractCall({
+      network: "testnet",
+      senderKey: "1".padStart(64, "0") + "01",
+      contractAddress: simnet.deployer,
+      contractName: "counter",
+      functionName: "increment",
+      functionArgs: [],
+      nonce: simnet.getAccountNonce(sender),
+      fee: 10n,
+      postConditionMode: "allow",
+    });
+    const result = simnet.broadcastTransaction(transaction.serialize());
+    expect(result.status).toBe("success");
+    if (result.status !== "success") throw new Error(result.status);
+    if (trackPerformance) {
+      expect(result.execution.performance).toContain(`${simnet.deployer}.counter`);
+    } else {
+      expect(result.execution.performance).toBeUndefined();
+    }
+    const replay = simnet.broadcastTransaction(transaction.serialize());
+    expect(replay.status).toBe("rejected");
+    expect(replay).not.toHaveProperty("performance");
+    expect(replay).not.toHaveProperty("execution");
+  },
+);
+
+it.each([true, false])(
   "reports raw call costs only when tracking is enabled (%s)",
   async (trackCosts) => {
     simnet = await initSimnet("tests/fixtures/Clarinet.toml", true, {

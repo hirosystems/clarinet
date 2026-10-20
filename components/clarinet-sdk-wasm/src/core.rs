@@ -1262,7 +1262,11 @@ impl SDK {
                         if let Some((id, interface)) = contract_interface_from_result(&execution) {
                             self.contracts_interfaces.insert(id, interface);
                         }
-                        json!({ "status": "success", "transaction": transaction, "execution": execution_result_to_transaction_res(&execution) })
+                        let mut response = execution_result_to_transaction_res(&execution);
+                        if self.options.track_performance {
+                            response.performance = self.get_session().get_performance_data();
+                        }
+                        json!({ "status": "success", "transaction": transaction, "execution": response })
                     }
                     RawTransactionResult::Failure {
                         kind,
