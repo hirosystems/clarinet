@@ -338,6 +338,9 @@ fn admit(
     if !balance.can_transfer(fee).map_err(|e| e.to_string())? {
         return Err("insufficient unlocked balance for transaction fee".into());
     }
+    // TODO: Before Epoch 2.1, fees were charged fees after execution.
+    //       It's a minor detail and shouldn't matter for current usage, but leaving a note here just in
+    //       case...
     balance.debit(fee).map_err(|e| e.to_string())?;
     balance.save().map_err(|e| e.to_string())?;
     Ok(nonces)
