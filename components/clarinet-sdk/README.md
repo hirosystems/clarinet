@@ -66,6 +66,8 @@ The result is a discriminated union:
   include transaction metadata, an error message, an optional Clarity `result`,
   attempted events, and costs. Aborted payload writes and asset-cache updates
   are rolled back; attempted events do not imply committed asset movement.
+  With performance tracking enabled, `abort_by_response` also includes
+  `performance` data; other failure statuses do not.
 - `rejected`: nothing is charged or executed permanently. `transaction` is
   present if decoding succeeded, otherwise `null`.
 

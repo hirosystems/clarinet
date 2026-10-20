@@ -50,6 +50,7 @@ export type RawTransactionResult =
       result: ClarityValue | null;
       events: ClarityEvent[];
       costs: ClarityCosts | null;
+      performance?: string;
     };
 
 export type BroadcastTransaction = (rawHex: string) => RawTransactionResult;

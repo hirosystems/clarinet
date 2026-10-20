@@ -1272,10 +1272,18 @@ impl SDK {
                         events,
                         cost,
                     } => {
+                        let performance = if self.options.track_performance
+                            && matches!(kind, RawFailureKind::Response)
+                        {
+                            self.get_session().get_performance_data()
+                        } else {
+                            None
+                        };
                         let status: &'static str = kind.into();
                         json!({ "status": status, "transaction": transaction, "error": error,
                             "result": output.as_deref().map(clarity_values::to_raw_value),
-                            "events": serialize_events(&events), "costs": json!(cost).to_string() })
+                            "events": serialize_events(&events), "costs": json!(cost).to_string(),
+                            "performance": performance })
                     }
                 }
             }

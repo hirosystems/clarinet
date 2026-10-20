@@ -69,12 +69,14 @@ it.each([false, true])(
         expect(consoleSpy).not.toHaveBeenCalled();
       }
       // Undecodable input isn't a contract call and preserves the last call's trace.
+      consoleSpy.mockClear();
       expect(simnet.broadcastTransaction("xyz").status).toBe("rejected");
       expect(simnet.getLastContractCallTrace()).toBe(trace);
       // A decoded call rejected at admission replaces the old execution trace.
       expect(simnet.broadcastTransaction(transaction.serialize()).status).toBe("rejected");
       expect(simnet.getLastContractCallTrace()).not.toBe(trace);
       expect(simnet.getLastContractCallTrace()).not.toContain("args:");
+      expect(consoleSpy).not.toHaveBeenCalled();
     } finally {
       consoleSpy.mockRestore();
     }
@@ -115,6 +117,65 @@ it.each([true, false])(
     expect(replay.status).toBe("rejected");
     expect(replay).not.toHaveProperty("performance");
     expect(replay).not.toHaveProperty("execution");
+  },
+);
+
+it.each([true, false])(
+  "reports fresh performance for raw err responses when tracking is enabled (%s)",
+  async (trackPerformance) => {
+    simnet = await initSimnet("tests/fixtures/Clarinet.toml", true, {
+      trackCosts: true,
+      trackPerformance,
+    });
+    simnet.enablePerformance("runtime");
+    simnet.setEpoch("3.4");
+    simnet.mintSTX(sender, 1000000n);
+    simnet.deployContract(
+      "perf-errors",
+      `(define-public (fail) (err u42))
+       (define-public (crash) (ok (/ u1 u0)))`,
+      null,
+      simnet.deployer,
+    );
+    const previous = simnet.callPublicFn(
+      "stacks-trace-test",
+      "call-sub",
+      [Cl.uint(9), Cl.uint(1)],
+      sender,
+    );
+    const call = async (functionName: string) => {
+      const tx = await makeContractCall({
+        network: "testnet",
+        senderKey: "1".padStart(64, "0") + "01",
+        contractAddress: simnet.deployer,
+        contractName: "perf-errors",
+        functionName,
+        functionArgs: [],
+        nonce: simnet.getAccountNonce(sender),
+        fee: 10n,
+        postConditionMode: "allow",
+      });
+      return simnet.broadcastTransaction(tx.serialize());
+    };
+    const result = await call("fail");
+    expect(result.status).toBe("abort_by_response");
+    if (result.status !== "abort_by_response") throw new Error(result.status);
+    expect(result.result).toEqual(Cl.error(Cl.uint(42)));
+    if (trackPerformance) {
+      expect(previous.performance).toContain("stacks-trace-test");
+      expect(result.performance).toContain(`${simnet.deployer}.perf-errors`);
+      expect(result.performance).not.toBe(previous.performance);
+    } else {
+      expect(result.performance).toBeUndefined();
+    }
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const failure = await call("crash");
+      expect(failure.status).toBe("runtime_error");
+      expect(failure).toHaveProperty("performance", undefined);
+    } finally {
+      consoleSpy.mockRestore();
+    }
   },
 );
 

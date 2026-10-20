@@ -838,17 +838,19 @@ impl Session {
         if metadata.is_some_and(|metadata| metadata.contract_call.is_some()) {
             let trace = tracer.output.join("\n");
             // An err response is a normal return, as with convenience calls.
-            if !matches!(
-                &outcome,
-                RawTransactionOutcome::Included {
-                    result: RawTransactionResult::Success(_)
-                        | RawTransactionResult::Failure {
-                            kind: RawFailureKind::Response,
-                            ..
-                        },
-                    ..
-                }
-            ) {
+            if outcome.is_included()
+                && !matches!(
+                    &outcome,
+                    RawTransactionOutcome::Included {
+                        result: RawTransactionResult::Success(_)
+                            | RawTransactionResult::Failure {
+                                kind: RawFailureKind::Response,
+                                ..
+                            },
+                        ..
+                    }
+                )
+            {
                 ueprint!("{trace}");
                 if let Some(error) = tracer.error {
                     ueprint!("{error}");

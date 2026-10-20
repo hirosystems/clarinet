@@ -159,6 +159,7 @@ export function createSessionProxy<S extends ProxySdk, ContractOptions>(
             result: response.result === null ? null : Cl.deserialize(response.result),
             events: parseEvents(response.events),
             costs: parseCosts(response.costs),
+            performance: response.performance ?? undefined,
           };
         };
         return broadcast;
