@@ -152,7 +152,7 @@ it.each([true, false])(
         test_name: "signed transfer call",
         contract_id: `${contractAddress}.counter`,
         method: "transfer-100",
-        args: [`'${sponsor}`],
+        args: [sponsor],
         cost_result: { total: { runtime: result.execution.costs!.total.runtime } },
       });
       expect(reports[0].cost_result.total.runtime).toBeGreaterThan(0);
@@ -160,6 +160,39 @@ it.each([true, false])(
     expect(JSON.parse(simnet.collectReport(false, "").costs)).toEqual([]);
   },
 );
+
+it("formats raw and convenience cost-report arguments identically", async () => {
+  simnet = await initSimnet("tests/fixtures/Clarinet.toml", true, {
+    trackCosts: true,
+    trackCoverage: false,
+  });
+  simnet.setEpoch("3.4");
+  simnet.mintSTX(sender, 1000000n);
+  simnet.deployContract(
+    "report-args",
+    "(define-public (echo (who principal) (data { a: uint, who: principal })) (ok data))",
+    null,
+    simnet.deployer,
+  );
+  const args = [Cl.principal(sponsor), Cl.tuple({ a: Cl.uint(1), who: Cl.principal(sender) })];
+  simnet.callPublicFn("report-args", "echo", args, sender);
+  const transaction = await makeContractCall({
+    network: "testnet",
+    senderKey: "1".padStart(64, "0") + "01",
+    contractAddress: simnet.deployer,
+    contractName: "report-args",
+    functionName: "echo",
+    functionArgs: args,
+    nonce: simnet.getAccountNonce(sender),
+    fee: 10n,
+    postConditionMode: "allow",
+  });
+  expect(simnet.broadcastTransaction(transaction.serialize()).status).toBe("success");
+  const reports = JSON.parse(simnet.collectReport(false, "").costs);
+  expect(reports).toHaveLength(2);
+  expect(reports[0].args).toEqual([sponsor, `(tuple (a u1) (who ${sender}))`]);
+  expect(reports[1].args).toEqual(reports[0].args);
+});
 
 it("reports returned err responses like convenience calls, excluding other payloads", async () => {
   simnet = await initSimnet("tests/fixtures/Clarinet.toml", true, {

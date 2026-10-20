@@ -1247,11 +1247,8 @@ impl SDK {
                             test_name: self.current_test_name.clone(),
                             contract_id: call.to_clarity_contract_id().to_string(),
                             method: call.function_name.to_string(),
-                            args: call
-                                .function_args
-                                .iter()
-                                .map(clarity_values::value_to_string)
-                                .collect(),
+                            // Preserve the Display format used by convenience-call reports.
+                            args: call.function_args.iter().map(ToString::to_string).collect(),
                             cost_result: cost.clone(),
                         });
                     }
