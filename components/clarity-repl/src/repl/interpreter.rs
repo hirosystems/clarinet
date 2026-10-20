@@ -166,6 +166,24 @@ fn post_condition_abort(
     }
 }
 
+/// Each public function's arguments, rendered as `(name type)`.
+pub(super) fn public_function_args(context: &ContractContext) -> BTreeMap<String, Vec<String>> {
+    context
+        .functions
+        .iter()
+        .filter(|(_, function)| function.is_public())
+        .map(|(name, function)| {
+            let args = function
+                .get_arguments()
+                .iter()
+                .zip(function.get_arg_types())
+                .map(|(name, ty)| format!("({name} {ty})"))
+                .collect();
+            (name.to_string(), args)
+        })
+        .collect()
+}
+
 /// Report a failed execution to the eval hooks, leaving them installed.
 fn notify_hooks_of_failure(global_context: &mut GlobalContext, error: &str) {
     let Some(eval_hooks) = &mut global_context.eval_hooks else {
@@ -823,7 +841,7 @@ impl ClarityInterpreter {
             .is_some_and(|data| data.is_mainnet)
     }
 
-    fn transaction_config(&self, epoch: StacksEpochId) -> TransactionConfig {
+    pub(super) fn transaction_config(&self, epoch: StacksEpochId) -> TransactionConfig {
         let mainnet = self.is_mainnet();
         let chain_id = if mainnet {
             CHAIN_ID_MAINNET
@@ -868,7 +886,7 @@ impl ClarityInterpreter {
         Ok((db, cost_tracker))
     }
 
-    fn get_transaction_connection<'db, 'hooks>(
+    pub(super) fn get_transaction_connection<'db, 'hooks>(
         &'db mut self,
         epoch: StacksEpochId,
         cost_track: bool,
@@ -1060,25 +1078,10 @@ impl ClarityInterpreter {
             !contract_context.functions.is_empty() || !contract_context.defined_traits.is_empty();
 
         let eval_result = if contract_saved {
-            let mut functions = BTreeMap::new();
-            for (name, defined_func) in contract_context.functions.iter() {
-                if !defined_func.is_public() {
-                    continue;
-                }
-
-                let args: Vec<_> = defined_func
-                    .get_arguments()
-                    .iter()
-                    .zip(defined_func.get_arg_types().iter())
-                    .map(|(n, t)| format!("({n} {t})"))
-                    .collect();
-
-                functions.insert(name.to_string(), args);
-            }
             let parsed_contract = ParsedContract {
                 contract_identifier: contract_id.to_string(),
                 code: snippet.to_string(),
-                function_args: functions,
+                function_args: public_function_args(&contract_context),
                 ast: contract_ast.clone(),
                 analysis: analysis.clone(),
             };
@@ -1172,20 +1175,7 @@ impl ClarityInterpreter {
                     &ResourceBudget::unlimited(),
                 )?;
                 let stored = connection.with_clarity_db_readonly(|db| db.get_contract(&id))?;
-                let functions = stored
-                    .functions
-                    .iter()
-                    .filter(|(_, function)| function.is_public())
-                    .map(|(name, function)| {
-                        let args = function
-                            .get_arguments()
-                            .iter()
-                            .zip(function.get_arg_types())
-                            .map(|(name, ty)| format!("({name} {ty})"))
-                            .collect();
-                        (name.to_string(), args)
-                    })
-                    .collect();
+                let functions = public_function_args(&stored);
                 // Like stacks-node, save analysis in the same outer frame as the deployment.
                 connection
                     .save_analysis(&id, &analysis)
@@ -1333,18 +1323,11 @@ impl ClarityInterpreter {
             .map_err(rejected)?;
         connection.begin();
         let mut callback_error = None;
-        let mut callback = |assets: &AssetMap, _: &mut ClarityDatabase| match terms
+        let mut callback = terms
             .post_conditions
-            .evaluate(assets, epoch)
-        {
-            Ok(reason) => reason,
-            Err(error) => {
-                let reason = BoundedErrorString::from_display(&error);
-                callback_error = Some(error);
-                Some(reason)
-            }
-        };
+            .abort_callback(epoch, &mut callback_error);
         let result = payload(&mut connection, &mut callback);
+        drop(callback);
         let result = if let Some(error) = callback_error {
             Err(rejected(error))
         } else {
@@ -1633,7 +1616,7 @@ impl ClarityInterpreter {
         Ok(execution_result)
     }
 
-    fn process_events(
+    pub(super) fn process_events(
         emitted_events: &mut Vec<StacksTransactionEvent>,
     ) -> (
         Vec<StacksTransactionEvent>,
@@ -1876,7 +1859,7 @@ impl ClarityInterpreter {
         self.datastore.get_current_burn_block_height()
     }
 
-    fn credit_token(&mut self, account: String, token: String, value: u128) {
+    pub(super) fn credit_token(&mut self, account: String, token: String, value: u128) {
         self.accounts.insert(account.clone());
         match self.tokens.entry(token) {
             Entry::Occupied(balances) => {
@@ -1894,7 +1877,7 @@ impl ClarityInterpreter {
         };
     }
 
-    fn debit_token(&mut self, account: String, token: String, value: u128) {
+    pub(super) fn debit_token(&mut self, account: String, token: String, value: u128) {
         self.accounts.insert(account.clone());
         match self.tokens.entry(token) {
             Entry::Occupied(balances) => {
@@ -1910,6 +1893,14 @@ impl ClarityInterpreter {
                 v.insert(balances);
             }
         };
+    }
+
+    pub(super) fn set_stx_reporting_balance(&mut self, account: String, balance: u128) {
+        self.accounts.insert(account.clone());
+        self.tokens
+            .entry("STX".into())
+            .or_default()
+            .insert(account, balance);
     }
 
     pub fn get_assets_maps(&self) -> BTreeMap<String, BTreeMap<String, u128>> {
