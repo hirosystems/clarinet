@@ -17,7 +17,6 @@ use clarity::types::Address;
 use clarity::vm::analysis::contract_interface_builder::{
     ContractInterface, ContractInterfaceFunction, ContractInterfaceFunctionAccess,
 };
-use clarity::vm::database::ClarityBackingStore;
 use clarity::vm::events::StacksTransactionEvent;
 use clarity::vm::types::{PrincipalData, QualifiedContractIdentifier, StandardPrincipalData};
 use clarity::vm::{ClarityVersion, EvaluationResult, ExecutionResult, SymbolicExpression};
@@ -1216,21 +1215,9 @@ impl SDK {
         use clarity_repl::repl::raw_transaction::{
             RawFailureKind, RawTransactionMetadata, RawTransactionOutcome, RawTransactionResult,
         };
-        let session = self.get_session_mut();
-        // Advancing also writes block metadata and, before epoch 3.0, tenure
-        // state. Preserve both stores so rejection can undo the entire block.
-        let clarity_datastore = session.interpreter.clarity_datastore.clone();
-        let datastore = session.interpreter.datastore.clone();
-        session.advance_chain_tip(1);
-        let outcome = session.broadcast_transaction(raw_hex);
-        if !outcome.is_included() {
-            session.interpreter.clarity_datastore = clarity_datastore;
-            session.interpreter.datastore = datastore;
-            // The stores share this pointer across clones.
-            let store = &mut session.interpreter.clarity_datastore;
-            let tip = store.get_open_chain_tip();
-            store.set_block_hash(tip).expect("restore saved chain tip");
-        }
+        let outcome = self
+            .get_session_mut()
+            .broadcast_transaction_in_next_block(raw_hex);
         let metadata_json = |metadata: &RawTransactionMetadata| {
             json!({
                 "txid": metadata.txid,

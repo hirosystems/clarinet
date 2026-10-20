@@ -798,6 +798,26 @@ impl Session {
             .map_err(Vec::from)
     }
 
+    /// Mine a block only if the signed transaction is included.
+    pub fn broadcast_transaction_in_next_block(
+        &mut self,
+        raw_hex: &str,
+    ) -> super::raw_transaction::RawTransactionOutcome {
+        let undo = self
+            .interpreter
+            .datastore
+            .checkpoint_next_block(&mut self.interpreter.clarity_datastore);
+        self.advance_chain_tip(1);
+        let outcome = self.broadcast_transaction(raw_hex);
+        if !outcome.is_included() {
+            undo.restore(
+                &mut self.interpreter.clarity_datastore,
+                &mut self.interpreter.datastore,
+            );
+        }
+        outcome
+    }
+
     pub fn broadcast_transaction(
         &mut self,
         raw_hex: &str,
