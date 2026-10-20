@@ -7,6 +7,7 @@ mod docs;
 pub mod hooks;
 pub mod interpreter;
 pub mod post_conditions;
+pub mod raw_transaction;
 pub mod remote_data;
 pub mod session;
 pub mod settings;
