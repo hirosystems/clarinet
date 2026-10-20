@@ -5,6 +5,7 @@ use std::{iter, mem};
 
 use clarity::vm::clarity::{ClarityConnection, ClarityError, TransactionConnection};
 use clarity::vm::database::ClarityDatabase;
+use clarity::vm::errors::VmExecutionError;
 use clarity::vm::events::StacksTransactionEvent;
 use clarity::vm::hooks::EvalHook;
 use clarity::vm::resource_limiter::ResourceBudget;
@@ -241,7 +242,7 @@ impl ClarityInterpreter {
         if result.is_ok() {
             match commit_accounts(connection.db(), stx_accounts, nonces) {
                 Ok(balances) => stx_balances = balances,
-                Err(error) => result = Err(error),
+                Err(error) => result = Err(error.to_string()),
             }
         }
         connection.settle(&NonceCharge::Free, BlockInclusion::from(result.is_ok()))?;
@@ -347,21 +348,19 @@ fn commit_accounts(
     db: &mut ClarityDatabase,
     stx_accounts: BTreeSet<String>,
     nonces: Vec<(PrincipalData, u64)>,
-) -> Result<Vec<(String, u128)>, String> {
+) -> Result<Vec<(String, u128)>, VmExecutionError> {
     let balances = stx_accounts
         .into_iter()
         .map(|account| {
-            let principal = PrincipalData::parse(&account).map_err(|e| e.to_string())?;
+            let principal = PrincipalData::parse(&account)?;
             let balance = db
-                .get_account_stx_balance(&principal)
-                .and_then(|balance| balance.get_total_balance())
-                .map_err(|e| e.to_string())?;
+                .get_account_stx_balance(&principal)?
+                .get_total_balance()?;
             Ok((account, balance))
         })
-        .collect::<Result<_, String>>()?;
+        .collect::<Result<_, VmExecutionError>>()?;
     for (principal, nonce) in nonces {
-        db.set_account_nonce(&principal, nonce)
-            .map_err(|e| e.to_string())?;
+        db.set_account_nonce(&principal, nonce)?;
     }
     Ok(balances)
 }
