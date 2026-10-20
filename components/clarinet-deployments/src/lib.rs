@@ -135,7 +135,11 @@ pub fn setup_session_with_deployment(
 ) -> DeploymentGenerationArtifacts {
     let mut session = initiate_session_from_manifest(manifest);
     if !enable_analysis {
-        session.interpreter.repl_settings.analysis.disable_all();
+        session
+            .interpreter
+            .repl_settings
+            .analysis
+            .disable_all_lints();
     }
 
     // Older plans carry no marker, and requirements lacked one until they were
@@ -2047,11 +2051,11 @@ mod tests {
         );
     }
 
-    /// When analysis is globally disabled via `disable_all()` (as done by
+    /// When analysis is globally disabled via `disable_all_lints()` (as done by
     /// `setup_session_with_deployment` when `enable_analysis=false`),
     /// deploying a contract should produce NO lint diagnostics even when
     /// `skip_analysis` is false on the contract itself — because the session
-    /// has no lints/passes configured.
+    /// has no lints configured.
     #[test]
     fn deploy_with_analysis_globally_disabled_produces_no_diagnostics() {
         let settings = SessionSettings::default();
@@ -2065,7 +2069,11 @@ mod tests {
             clarity_repl::analysis::SettingsFile::default(),
         )
         .unwrap();
-        session.interpreter.repl_settings.analysis.disable_all();
+        session
+            .interpreter
+            .repl_settings
+            .analysis
+            .disable_all_lints();
 
         let spec = EmulatedContractPublishSpecification {
             contract_name: ContractName::from_literal("lint-test"),
@@ -2073,7 +2081,7 @@ mod tests {
             source: LINT_TRIGGERING_SOURCE.to_string(),
             clarity_version: ClarityVersion::Clarity2,
             location: PathBuf::from("/contracts/lint-test.clar"),
-            skip_analysis: false, // Even with skip_analysis=false, disable_all() prevents lints
+            skip_analysis: false, // Even with skip_analysis=false, disable_all_lints() prevents lints
             remap_principals: BTreeMap::new(),
         };
 
@@ -2086,7 +2094,7 @@ mod tests {
             .collect();
         assert!(
             lint_diags.is_empty(),
-            "expected no lint diagnostics after disable_all(), got: {lint_diags:?}"
+            "expected no lint diagnostics after disable_all_lints(), got: {lint_diags:?}"
         );
     }
 
@@ -2104,7 +2112,11 @@ mod tests {
         )
         .unwrap();
         if disable_analysis {
-            session.interpreter.repl_settings.analysis.disable_all();
+            session
+                .interpreter
+                .repl_settings
+                .analysis
+                .disable_all_lints();
         }
 
         let deployment = DeploymentSpecification {

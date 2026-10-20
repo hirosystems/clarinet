@@ -30,6 +30,8 @@ pub enum LintName {
     // Keep sorted alphabetically
     /// Warn about usage of deprecated `at-block`
     AtBlock,
+    /// Check that calls pass the expected number of arguments
+    CallChecker,
     /// Enforce kebab-case for bindings
     CaseBinding,
     /// Enforce SCREAMING_SNAKE_CASE for constants
@@ -139,6 +141,7 @@ impl LintGroup {
             ],
             Safety => &[
                 LintName::AtBlock,
+                LintName::CallChecker,
                 LintName::ErrorConst,
                 LintName::Noop,
                 LintName::Panic,
@@ -199,6 +202,8 @@ impl LintMapBuilder {
         LintGroup::Perf.insert_into(&mut self.map, ClarityDiagnosticLevel::Warning);
         LintGroup::Safety.insert_into(&mut self.map, ClarityDiagnosticLevel::Warning);
         LintGroup::Style.insert_into(&mut self.map, ClarityDiagnosticLevel::Note);
+        self.map
+            .insert(LintName::CallChecker, ClarityDiagnosticLevel::Error);
 
         self
     }

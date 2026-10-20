@@ -25,13 +25,12 @@ use clarinet_files::{
 };
 use clarinet_format::formatter::{self, ClarityFormatter};
 use clarity::types::StacksEpochId;
-use clarity::vm::analysis::AnalysisDatabase;
+use clarity::vm::analysis::{AnalysisDatabase, ContractAnalysis};
 use clarity::vm::costs::LimitedCostTracker;
 use clarity::vm::diagnostic::Level;
 use clarity::vm::types::QualifiedContractIdentifier;
 use clarity::vm::ClarityVersion;
 use clarity_lsp::state::Environment;
-use clarity_repl::analysis::call_checker::ContractAnalysis;
 use clarity_repl::analysis::linter::{LintGroup, LintName};
 use clarity_repl::analysis::LintDiagnostic;
 use clarity_repl::frontend::Terminal;
@@ -1229,15 +1228,13 @@ pub fn main() {
         }
         Command::Check(cmd) if cmd.file.is_some() => {
             let file = cmd.file.unwrap();
-            let mut settings = repl::SessionSettings {
+            let settings = repl::SessionSettings {
                 repl_settings: repl::Settings {
                     analysis: analysis::Settings::with_default_lints(),
                     ..Default::default()
                 },
                 ..Default::default()
             };
-            settings.repl_settings.analysis.enable_all_passes();
-
             let mut session = repl::Session::new(settings.clone());
             let Ok(code_source) = fs::read_to_string(&file) else {
                 eprintln!("{} unable to read file: '{file}'", red!("error:"));
@@ -1632,14 +1629,14 @@ fn print_available_lints(settings: &analysis::Settings) {
     println!("{}", "Configure lints in Clarinet.toml:".bold());
     let sample = r#"
   # Only analyze files matching these patterns
-  [repl.analysis]
+  [linter]
   include = ["contracts/*.clar"]
   exclude = []
 
-  [repl.analysis.lint_groups]
+  [linter.groups]
   style = "warning"
 
-  [repl.analysis.lints]
+  [linter.lints]
   unused_const = "error"
   at_block = false
 "#;
@@ -2575,12 +2572,9 @@ mod tests {
                 # This is an important comment that should be preserved!
                 # Another comment line
 
-                [repl.analysis]
-                passes = ["check_checker"]
-
-                # Check-checker settings comment
-                [repl.analysis.check_checker]
-                strict = false
+                # Linter settings comment
+                [linter.lints]
+                unused_const = false
             "#};
 
             let mut doc: DocumentMut = input.parse().expect("Failed to parse TOML");
@@ -2598,8 +2592,8 @@ mod tests {
                 "Second comment should be preserved"
             );
             assert!(
-                contains_comment(&output, "Check-checker settings"),
-                "Check-checker comment should be preserved"
+                contains_comment(&output, "Linter settings"),
+                "Linter comment should be preserved"
             );
 
             // Verify the contract was added
@@ -2614,8 +2608,8 @@ mod tests {
                 "Project name should be preserved"
             );
             assert!(
-                has_toml_value(&output, "repl.analysis.check_checker.strict", "false"),
-                "Repl settings should be preserved"
+                has_toml_value(&output, "linter.lints.unused_const", "false"),
+                "Linter settings should be preserved"
             );
         }
 
@@ -2830,13 +2824,8 @@ mod tests {
                 clarity_version = 2
                 epoch = 2.4
 
-                # the analysis errors are used as a test case
-                [repl.analysis]
-                passes = ["check_checker"]
-                check_checker = { trusted_sender = false, trusted_caller = false, callee_filter = false }
-
                 # We don't want linter diagnostics in this test
-                [repl.analysis.lint_groups]
+                [linter.groups]
                 all = false
             "#};
 
@@ -2852,10 +2841,6 @@ mod tests {
             let output = doc.to_string();
 
             // Verify comments are preserved
-            assert!(
-                contains_comment(&output, "analysis errors are used as a test case"),
-                "Analysis comment should be preserved"
-            );
             assert!(
                 contains_comment(&output, "don't want linter diagnostics"),
                 "Linter comment should be preserved"
@@ -2903,14 +2888,9 @@ mod tests {
                 clarity_version = 2
                 epoch = "2.4"
 
-                [repl.analysis]
-                passes = ["check_checker"]
-
-                [repl.analysis.check_checker]
-                strict = false
-                trusted_sender = true
-                trusted_caller = false
-                callee_filter = false
+                [linter.lints]
+                unused_const = "error"
+                case_const = false
             "#};
 
             let mut doc: DocumentMut = input.parse().expect("Failed to parse TOML");
@@ -2941,12 +2921,8 @@ mod tests {
                 "Project name should be preserved"
             );
             assert!(
-                has_toml_value(
-                    &output,
-                    "repl.analysis.check_checker.trusted_sender",
-                    "true"
-                ),
-                "Check checker settings should be preserved"
+                has_toml_value(&output, "linter.lints.unused_const", "error"),
+                "Linter settings should be preserved"
             );
         }
 
@@ -3003,9 +2979,8 @@ mod tests {
                 [project]
                 name = "test-project"
 
-                [repl.analysis]
-                passes = ["check_checker"]
-                check_checker = { trusted_sender = false, trusted_caller = false, callee_filter = false }
+                [linter]
+                lints = { unused_const = false, case_const = "error" }
             "#};
 
             let mut doc: DocumentMut = input.parse().expect("Failed to parse TOML");
@@ -3015,7 +2990,7 @@ mod tests {
 
             // The inline table format should be preserved
             assert!(
-                output.contains("check_checker = {") || output.contains("check_checker = { "),
+                output.contains("lints = {"),
                 "Inline table format should be preserved: {}",
                 output
             );
@@ -3029,8 +3004,8 @@ mod tests {
                 authors = ["Alice", "Bob"]
                 requirements = []
 
-                [repl.analysis]
-                passes = ["check_checker", "lint"]
+                [linter]
+                include = ["contracts/*.clar", "lib/*.clar"]
             "#};
 
             let mut doc: DocumentMut = input.parse().expect("Failed to parse TOML");
@@ -3046,7 +3021,7 @@ mod tests {
         }
 
         #[test]
-        fn test_preserves_lint_groups_and_lints_ordering() {
+        fn test_preserves_linter_groups_and_lints_ordering() {
             // Test with all lint groups and lints in a deliberately random order
             // with random values to ensure ordering is preserved after edits
             //
@@ -3064,11 +3039,8 @@ mod tests {
                 path = "contracts/existing.clar"
 
                 # Custom comment about linting configuration
-                [repl.analysis]
-                passes = ["check_checker", "lint"]
-
                 # Lint groups in random order with random values
-                [repl.analysis.lint_groups]
+                [linter.groups]
                 style = "warn"
                 unused = "error"
                 all = false
@@ -3076,7 +3048,7 @@ mod tests {
                 perf = "off"
 
                 # Individual lints in random order with random values
-                [repl.analysis.lints]
+                [linter.lints]
                 unused_map = "error"
                 case_const = "warn"
                 unused_binding = "off"
@@ -3109,7 +3081,7 @@ mod tests {
             fn get_keys_in_order(toml_str: &str, section: &str) -> Vec<String> {
                 let doc: DocumentMut = toml_str.parse().unwrap();
 
-                // Navigate to the section (e.g., "repl.analysis.lint_groups")
+                // Navigate to the section (e.g., "linter.groups")
                 let parts: Vec<&str> = section.split('.').collect();
                 let mut current = doc.as_item();
 
@@ -3125,8 +3097,8 @@ mod tests {
                     .collect()
             }
 
-            // Verify lint_groups ordering is preserved
-            let lint_groups_order = get_keys_in_order(&output, "repl.analysis.lint_groups");
+            // Verify groups ordering is preserved
+            let lint_groups_order = get_keys_in_order(&output, "linter.groups");
             assert_eq!(
                 lint_groups_order,
                 vec!["style", "unused", "all", "safety", "perf"],
@@ -3134,7 +3106,7 @@ mod tests {
             );
 
             // Verify lints ordering is preserved
-            let lints_order = get_keys_in_order(&output, "repl.analysis.lints");
+            let lints_order = get_keys_in_order(&output, "linter.lints");
             assert_eq!(
                 lints_order,
                 vec![
@@ -3153,10 +3125,8 @@ mod tests {
 
             // Also verify the values are preserved
             let parsed: DocumentMut = output.parse().unwrap();
-            let lint_groups = parsed["repl"]["analysis"]["lint_groups"]
-                .as_table()
-                .unwrap();
-            let lints = parsed["repl"]["analysis"]["lints"].as_table().unwrap();
+            let lint_groups = parsed["linter"]["groups"].as_table().unwrap();
+            let lints = parsed["linter"]["lints"].as_table().unwrap();
 
             // Check a few lint group values
             assert_eq!(lint_groups["style"].as_str().unwrap(), "warn");
@@ -3186,7 +3156,6 @@ mod tests {
         "};
 
         let mut settings = repl::SessionSettings::default();
-        settings.repl_settings.analysis.enable_all_passes();
         settings
             .repl_settings
             .analysis

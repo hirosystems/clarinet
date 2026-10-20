@@ -842,7 +842,7 @@ mod lsp_tests {
                 epoch = 'latest'
                 clarity_version = 3
 
-                [repl.analysis.lint_groups]
+                [linter.groups]
                 all = false
             "#}
             .to_string();

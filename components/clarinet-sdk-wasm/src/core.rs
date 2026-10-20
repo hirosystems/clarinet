@@ -511,7 +511,11 @@ impl SDK {
             .await?;
 
         let mut session = initiate_session_from_manifest(&manifest);
-        session.interpreter.repl_settings.analysis.disable_all();
+        session
+            .interpreter
+            .repl_settings
+            .analysis
+            .disable_all_lints();
         if self.options.track_coverage {
             session.enable_coverage_hook();
         }

@@ -77,9 +77,8 @@ describe("get diagnostics", function () {
 
     await workspace.openTextDocument(contractUri);
     const diagnostics = await diagnosticsListener;
-    assert.strictEqual(diagnostics.length, 2);
+    assert.strictEqual(diagnostics.length, 1);
     assert.strictEqual(diagnostics[0].severity, DiagnosticSeverity.Warning);
-    assert.strictEqual(diagnostics[1].severity, DiagnosticSeverity.Information);
   });
 
   it("get diagnostics on contract change", async function () {

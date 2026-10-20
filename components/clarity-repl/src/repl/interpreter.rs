@@ -722,7 +722,7 @@ impl ClarityInterpreter {
             }
         })?;
 
-        // Run REPL-only analyses (linter, check_checker, etc.). These are
+        // Run REPL-only analyses (the linter). These are
         // clarinet's own lints, not consensus rules, so a mainnet node would
         // never see them — they can only reject an operation here.
         let lint_diagnostics = if !contract.skip_analysis {
@@ -4079,23 +4079,25 @@ mod tests {
     }
 
     #[test]
-    fn annotation_filter_missing_value() {
+    fn legacy_check_checker_annotations_produce_no_diagnostics() {
         let interpreter = get_interpreter(None);
-        let source = ";; #[filter]";
+        let source = indoc!(
+            "
+            ;; #[filter]
+            ;; #[filter(a, b)]
+            ;; #[allow(unchecked_data, unchecked_params)]
+            "
+        );
 
         let (annotations, diagnostics) = interpreter.collect_annotations(source);
-        assert!(annotations.is_empty());
-        assert_eq!(diagnostics.len(), 1);
-        assert_eq!(
-            diagnostics[0].message,
-            "missing value for 'filter' annotation"
-        );
+        assert_eq!(annotations.len(), 3);
+        assert!(diagnostics.is_empty());
     }
 
     #[test]
     fn valid_annotation_produces_no_diagnostics() {
         let interpreter = get_interpreter(None);
-        let source = ";; #[allow(unchecked_data)]";
+        let source = ";; #[allow(unused_const)]";
 
         let (annotations, diagnostics) = interpreter.collect_annotations(source);
         assert_eq!(annotations.len(), 1);

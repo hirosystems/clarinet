@@ -354,27 +354,6 @@ fn collect_check_diagnostic_messages(json: &serde_json::Value) -> Vec<String> {
         .collect()
 }
 
-/// Strip a TOML section (and its contents up to the next section header) from a file.
-fn strip_toml_section(path: &Path, section_header: &str) {
-    let content = fs::read_to_string(path).unwrap();
-    let mut in_section = false;
-    let stripped: String = content
-        .lines()
-        .filter(|line| {
-            if line.starts_with(section_header) {
-                in_section = true;
-                return false;
-            }
-            if in_section && line.starts_with('[') {
-                in_section = false;
-            }
-            !in_section
-        })
-        .collect::<Vec<_>>()
-        .join("\n");
-    fs::write(path, stripped).expect("Failed to write file");
-}
-
 /// `clarinet check <file>` with no Clarinet.toml should emit lint warnings by default.
 #[test]
 fn test_check_single_file_default_lints() {
@@ -393,7 +372,7 @@ fn test_check_single_file_default_lints() {
     );
 }
 
-/// `clarinet check` in a project with no `[repl.analysis]` section should emit lint warnings.
+/// `clarinet check` in a project with no `[linter]` section should emit lint warnings.
 #[test]
 fn test_check_project_default_lints() {
     let project_name = "test_default_lints";
@@ -410,8 +389,6 @@ fn test_check_project_default_lints() {
     let contract_path = project_path.join("contracts").join("my-contract.clar");
     fs::write(&contract_path, "(define-constant MY_UNUSED_CONST u42)\n")
         .expect("Failed to write contract");
-
-    strip_toml_section(&project_path.join("Clarinet.toml"), "[repl.analysis]");
 
     let json = run_clarinet_check_json(&[], &project_path);
     let messages = collect_check_diagnostic_messages(&json);
@@ -445,9 +422,6 @@ fn test_check_skips_requirement_lint_warnings() {
         "(define-constant PROJECT_UNUSED_CONST u42)\n",
     )
     .unwrap();
-
-    // Strip [repl.analysis] so default lints are used
-    strip_toml_section(&project_path.join("Clarinet.toml"), "[repl.analysis]");
 
     // Create requirement contract files in the cache directory.
     // Requirement A: a uniquely-named requirement.
@@ -585,8 +559,6 @@ fn test_check_project_standard_output_shows_lint_warnings() {
     let contract_path = project_path.join("contracts").join("my-contract.clar");
     fs::write(&contract_path, "(define-constant MY_UNUSED_CONST u42)\n")
         .expect("Failed to write contract");
-
-    strip_toml_section(&project_path.join("Clarinet.toml"), "[repl.analysis]");
 
     // Run clarinet check with standard output (no --output json)
     let output = Command::new(env!("CARGO_BIN_EXE_clarinet"))
