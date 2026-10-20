@@ -83,6 +83,58 @@ it.each([false, true])(
   },
 );
 
+it.each([
+  [false, false],
+  [false, true],
+  [true, false],
+  [true, true],
+])("traces nested events once and in order (raw=%s, abort=%s)", async (raw, abort) => {
+  simnet.deployContract(
+    "trace-child",
+    `(define-public (emit (n uint))
+       (begin (print n) (print (+ n u1)) (ok true)))`,
+    null,
+    simnet.deployer,
+  );
+  simnet.deployContract(
+    "trace-parent",
+    `(define-public (run (abort bool))
+       (begin
+         (print u1)
+         (unwrap-panic (contract-call? .trace-child emit u2))
+         (print u4)
+         (unwrap-panic (contract-call? .trace-child emit u5))
+         (print u7)
+         (if abort (err u8) (ok true))))`,
+    null,
+    simnet.deployer,
+  );
+  if (raw) {
+    const tx = await makeContractCall({
+      network: "testnet",
+      senderKey: "1".padStart(64, "0") + "01",
+      contractAddress: simnet.deployer,
+      contractName: "trace-parent",
+      functionName: "run",
+      functionArgs: [Cl.bool(abort)],
+      nonce: simnet.getAccountNonce(sender),
+      fee: 10n,
+      postConditionMode: "allow",
+    });
+    expect(simnet.broadcastTransaction(tx.serialize()).status).toBe(
+      abort ? "abort_by_response" : "success",
+    );
+  } else {
+    expect(simnet.callPublicFn("trace-parent", "run", [Cl.bool(abort)], sender).result).toEqual(
+      abort ? Cl.error(Cl.uint(8)) : Cl.ok(Cl.bool(true)),
+    );
+  }
+  const events = [...simnet.getLastContractCallTrace().matchAll(/print event: u(\d+)/g)].map(
+    ([, value]) => Number(value),
+  );
+  expect(events).toEqual([1, 2, 3, 4, 5, 6, 7]);
+});
+
 it.each([true, false])(
   "returns raw call performance only when tracking is enabled (%s)",
   async (trackPerformance) => {
