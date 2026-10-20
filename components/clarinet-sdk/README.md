@@ -72,8 +72,8 @@ The result is a discriminated union:
 `transaction` contains `txid` (64 lowercase hex characters, without `0x`), `fee`
 and `nonce` (both `bigint`). The ID is calculated from the complete signed
 transaction and matches Stacks.js. Replaying an included transaction is rejected
-by nonce validation. Included submissions execute at the current tip and then
-advance the chain by one block; rejections do not advance it.
+by nonce validation. Included submissions execute in the next block and advance
+the chain by one block; rejections do not advance it.
 
 Raw payloads execute exactly as signed: contract source, boot addresses,
 post-conditions, and transfer memo bytes are not rewritten. Private calls and

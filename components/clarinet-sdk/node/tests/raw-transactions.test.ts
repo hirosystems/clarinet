@@ -1,4 +1,9 @@
-import { Cl, deserializeTransaction, makeContractCall } from "@stacks/transactions";
+import {
+  Cl,
+  deserializeTransaction,
+  makeContractCall,
+  makeContractDeploy,
+} from "@stacks/transactions";
 import { beforeEach, expect, it } from "vitest";
 import { initSimnet, type Simnet } from "..";
 import fixtures from "./fixtures/raw-transactions/transactions.json";
@@ -234,3 +239,82 @@ it("rejects a deployment version that the epoch does not allow", () => {
   expect(balance(sender)).toBe(1000000n);
   expect(simnet.getAccountNonce(sender)).toBe(0n);
 });
+
+it.each([
+  ["2.05", 1, "block-height"],
+  ["3.4", 5, "stacks-block-height"],
+  ["4.0", 6, "stacks-block-height"],
+] as const)(
+  "executes in the inclusion block and restores rejected blocks in epoch %s",
+  async (epoch, clarityVersion, heightVariable) => {
+    simnet.setEpoch(epoch);
+    const options = {
+      network: "testnet" as const,
+      senderKey: "1".padStart(64, "0") + "01",
+      fee: 10n,
+      postConditionMode: "allow" as const,
+    };
+    const height = simnet.blockHeight;
+    const deployment = await makeContractDeploy({
+      ...options,
+      nonce: simnet.getAccountNonce(sender),
+      contractName: "heights",
+      clarityVersion,
+      codeBody: `(define-data-var deployed-at uint ${heightVariable})
+      (define-read-only (observe-height) (ok ${heightVariable}))
+      (define-public (height) (ok ${heightVariable}))
+      (define-public (fail) (err ${heightVariable}))`,
+    });
+    expect(simnet.broadcastTransaction(deployment.serialize()).status).toBe("success");
+    expect(simnet.getDataVar(`${sender}.heights`, "deployed-at")).toEqual(Cl.uint(height + 1));
+    expect(simnet.blockHeight).toBe(height + 1);
+
+    const call = async (functionName: string) =>
+      makeContractCall({
+        ...options,
+        nonce: simnet.getAccountNonce(sender),
+        contractAddress: sender,
+        contractName: "heights",
+        functionName,
+        functionArgs: [],
+      });
+    const signed = await call("height");
+    const result = simnet.broadcastTransaction(signed.serialize());
+    expect(result.status).toBe("success");
+    if (result.status !== "success") throw new Error(result.status);
+    expect(result.execution.result).toEqual(Cl.ok(Cl.uint(height + 2)));
+    expect(simnet.blockHeight).toBe(height + 2);
+
+    const failure = simnet.broadcastTransaction((await call("fail")).serialize());
+    expect(failure).toMatchObject({
+      status: "abort_by_response",
+      result: Cl.error(Cl.uint(height + 3)),
+    });
+    expect(simnet.blockHeight).toBe(height + 3);
+
+    const burnHeight = simnet.burnBlockHeight;
+    const nonce = simnet.getAccountNonce(sender);
+    const funds = balance(sender);
+    const duplicate = await makeContractDeploy({
+      ...options,
+      nonce,
+      contractName: "heights",
+      clarityVersion,
+      codeBody: "(define-constant duplicate true)",
+    });
+    for (const hex of ["xyz", signed.serialize(), duplicate.serialize()]) {
+      expect(simnet.broadcastTransaction(hex).status).toBe("rejected");
+      expect(simnet.blockHeight).toBe(height + 3);
+      expect(simnet.burnBlockHeight).toBe(burnHeight);
+      expect(simnet.getAccountNonce(sender)).toBe(nonce);
+      expect(balance(sender)).toBe(funds);
+      // Also read through the VM: the datastore's shared tip must be restored.
+      expect(
+        simnet.callReadOnlyFn(`${sender}.heights`, "observe-height", [], sender).result,
+      ).toEqual(Cl.ok(Cl.uint(height + 3)));
+    }
+    expect(simnet.callPublicFn(`${sender}.heights`, "height", [], sender).result).toEqual(
+      Cl.ok(Cl.uint(height + 4)),
+    );
+  },
+);
