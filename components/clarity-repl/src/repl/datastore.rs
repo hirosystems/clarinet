@@ -456,21 +456,17 @@ impl ClarityDatastore {
 
     fn put(&mut self, key: &str, value: &str) {
         let height = self.get_current_block_height();
+        let previous = self
+            .store
+            .entry(key.to_string())
+            .or_default()
+            .insert(height, value.to_string());
         if let Some(journal) = &mut self.write_journal {
             journal
                 .data
                 .entry((key.to_string(), height))
-                .or_insert_with(|| {
-                    self.store
-                        .get(key)
-                        .and_then(|values| values.get(&height))
-                        .cloned()
-                });
+                .or_insert(previous);
         }
-        self.store
-            .entry(key.to_string())
-            .or_default()
-            .insert(height, value.to_string());
     }
 
     fn fetch_block(&mut self, url: &str) -> Block {

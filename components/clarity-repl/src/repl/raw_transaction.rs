@@ -93,16 +93,17 @@ impl ClarityInterpreter {
                 }
             }
         };
+        let result = self.execute_raw_transaction(&tx, hooks);
         let metadata = RawTransactionMetadata {
             txid: tx.txid().to_string(),
             fee: tx.get_tx_fee(),
             nonce: tx.get_origin_nonce(),
-            contract_call: match &tx.payload {
-                TransactionPayload::ContractCall(call) => Some(call.clone()),
+            contract_call: match tx.payload {
+                TransactionPayload::ContractCall(call) => Some(call),
                 _ => None,
             },
         };
-        match self.execute_raw_transaction(&tx, hooks) {
+        match result {
             Ok(result) => RawTransactionOutcome::Included { metadata, result },
             Err(error) => RawTransactionOutcome::Rejected {
                 metadata: Some(metadata),
