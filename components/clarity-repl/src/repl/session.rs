@@ -1071,13 +1071,9 @@ impl Session {
             .interpreter
             .run(&contract, None, cost_track, eval_hooks);
 
-        match result {
-            Ok(result) => {
-                self.record_snippet_result(contract_identifier, &result);
-                Ok(result)
-            }
-            Err(res) => Err(res.into()),
-        }
+        result
+            .inspect(|result| self.record_snippet_result(contract_identifier, result))
+            .map_err(Vec::from)
     }
 
     fn next_snippet_contract_name(&self) -> String {

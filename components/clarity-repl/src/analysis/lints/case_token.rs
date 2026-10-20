@@ -13,7 +13,7 @@ use crate::analysis::cache::tokens::TokenData;
 use crate::analysis::cache::AnalysisCache;
 use crate::analysis::linter::Lint;
 use crate::analysis::util::{match_kebab_case, strip_unused_suffix, CaseError};
-use crate::analysis::{self, AnalysisPass, AnalysisResult, LintName};
+use crate::analysis::{AnalysisPass, AnalysisResult, LintName};
 
 pub struct CaseToken<'a, 'b>
 where
@@ -103,7 +103,6 @@ impl<'a, 'b> AnalysisPass for CaseToken<'a, 'b> {
         _analysis_db: &mut AnalysisDatabase,
         analysis_cache: &mut AnalysisCache,
         level: Level,
-        _settings: &analysis::Settings,
     ) -> AnalysisResult {
         let mut lint = CaseToken::new(analysis_cache, level);
         lint.run()

@@ -17,7 +17,6 @@ use clarity::types::Address;
 use clarity::vm::analysis::contract_interface_builder::{
     ContractInterface, ContractInterfaceFunction, ContractInterfaceFunctionAccess,
 };
-use clarity::vm::diagnostic::Diagnostic;
 use clarity::vm::types::{PrincipalData, QualifiedContractIdentifier, StandardPrincipalData};
 use clarity::vm::{ClarityVersion, EvaluationResult, ExecutionResult, SymbolicExpression};
 use clarity_repl::repl::boot::{
@@ -548,23 +547,13 @@ impl SDK {
                     }
                 }
                 Err(diagnostics) => {
-                    // Keep the identity of the lints that rejected the contract: the
-                    // digest reports them as `error[call_checker]: ...`.
-                    let (lint_diagnostics, plain): (Vec<_>, Vec<_>) = diagnostics
-                        .iter()
-                        .cloned()
-                        .partition(|d| d.lint_name.is_some());
+                    // Linting is disabled for this session; report the remaining diagnostics directly.
                     let contract_diagnostics = HashMap::from([(
                         contract_id.clone(),
-                        plain.into_iter().map(Diagnostic::from).collect(),
+                        diagnostics.iter().map(|d| d.diagnostic.clone()).collect(),
                     )]);
-                    let contract_lint_diagnostics =
-                        HashMap::from([(contract_id.clone(), lint_diagnostics)]);
-                    let diags_digest = DiagnosticsDigest::new(
-                        &contract_diagnostics,
-                        &contract_lint_diagnostics,
-                        &deployment,
-                    );
+                    let diags_digest =
+                        DiagnosticsDigest::new(&contract_diagnostics, &HashMap::new(), &deployment);
                     if diags_digest.errors > 0 {
                         return Err(diags_digest.message);
                     }

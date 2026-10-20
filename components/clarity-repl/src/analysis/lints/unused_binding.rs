@@ -15,7 +15,7 @@ use crate::analysis::cache::bindings::{BindingData, BindingType};
 use crate::analysis::cache::AnalysisCache;
 use crate::analysis::linter::Lint;
 use crate::analysis::util::is_explicitly_unused;
-use crate::analysis::{self, AnalysisPass, AnalysisResult, LintName};
+use crate::analysis::{AnalysisPass, AnalysisResult, LintName};
 
 struct UnusedBindingSettings {
     // TODO
@@ -124,7 +124,6 @@ impl<'a, 'b> AnalysisPass for UnusedBinding<'a, 'b> {
         _analysis_db: &mut AnalysisDatabase,
         analysis_cache: &mut AnalysisCache,
         level: Level,
-        _settings: &analysis::Settings,
     ) -> AnalysisResult {
         let settings = UnusedBindingSettings::new();
         let mut lint = UnusedBinding::new(analysis_cache, level, settings);

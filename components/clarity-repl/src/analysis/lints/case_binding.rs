@@ -13,7 +13,7 @@ use crate::analysis::cache::bindings::BindingData;
 use crate::analysis::cache::AnalysisCache;
 use crate::analysis::linter::Lint;
 use crate::analysis::util::{match_kebab_case, strip_unused_suffix, CaseError};
-use crate::analysis::{self, AnalysisPass, AnalysisResult, LintName};
+use crate::analysis::{AnalysisPass, AnalysisResult, LintName};
 
 struct CaseBindingSettings {
     // TODO
@@ -107,7 +107,6 @@ impl<'a, 'b> AnalysisPass for CaseBinding<'a, 'b> {
         _analysis_db: &mut AnalysisDatabase,
         analysis_cache: &mut AnalysisCache,
         level: Level,
-        _settings: &analysis::Settings,
     ) -> AnalysisResult {
         let settings = CaseBindingSettings::new();
         let mut lint = CaseBinding::new(analysis_cache, level, settings);

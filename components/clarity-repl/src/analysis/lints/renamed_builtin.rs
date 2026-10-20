@@ -15,7 +15,7 @@ use crate::analysis::annotation::{get_index_of_span, Annotation, AnnotationKind,
 use crate::analysis::ast_visitor::{traverse, ASTVisitor};
 use crate::analysis::cache::AnalysisCache;
 use crate::analysis::linter::Lint;
-use crate::analysis::{self, AnalysisPass, AnalysisResult, LintName};
+use crate::analysis::{AnalysisPass, AnalysisResult, LintName};
 
 /// A single rename entry: the old name, the new name, and the minimum Clarity
 /// version in which the rename takes effect.
@@ -168,7 +168,6 @@ impl AnalysisPass for RenamedBuiltin<'_> {
         _analysis_db: &mut AnalysisDatabase,
         analysis_cache: &mut AnalysisCache,
         level: Level,
-        _settings: &analysis::Settings,
     ) -> AnalysisResult {
         let checker = RenamedBuiltin::new(
             analysis_cache.contract_analysis.clarity_version,

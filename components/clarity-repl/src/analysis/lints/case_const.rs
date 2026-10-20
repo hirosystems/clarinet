@@ -13,7 +13,7 @@ use crate::analysis::cache::constants::ConstantData;
 use crate::analysis::cache::AnalysisCache;
 use crate::analysis::linter::Lint;
 use crate::analysis::util::{match_screaming_snake_case, CaseError};
-use crate::analysis::{self, AnalysisPass, AnalysisResult, LintName};
+use crate::analysis::{AnalysisPass, AnalysisResult, LintName};
 
 struct UnusedConstSettings {
     // TODO
@@ -109,7 +109,6 @@ impl<'a, 'b> AnalysisPass for CaseConst<'a, 'b> {
         _analysis_db: &mut AnalysisDatabase,
         analysis_cache: &mut AnalysisCache,
         level: Level,
-        _settings: &analysis::Settings,
     ) -> AnalysisResult {
         let settings = UnusedConstSettings::new();
         let mut lint = CaseConst::new(analysis_cache, level, settings);

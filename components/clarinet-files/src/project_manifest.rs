@@ -368,7 +368,7 @@ impl ProjectManifest {
             .as_ref()
             .is_some_and(repl::SettingsFile::has_removed_analysis_section)
         {
-            clarity_repl::ueprint!("Warning: [repl.analysis] is no longer supported and will be ignored. Move `lints` to [linter.lints] and `lint_groups` to [linter.groups]");
+            clarity_repl::ueprint!("Warning: [repl.analysis] is no longer supported and will be ignored. Move `lints` to [linter.lints], `lint_groups` to [linter.groups], and `include`/`exclude` to [linter]");
         }
         let mut repl_settings = project_manifest_file
             .repl
@@ -589,7 +589,7 @@ mod tests {
             [project]
             name = "linter"
             [linter.groups]
-            safety = "off"
+            correctness = "off"
             [linter.lints]
             unused_const = "error"
         };

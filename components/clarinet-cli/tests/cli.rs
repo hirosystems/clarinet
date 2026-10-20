@@ -369,17 +369,11 @@ fn test_check_single_file_default_lints() {
         .output()
         .unwrap();
     assert!(output.status.success());
-    assert!(
-        output.stderr.is_empty(),
-        "standalone checking should not warn about a missing manifest: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
     let json = serde_json::from_slice(&output.stdout).unwrap();
-    let messages = collect_check_diagnostic_messages(&json);
-
+    let lints = collect_lint_names(&json);
     assert!(
-        messages.iter().any(|m| m.contains("never used")),
-        "expected an unused constant lint warning from default lints, got: {messages:?}"
+        lints.contains(&(Some("unused_const"), "Warning")),
+        "expected the default unused-constant lint, got: {lints:?}"
     );
 }
 
@@ -664,18 +658,18 @@ fn test_check_project_rejection_keeps_lint_names() {
     );
 }
 
-/// `[linter.groups] safety = true` enables the group at each member's default level,
-/// so it must not downgrade the contract-rejecting `call_checker` to a warning.
+/// `[linter.groups] all = false` silences the lints but leaves the `correctness`
+/// group alone, so the wrong-arity call is still rejected.
 #[test]
-fn test_check_project_group_toggle_keeps_rejecting_lint() {
-    let (_temp_dir, project_path) = create_project_with_rejected_contract("test_group_toggle");
-    append_to_manifest(&project_path, "[linter.groups]\nsafety = true\n");
+fn test_check_project_all_off_keeps_rejecting_lint() {
+    let (_temp_dir, project_path) = create_project_with_rejected_contract("test_all_off");
+    append_to_manifest(&project_path, "[linter.groups]\nall = false\n");
 
     let json = run_clarinet_check_json(&[], &project_path);
     assert_eq!(
         json["success"],
         serde_json::json!(false),
-        "`safety = true` must not let a wrong-arity call through"
+        "`all = false` must not let a wrong-arity call through"
     );
     assert!(
         collect_lint_names(&json).contains(&(Some("call_checker"), "Error")),

@@ -3035,10 +3035,10 @@ mod tests {
             // Test with all lint groups and lints in a deliberately random order
             // with random values to ensure ordering is preserved after edits
             //
-            // LintGroups: All, Perf, Safety, Style, Unused
+            // LintGroups: All, Correctness, Perf, Safety, Style, Unused
             // LintNames: Noop, UnusedConst, UnusedDataVar, UnusedBinding, UnusedMap,
             //            UnusedPrivateFn, UnusedToken, UnusedTrait, CaseConst
-            // LintLevels: ignore/allow/off/none, notice/note, warning/warn/on, error/err
+            // LintLevels: ignore/allow/off/none, notice/note, on, warning/warn, error/err
             let input = indoc! {r#"
                 [project]
                 name = "lint-ordering-test"
