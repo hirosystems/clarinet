@@ -148,19 +148,20 @@ impl Lint for UnusedBinding<'_, '_> {
 
 #[cfg(test)]
 mod tests {
-    use clarity::vm::diagnostic::{Diagnostic, Level};
+    use clarity::vm::diagnostic::Level;
     use clarity::vm::ClarityName;
     use indoc::indoc;
 
     use super::UnusedBinding;
     use crate::analysis::linter::Lint;
     use crate::analysis::lints::unused_binding::BindingType;
+    use crate::analysis::LintDiagnostic;
     use crate::repl::session::{AnnotatedExecutionResult, Session};
     use crate::repl::SessionSettings;
 
     fn run_snippet_no_panic(
         snippet: String,
-    ) -> Result<(Vec<String>, AnnotatedExecutionResult), (Vec<String>, Vec<Diagnostic>)> {
+    ) -> Result<(Vec<String>, AnnotatedExecutionResult), (Vec<String>, Vec<LintDiagnostic>)> {
         let mut settings = SessionSettings::default();
         settings
             .repl_settings
@@ -387,6 +388,7 @@ mod tests {
 
         assert_eq!(diagnostics.len(), 1);
         assert!(diagnostics[0]
+            .diagnostic
             .message
             .contains("conflicts with previous value"));
     }

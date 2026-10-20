@@ -175,6 +175,19 @@ impl LintGroup {
         }
     }
 
+    /// Insert all members at the level they have in `defaults`
+    ///
+    /// Used when a group is enabled with `true`: the entry turns its members on
+    /// without changing their severity, so a lint that rejects the contract by
+    /// default (`call_checker`) keeps rejecting it.
+    pub fn insert_defaults_into(&self, defaults: &LintMap, map: &mut LintMap) {
+        for lint in self.lints() {
+            if let Some(level) = defaults.get(lint) {
+                map.insert(*lint, level.clone());
+            }
+        }
+    }
+
     /// Remove all members from map at given level
     pub fn remove_from<T>(&self, map: &mut HashMap<LintName, T>) {
         for lint in self.lints() {

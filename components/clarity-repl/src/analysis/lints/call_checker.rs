@@ -247,6 +247,7 @@ mod tests {
 
     use super::CallChecker;
     use crate::analysis::linter::Lint;
+    use crate::analysis::lints::UnusedConst;
     use crate::repl::session::Session;
     use crate::repl::SessionSettings;
 
@@ -301,94 +302,54 @@ mod tests {
         assert!(result.lint_diagnostics.is_empty());
     }
 
+    // CallChecker runs before UnusedConst; rejection must not hide later lints.
     #[test]
-    fn define_private() {
-        let mut session = default_session();
+    fn rejecting_lint_does_not_hide_the_others() {
         #[rustfmt::skip]
         let snippet = indoc!("
-            (define-private (foo (amount uint))
-                (ok amount)
-            )
-
-            (define-public (main)
-                (ok (foo u1 u2))
-            )
+            (define-constant MY_UNUSED u42)
+            (define-private (foo (a uint)) (ok a))
+            (define-public (main) (ok (foo u1 u2)))
         ").to_string();
-        match session.formatted_interpretation(snippet, Some("checker".to_string()), false, None) {
-            Err((output, _)) => {
-                assert_eq!(output.len(), 4);
-                assert_eq!(
-                    output[0],
-                    format_err!(
-                        "incorrect number of arguments in call to 'foo' (expected 1 got 2)"
-                    )
-                );
-                assert_eq!(output[1], format!("{} checker:6:9", blue!("-->")));
-                assert_eq!(output[2], "    (ok (foo u1 u2))");
-                assert_eq!(output[3], "        ^~~~~~~~~~~");
-            }
-            _ => panic!("Expected error"),
-        };
+
+        let mut settings = SessionSettings::default();
+        settings
+            .repl_settings
+            .analysis
+            .enable_lint(CallChecker::get_name(), Level::Error);
+        settings
+            .repl_settings
+            .analysis
+            .enable_lint(UnusedConst::get_name(), Level::Warning);
+
+        let (output, diagnostics) = Session::new_without_boot_contracts(settings)
+            .formatted_interpretation(snippet, Some("checker".to_string()), false, None)
+            .expect_err("the wrong-arity call must reject the contract");
+        assert_eq!(
+            diagnostics.iter().map(|d| d.lint_name).collect::<Vec<_>>(),
+            [Some(CallChecker::get_name()), Some(UnusedConst::get_name())]
+        );
+        let output = output.join("\n");
+
+        assert!(output.contains("error[call_checker]"), "{output}");
+        assert!(output.contains("warning[unused_const]"), "{output}");
     }
 
     #[test]
-    fn define_read_only() {
-        let mut session = default_session();
-        #[rustfmt::skip]
-        let snippet = indoc!("
-            (define-read-only (foo (amount uint))
-                (ok amount)
-            )
-
-            (define-public (main)
-                (ok (foo))
-            )
-        ").to_string();
-        match session.formatted_interpretation(snippet, Some("checker".to_string()), false, None) {
-            Err((output, _)) => {
-                assert_eq!(output.len(), 4);
-                assert_eq!(
-                    output[0],
-                    format_err!(
-                        "incorrect number of arguments in call to 'foo' (expected 1 got 0)"
-                    )
+    fn user_defined_function_arity() {
+        for definition in ["define-private", "define-read-only", "define-public"] {
+            for args in ["", "u1 u2"] {
+                let snippet = format!(
+                    "({definition} (foo (amount uint)) (ok amount))
+                     (define-public (main) (ok (foo {args})))"
                 );
-                assert_eq!(output[1], format!("{} checker:6:9", blue!("-->")));
-                assert_eq!(output[2], "    (ok (foo))");
-                assert_eq!(output[3], "        ^~~~~");
+                let diagnostics = default_session()
+                    .eval(snippet, false)
+                    .expect_err("wrong-arity calls must reject the contract");
+                assert_eq!(diagnostics[0].lint_name, Some(CallChecker::get_name()));
+                assert_eq!(diagnostics[0].diagnostic.level, Level::Error);
             }
-            _ => panic!("Expected error"),
-        };
-    }
-
-    #[test]
-    fn define_public() {
-        let mut session = default_session();
-        #[rustfmt::skip]
-        let snippet = indoc!("
-            (define-public (foo (amount uint))
-                (ok amount)
-            )
-
-            (define-public (main)
-                (ok (foo u1 u2))
-            )
-        ").to_string();
-        match session.formatted_interpretation(snippet, Some("checker".to_string()), false, None) {
-            Err((output, _)) => {
-                assert_eq!(output.len(), 4);
-                assert_eq!(
-                    output[0],
-                    format_err!(
-                        "incorrect number of arguments in call to 'foo' (expected 1 got 2)"
-                    )
-                );
-                assert_eq!(output[1], format!("{} checker:6:9", blue!("-->")));
-                assert_eq!(output[2], "    (ok (foo u1 u2))");
-                assert_eq!(output[3], "        ^~~~~~~~~~~");
-            }
-            _ => panic!("Expected error"),
-        };
+        }
     }
 
     #[test]
@@ -414,68 +375,20 @@ mod tests {
 
     #[test]
     fn builtin_function_arg_count() {
-        let mut session = default_session();
-        #[rustfmt::skip]
-        let snippet = indoc!("
-            (define-map kv-store { key: int } { value: int })
-            (define-private (incompatible-tuple) (tuple (k 1)))
-            (define-private (kv-set (key int) (value int))
-                (map-set kv-store { key: key } { value: value } {value: 0}))
-        ").to_string();
-        if let Err((err_output, _)) =
-            session.formatted_interpretation(snippet, Some("checker".to_string()), false, None)
-        {
-            assert_eq!(
-                err_output[0],
-                format_err!(
-                    "incorrect number of arguments in call to 'map-set' (expected 3 got 4)"
-                )
+        for call in [
+            "(map-set kv-store { key: 1 } { value: 1 } { value: 0 })",
+            "(map-insert kv-store { key: 1 } { value: 1 } { value: 0 })",
+            "(map-delete kv-store { key: 1 } { value: 0 })",
+        ] {
+            let snippet = format!(
+                "(define-map kv-store {{ key: int }} {{ value: int }})
+                 (define-private (run) {call})"
             );
-            assert_eq!(err_output[1], format!("{} checker:4:5", blue!("-->")));
-        } else {
-            panic!("expected error")
-        }
-
-        #[rustfmt::skip]
-        let snippet = indoc!("
-            (define-map kv-store { key: int } { value: int })
-            (define-private (incompatible-tuple) (tuple (k 1)))
-            (define-private (kv-add (key int) (value int))
-                (map-insert kv-store { key: key } { value: value } { value: 0}))
-        ").to_string();
-        if let Err((err_output, _)) =
-            session.formatted_interpretation(snippet, Some("checker".to_string()), false, None)
-        {
-            assert_eq!(
-                err_output[0],
-                format_err!(
-                    "incorrect number of arguments in call to 'map-insert' (expected 3 got 4)"
-                )
-            );
-            assert_eq!(err_output[1], format!("{} checker:4:5", blue!("-->")));
-        } else {
-            panic!("expected error")
-        }
-
-        #[rustfmt::skip]
-        let snippet = indoc!("
-            (define-map kv-store { key: int } { value: int })
-            (define-private (incompatible-tuple) (tuple (k 1)))
-            (define-private (kv-del (key int))
-                (map-delete kv-store { key: 1 } {value: 0}))
-        ").to_string();
-        if let Err((err_output, _)) =
-            session.formatted_interpretation(snippet, Some("checker".to_string()), false, None)
-        {
-            assert_eq!(
-                err_output[0],
-                format_err!(
-                    "incorrect number of arguments in call to 'map-delete' (expected 2 got 3)"
-                )
-            );
-            assert_eq!(err_output[1], format!("{} checker:4:5", blue!("-->")));
-        } else {
-            panic!("expected error")
+            let diagnostics = default_session()
+                .eval(snippet, false)
+                .expect_err("extra map arguments must reject the contract");
+            assert_eq!(diagnostics[0].lint_name, Some(CallChecker::get_name()));
+            assert_eq!(diagnostics[0].diagnostic.level, Level::Error);
         }
     }
 }

@@ -1228,9 +1228,19 @@ pub fn main() {
         }
         Command::Check(cmd) if cmd.file.is_some() => {
             let file = cmd.file.unwrap();
+            let manifest_path = cmd.manifest_path.or_else(|| {
+                get_manifest_location(None).map(|path| path.to_string_lossy().into_owned())
+            });
+            let analysis = manifest_path
+                .map(|path| {
+                    load_manifest_or_exit(Some(path), false)
+                        .repl_settings
+                        .analysis
+                })
+                .unwrap_or_else(analysis::Settings::with_default_lints);
             let settings = repl::SessionSettings {
                 repl_settings: repl::Settings {
-                    analysis: analysis::Settings::with_default_lints(),
+                    analysis,
                     ..Default::default()
                 },
                 ..Default::default()

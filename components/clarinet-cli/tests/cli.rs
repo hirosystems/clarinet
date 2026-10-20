@@ -363,7 +363,18 @@ fn test_check_single_file_default_lints() {
     fs::write(&contract_path, "(define-constant MY_UNUSED_CONST u42)\n")
         .expect("Failed to write contract");
 
-    let json = run_clarinet_check_json(&[contract_path.to_str().unwrap()], temp_dir.path());
+    let output = Command::new(env!("CARGO_BIN_EXE_clarinet"))
+        .args(["check", contract_path.to_str().unwrap(), "--output", "json"])
+        .current_dir(temp_dir.path())
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    assert!(
+        output.stderr.is_empty(),
+        "standalone checking should not warn about a missing manifest: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let json = serde_json::from_slice(&output.stdout).unwrap();
     let messages = collect_check_diagnostic_messages(&json);
 
     assert!(
@@ -578,6 +589,160 @@ fn test_check_project_standard_output_shows_lint_warnings() {
         stdout.contains("warning detected"),
         "expected warning count in standard output, got:\n{stdout}"
     );
+}
+
+/// Create a project with one contract that both trips a lint and is rejected by
+/// `call_checker`, and return its path.
+fn create_project_with_rejected_contract(
+    project_name: &str,
+) -> (tempfile::TempDir, std::path::PathBuf) {
+    let temp_dir = create_new_project(project_name);
+    let project_path = temp_dir.path().join(project_name);
+
+    let output = Command::new(env!("CARGO_BIN_EXE_clarinet"))
+        .args(["contract", "new", "arity"])
+        .current_dir(&project_path)
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "clarinet contract new failed");
+
+    fs::write(
+        project_path.join("contracts").join("arity.clar"),
+        "(define-constant MY_UNUSED u42)\n(define-private (foo (a uint)) (ok a))\n(define-public (main) (ok (foo u1 u2)))\n",
+    )
+    .expect("Failed to write contract");
+
+    (temp_dir, project_path)
+}
+
+/// Append a TOML section to the project's manifest.
+fn append_to_manifest(project_path: &Path, section: &str) {
+    let manifest_path = project_path.join("Clarinet.toml");
+    let mut content = fs::read_to_string(&manifest_path).expect("Failed to read Clarinet.toml");
+    content.push('\n');
+    content.push_str(section);
+    fs::write(&manifest_path, content).expect("Failed to write Clarinet.toml");
+}
+
+/// Collect `(lint_name, level)` for every diagnostic in a `check --output json` run.
+fn collect_lint_names(json: &serde_json::Value) -> Vec<(Option<&str>, &str)> {
+    json["diagnostics"]
+        .as_object()
+        .expect("diagnostics should be an object")
+        .values()
+        .flat_map(|v| v.as_array().unwrap())
+        .map(|d| {
+            (
+                d["lint_name"].as_str(),
+                d["level"].as_str().expect("diagnostic should have a level"),
+            )
+        })
+        .collect()
+}
+
+/// A lint that rejects the contract must keep its name in the output, and must not
+/// hide the diagnostics of the lints that would have run after it.
+#[test]
+fn test_check_project_rejection_keeps_lint_names() {
+    let (_temp_dir, project_path) = create_project_with_rejected_contract("test_reject_names");
+
+    let json = run_clarinet_check_json(&[], &project_path);
+    assert_eq!(
+        json["success"],
+        serde_json::json!(false),
+        "the wrong-arity call must reject the contract"
+    );
+
+    let names = collect_lint_names(&json);
+    assert!(
+        names.contains(&(Some("call_checker"), "Error")),
+        "expected a named `call_checker` error, got: {names:?}"
+    );
+    assert!(
+        names.contains(&(Some("unused_const"), "Warning")),
+        "the rejecting lint hid `unused_const`, got: {names:?}"
+    );
+}
+
+/// `[linter.groups] safety = true` enables the group at each member's default level,
+/// so it must not downgrade the contract-rejecting `call_checker` to a warning.
+#[test]
+fn test_check_project_group_toggle_keeps_rejecting_lint() {
+    let (_temp_dir, project_path) = create_project_with_rejected_contract("test_group_toggle");
+    append_to_manifest(&project_path, "[linter.groups]\nsafety = true\n");
+
+    let json = run_clarinet_check_json(&[], &project_path);
+    assert_eq!(
+        json["success"],
+        serde_json::json!(false),
+        "`safety = true` must not let a wrong-arity call through"
+    );
+    assert!(
+        collect_lint_names(&json).contains(&(Some("call_checker"), "Error")),
+        "expected `call_checker` to stay at error level"
+    );
+}
+
+/// `clarinet check <file>` must use the project's `[linter]` section, like
+/// `clarinet check` does.
+#[test]
+fn test_check_single_file_uses_project_linter_config() {
+    let (_temp_dir, project_path) = create_project_with_rejected_contract("test_file_linter");
+
+    let check = || {
+        Command::new(env!("CARGO_BIN_EXE_clarinet"))
+            .args(["check", "contracts/arity.clar"])
+            .env("NO_COLOR", "1")
+            .current_dir(&project_path)
+            .output()
+            .expect("Failed to execute clarinet check")
+    };
+
+    // Defaults: the wrong-arity call is an error.
+    let output = check();
+    assert!(
+        !output.status.success(),
+        "expected the default configuration to reject the contract, got:\n{}",
+        String::from_utf8_lossy(&output.stdout)
+    );
+
+    // Explicit files use configured lint levels, even outside the project filters.
+    append_to_manifest(
+        &project_path,
+        "[linter]\ninclude = [\"other/*.clar\"]\nexclude = [\"contracts/*.clar\"]\n[linter.lints]\ncall_checker = \"warning\"\n",
+    );
+    let output = check();
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        output.status.success(),
+        "expected the project's `[linter.lints]` to apply, got:\n{stdout}"
+    );
+    assert!(
+        stdout.contains("warning[call_checker]"),
+        "expected a named warning, got:\n{stdout}"
+    );
+}
+
+#[test]
+fn test_check_single_file_rejects_invalid_explicit_manifest() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    fs::write(temp_dir.path().join("standalone.clar"), "(ok true)\n").unwrap();
+    fs::write(temp_dir.path().join("invalid.toml"), "[project\n").unwrap();
+
+    for manifest in ["missing.toml", "invalid.toml"] {
+        let output = Command::new(env!("CARGO_BIN_EXE_clarinet"))
+            .args(["check", "standalone.clar", "--manifest-path", manifest])
+            .env("NO_COLOR", "1")
+            .current_dir(temp_dir.path())
+            .output()
+            .unwrap();
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(!output.status.success(), "accepted {manifest}: {stderr}");
+        assert!(
+            !stderr.contains("starting with default settings"),
+            "silently defaulted for {manifest}: {stderr}"
+        );
+    }
 }
 
 /// Devnet deployments should strip `#[env(simnet)]` code from contract sources.

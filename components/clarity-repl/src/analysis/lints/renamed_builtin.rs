@@ -245,10 +245,8 @@ mod tests {
 
     fn run_snippet(
         snippet: String,
-    ) -> Result<
-        crate::repl::session::AnnotatedExecutionResult,
-        Vec<clarity::vm::diagnostic::Diagnostic>,
-    > {
+    ) -> Result<crate::repl::session::AnnotatedExecutionResult, Vec<crate::analysis::LintDiagnostic>>
+    {
         let mut settings = SessionSettings::default();
         settings
             .repl_settings
@@ -272,15 +270,15 @@ mod tests {
                 (as-contract? ((with-stacking u1)) true))
         ").to_string();
 
-        let result = run_snippet(snippet);
-        match result {
-            Ok(_) => panic!("expected analysis error for unresolved `with-stacking`"),
-            Err(diagnostics) => {
-                assert!(diagnostics
-                    .iter()
-                    .any(|diagnostic| { diagnostic.message.contains("with-staking") }));
-            }
-        }
+        let diagnostics = run_snippet(snippet)
+            .expect_err("consensus analysis must reject the unresolved builtin");
+        assert!(diagnostics.iter().any(|diagnostic| {
+            diagnostic.lint_name == Some(RenamedBuiltin::get_name())
+                && diagnostic.diagnostic.level == Level::Warning
+        }));
+        assert!(diagnostics.iter().any(|diagnostic| {
+            diagnostic.lint_name.is_none() && diagnostic.diagnostic.level == Level::Error
+        }));
     }
 
     #[test]
@@ -433,7 +431,10 @@ mod tests {
             Ok(_) => panic!("expected analysis error for unresolved `with-stacking`"),
             Err(diagnostics) => {
                 assert!(!diagnostics.iter().any(|diagnostic| {
-                    diagnostic.message.contains("was renamed to `with-staking`")
+                    diagnostic
+                        .diagnostic
+                        .message
+                        .contains("was renamed to `with-staking`")
                 }));
             }
         }

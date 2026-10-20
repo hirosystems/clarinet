@@ -17,6 +17,7 @@ use clarity::types::Address;
 use clarity::vm::analysis::contract_interface_builder::{
     ContractInterface, ContractInterfaceFunction, ContractInterfaceFunctionAccess,
 };
+use clarity::vm::diagnostic::Diagnostic;
 use clarity::vm::types::{PrincipalData, QualifiedContractIdentifier, StandardPrincipalData};
 use clarity::vm::{ClarityVersion, EvaluationResult, ExecutionResult, SymbolicExpression};
 use clarity_repl::repl::boot::{
@@ -547,10 +548,23 @@ impl SDK {
                     }
                 }
                 Err(diagnostics) => {
-                    let contract_diagnostics =
-                        HashMap::from([(contract_id.clone(), diagnostics.clone())]);
-                    let diags_digest =
-                        DiagnosticsDigest::new(&contract_diagnostics, &HashMap::new(), &deployment);
+                    // Keep the identity of the lints that rejected the contract: the
+                    // digest reports them as `error[call_checker]: ...`.
+                    let (lint_diagnostics, plain): (Vec<_>, Vec<_>) = diagnostics
+                        .iter()
+                        .cloned()
+                        .partition(|d| d.lint_name.is_some());
+                    let contract_diagnostics = HashMap::from([(
+                        contract_id.clone(),
+                        plain.into_iter().map(Diagnostic::from).collect(),
+                    )]);
+                    let contract_lint_diagnostics =
+                        HashMap::from([(contract_id.clone(), lint_diagnostics)]);
+                    let diags_digest = DiagnosticsDigest::new(
+                        &contract_diagnostics,
+                        &contract_lint_diagnostics,
+                        &deployment,
+                    );
                     if diags_digest.errors > 0 {
                         return Err(diags_digest.message);
                     }
@@ -945,7 +959,7 @@ impl SDK {
                         .join(", ")
                 );
                 if let Some(diag) = failure.diagnostics.last() {
-                    message = format!("{message} -> {}", diag.message);
+                    message = format!("{message} -> {}", diag.diagnostic.message);
                 }
                 message
             })?;
@@ -1103,7 +1117,7 @@ impl SDK {
             Err(diagnostics) => {
                 let mut message = format!("{}: {}", "STX transfer error", args.sender);
                 if let Some(diag) = diagnostics.last() {
-                    message = format!("{} -> {}", message, diag.message);
+                    message = format!("{message} -> {}", diag.diagnostic.message);
                 }
                 return Err(message);
             }
@@ -1191,7 +1205,7 @@ impl SDK {
                         args.sender, args.name
                     );
                     if let Some(diag) = diagnostics.last() {
-                        message = format!("{} -> {}", message, diag.message);
+                        message = format!("{} -> {}", message, diag.diagnostic.message);
                     }
                     return Err(message);
                 }
@@ -1313,7 +1327,7 @@ impl SDK {
             Err(diagnostics) => {
                 let mut message = "error:".to_string();
                 diagnostics.iter().for_each(|d| {
-                    message = format!("{message}\n{}", d.message);
+                    message = format!("{message}\n{}", d.diagnostic.message);
                 });
                 message
             }
@@ -1329,7 +1343,7 @@ impl SDK {
             Err(diagnostics) => {
                 let message = diagnostics
                     .iter()
-                    .map(|d| d.message.to_string())
+                    .map(|d| d.diagnostic.message.to_string())
                     .collect::<Vec<String>>()
                     .join("\n");
                 Err(format!("error: {message}"))

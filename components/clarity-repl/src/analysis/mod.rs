@@ -20,6 +20,7 @@ use linter::{LintLevel, LintMapBuilder, LintName};
 #[cfg(feature = "json_schema")]
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use strum::VariantArray;
 
 use crate::analysis::annotation::Annotation;
 use crate::analysis::cache::AnalysisCache;
@@ -191,16 +192,6 @@ pub enum BoolOr<T> {
     Value(T),
 }
 
-impl From<BoolOr<Self>> for LintLevel {
-    fn from(val: BoolOr<Self>) -> Self {
-        match val {
-            BoolOr::Bool(true) => Self::Warning,
-            BoolOr::Bool(false) => Self::Ignore,
-            BoolOr::Value(v) => v,
-        }
-    }
-}
-
 #[derive(Debug, Default, Clone, Deserialize, Serialize)]
 #[cfg_attr(feature = "json_schema", derive(JsonSchema))]
 pub struct SettingsFile {
@@ -221,19 +212,29 @@ impl TryFrom<SettingsFile> for Settings {
 
     fn try_from(from_file: SettingsFile) -> Result<Self, Self::Error> {
         let mut settings = Self::with_default_lints();
+        // Levels to fall back on when a lint is enabled with `true`
+        let defaults = settings.lints.clone();
 
-        // Process lint groups first
+        // Boolean toggles restore defaults; explicit levels override them.
         for (group, val) in from_file.groups.unwrap_or_default() {
-            if let Some(level) = LintLevel::from(val).into() {
-                group.insert_into(&mut settings.lints, level);
-            } else {
-                group.remove_from(&mut settings.lints);
+            match val {
+                BoolOr::Bool(true) => group.insert_defaults_into(&defaults, &mut settings.lints),
+                BoolOr::Bool(false) => group.remove_from(&mut settings.lints),
+                BoolOr::Value(level) => match Option::<ClarityDiagnosticLevel>::from(level) {
+                    Some(level) => group.insert_into(&mut settings.lints, level),
+                    None => group.remove_from(&mut settings.lints),
+                },
             }
         }
 
-        // Individual lints can override group settings
+        // Individual lints override group settings.
         for (lint, val) in from_file.lints.unwrap_or_default() {
-            if let Some(level) = LintLevel::from(val).into() {
+            let level = match val {
+                BoolOr::Bool(true) => defaults.get(&lint).cloned(),
+                BoolOr::Bool(false) => None,
+                BoolOr::Value(level) => level.into(),
+            };
+            if let Some(level) = level {
                 settings.lints.insert(lint, level);
             } else {
                 settings.lints.remove(&lint);
@@ -282,34 +283,41 @@ pub fn run_analysis(
     annotations: &[Annotation],
     settings: &Settings,
 ) -> Result<Vec<LintDiagnostic>, Vec<LintDiagnostic>> {
-    let mut errors: Vec<LintDiagnostic> = vec![];
+    let mut diagnostics: Vec<LintDiagnostic> = vec![];
+    let mut rejected = false;
 
     // Create shared cache for all lints
     let mut cache = AnalysisCache::new(contract_analysis, annotations);
 
     execute(analysis_db, |database| {
-        for (&lint_name, level) in &settings.lints {
-            let pass = AnalysisPassFn::from(&lint_name);
-            let wrap = |diagnostics: Vec<Diagnostic>| -> Vec<LintDiagnostic> {
-                diagnostics
-                    .into_iter()
-                    .map(|d| LintDiagnostic {
-                        lint_name: Some(lint_name),
-                        diagnostic: d,
-                    })
-                    .collect()
+        // Run every lint in stable order, even after a rejection.
+        for lint_name in LintName::VARIANTS {
+            let Some(level) = settings.lints.get(lint_name) else {
+                continue;
             };
-
-            // Collect warnings and continue, or if there is an error, return.
-            match pass(database, &mut cache, level.clone(), settings) {
-                Ok(w) => errors.extend(wrap(w)),
-                Err(e) => {
-                    errors.extend(wrap(e));
-                    return Err(errors);
+            let pass = AnalysisPassFn::from(lint_name);
+            let lint_diagnostics = match pass(database, &mut cache, level.clone(), settings) {
+                Ok(diagnostics) => diagnostics,
+                Err(diagnostics) => {
+                    rejected = true;
+                    diagnostics
                 }
-            }
+            };
+            diagnostics.extend(
+                lint_diagnostics
+                    .into_iter()
+                    .map(|diagnostic| LintDiagnostic {
+                        lint_name: Some(*lint_name),
+                        diagnostic,
+                    }),
+            );
         }
-        Ok(errors)
+
+        if rejected {
+            Err(diagnostics)
+        } else {
+            Ok(diagnostics)
+        }
     })
 }
 
@@ -378,6 +386,61 @@ mod tests {
         assert!(!settings.lints.contains_key(&LintName::CaseConst));
         assert_eq!(
             settings.lints.get(&LintName::CaseFn),
+            Some(&ClarityDiagnosticLevel::Error)
+        );
+    }
+
+    // Re-enable a disabled group without downgrading its rejecting lint.
+    #[test]
+    fn enabling_a_group_keeps_the_default_level_of_each_lint() {
+        let file = SettingsFile {
+            groups: Some(IndexMap::from([
+                (LintGroup::All, BoolOr::Bool(false)),
+                (LintGroup::Safety, BoolOr::Bool(true)),
+            ])),
+            ..Default::default()
+        };
+        let settings = Settings::try_from(file).unwrap();
+
+        assert_eq!(
+            settings.lints.get(&LintName::CallChecker),
+            Some(&ClarityDiagnosticLevel::Error),
+            "`safety = true` must not downgrade the rejecting `call_checker`"
+        );
+        assert_eq!(
+            settings.lints.get(&LintName::Panic),
+            Some(&ClarityDiagnosticLevel::Warning)
+        );
+        assert!(!settings.lints.contains_key(&LintName::UnusedConst));
+    }
+
+    // Individual toggles restore defaults after group-level overrides.
+    #[test]
+    fn enabling_a_lint_uses_its_default_level() {
+        let file = SettingsFile {
+            groups: Some(IndexMap::from([
+                (LintGroup::All, BoolOr::Bool(false)),
+                (LintGroup::Style, BoolOr::Value(LintLevel::Error)),
+            ])),
+            lints: Some(IndexMap::from([
+                (LintName::CallChecker, BoolOr::Bool(true)),
+                (LintName::CaseConst, BoolOr::Bool(true)),
+                (LintName::UnusedConst, BoolOr::Value(LintLevel::Error)),
+            ])),
+            ..Default::default()
+        };
+        let settings = Settings::try_from(file).unwrap();
+
+        assert_eq!(
+            settings.lints.get(&LintName::CallChecker),
+            Some(&ClarityDiagnosticLevel::Error)
+        );
+        assert_eq!(
+            settings.lints.get(&LintName::CaseConst),
+            Some(&ClarityDiagnosticLevel::Note)
+        );
+        assert_eq!(
+            settings.lints.get(&LintName::UnusedConst),
             Some(&ClarityDiagnosticLevel::Error)
         );
     }

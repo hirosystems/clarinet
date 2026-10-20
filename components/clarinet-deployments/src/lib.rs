@@ -20,6 +20,7 @@ use clarity::vm::{
     ClarityVersion, ContractName, EvaluationResult, ExecutionResult, SymbolicExpression,
 };
 use clarity_repl::analysis::ast_dependency_detector::{ASTDependencyDetector, DependencySet};
+use clarity_repl::analysis::LintDiagnostic;
 use clarity_repl::repl::boot::{
     get_boot_contract_epoch_and_clarity_version, remap_mainnet_boot_principals,
     BOOT_CONTRACTS_DATA, BOOT_MAINNET_PRINCIPAL, BOOT_TESTNET_PRINCIPAL, SBTC_BOOT_CONTRACTS,
@@ -233,7 +234,14 @@ pub fn setup_session_with_deployment(
             }
             Err(errors) => {
                 success = false;
-                diags.insert(contract_id.clone(), errors);
+                // Keep lint identities in the lint channel.
+                let (lint_diagnostics, diagnostics): (Vec<_>, Vec<_>) =
+                    errors.into_iter().partition(|d| d.lint_name.is_some());
+                lint_diags.insert(contract_id.clone(), lint_diagnostics);
+                diags.insert(
+                    contract_id,
+                    diagnostics.into_iter().map(Diagnostic::from).collect(),
+                );
             }
         }
     }
@@ -602,7 +610,7 @@ fn handle_emulated_contract_publish(
     tx: &EmulatedContractPublishSpecification,
     contract_ast: Option<&ContractAST>,
     epoch: StacksEpochId,
-) -> Result<AnnotatedExecutionResult, Vec<Diagnostic>> {
+) -> Result<AnnotatedExecutionResult, Vec<LintDiagnostic>> {
     let default_tx_sender = session.get_tx_sender();
     session.set_tx_sender(&tx.emulated_sender.to_string());
 
@@ -631,7 +639,7 @@ fn handle_emulated_contract_publish(
 fn handle_emulated_contract_call(
     session: &mut Session,
     tx: &EmulatedContractCallSpecification,
-) -> Result<ExecutionResult, Vec<Diagnostic>> {
+) -> Result<ExecutionResult, Vec<LintDiagnostic>> {
     let default_tx_sender = session.get_tx_sender();
     session.set_tx_sender(&tx.emulated_sender.to_string());
 
@@ -652,7 +660,10 @@ fn handle_emulated_contract_call(
         PostConditionCheck::Unchecked,
     );
     if let Err(errors) = &result {
-        clarity_repl::ueprint!("error: {:?}", errors.diagnostics.first().unwrap().message);
+        clarity_repl::ueprint!(
+            "error: {:?}",
+            errors.diagnostics.first().unwrap().diagnostic.message
+        );
     }
 
     session.set_tx_sender(&default_tx_sender);
@@ -1695,7 +1706,7 @@ mod tests {
         name: &str,
         source: &str,
         epoch: StacksEpochId,
-    ) -> Result<AnnotatedExecutionResult, Vec<Diagnostic>> {
+    ) -> Result<AnnotatedExecutionResult, Vec<LintDiagnostic>> {
         let emulated_publish_spec = EmulatedContractPublishSpecification {
             contract_name: ContractName::try_from(name).unwrap(),
             emulated_sender: PrincipalData::parse_standard_principal(DEPLOYER).unwrap(),

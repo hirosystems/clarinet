@@ -112,19 +112,20 @@ impl Lint for CaseMap<'_, '_> {
 
 #[cfg(test)]
 mod tests {
-    use clarity::vm::diagnostic::{Diagnostic, Level};
+    use clarity::vm::diagnostic::Level;
     use clarity::vm::ClarityName;
     use indoc::indoc;
 
     use super::CaseMap;
     use crate::analysis::linter::Lint;
     use crate::analysis::util::CaseError;
+    use crate::analysis::LintDiagnostic;
     use crate::repl::session::{AnnotatedExecutionResult, Session};
     use crate::repl::SessionSettings;
 
     fn run_snippet_no_panic(
         snippet: String,
-    ) -> Result<(Vec<String>, AnnotatedExecutionResult), (Vec<String>, Vec<Diagnostic>)> {
+    ) -> Result<(Vec<String>, AnnotatedExecutionResult), (Vec<String>, Vec<LintDiagnostic>)> {
         let mut settings = SessionSettings::default();
         settings
             .repl_settings
