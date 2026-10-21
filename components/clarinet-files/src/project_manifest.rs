@@ -253,13 +253,15 @@ impl Serialize for ProjectConfig {
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "json_schema", derive(JsonSchema))]
 pub struct RequirementConfig {
-    /// Contract identifier (e.g., SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.nft-trait)
+    /// Contract identifier that the project's sources use. It can be a mainnet
+    /// or a testnet contract (e.g., SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.nft-trait)
     pub contract_id: String,
-    /// Contract already deployed on testnet to use in place of `contract_id`,
-    /// instead of redeploying a copy
+    /// Testnet contract to use in place of `contract_id`, instead of
+    /// publishing a copy. Not needed if `contract_id` is a testnet contract.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub testnet: Option<String>,
-    /// Contract to use in place of `contract_id` on mainnet
+    /// Mainnet contract to use in place of `contract_id`. Needed if
+    /// `contract_id` is a testnet contract, or if mainnet uses a different one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mainnet: Option<String>,
 }

@@ -99,7 +99,7 @@ enum Command {
     /// Subcommands for working with contracts
     #[clap(subcommand, name = "contracts", aliases = &["contract"])]
     Contracts(Contracts),
-    /// Interact with contracts deployed on Mainnet
+    /// Manage the deployed contracts that the project depends on
     #[clap(subcommand, name = "requirements", aliases = &["requirement"])]
     Requirements(Requirements),
     /// Manage contracts deployments on Simnet/Devnet/Testnet/Mainnet
@@ -262,7 +262,7 @@ enum Contracts {
 
 #[derive(Subcommand, PartialEq, Clone, Debug)]
 enum Requirements {
-    /// Interact with contracts deployed on Mainnet
+    /// Add or update a deployed contract that the project depends on
     #[clap(name = "add", bin_name = "add")]
     AddRequirement(AddRequirement),
 }
@@ -330,12 +330,12 @@ struct RemoveContract {
 
 #[derive(Parser, PartialEq, Clone, Debug)]
 struct AddRequirement {
-    /// Contract id (ex. "SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.nft-trait")
+    /// Contract id that the project's sources use, on mainnet or testnet (ex. "SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.nft-trait")
     pub contract_id: String,
-    /// Contract already deployed on testnet to use instead of redeploying a copy
+    /// Testnet contract to use instead of publishing a copy. Not needed for a testnet contract id
     #[clap(long = "testnet")]
     pub testnet: Option<String>,
-    /// Contract to use in place of the requirement on mainnet
+    /// Mainnet contract to use instead. Needed for a testnet contract id
     #[clap(long = "mainnet")]
     pub mainnet: Option<String>,
     /// Path to Clarinet.toml

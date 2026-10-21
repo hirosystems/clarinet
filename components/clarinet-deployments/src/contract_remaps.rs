@@ -60,8 +60,28 @@ pub fn requirement_remaps(
         .collect()
 }
 
-/// Every remap that applies on `network`: the defaults, then the project's
-/// own on top.
+/// Requirements that are already testnet contracts. On testnet, each one
+/// remaps to itself, so the plan uses it in place and does not publish a copy.
+/// Mainnet plans never publish requirements, so they need no such remap.
+fn testnet_requirements_in_place(
+    manifest: &ProjectManifest,
+    network: &StacksNetwork,
+) -> Result<ContractRemaps, String> {
+    if !matches!(network, StacksNetwork::Testnet) {
+        return Ok(ContractRemaps::new());
+    }
+    let mut remaps = ContractRemaps::new();
+    for requirement in manifest.project.requirements.iter().flatten() {
+        let contract_id = parse_contract_id(&requirement.contract_id)?;
+        if !contract_id.issuer.is_mainnet() {
+            remaps.insert(contract_id.clone(), contract_id);
+        }
+    }
+    Ok(remaps)
+}
+
+/// Every remap that applies on `network`: the defaults, then the testnet
+/// requirements in place, then the project's own on top.
 pub fn resolve_contract_remaps(
     manifest: &ProjectManifest,
     network: &StacksNetwork,
@@ -71,6 +91,7 @@ pub fn resolve_contract_remaps(
     } else {
         ContractRemaps::new()
     };
+    remaps.extend(testnet_requirements_in_place(manifest, network)?);
     remaps.extend(requirement_remaps(manifest, network)?);
     Ok(remaps)
 }

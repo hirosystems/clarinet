@@ -11,6 +11,8 @@ use clarinet_deployments::types::{
 };
 use clarinet_files::{ProjectManifest, StacksNetwork};
 use clarinet_utils::DEFAULT_DEPLOYER_MNEMONIC as TEST_MNEMONIC;
+use clarity_repl::repl::boot::SBTC_BOOT_CONTRACTS;
+use clarity_repl::repl::ClarityCodeSource;
 use clarity_repl::utils::Environment;
 use indoc::formatdoc;
 use mockito::{Server, ServerGuard};
@@ -110,6 +112,12 @@ async fn mock_contracts(contract_ids: &[&str]) -> ServerGuard {
 
 /// Serve each `(contract_id, source)` from a mock API.
 async fn mock_contract_sources(contracts: &[(&str, &str)]) -> ServerGuard {
+    // An epoch 3.0 height on mainnet.
+    mock_contract_sources_at(contracts, 175232).await
+}
+
+/// Serve each `(contract_id, source)` as published at `block_height`.
+async fn mock_contract_sources_at(contracts: &[(&str, &str)], block_height: u32) -> ServerGuard {
     let mut server = Server::new_async().await;
     for (contract_id, source) in contracts {
         server
@@ -122,7 +130,7 @@ async fn mock_contract_sources(contracts: &[(&str, &str)]) -> ServerGuard {
             .with_body(
                 serde_json::json!({
                     "source_code": source,
-                    "block_height": 175232,
+                    "block_height": block_height,
                     "clarity_version": 3
                 })
                 .to_string(),
@@ -390,6 +398,96 @@ async fn a_dependency_also_used_directly_is_still_redeployed() {
     assert_eq!(requirement_publishes(&deployment), vec![POOL]);
 }
 
+/// The bundled source of the sBTC contract `name`.
+fn sbtc_source(name: &str) -> String {
+    SBTC_BOOT_CONTRACTS
+        .iter()
+        .find_map(|(id, (contract, _))| match &contract.code_source {
+            ClarityCodeSource::ContractInMemory(source) if id.name.as_str() == name => {
+                Some(source.clone())
+            }
+            _ => None,
+        })
+        .unwrap()
+}
+
+/// Serve the bundled sBTC sources at the mainnet deployer, plus the testnet
+/// `sbtc-deposit`.
+async fn mock_sbtc() -> ServerGuard {
+    let names = ["sbtc-registry", "sbtc-token", "sbtc-deposit"];
+    let mut contracts: Vec<_> = names
+        .iter()
+        .map(|name| (format!("{SBTC_MAINNET_DEPLOYER}.{name}"), sbtc_source(name)))
+        .collect();
+    contracts.push((
+        format!("{SBTC_TESTNET_DEPLOYER}.sbtc-deposit"),
+        sbtc_source("sbtc-deposit"),
+    ));
+    let contracts: Vec<_> = contracts
+        .iter()
+        .map(|(id, source)| (id.as_str(), source.as_str()))
+        .collect();
+    mock_contract_sources(&contracts).await
+}
+
+#[tokio::test]
+async fn partially_remapped_sbtc_generates_a_plan() {
+    let sbtc_deposit = format!("{SBTC_MAINNET_DEPLOYER}.sbtc-deposit");
+    let project = Project::new(
+        &format!(
+            "default_contract_remaps = false\n\n[[project.requirements]]\ncontract_id = \"{sbtc_deposit}\"\ntestnet = \"{SBTC_TESTNET_DEPLOYER}.sbtc-deposit\"\n"
+        ),
+        Some(&format!(
+            "(define-read-only (header) (contract-call? '{sbtc_deposit} get-burn-header u1))"
+        )),
+    );
+    let server = mock_sbtc().await;
+
+    let deployment = project.generate(StacksNetwork::Testnet, &server).await;
+
+    assert_eq!(requirement_publishes(&deployment), Vec::<String>::new());
+}
+
+#[tokio::test]
+async fn a_redeployed_sbtc_contract_keeps_its_dependencies() {
+    let sbtc_deposit = format!("{SBTC_MAINNET_DEPLOYER}.sbtc-deposit");
+    let sbtc_token = format!("{SBTC_MAINNET_DEPLOYER}.sbtc-token");
+    let project = Project::new(
+        &format!(
+            "default_contract_remaps = false\n\n[[project.requirements]]\ncontract_id = \"{sbtc_deposit}\"\ntestnet = \"{SBTC_TESTNET_DEPLOYER}.sbtc-deposit\"\n"
+        ),
+        Some(&format!(
+            "(define-read-only (name) (contract-call? '{sbtc_token} get-name))"
+        )),
+    );
+    let server = mock_sbtc().await;
+
+    let deployment = project.generate(StacksNetwork::Testnet, &server).await;
+
+    assert_eq!(
+        requirement_publishes(&deployment),
+        vec![format!("{SBTC_MAINNET_DEPLOYER}.sbtc-registry"), sbtc_token]
+    );
+}
+
+#[tokio::test]
+async fn testnet_requirement_is_used_in_place() {
+    let project = Project::new(
+        &format!("\n[[project.requirements]]\ncontract_id = \"{TESTNET_NFT_TRAIT}\"\n"),
+        Some(&calls(&[TESTNET_NFT_TRAIT])),
+    );
+    // An epoch 3.2 height on testnet, before the project contract's epoch.
+    let server = mock_contract_sources_at(&[(TESTNET_NFT_TRAIT, REQUIREMENT_SOURCE)], 730).await;
+
+    let deployment = project.generate(StacksNetwork::Testnet, &server).await;
+
+    assert_eq!(requirement_publishes(&deployment), Vec::<String>::new());
+    assert_eq!(
+        contract_remaps(&deployment),
+        BTreeMap::from([(TESTNET_NFT_TRAIT.to_string(), TESTNET_NFT_TRAIT.to_string())])
+    );
+}
+
 #[tokio::test]
 async fn opting_out_of_default_remaps_redeploys_sbtc() {
     let sbtc_deposit = format!("{SBTC_MAINNET_DEPLOYER}.sbtc-deposit");
@@ -399,11 +497,15 @@ async fn opting_out_of_default_remaps_redeploys_sbtc() {
         ),
         None,
     );
-    let server = mock_contracts(&[&sbtc_deposit]).await;
+    let server = mock_sbtc().await;
 
     let deployment = project.generate(StacksNetwork::Testnet, &server).await;
 
-    assert_eq!(requirement_publishes(&deployment), vec![sbtc_deposit]);
+    assert_eq!(
+        requirement_publishes(&deployment),
+        ["sbtc-registry", "sbtc-token", "sbtc-deposit"]
+            .map(|name| format!("{SBTC_MAINNET_DEPLOYER}.{name}"))
+    );
     // Empty rather than absent, so deploying skips the legacy sBTC rewrite.
     let content = deployment.to_file_content(project.dir.path()).unwrap();
     assert!(String::from_utf8(content)
