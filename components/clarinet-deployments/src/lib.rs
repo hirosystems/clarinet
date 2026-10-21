@@ -1459,6 +1459,7 @@ pub async fn generate_default_deployment_with_cache(
 
     let dependencies =
         ASTDependencyDetector::detect_dependencies(&contract_data, &requirements_data);
+    let project_dependencies_complete = dependencies.is_ok();
 
     let mut dependencies = match dependencies {
         Ok(dependencies) => dependencies,
@@ -1481,6 +1482,45 @@ pub async fn generate_default_deployment_with_cache(
     }
 
     dependencies.extend(requirements_deps);
+
+    // Publish only the requirements that a project contract or a listed
+    // requirement needs. Do not follow a remapped contract, because its
+    // destination uses its own dependencies. If the project dependencies are
+    // incomplete, keep all publishes.
+    //
+    // If a project contract also calls a dependency of a remapped contract,
+    // the plan publishes that dependency, but the destination does not use it.
+    // To share one contract, remap the dependency too.
+    if matches!(network, StacksNetwork::Testnet) && project_dependencies_complete {
+        let listed_requirements = manifest.project.requirements.iter().flatten();
+        let mut pending: Vec<_> = listed_requirements
+            .filter_map(|requirement| {
+                QualifiedContractIdentifier::parse(&requirement.contract_id).ok()
+            })
+            .chain(contract_asts.keys().cloned())
+            .collect();
+        let mut needed = BTreeSet::new();
+        while let Some(contract_id) = pending.pop() {
+            if remaps.contains_key(&contract_id) || !needed.insert(contract_id.clone()) {
+                continue;
+            }
+            if let Some(contract_dependencies) = dependencies.get(&contract_id) {
+                pending.extend(
+                    contract_dependencies
+                        .iter()
+                        .map(|dependency| dependency.contract_id.clone()),
+                );
+            }
+        }
+        for epoch_transactions in transactions.values_mut() {
+            epoch_transactions.retain(|tx| match tx {
+                TransactionSpecification::RequirementPublish(spec) => {
+                    needed.contains(&spec.contract_id)
+                }
+                _ => true,
+            });
+        }
+    }
 
     // Only record the remaps whose source ID appears in a source the plan
     // publishes: rewriting is textual, so a reference used as data counts as

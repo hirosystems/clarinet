@@ -349,6 +349,47 @@ async fn relative_references_select_their_remap() {
     );
 }
 
+const ROUTER: &str = "SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.router";
+const POOL: &str = "SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.pool";
+const TESTNET_ROUTER: &str = "ST1NXBK3K5YYMD6FD41MVNP3JS1GABZ8TRVX023PT.router";
+
+/// Serve `router`, its testnet copy, and `pool`. `router` calls `pool`.
+async fn mock_router_and_pool() -> ServerGuard {
+    let router_source = format!("{REQUIREMENT_SOURCE}\n{}", calls(&[POOL]));
+    mock_contract_sources(&[
+        (ROUTER, &router_source),
+        (POOL, REQUIREMENT_SOURCE),
+        (TESTNET_ROUTER, &router_source),
+    ])
+    .await
+}
+
+#[tokio::test]
+async fn dependencies_of_a_remapped_requirement_are_not_redeployed() {
+    let project = Project::new(
+        &format!("\n[[project.requirements]]\ncontract_id = \"{ROUTER}\"\ntestnet = \"{TESTNET_ROUTER}\"\n"),
+        Some(&calls(&[ROUTER])),
+    );
+    let server = mock_router_and_pool().await;
+
+    let deployment = project.generate(StacksNetwork::Testnet, &server).await;
+
+    assert_eq!(requirement_publishes(&deployment), Vec::<String>::new());
+}
+
+#[tokio::test]
+async fn a_dependency_also_used_directly_is_still_redeployed() {
+    let project = Project::new(
+        &format!("\n[[project.requirements]]\ncontract_id = \"{ROUTER}\"\ntestnet = \"{TESTNET_ROUTER}\"\n"),
+        Some(&calls(&[ROUTER, POOL])),
+    );
+    let server = mock_router_and_pool().await;
+
+    let deployment = project.generate(StacksNetwork::Testnet, &server).await;
+
+    assert_eq!(requirement_publishes(&deployment), vec![POOL]);
+}
+
 #[tokio::test]
 async fn opting_out_of_default_remaps_redeploys_sbtc() {
     let sbtc_deposit = format!("{SBTC_MAINNET_DEPLOYER}.sbtc-deposit");
