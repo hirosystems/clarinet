@@ -40,7 +40,7 @@ fn main() {
         .unwrap_or_else(|e| panic!("failed to read network manifest data {e:?}"));
 
     let network_manifest: NetworkManifest =
-        yaml_serde::from_slice(&network_manifest_file_content[..])
+        serde_saphyr::from_slice(&network_manifest_file_content[..])
             .unwrap_or_else(|e| panic!("Devnet.toml file malformatted {e:?}"));
 
     let orchestrator =
@@ -48,7 +48,7 @@ fn main() {
 
     let deployment_specification_file_content = paths::read_content(&deployment_location)
         .unwrap_or_else(|e| panic!("failed to read manifest data {e:?}"));
-    let deployment = yaml_serde::from_slice(&deployment_specification_file_content)
+    let deployment = serde_saphyr::from_slice(&deployment_specification_file_content)
         .unwrap_or_else(|e| panic!("deployment plan malformatted {e:?}"));
 
     let logger = hiro_system_kit::log::setup_logger();
