@@ -2,6 +2,7 @@ use std::path::PathBuf;
 use std::sync::mpsc::channel;
 
 use clap::Parser;
+use clarinet_deployments::yaml::from_yaml;
 use clarinet_files::{paths, NetworkManifest, ProjectManifest};
 use hiro_system_kit::slog;
 use stacks_network::{do_run_chain_coordinator, Context, DevnetOrchestrator};
@@ -39,16 +40,15 @@ fn main() {
     let network_manifest_file_content = paths::read_content(&network_manifest_path)
         .unwrap_or_else(|e| panic!("failed to read network manifest data {e:?}"));
 
-    let network_manifest: NetworkManifest =
-        yaml_serde::from_slice(&network_manifest_file_content[..])
-            .unwrap_or_else(|e| panic!("Devnet.toml file malformatted {e:?}"));
+    let network_manifest: NetworkManifest = from_yaml(&network_manifest_file_content)
+        .unwrap_or_else(|e| panic!("Devnet.toml file malformatted {e:?}"));
 
     let orchestrator =
         DevnetOrchestrator::new(manifest, Some(network_manifest.clone()), None, false).unwrap();
 
     let deployment_specification_file_content = paths::read_content(&deployment_location)
         .unwrap_or_else(|e| panic!("failed to read manifest data {e:?}"));
-    let deployment = yaml_serde::from_slice(&deployment_specification_file_content)
+    let deployment = from_yaml(&deployment_specification_file_content)
         .unwrap_or_else(|e| panic!("deployment plan malformatted {e:?}"));
 
     let logger = hiro_system_kit::log::setup_logger();
