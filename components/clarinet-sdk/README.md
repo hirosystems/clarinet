@@ -27,12 +27,45 @@ actual data size, so cost assertions may need updating.
 
 `transferSTX` represents a native transfer: self-transfers, zero-amount transfers,
 and transfers exceeding the available unlocked balance throw without consuming a
-nonce. Inside `mineBlock`, the same transfers instead return the `stx-transfer?`
-error response (`(err u1)`, `(err u2)` or `(err u3)`), consume a nonce, and the
-rest of the block is still processed. This differs
-from calling the Clarity `stx-transfer?` function inside a contract, which retains
-its ordinary response semantics. Private calls remain a simnet convenience and
-use the same transaction frame.
+nonce. Inside `mineBlock`, these transfers return a `rejected` outcome without
+consuming a nonce. Calling the Clarity `stx-transfer?` function inside a contract
+retains its ordinary response semantics. Private calls remain a simnet convenience
+and use the same transaction frame.
+
+### Migrating `mineBlock` to 4.0
+
+`mineBlock(txs)` returns one `BlockTransactionResult` per entry, in input order:
+
+- `success`: `execution` contains the parsed result, events, costs, and performance.
+- `included_failure`: `error` describes the failure. For a returned `(err ...)`,
+  `execution` contains its parsed result, events, costs, and performance. For VM,
+  analysis, or post-condition errors, `execution` is `null`. Included failures
+  consume a nonce according to the VM's epoch rules; their payload writes roll back.
+- `rejected`: `error` describes why the transaction was rejected. No payload writes
+  or nonce changes commit.
+
+Later entries execute after either kind of failure. Every call advances exactly
+one block before execution, even for empty or entirely rejected batches. All
+entries execute at that inclusion height. Convenience entries remain unsigned
+and fee-free.
+
+Previously, entries returned the execution object directly, most failures threw
+and stopped the batch, and invalid native transfers returned `(err u1/u2/u3)`
+and consumed a nonce. Replace direct access such as `results[0].result` with a
+status check and `results[0].execution.result`:
+
+```ts
+for (const outcome of simnet.mineBlock(transactions)) {
+  if (outcome.status === "success") {
+    console.log(outcome.execution.result);
+  } else {
+    console.log(outcome.status, outcome.error);
+  }
+}
+```
+
+The synchronous debug adapter uses the same batch outcome contract, transaction
+nonce rules, and inclusion height.
 
 ## Signed transactions
 
@@ -80,8 +113,8 @@ the chain by one block; rejections do not advance it.
 Raw payloads execute exactly as signed: contract source, boot addresses,
 post-conditions, and transfer memo bytes are not rewritten. Private calls and
 coinbase, tenure-change, and poison-microblock payloads are unsupported. Existing
-convenience calls remain unsigned and fee-free. `mineBlock` behavior is unchanged;
-raw batch entries and batch alignment are separate work. This method does not
+convenience calls remain unsigned and fee-free. Raw batch entries are not yet
+supported by `mineBlock`. This method does not
 submit to a network or emulate a mempool.
 
 ## Contributing

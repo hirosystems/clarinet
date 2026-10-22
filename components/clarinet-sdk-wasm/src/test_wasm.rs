@@ -454,3 +454,63 @@ async fn it_handles_contract_address_as_recipient() {
     // we support contract addresses as recipients
     assert_tx_result(&result.unwrap(), ClarityValue::okay_true());
 }
+
+#[wasm_bindgen_test]
+async fn mine_block_reports_each_entry_and_continues_after_malformed_and_rejected_entries() {
+    use serde_json::json;
+    let mut sdk = init_sdk().await;
+    let sender = "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM";
+    let before = sdk.get_account_nonce(sender).unwrap();
+    let height = sdk.block_height();
+    let contract = format!("{sender}.batch");
+    let txs = json!([
+        {"deployContract": {"name": "batch", "content": "(define-public (fail) (err u7)) (define-public (yes) (ok true))", "sender": sender}},
+        {"transferSTX": {"amount": 0, "recipient": sender, "sender": sender}},
+        {"callPublicFn": {"contract": contract, "method": "fail", "args_maps": [], "sender": sender}},
+        {"callPublicFn": {"contract": contract, "method": "missing", "args_maps": [], "sender": sender}},
+        {"transferSTX": {"amount": "invalid"}},
+        {},
+        {"callPublicFn": {"contract": contract, "method": "yes", "args_maps": [{"99": 3}], "sender": sender}},
+        {"callPublicFn": {"contract": contract, "method": "yes", "args_maps": [{"0": 255}], "sender": sender}},
+        {"callPublicFn": {"contract": contract, "method": "yes", "args_maps": [], "sender": sender}}
+    ]);
+    let array = js_sys::Array::from(&JsValue::from_serde(&txs).unwrap());
+    let response = sdk.mine_block_js(array).unwrap();
+    let failure = js_sys::Array::from(&response).get(3);
+    assert!(
+        js_sys::Reflect::get(&failure, &JsValue::from_str("execution"))
+            .unwrap()
+            .is_null()
+    );
+    let results: serde_json::Value = response.into_serde().unwrap();
+    let statuses: Vec<_> = results
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|r| r["status"].as_str().unwrap())
+        .collect();
+    assert_eq!(
+        statuses,
+        [
+            "success",
+            "rejected",
+            "included_failure",
+            "included_failure",
+            "rejected",
+            "rejected",
+            "rejected",
+            "rejected",
+            "success"
+        ]
+    );
+    assert_eq!(
+        results[2]["execution"]["result"],
+        format!(
+            "0x{}",
+            ClarityValue::err_uint(7).serialize_to_hex().unwrap()
+        )
+    );
+    assert_eq!(results[3]["execution"], serde_json::Value::Null);
+    assert_eq!(sdk.get_account_nonce(sender).unwrap(), before + 4);
+    assert_eq!(sdk.block_height(), height + 1);
+}

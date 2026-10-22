@@ -54,7 +54,7 @@ it("rejects invalid native transfers without consuming a nonce or mining a block
   expect(simnet.blockHeight).toBe(height + 1);
 });
 
-it("returns error responses for invalid transfers in a block and keeps mining it", () => {
+it("rejects invalid transfers in a block and keeps mining it", () => {
   const nonce = simnet.getAccountNonce(sender);
   const height = simnet.blockHeight;
   const balance = simnet.getAssetsMap().get("STX")!.get(sender)!;
@@ -64,14 +64,14 @@ it("returns error responses for invalid transfers in a block and keeps mining it
     tx.transferSTX(Number(balance + 1n), recipient, sender),
     tx.transferSTX(1, recipient, sender),
   ]);
-  expect(results.map(({ result }) => result)).toEqual([
-    Cl.error(Cl.uint(2)),
-    Cl.error(Cl.uint(3)),
-    Cl.error(Cl.uint(1)),
-    Cl.ok(Cl.bool(true)),
+  expect(results.map(({ status }) => status)).toEqual([
+    "rejected",
+    "rejected",
+    "rejected",
+    "success",
   ]);
-  expect(results.map(({ events }) => events.length)).toEqual([0, 0, 0, 1]);
-  expect(simnet.getAccountNonce(sender)).toBe(nonce + 4n);
+  expect(results[3]).toMatchObject({ execution: { result: Cl.ok(Cl.bool(true)) } });
+  expect(simnet.getAccountNonce(sender)).toBe(nonce + 1n);
   expect(simnet.blockHeight).toBe(height + 1);
   expect(simnet.getAssetsMap().get("STX")!.get(sender)).toBe(balance - 1n);
 });
@@ -138,4 +138,94 @@ it("checks FT and NFT movements from a contract principal and rolls both back on
   expect(simnet.callReadOnlyFn("vault", "owner", [], sender).result).toEqual(
     Cl.some(Cl.principal(recipient)),
   );
+});
+
+it("reports every mixed-batch outcome and keeps only committed deployment caches", () => {
+  const nonce = simnet.getAccountNonce(sender);
+  const height = simnet.blockHeight;
+  const balance = simnet.getAssetsMap().get("STX")!.get(sender)!;
+  const source = `(define-data-var count uint u0)
+    (define-public (increment) (ok (var-set count (+ (var-get count) u1))))
+    (define-public (fail-response) (begin (var-set count u99) (err u7)))
+    (define-public (fail-runtime) (begin (var-set count u99) (ok (/ u1 u0))))`;
+  const results = simnet.mineBlock([
+    tx.deployContract("batch", source, null, sender),
+    tx.callPublicFn("batch", "increment", [], sender),
+    tx.transferSTX(0, recipient, sender),
+    tx.callPublicFn("batch", "fail-response", [], sender),
+    tx.callPublicFn("batch", "fail-runtime", [], sender),
+    tx.deployContract("batch", "(+ u1 true)", null, sender),
+    tx.deployContract(
+      "retry",
+      `(define-data-var count uint u0) (stx-transfer? u1 tx-sender '${recipient})`,
+      null,
+      sender,
+      {
+        postConditions: [Pc.principal(sender).willSendEq(2).ustx()],
+      },
+    ),
+    tx.deployContract("retry", "(define-private (private-value) u42)", null, sender),
+    tx.callPrivateFn("retry", "private-value", [], sender),
+    tx.callPublicFn("batch", "increment", [], sender),
+    tx.transferSTX(1, recipient, sender),
+  ]);
+  expect(results.map((r) => r.status)).toEqual([
+    "success",
+    "success",
+    "rejected",
+    "included_failure",
+    "included_failure",
+    "rejected",
+    "included_failure",
+    "success",
+    "success",
+    "success",
+    "success",
+  ]);
+  expect(results[3]).toMatchObject({ execution: { result: Cl.error(Cl.uint(7)), events: [] } });
+  expect(results[4]).toMatchObject({
+    execution: null,
+    error: expect.stringMatching(/DivisionByZero/),
+  });
+  expect(results[6]).toMatchObject({
+    execution: null,
+    error: expect.stringMatching(/Post-condition/),
+  });
+  expect(results[8]).toMatchObject({ execution: { result: Cl.uint(42) } });
+  expect(simnet.getDataVar("batch", "count")).toEqual(Cl.uint(2));
+  expect(simnet.getContractSource("batch")).toBe(source);
+  expect(simnet.getContractSource("retry")).toBe("(define-private (private-value) u42)");
+  expect(
+    simnet
+      .getContractsInterfaces()
+      .get(`${sender}.retry`)!
+      .functions.map((f) => f.name),
+  ).toEqual(["private-value"]);
+  expect(simnet.getAccountNonce(sender)).toBe(nonce + 9n);
+  expect(simnet.getAssetsMap().get("STX")!.get(sender)).toBe(balance - 1n);
+  expect(simnet.blockHeight).toBe(height + 1);
+});
+
+it("mines empty and entirely rejected blocks once without charging nonces", () => {
+  const height = simnet.blockHeight;
+  const nonce = simnet.getAccountNonce(sender);
+  expect(simnet.mineBlock([])).toEqual([]);
+  expect(simnet.blockHeight).toBe(height + 1);
+  expect(simnet.mineBlock([tx.transferSTX(0, recipient, sender)])).toEqual([
+    expect.objectContaining({ status: "rejected" }),
+  ]);
+  expect(simnet.blockHeight).toBe(height + 2);
+  expect(simnet.getAccountNonce(sender)).toBe(nonce);
+});
+
+it.each(["2.05", "2.1"] as const)("uses the VM inclusion rules in epoch %s", (epoch) => {
+  simnet.setEpoch(epoch);
+  const nonce = simnet.getAccountNonce(sender);
+  const results = simnet.mineBlock([
+    tx.callPublicFn("not-deployed", "missing", [], sender),
+    tx.transferSTX(1, recipient, sender),
+  ]);
+  expect(results[0].status).toBe(epoch === "2.05" ? "rejected" : "included_failure");
+  expect(results[1].status).toBe("success");
+  expect(simnet.getAccountNonce(sender)).toBe(nonce + (epoch === "2.05" ? 1n : 2n));
 });

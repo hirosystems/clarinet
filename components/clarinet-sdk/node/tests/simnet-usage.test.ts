@@ -269,7 +269,7 @@ describe("simnet can call contracts function", () => {
     ]);
 
     for (const tx of res) {
-      expect(tx.result).toStrictEqual(Cl.ok(Cl.bool(true)));
+      expect(tx).toMatchObject({ status: "success", execution: { result: Cl.ok(Cl.bool(true)) } });
     }
     const count = simnet.getDataVar("counter", "count");
     expect(count).toStrictEqual(Cl.uint(5));
@@ -292,10 +292,16 @@ describe("simnet can call contracts function", () => {
     ]);
 
     expect(res).toHaveLength(2);
-    expect(res[0]).toHaveProperty("events");
-    expect(res[1]).toHaveProperty("events");
-    expect(res[0].result).toStrictEqual(Cl.ok(Cl.bool(true)));
-    expect(res[1].result).toStrictEqual(Cl.ok(Cl.bool(true)));
+    expect(res[0]).toHaveProperty("execution.events");
+    expect(res[1]).toHaveProperty("execution.events");
+    expect(res[0]).toMatchObject({
+      status: "success",
+      execution: { result: Cl.ok(Cl.bool(true)) },
+    });
+    expect(res[1]).toMatchObject({
+      status: "success",
+      execution: { result: Cl.ok(Cl.bool(true)) },
+    });
 
     const counterVal = simnet.callReadOnlyFn("counter", "get-count", [], address1);
     expect(counterVal.result).toStrictEqual(Cl.ok(Cl.tuple({ count: Cl.uint(2) })));
@@ -318,9 +324,12 @@ describe("simnet can call contracts function", () => {
       tx.callPrivateFn("counter", "inner-increment", [], address1),
     ]);
 
-    expect(res[0].result).toStrictEqual(Cl.bool(true));
-    expect(res[1].result).toStrictEqual(Cl.ok(Cl.bool(true)));
-    expect(res[2].result).toStrictEqual(Cl.bool(true));
+    expect(res[0]).toMatchObject({ status: "success", execution: { result: Cl.bool(true) } });
+    expect(res[1]).toMatchObject({
+      status: "success",
+      execution: { result: Cl.ok(Cl.bool(true)) },
+    });
+    expect(res[2]).toMatchObject({ status: "success", execution: { result: Cl.bool(true) } });
 
     const counterVal = simnet.callReadOnlyFn("counter", "get-count", [], address1);
     expect(counterVal.result).toStrictEqual(Cl.ok(Cl.tuple({ count: Cl.uint(3) })));
@@ -459,10 +468,13 @@ describe("mineBlock and callPublicFunction properly handle block height incremen
   });
 
   it("increases the block height after the call in mineBlock", () => {
-    const [{ result }] = simnet.mineBlock([
+    const [outcome] = simnet.mineBlock([
       tx.callPublicFn("block-height-tests", "get-block-height", [], address1),
     ]);
-    expect(result).toStrictEqual(Cl.ok(Cl.uint(expectedReturnedBH)));
+    expect(outcome).toMatchObject({
+      status: "success",
+      execution: { result: Cl.ok(Cl.uint(expectedReturnedBH)) },
+    });
   });
 });
 
@@ -585,7 +597,10 @@ describe("simnet can get contracts info and deploy contracts", () => {
       tx.deployContract("oktrue", source, { clarityVersion: 3 }, simnet.deployer),
     ]);
 
-    expect(deployRes.result).toStrictEqual(Cl.ok(Cl.bool(true)));
+    expect(deployRes).toMatchObject({
+      status: "success",
+      execution: { result: Cl.ok(Cl.bool(true)) },
+    });
 
     const contractInterface = simnet.getContractsInterfaces().get(`${simnet.deployer}.oktrue`)!;
     expect(contractInterface.clarity_version).toBe("Clarity3");
@@ -602,7 +617,10 @@ describe("simnet can get contracts info and deploy contracts", () => {
       tx.deployContract("test-null", source, null, simnet.deployer),
     ]);
 
-    expect(deployRes.result).toStrictEqual(Cl.ok(Cl.bool(true)));
+    expect(deployRes).toMatchObject({
+      status: "success",
+      execution: { result: Cl.ok(Cl.bool(true)) },
+    });
 
     const contractInterface = simnet.getContractsInterfaces().get(`${simnet.deployer}.test-null`)!;
     expect(contractInterface).toBeDefined();

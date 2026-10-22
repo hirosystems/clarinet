@@ -527,62 +527,11 @@ fn run_sdk_request_loop(
 
                 let mut dap_guard = dap.lock().expect("DAP mutex poisoned");
                 let mut results: Vec<serde_json::Value> = Vec::with_capacity(txs.len());
-                for tx_val in &txs {
-                    let tx_type = tx_val["type"].as_str().unwrap_or("");
-                    let result = match tx_type {
-                        "callPublicFn" | "callPrivateFn" => {
-                            let contract = tx_val["contract"].as_str().unwrap_or("").to_string();
-                            let function = tx_val["function"].as_str().unwrap_or("").to_string();
-                            let sender = tx_val["sender"].as_str().map(|s| s.to_string());
-                            let args: Vec<String> = tx_val["args"]
-                                .as_array()
-                                .map(|a| {
-                                    a.iter()
-                                        .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                                        .collect()
-                                })
-                                .unwrap_or_default();
-                            call_contract(
-                                session,
-                                &mut dap_guard,
-                                &contract,
-                                &function,
-                                &args,
-                                sender,
-                            )
-                        }
-                        "transferSTX" => {
-                            let amount = tx_val["amount"].as_u64().unwrap_or(0);
-                            let recipient = tx_val["recipient"].as_str().unwrap_or("").to_string();
-                            let sender_str = tx_val["sender"].as_str().unwrap_or("");
-                            if sender_str.is_empty() {
-                                serde_json::json!({"error": "transferSTX: missing sender"})
-                            } else if PrincipalData::parse_standard_principal(sender_str).is_err() {
-                                serde_json::json!({"error": format!("transferSTX: invalid sender: {sender_str}")})
-                            } else {
-                                // Native token transfers carry a fixed 34-byte memo.
-                                let memo = "00".repeat(34);
-                                let snippet = format!(
-                                    "(stx-transfer-memo? u{amount} tx-sender '{recipient} 0x{memo})"
-                                );
-                                let orig = session.get_tx_sender();
-                                session.set_tx_sender(sender_str);
-                                let cid = QualifiedContractIdentifier::transient();
-                                dap_guard.prepare_for_call(&cid, &snippet);
-                                let r = eval_snippet_as_tx(session, &mut dap_guard, snippet);
-                                session.set_tx_sender(&orig);
-                                r
-                            }
-                        }
-                        _ => {
-                            serde_json::json!({"error": format!("unsupported transaction type: {tx_type}")})
-                        }
-                    };
-                    results.push(result);
+                session.advance_chain_tip(1);
+                for tx in &txs {
+                    results.push(execute_block_entry(session, &mut dap_guard, tx));
                 }
 
-                // Advance the chain tip by one block, mirroring simnet.mineBlock semantics.
-                session.advance_chain_tip(1);
                 drop(dap_guard);
 
                 let response = serde_json::json!({"id": id, "result": {"results": results}});
@@ -605,6 +554,206 @@ fn run_sdk_request_loop(
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/// Batch entries use transaction methods so VM inclusion owns nonce settlement.
+fn execute_block_entry(
+    session: &mut Session,
+    dap: &mut DAPDebugger,
+    tx: &serde_json::Value,
+) -> serde_json::Value {
+    use clarity::vm::analysis::contract_interface_builder::ContractInterfaceFunctionAccess;
+    use clarity::vm::types::Value;
+    use clarity::vm::{ClarityVersion, ExecutionResult, SymbolicExpression};
+    use clarity_repl::repl::interpreter::BlockInclusion;
+    use clarity_repl::repl::post_conditions::{
+        parse_post_condition_mode, PostConditionCheck, DEFAULT_POST_CONDITION_MODE,
+    };
+    use clarity_repl::repl::session::CallKind;
+    use clarity_repl::repl::{ClarityCodeSource, ClarityContract, ContractDeployer, Epoch};
+
+    let mut execute = || -> Result<ExecutionResult, (BlockInclusion, String)> {
+        let reject = |message: String| (BlockInclusion::Rejected, message);
+        let sender = tx["sender"]
+            .as_str()
+            .ok_or_else(|| reject("Missing sender".into()))?;
+        let principal = PrincipalData::parse_standard_principal(sender)
+            .map_err(|e| reject(format!("Invalid sender: {e}")))?;
+        let conditions = if tx["postConditions"].is_null() && tx["postConditionMode"].is_null() {
+            PostConditionCheck::Unchecked
+        } else {
+            let mode = tx["postConditionMode"]
+                .as_str()
+                .map(parse_post_condition_mode)
+                .transpose()
+                .map_err(reject)?
+                .unwrap_or(DEFAULT_POST_CONDITION_MODE);
+            let hex: Vec<String> = if tx["postConditions"].is_null() {
+                vec![]
+            } else {
+                serde_json::from_value(tx["postConditions"].clone())
+                    .map_err(|e| reject(e.to_string()))?
+            };
+            PostConditionCheck::from_hex(&hex, mode, principal.clone().into()).map_err(reject)?
+        };
+        let epoch = session.interpreter.datastore.get_current_epoch();
+        conditions.validate_for_epoch(epoch).map_err(reject)?;
+        let failure = |error: clarity_repl::repl::interpreter::ExecutionError| {
+            (
+                error.inclusion,
+                error
+                    .diagnostics
+                    .iter()
+                    .map(|d| d.message.to_string())
+                    .collect::<Vec<_>>()
+                    .join("; "),
+            )
+        };
+        match tx["type"].as_str().unwrap_or("") {
+            operation @ ("callPublicFn" | "callPrivateFn") => {
+                let contract = tx["contract"].as_str().unwrap_or("");
+                let method = tx["function"].as_str().unwrap_or("");
+                let contract_id = session
+                    .resolve_contract_id(&session.get_tx_sender(), contract)
+                    .map_err(reject)?;
+                let required_access = if operation == "callPrivateFn" {
+                    ContractInterfaceFunctionAccess::private
+                } else {
+                    ContractInterfaceFunctionAccess::public
+                };
+                let wrong_access = session
+                    .contracts
+                    .get(&contract_id)
+                    .and_then(|contract| contract.analysis.contract_interface.as_ref())
+                    .and_then(|interface| interface.functions.iter().find(|f| f.name == method))
+                    .is_some_and(|function| function.access != required_access);
+                if wrong_access {
+                    let inclusion =
+                        BlockInclusion::from_uncallable_function(contract, method, epoch);
+                    if inclusion.is_included() {
+                        session
+                            .charge_nonce_without_execution(principal.into())
+                            .map_err(reject)?;
+                    }
+                    return Err((
+                        inclusion,
+                        format!("{method} is not a {required_access:?} function"),
+                    ));
+                }
+                let args = tx["args"]
+                    .as_array()
+                    .ok_or_else(|| reject("Missing arguments".into()))?
+                    .iter()
+                    .map(|arg| {
+                        Value::try_deserialize_hex_untyped(arg.as_str().unwrap_or(""))
+                            .map(SymbolicExpression::atom_value)
+                            .map_err(|e| reject(e.to_string()))
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+                dap.prepare_for_call(&contract_id, method);
+                session
+                    .call_contract_fn_with_hooks(
+                        contract,
+                        method,
+                        &args,
+                        sender,
+                        operation == "callPrivateFn",
+                        false,
+                        CallKind::Transaction,
+                        conditions,
+                        Some(vec![dap]),
+                    )
+                    .map_err(failure)
+            }
+            "transferSTX" => {
+                let amount = tx["amount"]
+                    .as_u64()
+                    .ok_or_else(|| reject("Invalid transfer amount".into()))?;
+                let recipient = tx["recipient"].as_str().unwrap_or("");
+                let previous = session.get_tx_sender();
+                session.set_tx_sender(sender);
+                let result = session.stx_transfer(amount, recipient, conditions);
+                session.set_tx_sender(&previous);
+                result.map(|r| r.execution_result).map_err(|diagnostics| {
+                    reject(
+                        diagnostics
+                            .iter()
+                            .map(|d| d.message.to_string())
+                            .collect::<Vec<_>>()
+                            .join("; "),
+                    )
+                })
+            }
+            "deployContract" => {
+                let name = tx["name"].as_str().unwrap_or("");
+                let contract_id =
+                    QualifiedContractIdentifier::parse(&format!("{sender}.{name}"))
+                        .map_err(|error| reject(format!("Invalid contract identifier: {error}")))?;
+                dap.prepare_for_call(&contract_id, tx["content"].as_str().unwrap_or(""));
+                let version = tx["options"]["clarityVersion"].as_u64();
+                let clarity_version = version
+                    .and_then(|v| clarity_repl::repl::clarity_version_from_u8(v as u8))
+                    .unwrap_or_else(|| {
+                        if version.is_some() {
+                            clarinet_defaults::DEFAULT_CLARITY_VERSION
+                        } else {
+                            ClarityVersion::default_for_epoch(epoch)
+                        }
+                    });
+                let contract = ClarityContract {
+                    name: tx["name"].as_str().unwrap_or("").into(),
+                    code_source: ClarityCodeSource::ContractInMemory(
+                        session.remap_user_snippet(tx["content"].as_str().unwrap_or("").into()),
+                    ),
+                    deployer: ContractDeployer::Address(sender.into()),
+                    clarity_version,
+                    epoch: Epoch::Specific(epoch),
+                    skip_analysis: false,
+                };
+                let conditions = if session.interpreter.is_mainnet() {
+                    conditions
+                } else {
+                    conditions.remap_mainnet_boot_principals()
+                };
+                session
+                    .deploy_contract_with_inclusion(
+                        &contract,
+                        false,
+                        None,
+                        conditions,
+                        Some(vec![dap]),
+                    )
+                    .map(|r| r.execution_result)
+                    .map_err(failure)
+            }
+            operation => Err(reject(format!("Unsupported transaction type: {operation}"))),
+        }
+    };
+    match execute() {
+        Ok(execution) => {
+            let value = match &execution.result {
+                EvaluationResult::Snippet(snippet) => Some(&snippet.result),
+                EvaluationResult::Contract(contract) => contract.result.as_ref(),
+            };
+            let failed = matches!(value, Some(Value::Response(response)) if !response.committed);
+            let result = serde_json::json!({
+                "result": value.map(to_raw_value).unwrap_or_else(|| "0x03".into()),
+                "events": serde_json::to_string(&execution.events.iter().map(serialize_event).collect::<Vec<_>>()).unwrap(),
+                "costs": serde_json::to_string(&execution.cost).unwrap(),
+            });
+            if failed {
+                serde_json::json!({"status": "included_failure", "error": value.unwrap().to_string(), "execution": result})
+            } else {
+                serde_json::json!({"status": "success", "execution": result})
+            }
+        }
+        Err((BlockInclusion::Included, error)) => {
+            serde_json::json!({"status": "included_failure", "error": error, "execution": null})
+        }
+        Err((BlockInclusion::Rejected, error)) => {
+            serde_json::json!({"status": "rejected", "error": error})
+        }
+    }
+}
 
 /// Resolve a short contract name or full principal to the snippet form `'principal`.
 fn resolve_contract_principal(dap: &DAPDebugger, contract: &str) -> String {
@@ -732,5 +881,111 @@ fn wrap_response(id: serde_json::Value, inner: serde_json::Value) -> serde_json:
         serde_json::json!({"id": id, "error": msg})
     } else {
         serde_json::json!({"id": id, "result": inner})
+    }
+}
+
+#[cfg(test)]
+mod batch_tests {
+    use clarity::types::StacksEpochId;
+    use clarity::vm::types::Value;
+    use clarity_repl::repl::SessionSettings;
+    use serde_json::json;
+
+    use super::*;
+
+    #[test]
+    fn debug_batch_entries_settle_nonces_roll_back_failures_and_preserve_caches() {
+        let mut session = Session::new(SessionSettings::default());
+        session.update_epoch(clarinet_defaults::DEFAULT_EPOCH);
+        let sender = session.get_tx_sender();
+        let principal = PrincipalData::parse(&sender).unwrap();
+        let recipient = "ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5";
+        session
+            .interpreter
+            .mint_stx_balance(principal.clone(), 100)
+            .unwrap();
+        let mut dap = DAPDebugger::no_op();
+        let source = "(define-data-var count uint u0) (define-public (increment) (ok (var-set count (+ (var-get count) u1)))) (define-public (fail) (begin (var-set count u99) (err u7))) (define-public (panic) (begin (var-set count u99) (ok (/ u1 u0)))) (define-private (private-value) u42)";
+        let txs = [
+            json!({"type": "deployContract", "name": "batch", "content": source, "sender": sender}),
+            json!({"type": "callPublicFn", "contract": "batch", "function": "increment", "args": [], "sender": sender}),
+            json!({"type": "transferSTX", "amount": 0, "recipient": recipient, "sender": sender}),
+            json!({"type": "callPublicFn", "contract": "batch", "function": "fail", "args": [], "sender": sender}),
+            json!({"type": "callPublicFn", "contract": "batch", "function": "panic", "args": [], "sender": sender}),
+            json!({"type": "deployContract", "name": "batch", "content": "(+ u1 true)", "sender": sender}),
+            json!({"type": "callPrivateFn", "contract": "batch", "function": "private-value", "args": [], "sender": sender}),
+            json!({"type": "callPublicFn", "contract": "batch", "function": "private-value", "args": [], "sender": sender}),
+            json!({"type": "transferSTX", "amount": 1, "recipient": recipient, "sender": sender}),
+        ];
+        session.advance_chain_tip(1);
+        let results: Vec<_> = txs
+            .iter()
+            .map(|tx| execute_block_entry(&mut session, &mut dap, tx))
+            .collect();
+        let statuses: Vec<_> = results
+            .iter()
+            .map(|r| r["status"].as_str().unwrap())
+            .collect();
+        assert_eq!(
+            statuses,
+            [
+                "success",
+                "success",
+                "rejected",
+                "included_failure",
+                "included_failure",
+                "rejected",
+                "success",
+                "included_failure",
+                "success"
+            ]
+        );
+        assert_eq!(
+            results[3]["execution"]["result"],
+            to_raw_value(&Value::err_uint(7))
+        );
+        assert_eq!(results[4]["execution"], serde_json::Value::Null);
+        assert_eq!(
+            results[6]["execution"]["result"],
+            to_raw_value(&Value::UInt(42))
+        );
+        assert_eq!(session.get_nonce(&principal).unwrap(), 7);
+        assert_eq!(
+            session.interpreter.get_balance_for_account(&sender, "STX"),
+            99
+        );
+        let id = session.resolve_contract_id(&sender, "batch").unwrap();
+        assert_eq!(
+            session.interpreter.get_data_var(&id, "count").unwrap(),
+            to_raw_value(&Value::UInt(1))
+        );
+        assert!(session.contracts.contains_key(&id));
+    }
+
+    #[test]
+    fn debug_batch_missing_calls_obey_epoch_inclusion() {
+        for (epoch, status, nonce) in [
+            (StacksEpochId::Epoch2_05, "rejected", 0),
+            (StacksEpochId::Epoch21, "included_failure", 1),
+        ] {
+            let mut session = Session::new(SessionSettings::default());
+            session.update_epoch(epoch);
+            let sender = session.get_tx_sender();
+            let mut dap = DAPDebugger::no_op();
+            let result = execute_block_entry(
+                &mut session,
+                &mut dap,
+                &json!({
+                    "type": "callPublicFn", "contract": "missing", "function": "missing", "args": [], "sender": sender,
+                }),
+            );
+            assert_eq!(result["status"], status);
+            assert_eq!(
+                session
+                    .get_nonce(&PrincipalData::parse(&sender).unwrap())
+                    .unwrap(),
+                nonce
+            );
+        }
     }
 }

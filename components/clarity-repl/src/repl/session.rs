@@ -24,9 +24,7 @@ use stacks_common::bounded_format;
 use super::diagnostic::output_diagnostic;
 use super::hooks::logger::LoggerHook;
 use super::hooks::perf::{CostField, PerfHook};
-use super::interpreter::{
-    ContractCallError, ExecutionError, InvalidTransfer, NonceCharge, TransactionTerms,
-};
+use super::interpreter::{ContractCallError, ExecutionError, NonceCharge, TransactionTerms};
 use super::post_conditions::PostConditionCheck;
 use super::{
     ClarityCodeSource, ClarityContract, ClarityInterpreter, ContractDeployer, Epoch,
@@ -745,18 +743,6 @@ impl Session {
         recipient: &str,
         post_conditions: PostConditionCheck,
     ) -> Result<AnnotatedExecutionResult, Vec<Diagnostic>> {
-        self.stx_transfer_with(amount, recipient, post_conditions, InvalidTransfer::Reject)
-    }
-
-    /// [`Session::stx_transfer`], reporting a transfer that `stx-transfer?`
-    /// refuses as `invalid` says.
-    pub fn stx_transfer_with(
-        &mut self,
-        amount: u64,
-        recipient: &str,
-        post_conditions: PostConditionCheck,
-        invalid: InvalidTransfer,
-    ) -> Result<AnnotatedExecutionResult, Vec<Diagnostic>> {
         // stacks-core rejects TokenTransfer payloads with post-conditions
         // before execution. Keep simnet aligned with mainnet/testnet here.
         if post_conditions.has_conditions() {
@@ -790,7 +776,7 @@ impl Session {
             }]
         })?;
         self.interpreter
-            .stx_transfer(amount, recipient, self.hooks.enabled(), invalid)
+            .stx_transfer(amount, recipient, self.hooks.enabled())
             .map(|execution_result| AnnotatedExecutionResult {
                 execution_result,
                 lint_diagnostics: vec![],
@@ -874,6 +860,19 @@ impl Session {
         ast: Option<&ContractAST>,
         post_conditions: PostConditionCheck,
     ) -> Result<AnnotatedExecutionResult, Vec<Diagnostic>> {
+        self.deploy_contract_with_inclusion(contract, cost_track, ast, post_conditions, None)
+            .map_err(Vec::from)
+    }
+
+    /// Deploy while preserving the VM classification of a failed transaction.
+    pub fn deploy_contract_with_inclusion(
+        &mut self,
+        contract: &ClarityContract,
+        cost_track: bool,
+        ast: Option<&ContractAST>,
+        post_conditions: PostConditionCheck,
+        eval_hooks: Option<Vec<&mut dyn EvalHook>>,
+    ) -> Result<AnnotatedExecutionResult, ExecutionError> {
         let current_epoch = self.interpreter.datastore.get_current_epoch();
         if contract.epoch.resolve() != current_epoch {
             let diagnostic = Diagnostic {
@@ -886,7 +885,7 @@ impl Session {
                 spans: vec![],
                 suggestion: None,
             };
-            return Err(vec![diagnostic]);
+            return Err(ExecutionError::rejected(vec![diagnostic]));
         }
 
         if contract.clarity_version > ClarityVersion::default_for_epoch(contract.epoch.resolve()) {
@@ -900,7 +899,7 @@ impl Session {
                 spans: vec![],
                 suggestion: None,
             };
-            return Err(vec![diagnostic]);
+            return Err(ExecutionError::rejected(vec![diagnostic]));
         }
 
         let contract_id =
@@ -909,7 +908,11 @@ impl Session {
         let initial_tx_sender = self.get_tx_sender();
         self.set_tx_sender(&contract_id.issuer.to_string());
 
-        let hooks = self.hooks.enabled();
+        let mut hooks = self.hooks.enabled();
+        let mut eval_hooks = eval_hooks.unwrap_or_default();
+        for hook in &mut eval_hooks {
+            hooks.push(&mut **hook);
+        }
 
         // Boot contracts bypass this transaction path because they are genesis
         // state and consume no nonce.
@@ -922,14 +925,12 @@ impl Session {
                 .run_with_terms(contract, ast, cost_track, Some(hooks), &terms);
         self.set_tx_sender(&initial_tx_sender);
 
-        result
-            .inspect(|result| {
-                if let EvaluationResult::Contract(contract_result) = &result.result {
-                    self.contracts
-                        .insert(contract_id.clone(), contract_result.contract.clone());
-                }
-            })
-            .map_err(Vec::from)
+        result.inspect(|result| {
+            if let EvaluationResult::Contract(contract_result) = &result.result {
+                self.contracts
+                    .insert(contract_id.clone(), contract_result.contract.clone());
+            }
+        })
     }
 
     /// Resolve a user-supplied contract reference to the contract this session
@@ -1002,6 +1003,33 @@ impl Session {
         kind: CallKind,
         post_conditions: PostConditionCheck,
     ) -> Result<ExecutionResult, ExecutionError> {
+        self.call_contract_fn_with_hooks(
+            contract,
+            method,
+            args,
+            sender,
+            allow_private,
+            track_costs,
+            kind,
+            post_conditions,
+            None,
+        )
+    }
+
+    /// Call with additional hooks, preserving transaction settlement and tracing.
+    #[allow(clippy::too_many_arguments)]
+    pub fn call_contract_fn_with_hooks(
+        &mut self,
+        contract: &str,
+        method: &str,
+        args: &[SymbolicExpression],
+        sender: &str,
+        allow_private: bool,
+        track_costs: bool,
+        kind: CallKind,
+        post_conditions: PostConditionCheck,
+        eval_hooks: Option<Vec<&mut dyn EvalHook>>,
+    ) -> Result<ExecutionResult, ExecutionError> {
         let initial_tx_sender = self.get_tx_sender();
 
         // The redirect below moves boot asset movement onto the testnet twin,
@@ -1030,6 +1058,10 @@ impl Session {
         let mut tracer_hook = TracerHook::new();
         let mut hooks: Vec<&mut dyn EvalHook> = vec![&mut tracer_hook];
         hooks.extend(self.hooks.enabled());
+        let mut eval_hooks = eval_hooks.unwrap_or_default();
+        for hook in &mut eval_hooks {
+            hooks.push(&mut **hook);
+        }
 
         // Taken from the interpreter rather than re-parsed, so the principal
         // charged is exactly the one the call runs as.
@@ -2597,42 +2629,6 @@ mod tests {
             panic!()
         };
         assert!(matches!(result.result, Value::Response(ref response) if !response.committed));
-    }
-
-    #[test]
-    fn an_invalid_transfer_can_return_its_error_response_and_consume_a_nonce() {
-        let mut session = Session::new(SessionSettings::default());
-        let sender = session.get_tx_sender();
-        let addr = principal(&sender);
-        let recipient = "ST2CY5V39NHDPWSXMW9QDT3HC3GD6Q6XX4CFRK9AG";
-        session
-            .interpreter
-            .mint_stx_balance(addr.clone(), 1000)
-            .unwrap();
-
-        // `stx-transfer?` checks the amount before the recipient.
-        let cases = [(1001, recipient, 1), (100, &sender, 2), (0, &sender, 3)];
-        for (nonce, (amount, to, code)) in (1..).zip(cases) {
-            let execution = session
-                .stx_transfer_with(
-                    amount,
-                    to,
-                    PostConditionCheck::Unchecked,
-                    InvalidTransfer::ErrorResponse,
-                )
-                .unwrap()
-                .execution_result;
-            let EvaluationResult::Snippet(result) = execution.result else {
-                panic!("expected a snippet result");
-            };
-            assert_eq!(result.result, Value::err_uint(code));
-            assert!(execution.events.is_empty());
-            assert_eq!(session.get_nonce(&addr).unwrap(), nonce);
-        }
-        assert_eq!(
-            session.interpreter.get_balance_for_account(&sender, "STX"),
-            1000
-        );
     }
 
     #[test]

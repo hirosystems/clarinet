@@ -103,20 +103,6 @@ impl From<bool> for BlockInclusion {
     }
 }
 
-/// How [`ClarityInterpreter::stx_transfer`] reports a transfer that
-/// `stx-transfer?` refuses: a zero amount, a self-transfer or an insufficient
-/// unlocked balance.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub enum InvalidTransfer {
-    /// Reject it without consuming a nonce, as a Stacks node does.
-    #[default]
-    Reject,
-    /// Consume the nonce and return the `stx-transfer?` error response,
-    /// changing nothing else. `mineBlock` has always recorded an invalid
-    /// transfer this way.
-    ErrorResponse,
-}
-
 /// The nonce charge to include in an execution's database transaction.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub enum NonceCharge {
@@ -1209,27 +1195,17 @@ impl ClarityInterpreter {
         amount: u64,
         recipient: PrincipalData,
         hooks: Vec<&mut dyn EvalHook>,
-        invalid: InvalidTransfer,
     ) -> Result<ExecutionResult, ExecutionError> {
-        // `stx-transfer?` error codes.
-        const NOT_ENOUGH_BALANCE: u128 = 1;
-        const SENDER_IS_RECIPIENT: u128 = 2;
-        const NON_POSITIVE_AMOUNT: u128 = 3;
-
         let sender: PrincipalData = self.tx_sender.clone().into();
-        if invalid == InvalidTransfer::Reject {
-            if recipient == sender {
-                return Err(ExecutionError::rejected(vec![runtime_diagnostic(
-                    "Invalid TokenTransfer: address tried to send to itself",
-                )]));
-            }
-            // stacks-node rejects this too, but upstream reports every failed
-            // transfer as `InsufficientBalance`; name the real reason.
-            if amount == 0 {
-                return Err(ExecutionError::rejected(vec![runtime_diagnostic(
-                    "Invalid TokenTransfer: amount must be positive",
-                )]));
-            }
+        if recipient == sender {
+            return Err(ExecutionError::rejected(vec![runtime_diagnostic(
+                "Invalid TokenTransfer: address tried to send to itself",
+            )]));
+        }
+        if amount == 0 {
+            return Err(ExecutionError::rejected(vec![runtime_diagnostic(
+                "Invalid TokenTransfer: amount must be positive",
+            )]));
         }
         let terms = TransactionTerms {
             charge: NonceCharge::Sender(sender.clone()),
@@ -1243,21 +1219,6 @@ impl ClarityInterpreter {
             hooks,
             &terms,
             |connection, _| {
-                let error_response = |code| {
-                    Ok((
-                        EvaluationResult::Snippet(SnippetEvaluationResult {
-                            result: Value::err_uint(code),
-                        }),
-                        vec![],
-                    ))
-                };
-                // `stx-transfer?` checks the amount before the recipient.
-                if amount == 0 {
-                    return error_response(NON_POSITIVE_AMOUNT);
-                }
-                if recipient == sender {
-                    return error_response(SENDER_IS_RECIPIENT);
-                }
                 let (value, _, events) = match connection.run_stx_transfer(
                     &sender,
                     &recipient,
@@ -1274,9 +1235,6 @@ impl ClarityInterpreter {
                             ClarityError::Interpreter(VmExecutionError::Internal(
                                 VmInternalError::InsufficientBalance,
                             )) => {
-                                if invalid == InvalidTransfer::ErrorResponse {
-                                    return error_response(NOT_ENOUGH_BALANCE);
-                                }
                                 format!("insufficient unlocked balance to send {amount} uSTX")
                             }
                             error => error.to_string(),
@@ -2163,63 +2121,38 @@ mod tests {
     }
 
     #[test]
-    fn transfer_completion_hooks_observe_the_final_error_response_and_settlement() {
+    fn transfer_completion_hooks_observe_rejection_and_settlement() {
         #[derive(Default)]
-        struct Hook(Vec<Result<Value, String>>);
+        struct Hook(Vec<bool>);
         impl EvalHook for Hook {
             fn did_complete(&mut self, result: Result<&mut ExecutionResult, String>) {
-                self.0.push(result.map(|execution| {
-                    let EvaluationResult::Snippet(snippet) = &execution.result else {
-                        panic!("expected a transfer response");
-                    };
-                    snippet.result.clone()
-                }));
+                self.0.push(result.is_ok());
             }
         }
-
         for nonce in [0, u64::MAX] {
-            for (amount, to_self, expected) in [
-                (101, false, Value::err_uint(1)),
-                (1, true, Value::err_uint(2)),
-                (0, false, Value::err_uint(3)),
-                (0, true, Value::err_uint(3)),
-                (1, false, Value::okay_true()),
-            ] {
+            for amount in [1, 101] {
                 let mut interpreter = get_interpreter(None);
                 let sender: PrincipalData = interpreter.get_tx_sender().into();
                 let recipient = PrincipalData::parse("ST000000000000000000002AMW42H").unwrap();
                 interpreter.mint_stx_balance(sender.clone(), 100).unwrap();
                 interpreter.force_nonce(&sender, nonce);
                 let mut hook = Hook::default();
-                let result = interpreter.stx_transfer(
-                    amount,
-                    if to_self {
-                        sender.clone()
-                    } else {
-                        recipient.clone()
-                    },
-                    vec![&mut hook],
-                    InvalidTransfer::ErrorResponse,
-                );
-
-                assert_eq!(hook.0.len(), 1, "completion must be reported exactly once");
-                let transferred = nonce == 0 && expected == Value::okay_true();
-                if nonce == u64::MAX {
-                    let failure = result.expect_err("nonce overflow must reject the transfer");
-                    assert_eq!(failure.inclusion, BlockInclusion::Rejected);
-                    assert!(hook.0[0].as_ref().unwrap_err().contains("nonce"));
-                } else {
+                let result = interpreter.stx_transfer(amount, recipient.clone(), vec![&mut hook]);
+                let transferred = nonce == 0 && amount == 1;
+                assert_eq!(hook.0, vec![transferred]);
+                if transferred {
                     let execution = result.unwrap();
                     let EvaluationResult::Snippet(snippet) = execution.result else {
-                        panic!("expected a transfer response");
+                        panic!()
                     };
-                    assert_eq!(snippet.result, expected);
-                    assert_eq!(hook.0, vec![Ok(expected)]);
-                    assert_eq!(execution.events.len(), usize::from(transferred));
+                    assert_eq!(snippet.result, Value::okay_true());
+                    assert_eq!(execution.events.len(), 1);
+                } else {
+                    assert_eq!(result.unwrap_err().inclusion, BlockInclusion::Rejected);
                 }
                 assert_eq!(
                     interpreter.get_nonce(&sender).unwrap(),
-                    nonce.saturating_add(1)
+                    if transferred { 1 } else { nonce }
                 );
                 assert_eq!(
                     interpreter.get_balance_for_account(&sender.to_string(), "STX"),

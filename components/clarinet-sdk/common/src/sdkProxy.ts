@@ -2,6 +2,8 @@ import { Cl, serializeCVBytes } from "@stacks/transactions";
 
 import {
   parseCosts,
+  parseBlockTransactionResult,
+  type SerializedBlockTransactionResult,
   parseEvents,
   serializePostConditions,
   type BroadcastTransaction,
@@ -33,7 +35,7 @@ type ProxySdk = {
   execute(snippet: string): WasmTransactionRes;
   getDataVar(contract: string, varName: string): string;
   getMapEntry(contract: string, mapName: string, mapKey: Uint8Array): string;
-  mineBlock(txs: unknown[]): WasmTransactionRes[];
+  mineBlock(txs: unknown[]): SerializedBlockTransactionResult[];
   runSnippet(snippet: string): string;
   transferSTX(args: unknown): WasmTransactionRes;
 };
@@ -241,7 +243,7 @@ export function createSessionProxy<S extends ProxySdk, ContractOptions>(
             }
             return tx;
           });
-          return sdk.mineBlock(serializedTxs).map(parseTxResponse);
+          return sdk.mineBlock(serializedTxs).map(parseBlockTransactionResult);
         };
         return mineBlock;
       }

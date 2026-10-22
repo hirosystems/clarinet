@@ -133,7 +133,7 @@ export type DeployContract = (
 
 /** Execute a native STX transfer. Invalid transfers (self-transfers, zero
  * amounts and insufficient funds) throw without consuming a nonce. In
- * `mineBlock`, they return the `stx-transfer?` error response and consume a
+ * `mineBlock`, they return a rejected outcome without consuming a
  * nonce instead. */
 export type TransferSTX = (
   amount: number | bigint,
@@ -280,7 +280,42 @@ export function parseCosts(costs: string): ClarityCosts | null {
   }
 }
 
-export type MineBlock = (txs: Array<Tx>) => ParsedTransactionResult[];
+/** One outcome per entry; rejected entries do not consume a nonce. */
+export type BlockTransactionResult =
+  | { status: "success"; execution: ParsedTransactionResult }
+  | { status: "included_failure"; error: string; execution: ParsedTransactionResult | null }
+  | { status: "rejected"; error: string };
+
+export type MineBlock = (txs: Array<Tx>) => BlockTransactionResult[];
+
+export type SerializedBlockTransactionResult =
+  | {
+      status: "success";
+      execution: { result: string; events: string; costs: string; performance?: string };
+    }
+  | {
+      status: "included_failure";
+      error: string;
+      execution: { result: string; events: string; costs: string; performance?: string } | null;
+    }
+  | { status: "rejected"; error: string };
+
+export function parseBlockTransactionResult(
+  response: SerializedBlockTransactionResult,
+): BlockTransactionResult {
+  if (response.status === "rejected") return response;
+  const execution =
+    response.execution === null
+      ? null
+      : {
+          result: Cl.deserialize(response.execution.result),
+          events: parseEvents(response.execution.events),
+          costs: parseCosts(response.execution.costs),
+          performance: response.execution.performance ?? undefined,
+        };
+  if (response.status === "success") return { status: "success", execution: execution! };
+  return { status: "included_failure", error: response.error, execution };
+}
 export type Execute = (snippet: string) => ParsedTransactionResult;
 export type GetDataVar = (contract: string, dataVar: string) => ClarityValue;
 export type GetMapEntry = (contract: string, mapName: string, mapKey: ClarityValue) => ClarityValue;
