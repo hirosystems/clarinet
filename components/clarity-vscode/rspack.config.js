@@ -68,7 +68,14 @@ const clientBrowserConfig = {
       __DEV_MODE__: JSON.stringify(false),
     }),
   ],
-  module: { rules: [swcLoader] },
+  module: {
+    rules: [
+      swcLoader,
+      // mocha's package is "type": "module", but mocha.js is a UMD bundle. Parsed as
+      // ESM, its `module.exports = ...` overwrites the test suite's own exports.
+      { test: /[\\/]mocha[\\/]mocha\.js$/, type: "javascript/dynamic" },
+    ],
+  },
   externals: { vscode: "commonjs vscode" },
 };
 
