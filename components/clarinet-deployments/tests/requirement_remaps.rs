@@ -14,7 +14,7 @@ use clarinet_utils::DEFAULT_DEPLOYER_MNEMONIC as TEST_MNEMONIC;
 use clarity_repl::repl::boot::SBTC_BOOT_CONTRACTS;
 use clarity_repl::repl::ClarityCodeSource;
 use clarity_repl::utils::Environment;
-use indoc::formatdoc;
+use indoc::{formatdoc, indoc};
 use mockito::{Server, ServerGuard};
 use tempfile::TempDir;
 
@@ -46,7 +46,12 @@ impl Project {
         let contracts = match app_source {
             Some(source) => {
                 fs::write(root.join("contracts/app.clar"), source).unwrap();
-                "[contracts.app]\npath = \"contracts/app.clar\"\nclarity_version = 4\nepoch = 3.3\n"
+                indoc! {r#"
+                    [contracts.app]
+                    path = "contracts/app.clar"
+                    clarity_version = 4
+                    epoch = 3.3
+                "#}
             }
             None => "",
         };
@@ -192,7 +197,11 @@ fn sbtc_remaps(names: &[&str]) -> BTreeMap<String, String> {
 #[tokio::test]
 async fn testnet_override_replaces_the_requirement_publish() {
     let project = Project::new(
-        &format!("\n[[project.requirements]]\ncontract_id = \"{NFT_TRAIT}\"\ntestnet = \"{TESTNET_NFT_TRAIT}\"\n"),
+        &formatdoc! {r#"
+            [[project.requirements]]
+            contract_id = "{NFT_TRAIT}"
+            testnet = "{TESTNET_NFT_TRAIT}"
+        "#},
         Some(&calls(&[NFT_TRAIT])),
     );
     let server = mock_contracts(&[NFT_TRAIT, TESTNET_NFT_TRAIT]).await;
@@ -209,7 +218,11 @@ async fn testnet_override_replaces_the_requirement_publish() {
 #[tokio::test]
 async fn contract_remaps_round_trip_through_the_plan_file() {
     let project = Project::new(
-        &format!("\n[[project.requirements]]\ncontract_id = \"{NFT_TRAIT}\"\ntestnet = \"{TESTNET_NFT_TRAIT}\"\n"),
+        &formatdoc! {r#"
+            [[project.requirements]]
+            contract_id = "{NFT_TRAIT}"
+            testnet = "{TESTNET_NFT_TRAIT}"
+        "#},
         Some(&calls(&[NFT_TRAIT])),
     );
     let server = mock_contracts(&[NFT_TRAIT, TESTNET_NFT_TRAIT]).await;
@@ -218,9 +231,10 @@ async fn contract_remaps_round_trip_through_the_plan_file() {
     let content = deployment.to_file_content(project.dir.path()).unwrap();
     let content = String::from_utf8(content).unwrap();
     assert!(
-        content.contains(&format!(
-            "contract-remaps:\n  {NFT_TRAIT}: {TESTNET_NFT_TRAIT}\n"
-        )),
+        content.contains(&formatdoc! {"
+            contract-remaps:
+              {NFT_TRAIT}: {TESTNET_NFT_TRAIT}
+        "}),
         "{content}"
     );
 
@@ -238,7 +252,10 @@ async fn contract_remaps_round_trip_through_the_plan_file() {
 #[tokio::test]
 async fn requirement_without_override_is_still_redeployed() {
     let project = Project::new(
-        &format!("\n[[project.requirements]]\ncontract_id = \"{NFT_TRAIT}\"\n"),
+        &formatdoc! {r#"
+            [[project.requirements]]
+            contract_id = "{NFT_TRAIT}"
+        "#},
         None,
     );
     let server = mock_contracts(&[NFT_TRAIT]).await;
@@ -260,7 +277,10 @@ async fn requirement_without_override_is_still_redeployed() {
 async fn sbtc_requirement_points_at_the_sbtc_testnet_deployment() {
     let sbtc_deposit = format!("{SBTC_MAINNET_DEPLOYER}.sbtc-deposit");
     let project = Project::new(
-        &format!("\n[[project.requirements]]\ncontract_id = \"{sbtc_deposit}\"\n"),
+        &formatdoc! {r#"
+            [[project.requirements]]
+            contract_id = "{sbtc_deposit}"
+        "#},
         Some(&calls(&[&sbtc_deposit])),
     );
     let server = mock_contracts(&[]).await;
@@ -306,9 +326,14 @@ async fn remaps_referenced_by_a_redeployed_requirement_are_recorded() {
     let wrapper = "SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.wrapper";
     let canonical = "ST1NXBK3K5YYMD6FD41MVNP3JS1GABZ8TRVX023PT.canonical-trait";
     let project = Project::new(
-        &format!(
-            "\n[[project.requirements]]\ncontract_id = \"{wrapper}\"\n\n[[project.requirements]]\ncontract_id = \"{NFT_TRAIT}\"\ntestnet = \"{canonical}\"\n"
-        ),
+        &formatdoc! {r#"
+            [[project.requirements]]
+            contract_id = "{wrapper}"
+
+            [[project.requirements]]
+            contract_id = "{NFT_TRAIT}"
+            testnet = "{canonical}"
+        "#},
         None,
     );
     let wrapper_source = calls(&[NFT_TRAIT]);
@@ -336,9 +361,14 @@ async fn relative_references_select_their_remap() {
     let base = "SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.base";
     let canonical = "ST1NXBK3K5YYMD6FD41MVNP3JS1GABZ8TRVX023PT.canonical-base";
     let project = Project::new(
-        &format!(
-            "\n[[project.requirements]]\ncontract_id = \"{wrapper}\"\n\n[[project.requirements]]\ncontract_id = \"{base}\"\ntestnet = \"{canonical}\"\n"
-        ),
+        &formatdoc! {r#"
+            [[project.requirements]]
+            contract_id = "{wrapper}"
+
+            [[project.requirements]]
+            contract_id = "{base}"
+            testnet = "{canonical}"
+        "#},
         None,
     );
     let wrapper_source = "(define-read-only (call-base) (contract-call? .base get-one))";
@@ -375,7 +405,11 @@ async fn mock_router_and_pool() -> ServerGuard {
 #[tokio::test]
 async fn dependencies_of_a_remapped_requirement_are_not_redeployed() {
     let project = Project::new(
-        &format!("\n[[project.requirements]]\ncontract_id = \"{ROUTER}\"\ntestnet = \"{TESTNET_ROUTER}\"\n"),
+        &formatdoc! {r#"
+            [[project.requirements]]
+            contract_id = "{ROUTER}"
+            testnet = "{TESTNET_ROUTER}"
+        "#},
         Some(&calls(&[ROUTER])),
     );
     let server = mock_router_and_pool().await;
@@ -388,7 +422,11 @@ async fn dependencies_of_a_remapped_requirement_are_not_redeployed() {
 #[tokio::test]
 async fn a_dependency_also_used_directly_is_still_redeployed() {
     let project = Project::new(
-        &format!("\n[[project.requirements]]\ncontract_id = \"{ROUTER}\"\ntestnet = \"{TESTNET_ROUTER}\"\n"),
+        &formatdoc! {r#"
+            [[project.requirements]]
+            contract_id = "{ROUTER}"
+            testnet = "{TESTNET_ROUTER}"
+        "#},
         Some(&calls(&[ROUTER, POOL])),
     );
     let server = mock_router_and_pool().await;
@@ -434,9 +472,13 @@ async fn mock_sbtc() -> ServerGuard {
 async fn partially_remapped_sbtc_generates_a_plan() {
     let sbtc_deposit = format!("{SBTC_MAINNET_DEPLOYER}.sbtc-deposit");
     let project = Project::new(
-        &format!(
-            "default_contract_remaps = false\n\n[[project.requirements]]\ncontract_id = \"{sbtc_deposit}\"\ntestnet = \"{SBTC_TESTNET_DEPLOYER}.sbtc-deposit\"\n"
-        ),
+        &formatdoc! {r#"
+            default_contract_remaps = false
+
+            [[project.requirements]]
+            contract_id = "{sbtc_deposit}"
+            testnet = "{SBTC_TESTNET_DEPLOYER}.sbtc-deposit"
+        "#},
         Some(&format!(
             "(define-read-only (header) (contract-call? '{sbtc_deposit} get-burn-header u1))"
         )),
@@ -453,9 +495,13 @@ async fn a_redeployed_sbtc_contract_keeps_its_dependencies() {
     let sbtc_deposit = format!("{SBTC_MAINNET_DEPLOYER}.sbtc-deposit");
     let sbtc_token = format!("{SBTC_MAINNET_DEPLOYER}.sbtc-token");
     let project = Project::new(
-        &format!(
-            "default_contract_remaps = false\n\n[[project.requirements]]\ncontract_id = \"{sbtc_deposit}\"\ntestnet = \"{SBTC_TESTNET_DEPLOYER}.sbtc-deposit\"\n"
-        ),
+        &formatdoc! {r#"
+            default_contract_remaps = false
+
+            [[project.requirements]]
+            contract_id = "{sbtc_deposit}"
+            testnet = "{SBTC_TESTNET_DEPLOYER}.sbtc-deposit"
+        "#},
         Some(&format!(
             "(define-read-only (name) (contract-call? '{sbtc_token} get-name))"
         )),
@@ -473,7 +519,10 @@ async fn a_redeployed_sbtc_contract_keeps_its_dependencies() {
 #[tokio::test]
 async fn testnet_requirement_is_used_in_place() {
     let project = Project::new(
-        &format!("\n[[project.requirements]]\ncontract_id = \"{TESTNET_NFT_TRAIT}\"\n"),
+        &formatdoc! {r#"
+            [[project.requirements]]
+            contract_id = "{TESTNET_NFT_TRAIT}"
+        "#},
         Some(&calls(&[TESTNET_NFT_TRAIT])),
     );
     // An epoch 3.2 height on testnet, before the project contract's epoch.
@@ -492,9 +541,12 @@ async fn testnet_requirement_is_used_in_place() {
 async fn opting_out_of_default_remaps_redeploys_sbtc() {
     let sbtc_deposit = format!("{SBTC_MAINNET_DEPLOYER}.sbtc-deposit");
     let project = Project::new(
-        &format!(
-            "default_contract_remaps = false\n\n[[project.requirements]]\ncontract_id = \"{sbtc_deposit}\"\n"
-        ),
+        &formatdoc! {r#"
+            default_contract_remaps = false
+
+            [[project.requirements]]
+            contract_id = "{sbtc_deposit}"
+        "#},
         None,
     );
     let server = mock_sbtc().await;
@@ -518,9 +570,11 @@ async fn project_override_beats_the_default() {
     let sbtc_token = format!("{SBTC_MAINNET_DEPLOYER}.sbtc-token");
     let mock_token = "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.sbtc-token-mock";
     let project = Project::new(
-        &format!(
-            "\n[[project.requirements]]\ncontract_id = \"{sbtc_token}\"\ntestnet = \"{mock_token}\"\n"
-        ),
+        &formatdoc! {r#"
+            [[project.requirements]]
+            contract_id = "{sbtc_token}"
+            testnet = "{mock_token}"
+        "#},
         Some(&calls(&[
             &sbtc_token,
             &format!("{SBTC_MAINNET_DEPLOYER}.sbtc-registry"),
@@ -546,7 +600,11 @@ async fn project_override_beats_the_default() {
 async fn mainnet_override_is_recorded() {
     let mainnet_trait = "SP3K8BC0PPEVCV7NZ6QSRWPQ2JE9E5B6N3PA0KBR9.nft-trait";
     let project = Project::new(
-        &format!("\n[[project.requirements]]\ncontract_id = \"{NFT_TRAIT}\"\nmainnet = \"{mainnet_trait}\"\n"),
+        &formatdoc! {r#"
+            [[project.requirements]]
+            contract_id = "{NFT_TRAIT}"
+            mainnet = "{mainnet_trait}"
+        "#},
         Some(&calls(&[NFT_TRAIT])),
     );
     let server = mock_contracts(&[NFT_TRAIT, mainnet_trait]).await;

@@ -651,6 +651,7 @@ fn get_epoch_and_clarity_version(
 
 #[cfg(test)]
 mod tests {
+    use indoc::formatdoc;
     use toml::toml;
 
     use super::*;
@@ -950,9 +951,14 @@ mod tests {
     #[test]
     fn test_requirement_override_errors() {
         let manifest_with = |key_value: &str| {
-            parse_manifest(&format!(
-                "[project]\nname = \"p\"\n\n[[project.requirements]]\ncontract_id = \"SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.nft-trait\"\n{key_value}\n"
-            ))
+            parse_manifest(&formatdoc! {r#"
+                [project]
+                name = "p"
+
+                [[project.requirements]]
+                contract_id = "SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.nft-trait"
+                {key_value}
+            "#})
         };
 
         let err = manifest_with(r#"testnet = "not-a-contract""#).unwrap_err();

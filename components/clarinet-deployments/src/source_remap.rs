@@ -272,10 +272,12 @@ mod tests {
             QualifiedContractIdentifier::parse(NFT_TRAIT).unwrap(),
         )]);
         let source = |base: &str| {
-            format!(
-                "(impl-trait {base}.sample)\n(contract-call? {base} f)\n\
-                 (define-constant c .base-v2) ;; .base\n(define-constant s \".base\")"
-            )
+            formatdoc! {r#"
+                (impl-trait {base}.sample)
+                (contract-call? {base} f)
+                (define-constant c .base-v2) ;; .base
+                (define-constant s ".base")
+            "#}
         };
         assert_eq!(
             qualify_remapped_relative_references(&source(".base"), &original, &remaps),
