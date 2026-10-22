@@ -2,7 +2,7 @@ use std::path::PathBuf;
 use std::sync::mpsc::channel;
 
 use clap::Parser;
-use clarinet_deployments::types::from_yaml;
+use clarinet_deployments::yaml::from_yaml;
 use clarinet_files::{paths, NetworkManifest, ProjectManifest};
 use hiro_system_kit::slog;
 use stacks_network::{do_run_chain_coordinator, Context, DevnetOrchestrator};
