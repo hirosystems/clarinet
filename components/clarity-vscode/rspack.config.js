@@ -71,8 +71,7 @@ const clientBrowserConfig = {
   module: {
     rules: [
       swcLoader,
-      // mocha's package is "type": "module", but mocha.js is a UMD bundle. Parsed as
-      // ESM, its `module.exports = ...` overwrites the test suite's own exports.
+      // mocha.js is UMD in a "type": "module" package; parse it as CommonJS
       { test: /[\\/]mocha[\\/]mocha\.js$/, type: "javascript/dynamic" },
     ],
   },
