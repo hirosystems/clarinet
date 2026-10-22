@@ -1001,6 +1001,9 @@ pub async fn generate_default_deployment_with_cache(
                 continue;
             }
 
+            let is_sbtc = contract_id.issuer.to_string() == SBTC_MAINNET_ADDRESS;
+            let is_remapped = remaps.contains(&contract_id);
+
             // On testnet, an sBTC requirement that is not remapped is published
             // as a real transaction, so it has to be retrieved like any other
             // requirement: the boot entries seeded into `requirements_data`
@@ -1008,19 +1011,14 @@ pub async fn generate_default_deployment_with_cache(
             // anyway, because dependency detection finds no dependencies for a
             // contract that is also preloaded.
             let cached_requirement = requirements_data.remove(&contract_id).filter(|_| {
-                !(matches!(network, StacksNetwork::Testnet)
-                    && contract_id.issuer.to_string() == SBTC_MAINNET_ADDRESS
-                    && !remaps.contains(&contract_id))
+                !(matches!(network, StacksNetwork::Testnet) && is_sbtc && !is_remapped)
             });
 
             // A remapped sBTC requirement resolves from its seeded AST; keep
             // the seeded source too, to compare against the destination.
             // Record its epoch, because an sBTC contract that is not remapped
             // is fetched with its real epoch and can depend on this one.
-            if cached_requirement.is_some()
-                && remaps.contains(&contract_id)
-                && contract_id.issuer.to_string() == SBTC_MAINNET_ADDRESS
-            {
+            if cached_requirement.is_some() && is_sbtc && is_remapped {
                 if let Some(source) = sbtc_sources.get(contract_id.name.as_str()) {
                     remapped_sources.insert(contract_id.clone(), source.clone());
                 }
@@ -1069,7 +1067,7 @@ pub async fn generate_default_deployment_with_cache(
 
                             emulated_contracts_publish.insert(contract_id.clone(), data);
                         }
-                    } else if remaps.contains(&contract_id) {
+                    } else if is_remapped {
                         // Already on this network: published sources are
                         // rewritten to reference it instead.
                         remapped_sources.insert(contract_id.clone(), source.clone());

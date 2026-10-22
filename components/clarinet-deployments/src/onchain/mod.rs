@@ -71,11 +71,6 @@ fn initial_contract_ids_to_remap(deployment: &DeploymentSpecification) -> Contra
     }
 }
 
-/// `contracts_ids_to_remap` as owned pairs for [`remap_contract_ids`].
-fn owned_pairs(remap: &ContractIdsToRemap) -> impl Iterator<Item = (String, String)> + '_ {
-    remap.iter().map(|(src, dst)| (src.clone(), dst.clone()))
-}
-
 /// Rewrite the contract references a non-mainnet deployment needs.
 ///
 /// Explicit contract mappings take precedence over the boot-principal fallback.
@@ -100,7 +95,11 @@ fn requirement_publish_source(
     });
     remap_deployment_source(
         qualified.as_deref().unwrap_or(&tx.source),
-        remap_principal_pairs(&tx.remap_principals).chain(owned_pairs(contracts_ids_to_remap)),
+        remap_principal_pairs(&tx.remap_principals).chain(
+            contracts_ids_to_remap
+                .iter()
+                .map(|(from, to)| (from.clone(), to.clone())),
+        ),
     )
 }
 
@@ -1115,7 +1114,7 @@ mod tests {
 
         let source = format!("(contract-call? '{source_id} get-name)");
         assert_eq!(
-            remap_contract_ids(&source, owned_pairs(&contract_ids)),
+            remap_contract_ids(&source, contract_ids.iter()),
             format!("(contract-call? '{deployer_id} get-name)"),
             "devnet must rewrite sBTC references to the locally deployed contract"
         );
@@ -1130,14 +1129,14 @@ mod tests {
 
         let source = format!("(contract-call? '{source_id} get-name)");
         assert_eq!(
-            remap_contract_ids(&source, owned_pairs(&contract_ids)),
+            remap_contract_ids(&source, contract_ids.iter()),
             format!("(contract-call? '{deployer_id} get-name)"),
         );
     }
 
     fn deployment_with_remaps(
         network: StacksNetwork,
-        contract_remaps: Option<crate::types::ContractRemaps>,
+        contract_remaps: Option<ContractRemaps>,
     ) -> DeploymentSpecification {
         DeploymentSpecification {
             id: 0,

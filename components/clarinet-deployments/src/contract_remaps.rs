@@ -69,13 +69,13 @@ fn testnet_requirements_in_place(
         .requirements
         .iter()
         .flatten()
-        .map(|requirement| parse_contract_id(&requirement.contract_id))
-        .filter(|contract_id| {
-            contract_id
-                .as_ref()
-                .map_or(true, |contract_id| !contract_id.issuer.is_mainnet())
+        .filter_map(|requirement| {
+            parse_contract_id(&requirement.contract_id)
+                .map(|contract_id| {
+                    (!contract_id.issuer.is_mainnet()).then(|| (contract_id.clone(), contract_id))
+                })
+                .transpose()
         })
-        .map(|contract_id| contract_id.map(|contract_id| (contract_id.clone(), contract_id)))
         .collect()
 }
 

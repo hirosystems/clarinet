@@ -1204,25 +1204,22 @@ impl FromIterator<(QualifiedContractIdentifier, QualifiedContractIdentifier)> fo
     }
 }
 
-/// Parse the `contract-remaps` section of a plan file.
-fn parse_contract_remaps(
-    specs: Option<&BTreeMap<String, String>>,
-) -> Result<Option<ContractRemaps>, String> {
-    specs
-        .map(|specs| {
-            let mut remaps = ContractRemaps::default();
-            for (source, destination) in specs {
-                remaps.insert_str(source, destination)?;
-            }
-            Ok(remaps)
-        })
-        .transpose()
+/// The `contract-remaps` section of a plan file.
+impl TryFrom<&BTreeMap<String, String>> for ContractRemaps {
+    type Error = String;
+
+    fn try_from(specs: &BTreeMap<String, String>) -> Result<Self, String> {
+        let mut remaps = Self::default();
+        for (source, destination) in specs {
+            remaps.insert_str(source, destination)?;
+        }
+        Ok(remaps)
+    }
 }
 
 pub mod contract_remaps_serde {
     use std::collections::BTreeMap;
 
-    use serde::ser::SerializeMap;
     use serde::{Deserializer, Serializer};
 
     use super::ContractRemaps;
@@ -1231,14 +1228,10 @@ pub mod contract_remaps_serde {
     where
         S: Serializer,
     {
-        let Some(target) = target else {
-            return serializer.serialize_none();
-        };
-        let mut map = serializer.serialize_map(None)?;
-        for (source, destination) in target.pairs() {
-            map.serialize_entry(&source, &destination)?;
+        match target {
+            Some(target) => serializer.collect_map(target.pairs()),
+            None => serializer.serialize_none(),
         }
-        map.end()
     }
 
     pub fn deserialize<'de, D>(des: D) -> Result<Option<ContractRemaps>, D::Error>
@@ -1246,7 +1239,11 @@ pub mod contract_remaps_serde {
         D: Deserializer<'de>,
     {
         let container: Option<BTreeMap<String, String>> = serde::Deserialize::deserialize(des)?;
-        super::parse_contract_remaps(container.as_ref()).map_err(serde::de::Error::custom)
+        container
+            .as_ref()
+            .map(ContractRemaps::try_from)
+            .transpose()
+            .map_err(serde::de::Error::custom)
     }
 }
 
@@ -1500,7 +1497,11 @@ impl DeploymentSpecification {
             genesis,
             plan,
             contracts,
-            contract_remaps: parse_contract_remaps(specs.contract_remaps.as_ref())?,
+            contract_remaps: specs
+                .contract_remaps
+                .as_ref()
+                .map(ContractRemaps::try_from)
+                .transpose()?,
         })
     }
 
