@@ -1,5 +1,4 @@
 import typescriptEslint from "@typescript-eslint/eslint-plugin";
-import tsParser from "@typescript-eslint/parser";
 import js from "@eslint/js";
 
 export default [
@@ -17,15 +16,6 @@ export default [
   ),
   {
     files: ["**/*.ts", "**/*.tsx"],
-
-    plugins: {
-      "@typescript-eslint": typescriptEslint,
-    },
-
-    languageOptions: {
-      parser: tsParser,
-    },
-
     rules: {
       semi: [2, "always"],
       "comma-dangle": [2, "always-multiline"],
