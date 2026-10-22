@@ -14,7 +14,7 @@
     "@types/node": "26.4.0",
     "@types/vscode": "1.91.0",
     "@types/webpack-env": "1.18.8",
-    "mocha": "11.8.0"
+    "mocha": "12.0.3"
   },
   "dependencies": {
     "vscode-languageclient": "10.1.1"
