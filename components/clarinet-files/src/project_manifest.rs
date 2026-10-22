@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 use clarity::types::StacksEpochId;
-use clarity::vm::types::QualifiedContractIdentifier;
+use clarity::vm::types::PrincipalData;
 use clarity::vm::ClarityVersion;
 use clarity_repl::repl;
 use clarity_repl::repl::boot::BOOT_CONTRACTS_NAMES;
@@ -96,6 +96,10 @@ pub struct ProjectManifestFile {
     #[serde(default)]
     #[cfg_attr(feature = "json_schema", schemars(schema_with = "schema::repl_schema"))]
     repl: Option<repl::SettingsFile>,
+    /// Contracts already deployed on testnet or mainnet, keyed by the contract
+    /// ID, or the address of every contract, that the project's sources use
+    #[serde(default)]
+    remap: Option<BTreeMap<String, RemapConfig>>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -106,6 +110,9 @@ pub struct ProjectManifest {
     pub contracts: BTreeMap<String, ClarityContract>,
     #[serde(rename = "repl")]
     pub repl_settings: repl::Settings,
+    /// Validated `[remap]` entries.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub remap: BTreeMap<String, RemapConfig>,
     #[serde(skip_serializing)]
     #[serde(default = "default_root_dir")]
     pub root_dir: PathBuf,
@@ -256,21 +263,31 @@ pub struct RequirementConfig {
     /// Contract identifier that the project's sources use. It can be a mainnet
     /// or a testnet contract (e.g., SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.nft-trait)
     pub contract_id: String,
-    /// Testnet contract to use in place of `contract_id`, instead of
-    /// publishing a copy. Not needed if `contract_id` is a testnet contract.
+}
+
+/// Where a contract, or every contract of an address, is already deployed on
+/// testnet and mainnet. Published sources reference it there instead of
+/// publishing a copy.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Default)]
+#[cfg_attr(feature = "json_schema", derive(JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct RemapConfig {
+    /// Testnet contract or address to use instead. Not needed for a testnet
+    /// contract, which is used in place
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub testnet: Option<String>,
-    /// Mainnet contract to use in place of `contract_id`. Needed if
-    /// `contract_id` is a testnet contract, or if mainnet uses a different one.
+    /// Mainnet contract or address to use instead
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mainnet: Option<String>,
 }
 
-impl RequirementConfig {
-    /// Check that each override is a contract identifier on its network.
-    pub fn validate(&self) -> Result<(), String> {
-        let contract_id = &self.contract_id;
-        for (key, remap, versions) in [
+impl RemapConfig {
+    /// Check that `source` is a contract identifier or an address, and that
+    /// each destination is the same kind of principal on its own network.
+    pub fn validate(&self, source: &str) -> Result<(), String> {
+        let source_principal = PrincipalData::parse(source)
+            .map_err(|_| format!("remap {source}: not a valid contract identifier or address"))?;
+        for (key, destination, versions) in [
             (
                 "testnet",
                 &self.testnet,
@@ -288,25 +305,36 @@ impl RequirementConfig {
                 ],
             ),
         ] {
-            let Some(remap) = remap else {
+            let Some(destination) = destination else {
                 continue;
             };
-            let remap_id = QualifiedContractIdentifier::parse(remap).map_err(|_| {
-                format!(
-                    "requirement {contract_id}: `{key}` is not a valid contract identifier: {remap}"
-                )
-            })?;
-            if !versions.contains(&remap_id.issuer.version()) {
+            let principal = match (&source_principal, PrincipalData::parse(destination)) {
+                (PrincipalData::Standard(_), Ok(principal @ PrincipalData::Standard(_)))
+                | (PrincipalData::Contract(_), Ok(principal @ PrincipalData::Contract(_))) => {
+                    principal
+                }
+                (PrincipalData::Standard(_), _) => {
+                    return Err(format!(
+                        "remap {source}: `{key}` must be an address, got {destination}"
+                    ))
+                }
+                (PrincipalData::Contract(_), _) => {
+                    return Err(format!(
+                        "remap {source}: `{key}` must be a contract identifier, got {destination}"
+                    ))
+                }
+            };
+            if !versions.contains(&principal.version()) {
                 return Err(format!(
-                    "requirement {contract_id}: `{key}` must use a {key} address, got {remap}"
+                    "remap {source}: `{key}` must use a {key} address, got {destination}"
                 ));
             }
         }
         Ok(())
     }
 
-    /// The contract that replaces `contract_id` on `network`, if any.
-    pub fn remap_for(&self, network: &StacksNetwork) -> Option<&str> {
+    /// The contract or address that replaces the source on `network`, if any.
+    pub fn for_network(&self, network: &StacksNetwork) -> Option<&str> {
         match network {
             StacksNetwork::Testnet => self.testnet.as_deref(),
             StacksNetwork::Mainnet => self.mainnet.as_deref(),
@@ -317,22 +345,6 @@ impl RequirementConfig {
 
 fn default_contract_remaps() -> bool {
     true
-}
-
-/// Read the optional `key` override of a requirement table.
-fn read_requirement_override(
-    settings: &toml::map::Map<String, TomlValue>,
-    contract_id: &str,
-    key: &str,
-) -> Result<Option<String>, String> {
-    settings
-        .get(key)
-        .map(|value| {
-            value.as_str().map(str::to_owned).ok_or_else(|| {
-                format!("requirement {contract_id}: `{key}` must be a contract identifier string")
-            })
-        })
-        .transpose()
 }
 
 impl ProjectManifest {
@@ -524,10 +536,16 @@ impl ProjectManifest {
             override_boot_contracts_source,
         };
 
+        let remap = project_manifest_file.remap.unwrap_or_default();
+        for (source, config) in &remap {
+            config.validate(source)?;
+        }
+
         let mut config = ProjectManifest {
             project,
             contracts: BTreeMap::new(),
             repl_settings,
+            remap,
             root_dir: root_path.to_path_buf(),
             location: manifest_location.to_path_buf(),
             contracts_settings: HashMap::new(),
@@ -543,13 +561,7 @@ impl ProjectManifest {
                         Some(TomlValue::String(contract_id)) => contract_id.to_string(),
                         _ => continue,
                     };
-                    let requirement = RequirementConfig {
-                        testnet: read_requirement_override(link_settings, &contract_id, "testnet")?,
-                        mainnet: read_requirement_override(link_settings, &contract_id, "mainnet")?,
-                        contract_id,
-                    };
-                    requirement.validate()?;
-                    config_requirements.push(requirement);
+                    config_requirements.push(RequirementConfig { contract_id });
                 }
             }
         };
@@ -651,7 +663,7 @@ fn get_epoch_and_clarity_version(
 
 #[cfg(test)]
 mod tests {
-    use indoc::formatdoc;
+    use indoc::{formatdoc, indoc};
     use toml::toml;
 
     use super::*;
@@ -879,7 +891,8 @@ mod tests {
     }
 
     fn parse_manifest(manifest_toml: &str) -> Result<ProjectManifest, String> {
-        let manifest_file: ProjectManifestFile = toml::from_str(manifest_toml).unwrap();
+        let manifest_file: ProjectManifestFile =
+            toml::from_str(manifest_toml).map_err(|e| e.to_string())?;
         ProjectManifest::from_project_manifest_file(
             manifest_file,
             &PathBuf::from("/tmp/clarinet.toml"),
@@ -888,120 +901,128 @@ mod tests {
     }
 
     #[test]
-    fn test_requirements_without_overrides_are_unchanged() {
-        let manifest = parse_manifest(
-            r#"
+    fn test_manifest_without_remaps_is_unchanged() {
+        let manifest = parse_manifest(indoc! {r#"
             [project]
             name = "test-project"
 
             [[project.requirements]]
             contract_id = "SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.nft-trait"
-        "#,
-        )
+        "#})
         .unwrap();
 
-        assert_eq!(
-            manifest.project.requirements,
-            Some(vec![RequirementConfig {
-                contract_id: "SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.nft-trait".into(),
-                testnet: None,
-                mainnet: None,
-            }])
-        );
+        assert!(manifest.remap.is_empty());
         assert!(manifest.project.default_contract_remaps);
-        // Serialized output is unchanged for projects that use no overrides.
-        assert_eq!(
-            serde_json::to_value(&manifest.project).unwrap()["requirements"],
-            serde_json::json!([{
-                "contract_id": "SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.nft-trait"
-            }])
+        let serialized = serde_json::to_value(&manifest).unwrap();
+        assert!(serialized.get("remap").is_none(), "{serialized}");
+        assert!(
+            serialized["project"]
+                .get("default_contract_remaps")
+                .is_none(),
+            "{serialized}"
         );
     }
 
     #[test]
-    fn test_requirement_overrides() {
-        let manifest = parse_manifest(
-            r#"
+    fn test_remaps() {
+        let manifest = parse_manifest(indoc! {r#"
             [project]
             name = "test-project"
             default_contract_remaps = false
 
-            [[project.requirements]]
-            contract_id = "SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.nft-trait"
-            testnet = "ST1NXBK3K5YYMD6FD41MVNP3JS1GABZ8TRVX023PT.nft-trait"
-            mainnet = "SP3K8BC0PPEVCV7NZ6QSRWPQ2JE9E5B6N3PA0KBR9.nft-trait"
-        "#,
-        )
+            [remap]
+            "SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9" = { testnet = "ST1NXBK3K5YYMD6FD41MVNP3JS1GABZ8TRVX023PT" }
+            "SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.nft-trait" = { testnet = "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.nft-trait", mainnet = "SP3K8BC0PPEVCV7NZ6QSRWPQ2JE9E5B6N3PA0KBR9.nft-trait" }
+        "#})
         .unwrap();
 
-        let requirement = &manifest.project.requirements.as_ref().unwrap()[0];
+        let address = &manifest.remap["SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9"];
         assert_eq!(
-            requirement.remap_for(&StacksNetwork::Testnet),
-            Some("ST1NXBK3K5YYMD6FD41MVNP3JS1GABZ8TRVX023PT.nft-trait")
+            address.for_network(&StacksNetwork::Testnet),
+            Some("ST1NXBK3K5YYMD6FD41MVNP3JS1GABZ8TRVX023PT")
         );
+        assert_eq!(address.for_network(&StacksNetwork::Mainnet), None);
+
+        let contract = &manifest.remap["SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.nft-trait"];
         assert_eq!(
-            requirement.remap_for(&StacksNetwork::Mainnet),
+            contract.for_network(&StacksNetwork::Mainnet),
             Some("SP3K8BC0PPEVCV7NZ6QSRWPQ2JE9E5B6N3PA0KBR9.nft-trait")
         );
-        assert_eq!(requirement.remap_for(&StacksNetwork::Devnet), None);
-        assert_eq!(requirement.remap_for(&StacksNetwork::Simnet), None);
+        assert_eq!(contract.for_network(&StacksNetwork::Devnet), None);
+        assert_eq!(contract.for_network(&StacksNetwork::Simnet), None);
         assert!(!manifest.project.default_contract_remaps);
     }
 
     #[test]
-    fn test_requirement_override_errors() {
-        let manifest_with = |key_value: &str| {
+    fn test_remap_errors() {
+        const CONTRACT: &str = "SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.nft-trait";
+        const ADDRESS: &str = "SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9";
+        let manifest_with = |source: &str, destination: &str| {
             parse_manifest(&formatdoc! {r#"
                 [project]
                 name = "p"
 
-                [[project.requirements]]
-                contract_id = "SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.nft-trait"
-                {key_value}
+                [remap]
+                "{source}" = {{ {destination} }}
             "#})
         };
+        let error = |source, destination| manifest_with(source, destination).unwrap_err();
 
-        let err = manifest_with(r#"testnet = "not-a-contract""#).unwrap_err();
-        assert!(
-            err.contains("`testnet` is not a valid contract identifier"),
-            "{err}"
-        );
+        for (source, destination, expected) in [
+            (
+                "not-a-principal",
+                r#"testnet = "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM""#,
+                "not a valid contract identifier or address",
+            ),
+            (
+                CONTRACT,
+                r#"testnet = "not-a-contract""#,
+                "`testnet` must be a contract identifier",
+            ),
+            (
+                CONTRACT,
+                r#"testnet = "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM""#,
+                "`testnet` must be a contract identifier",
+            ),
+            (
+                ADDRESS,
+                r#"testnet = "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.nft-trait""#,
+                "`testnet` must be an address",
+            ),
+            (
+                CONTRACT,
+                r#"testnet = "SP3K8BC0PPEVCV7NZ6QSRWPQ2JE9E5B6N3PA0KBR9.nft-trait""#,
+                "`testnet` must use a testnet address",
+            ),
+            (
+                ADDRESS,
+                r#"mainnet = "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM""#,
+                "`mainnet` must use a mainnet address",
+            ),
+            // Checksum-valid, but version 5 is neither a testnet nor a mainnet address.
+            (
+                CONTRACT,
+                r#"testnet = "S51PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSSCCBCA2.nft-trait""#,
+                "`testnet` must use a testnet address",
+            ),
+            (CONTRACT, "testnet = 1", "invalid type"),
+            (
+                CONTRACT,
+                r#"testent = "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.x""#,
+                "unknown field `testent`",
+            ),
+        ] {
+            let err = error(source, destination);
+            assert!(err.contains(expected), "{destination}: {err}");
+        }
 
-        let err =
-            manifest_with(r#"testnet = "SP3K8BC0PPEVCV7NZ6QSRWPQ2JE9E5B6N3PA0KBR9.nft-trait""#)
-                .unwrap_err();
         assert!(
-            err.contains("`testnet` must use a testnet address"),
-            "{err}"
-        );
-
-        let err =
-            manifest_with(r#"mainnet = "ST1NXBK3K5YYMD6FD41MVNP3JS1GABZ8TRVX023PT.nft-trait""#)
-                .unwrap_err();
-        assert!(
-            err.contains("`mainnet` must use a mainnet address"),
-            "{err}"
-        );
-
-        assert!(
-            manifest_with(r#"testnet = "SN3VMHXEN64ZZF71JQ5VESXDWTR301XTTXGF4J8F1.sbtc-token""#)
-                .is_ok(),
+            manifest_with(
+                CONTRACT,
+                r#"testnet = "SN3VMHXEN64ZZF71JQ5VESXDWTR301XTTXGF4J8F1.sbtc-token""#
+            )
+            .is_ok(),
             "testnet multisig addresses are valid"
-        );
-
-        // Checksum-valid, but version 5 is neither a testnet nor a mainnet address.
-        let err =
-            manifest_with(r#"testnet = "S51PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSSCCBCA2.nft-trait""#)
-                .unwrap_err();
-        assert!(
-            err.contains("`testnet` must use a testnet address"),
-            "{err}"
-        );
-
-        let err = manifest_with("testnet = 1").unwrap_err();
-        assert!(
-            err.contains("`testnet` must be a contract identifier string"),
-            "{err}"
         );
     }
 }

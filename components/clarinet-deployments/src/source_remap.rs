@@ -25,23 +25,25 @@ pub(crate) fn qualify_remapped_relative_references(
     original_contract_id: &QualifiedContractIdentifier,
     remaps: &ContractRemaps,
 ) -> Option<String> {
-    let names: Vec<_> = remaps
-        .keys()
-        .filter(|id| id.issuer == original_contract_id.issuer)
-        .map(|id| &id.name)
-        .collect();
-    if names.is_empty() {
+    let issuer = &original_contract_id.issuer;
+    if !remaps.covers_issuer(issuer) {
         return None;
     }
     let expressions =
         parser::v2::parse(source, StackDepthLimits::for_epoch(StacksEpochId::latest())).ok()?;
+    let is_remapped = |name: &ContractName| {
+        remaps.contains(&QualifiedContractIdentifier::new(
+            issuer.clone(),
+            name.clone(),
+        ))
+    };
     let mut positions = vec![];
-    collect_relative_positions(&expressions, &names, &mut positions);
+    collect_relative_positions(&expressions, &is_remapped, &mut positions);
     if positions.is_empty() {
         return None;
     }
 
-    let prefix = format!("'{}", original_contract_id.issuer);
+    let prefix = format!("'{issuer}");
     let mut qualified = String::new();
     let (mut line, mut column) = (1, 1);
     for c in source.chars() {
@@ -60,19 +62,19 @@ pub(crate) fn qualify_remapped_relative_references(
 
 fn collect_relative_positions(
     expressions: &[PreSymbolicExpression],
-    names: &[&ContractName],
+    is_remapped: &impl Fn(&ContractName) -> bool,
     positions: &mut Vec<(u32, u32)>,
 ) {
     for expression in expressions {
         match &expression.pre_expr {
             PreSymbolicExpressionType::SugaredContractIdentifier(name)
             | PreSymbolicExpressionType::SugaredFieldIdentifier(name, _)
-                if names.contains(&name) =>
+                if is_remapped(name) =>
             {
                 positions.push((expression.span.start_line, expression.span.start_column));
             }
             PreSymbolicExpressionType::List(items) | PreSymbolicExpressionType::Tuple(items) => {
-                collect_relative_positions(items, names, positions);
+                collect_relative_positions(items, is_remapped, positions);
             }
             _ => {}
         }
@@ -267,7 +269,7 @@ mod tests {
     fn only_parsed_relative_references_to_remapped_contracts_are_qualified() {
         let original = QualifiedContractIdentifier::parse(&format!("{DEPLOYER}.wrapper")).unwrap();
         let base = format!("{DEPLOYER}.base");
-        let remaps = ContractRemaps::from([(
+        let remaps = ContractRemaps::from_iter([(
             QualifiedContractIdentifier::parse(&base).unwrap(),
             QualifiedContractIdentifier::parse(NFT_TRAIT).unwrap(),
         )]);
@@ -286,6 +288,25 @@ mod tests {
         assert_eq!(
             qualify_remapped_relative_references("(contract-call? .other f)", &original, &remaps),
             None
+        );
+    }
+
+    #[test]
+    fn an_address_remap_qualifies_every_relative_reference() {
+        let original = QualifiedContractIdentifier::parse(&format!("{DEPLOYER}.wrapper")).unwrap();
+        let mut remaps = ContractRemaps::default();
+        remaps
+            .insert_str(DEPLOYER, "ST1NXBK3K5YYMD6FD41MVNP3JS1GABZ8TRVX023PT")
+            .unwrap();
+        assert_eq!(
+            qualify_remapped_relative_references(
+                "(contract-call? .base f) (contract-call? .other f)",
+                &original,
+                &remaps
+            ),
+            Some(format!(
+                "(contract-call? '{DEPLOYER}.base f) (contract-call? '{DEPLOYER}.other f)"
+            ))
         );
     }
 }

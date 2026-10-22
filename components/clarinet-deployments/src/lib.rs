@@ -39,9 +39,9 @@ use clarity_repl::ueprint;
 use clarity_repl::utils::{remove_env_simnet, Environment};
 pub use types::CachedContractAST;
 use types::{
-    ContractPublishSpecification, ContractRemaps, DeploymentGenerationArtifacts,
-    EmulatedContractCallSpecification, EpochSpec, RemapPrincipals, RequirementPublishSpecification,
-    StxTransferSpecification, TransactionSpecification,
+    ContractPublishSpecification, DeploymentGenerationArtifacts, EmulatedContractCallSpecification,
+    EpochSpec, RemapPrincipals, RequirementPublishSpecification, StxTransferSpecification,
+    TransactionSpecification,
 };
 
 use self::types::{
@@ -1010,7 +1010,7 @@ pub async fn generate_default_deployment_with_cache(
             let cached_requirement = requirements_data.remove(&contract_id).filter(|_| {
                 !(matches!(network, StacksNetwork::Testnet)
                     && contract_id.issuer.to_string() == SBTC_MAINNET_ADDRESS
-                    && !remaps.contains_key(&contract_id))
+                    && !remaps.contains(&contract_id))
             });
 
             // A remapped sBTC requirement resolves from its seeded AST; keep
@@ -1018,7 +1018,7 @@ pub async fn generate_default_deployment_with_cache(
             // Record its epoch, because an sBTC contract that is not remapped
             // is fetched with its real epoch and can depend on this one.
             if cached_requirement.is_some()
-                && remaps.contains_key(&contract_id)
+                && remaps.contains(&contract_id)
                 && contract_id.issuer.to_string() == SBTC_MAINNET_ADDRESS
             {
                 if let Some(source) = sbtc_sources.get(contract_id.name.as_str()) {
@@ -1069,7 +1069,7 @@ pub async fn generate_default_deployment_with_cache(
 
                             emulated_contracts_publish.insert(contract_id.clone(), data);
                         }
-                    } else if remaps.contains_key(&contract_id) {
+                    } else if remaps.contains(&contract_id) {
                         // Already on this network: published sources are
                         // rewritten to reference it instead.
                         remapped_sources.insert(contract_id.clone(), source.clone());
@@ -1164,7 +1164,7 @@ pub async fn generate_default_deployment_with_cache(
             // already on chain. On devnet, also filter sbtc boot contracts —
             // they are deployed separately as RequirementPublish below
             ordered_contracts_ids.retain(|contract_id| {
-                if boot_contracts_ids.contains(contract_id) || remaps.contains_key(contract_id) {
+                if boot_contracts_ids.contains(contract_id) || remaps.contains(contract_id) {
                     return false;
                 }
                 if matches!(network, StacksNetwork::Devnet)
@@ -1508,7 +1508,7 @@ pub async fn generate_default_deployment_with_cache(
             .collect();
         let mut needed = BTreeSet::new();
         while let Some(contract_id) = pending.pop() {
-            if remaps.contains_key(&contract_id) || !needed.insert(contract_id.clone()) {
+            if remaps.contains(&contract_id) || !needed.insert(contract_id.clone()) {
                 continue;
             }
             if let Some(contract_dependencies) = dependencies.get(&contract_id) {
@@ -1566,20 +1566,24 @@ pub async fn generate_default_deployment_with_cache(
             _ => None,
         })
         .collect();
-    let contract_remaps: ContractRemaps = remaps
-        .iter()
-        .filter(|(contract_id, _)| {
-            let contract_id = contract_id.to_string();
-            published_sources
-                .iter()
-                .any(|source| source_remap::contains_identifier(source, &contract_id))
-        })
-        .map(|(contract_id, remap)| (contract_id.clone(), remap.clone()))
-        .collect();
+    let contract_remaps = remaps.filter(|source_id| {
+        published_sources
+            .iter()
+            .any(|source| source_remap::contains_identifier(source, source_id))
+    });
 
     if matches!(network, StacksNetwork::Testnet | StacksNetwork::Mainnet) {
-        let mut checked = contract_remaps::requirement_remaps(manifest, network)?;
-        checked.retain(|contract_id, _| contract_remaps.contains_key(contract_id));
+        // Check the project's remaps as this plan applies them: per contract
+        // it records, and per contract fetched under a remapped address.
+        let project_remaps = contract_remaps::project_remaps(manifest, network)?;
+        let checked: BTreeMap<_, _> = contract_remaps
+            .contract_ids()
+            .chain(remapped_sources.keys())
+            .filter(|contract_id| project_remaps.contains(contract_id))
+            .filter_map(|contract_id| {
+                Some((contract_id.clone(), contract_remaps.get(contract_id)?))
+            })
+            .collect();
         for warning in contract_remaps::check_requirement_remaps(
             &checked,
             &remapped_sources,

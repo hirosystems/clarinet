@@ -1,7 +1,7 @@
-//! Requirements that already exist on the target network are pointed at that
+//! Contracts that already exist on the target network are pointed at that
 //! deployment instead of being redeployed under the project's deployer.
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use clarinet_files::{ProjectManifest, StacksNetwork};
 use clarity::vm::types::QualifiedContractIdentifier;
@@ -13,10 +13,10 @@ use crate::types::ContractRemaps;
 
 /// Well-known contracts and where they are deployed on `network`.
 ///
-/// Applied unless the project sets `default_contract_remaps = false`; a
-/// requirement's own `testnet` / `mainnet` entry takes precedence. Only list
-/// contracts whose deployment on that network is maintained, since every
-/// project that references them is pointed there.
+/// Applied unless the project sets `default_contract_remaps = false`; the
+/// project's own `[remap]` entries take precedence. Only list contracts whose
+/// deployment on that network is maintained, since every project that
+/// references them is pointed there.
 fn default_contract_remaps(network: &StacksNetwork) -> ContractRemaps {
     match network {
         StacksNetwork::Testnet => SBTC_BOOT_CONTRACTS
@@ -30,7 +30,7 @@ fn default_contract_remaps(network: &StacksNetwork) -> ContractRemaps {
             })
             .collect(),
         StacksNetwork::Simnet | StacksNetwork::Devnet | StacksNetwork::Mainnet => {
-            ContractRemaps::new()
+            ContractRemaps::default()
         }
     }
 }
@@ -40,24 +40,18 @@ fn parse_contract_id(contract_id: &str) -> Result<QualifiedContractIdentifier, S
         .map_err(|_| format!("malformatted contract_id: {contract_id}"))
 }
 
-/// The requirement remaps the project itself declares for `network`.
-pub fn requirement_remaps(
+/// The `[remap]` entries the project itself declares for `network`.
+pub fn project_remaps(
     manifest: &ProjectManifest,
     network: &StacksNetwork,
 ) -> Result<ContractRemaps, String> {
-    manifest
-        .project
-        .requirements
-        .iter()
-        .flatten()
-        .filter_map(|requirement| {
-            let remap = requirement.remap_for(network)?;
-            Some((&requirement.contract_id, remap))
-        })
-        .map(|(contract_id, remap)| {
-            Ok((parse_contract_id(contract_id)?, parse_contract_id(remap)?))
-        })
-        .collect()
+    let mut remaps = ContractRemaps::default();
+    for (source, config) in &manifest.remap {
+        if let Some(destination) = config.for_network(network) {
+            remaps.insert_str(source, destination)?;
+        }
+    }
+    Ok(remaps)
 }
 
 /// Requirements that are already testnet contracts. On testnet, each one
@@ -68,16 +62,21 @@ fn testnet_requirements_in_place(
     network: &StacksNetwork,
 ) -> Result<ContractRemaps, String> {
     if !matches!(network, StacksNetwork::Testnet) {
-        return Ok(ContractRemaps::new());
+        return Ok(ContractRemaps::default());
     }
-    let mut remaps = ContractRemaps::new();
-    for requirement in manifest.project.requirements.iter().flatten() {
-        let contract_id = parse_contract_id(&requirement.contract_id)?;
-        if !contract_id.issuer.is_mainnet() {
-            remaps.insert(contract_id.clone(), contract_id);
-        }
-    }
-    Ok(remaps)
+    manifest
+        .project
+        .requirements
+        .iter()
+        .flatten()
+        .map(|requirement| parse_contract_id(&requirement.contract_id))
+        .filter(|contract_id| {
+            contract_id
+                .as_ref()
+                .map_or(true, |contract_id| !contract_id.issuer.is_mainnet())
+        })
+        .map(|contract_id| contract_id.map(|contract_id| (contract_id.clone(), contract_id)))
+        .collect()
 }
 
 /// Every remap that applies on `network`: the defaults, then the testnet
@@ -89,10 +88,10 @@ pub fn resolve_contract_remaps(
     let mut remaps = if manifest.project.default_contract_remaps {
         default_contract_remaps(network)
     } else {
-        ContractRemaps::new()
+        ContractRemaps::default()
     };
     remaps.extend(testnet_requirements_in_place(manifest, network)?);
-    remaps.extend(requirement_remaps(manifest, network)?);
+    remaps.extend(project_remaps(manifest, network)?);
     Ok(remaps)
 }
 
@@ -102,7 +101,7 @@ pub fn resolve_contract_remaps(
 /// Best effort: a network failure becomes a warning too, so an offline plan
 /// generation still succeeds.
 pub async fn check_requirement_remaps(
-    remaps: &ContractRemaps,
+    remaps: &BTreeMap<QualifiedContractIdentifier, QualifiedContractIdentifier>,
     sources: &HashMap<QualifiedContractIdentifier, String>,
     all_remaps: &ContractRemaps,
     api_base_url: Option<&str>,
@@ -139,14 +138,7 @@ fn is_remapped_copy(
     contract_id: &QualifiedContractIdentifier,
     all_remaps: &ContractRemaps,
 ) -> bool {
-    let normalize = |source: &str| {
-        remap_contract_ids(
-            source,
-            all_remaps
-                .iter()
-                .map(|(src, dst)| (src.to_string(), dst.to_string())),
-        )
-    };
+    let normalize = |source: &str| remap_contract_ids(source, all_remaps.pairs());
     normalize(source) == remap_source
         || qualify_remapped_relative_references(source, contract_id, all_remaps)
             .is_some_and(|qualified| normalize(&qualified) == remap_source)
@@ -164,7 +156,7 @@ mod tests {
         for name in ["sbtc-registry", "sbtc-token", "sbtc-deposit"] {
             let mainnet_id = parse_contract_id(&format!("{SBTC_MAINNET_ADDRESS}.{name}")).unwrap();
             assert_eq!(
-                remaps[&mainnet_id].to_string(),
+                remaps.get(&mainnet_id).unwrap().to_string(),
                 format!("{SBTC_TESTNET_ADDRESS}.{name}")
             );
         }
@@ -179,6 +171,55 @@ mod tests {
         ] {
             assert!(default_contract_remaps(&network).is_empty(), "{network:?}");
         }
+    }
+
+    #[test]
+    fn layered_remaps_resolve_by_precedence() {
+        let id = |id: &str| parse_contract_id(id).unwrap();
+        let token = id(&format!("{SBTC_MAINNET_ADDRESS}.sbtc-token"));
+        let registry = id(&format!("{SBTC_MAINNET_ADDRESS}.sbtc-registry"));
+        let mock_token = id("ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.mock-token");
+
+        let mut project = ContractRemaps::default();
+        project
+            .insert_str(
+                SBTC_MAINNET_ADDRESS,
+                "ST1NXBK3K5YYMD6FD41MVNP3JS1GABZ8TRVX023PT",
+            )
+            .unwrap();
+        project
+            .insert_str(&token.to_string(), &mock_token.to_string())
+            .unwrap();
+        let mut remaps = default_contract_remaps(&StacksNetwork::Testnet);
+        remaps.extend(project);
+
+        assert_eq!(
+            remaps.get(&token),
+            Some(mock_token),
+            "a contract entry beats the address entry of its issuer"
+        );
+        assert_eq!(
+            remaps.get(&registry).unwrap().to_string(),
+            "ST1NXBK3K5YYMD6FD41MVNP3JS1GABZ8TRVX023PT.sbtc-registry",
+            "a project address entry replaces the defaults of that address"
+        );
+        assert_eq!(
+            remaps.get(&id("SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.nft-trait")),
+            None
+        );
+    }
+
+    #[test]
+    fn an_address_only_remaps_to_an_address() {
+        let mut remaps = ContractRemaps::default();
+        let err = remaps
+            .insert_str(
+                "SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9",
+                "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.nft-trait",
+            )
+            .unwrap_err();
+        assert!(err.contains("an address remaps to an address"), "{err}");
+        assert!(remaps.is_empty());
     }
 
     #[tokio::test]
@@ -212,7 +253,7 @@ mod tests {
             .await;
 
         let id = |id: &str| parse_contract_id(id).unwrap();
-        let remaps = ContractRemaps::from([
+        let remaps = BTreeMap::from([
             (
                 id("SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.missing"),
                 id("ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.missing"),
@@ -237,8 +278,13 @@ mod tests {
             ),
         ]);
 
-        let warnings =
-            check_requirement_remaps(&remaps, &sources, &remaps, Some(&server.url())).await;
+        let warnings = check_requirement_remaps(
+            &remaps,
+            &sources,
+            &ContractRemaps::from_iter(remaps.clone()),
+            Some(&server.url()),
+        )
+        .await;
 
         assert_eq!(warnings.len(), 2, "{warnings:?}");
         assert!(
@@ -255,7 +301,7 @@ mod tests {
     fn a_copy_may_keep_or_qualify_relative_references() {
         let id = |id: &str| parse_contract_id(id).unwrap();
         let wrapper = id("SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.wrapper");
-        let remaps = ContractRemaps::from([(
+        let remaps = ContractRemaps::from_iter([(
             id("SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.base"),
             id("ST1NXBK3K5YYMD6FD41MVNP3JS1GABZ8TRVX023PT.canonical-base"),
         )]);
@@ -294,8 +340,8 @@ mod tests {
         let id = |id: &str| parse_contract_id(id).unwrap();
         let wrapper = id("SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.wrapper");
         let wrapper_remap = id("ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.wrapper");
-        let remaps = ContractRemaps::from([(wrapper.clone(), wrapper_remap.clone())]);
-        let all_remaps = ContractRemaps::from([
+        let remaps = BTreeMap::from([(wrapper.clone(), wrapper_remap.clone())]);
+        let all_remaps = ContractRemaps::from_iter([
             (wrapper.clone(), wrapper_remap),
             (
                 id("SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.base"),

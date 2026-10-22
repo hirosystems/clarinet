@@ -62,14 +62,11 @@ fn sbtc_contract_ids_to_remap(network: &StacksNetwork) -> ContractIdsToRemap {
         .collect()
 }
 
-/// The contract-ID remappings a deployment starts with: the plan's own, or
-/// the legacy sBTC ones for a plan that records none.
+/// The remappings a deployment starts with: the plan's own, or the legacy
+/// sBTC ones for a plan that records none.
 fn initial_contract_ids_to_remap(deployment: &DeploymentSpecification) -> ContractIdsToRemap {
     match &deployment.contract_remaps {
-        Some(remaps) => remaps
-            .iter()
-            .map(|(src, dst)| (src.to_string(), dst.to_string()))
-            .collect(),
+        Some(remaps) => remaps.pairs().collect(),
         None => sbtc_contract_ids_to_remap(&deployment.network),
     }
 }
@@ -1165,7 +1162,10 @@ mod tests {
             QualifiedContractIdentifier::parse(&format!("{TEST_DEPLOYER}.nft-trait")).unwrap();
         let deployment = deployment_with_remaps(
             StacksNetwork::Testnet,
-            Some(BTreeMap::from([(nft_trait.clone(), testnet_trait.clone())])),
+            Some(ContractRemaps::from_iter([(
+                nft_trait.clone(),
+                testnet_trait.clone(),
+            )])),
         );
 
         assert_eq!(
@@ -1181,7 +1181,8 @@ mod tests {
             initial_contract_ids_to_remap(&legacy),
             sbtc_contract_ids_to_remap(&StacksNetwork::Testnet),
         );
-        let opted_out = deployment_with_remaps(StacksNetwork::Testnet, Some(BTreeMap::new()));
+        let opted_out =
+            deployment_with_remaps(StacksNetwork::Testnet, Some(ContractRemaps::default()));
         assert!(initial_contract_ids_to_remap(&opted_out).is_empty());
     }
 
@@ -1209,7 +1210,7 @@ mod tests {
         let original = "SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9";
         let destination = format!("{TEST_DEPLOYER}.mock-base");
         let deployer = PrincipalData::parse_standard_principal(TEST_DEPLOYER).unwrap();
-        let remaps = BTreeMap::from([(
+        let remaps = ContractRemaps::from_iter([(
             QualifiedContractIdentifier::parse(&format!("{original}.base")).unwrap(),
             QualifiedContractIdentifier::parse(&destination).unwrap(),
         )]);

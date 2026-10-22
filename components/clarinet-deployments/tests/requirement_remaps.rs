@@ -1,6 +1,6 @@
-//! Requirements remapped to a contract already deployed on the target
-//! network: by a `testnet` / `mainnet` entry in `[[project.requirements]]`,
-//! or by the built-in defaults (sBTC on testnet).
+//! Contracts remapped to a contract already deployed on the target network:
+//! by the project's `[remap]` entries, or by the built-in defaults (sBTC on
+//! testnet).
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -176,10 +176,8 @@ fn contract_remaps(deployment: &DeploymentSpecification) -> BTreeMap<String, Str
     deployment
         .contract_remaps
         .as_ref()
-        .into_iter()
-        .flatten()
-        .map(|(src, dst)| (src.to_string(), dst.to_string()))
-        .collect()
+        .map(|remaps| remaps.pairs().collect())
+        .unwrap_or_default()
 }
 
 fn sbtc_remaps(names: &[&str]) -> BTreeMap<String, String> {
@@ -200,7 +198,9 @@ async fn testnet_override_replaces_the_requirement_publish() {
         &formatdoc! {r#"
             [[project.requirements]]
             contract_id = "{NFT_TRAIT}"
-            testnet = "{TESTNET_NFT_TRAIT}"
+
+            [remap]
+            "{NFT_TRAIT}" = {{ testnet = "{TESTNET_NFT_TRAIT}" }}
         "#},
         Some(&calls(&[NFT_TRAIT])),
     );
@@ -221,7 +221,9 @@ async fn contract_remaps_round_trip_through_the_plan_file() {
         &formatdoc! {r#"
             [[project.requirements]]
             contract_id = "{NFT_TRAIT}"
-            testnet = "{TESTNET_NFT_TRAIT}"
+
+            [remap]
+            "{NFT_TRAIT}" = {{ testnet = "{TESTNET_NFT_TRAIT}" }}
         "#},
         Some(&calls(&[NFT_TRAIT])),
     );
@@ -332,7 +334,9 @@ async fn remaps_referenced_by_a_redeployed_requirement_are_recorded() {
 
             [[project.requirements]]
             contract_id = "{NFT_TRAIT}"
-            testnet = "{canonical}"
+
+            [remap]
+            "{NFT_TRAIT}" = {{ testnet = "{canonical}" }}
         "#},
         None,
     );
@@ -367,7 +371,9 @@ async fn relative_references_select_their_remap() {
 
             [[project.requirements]]
             contract_id = "{base}"
-            testnet = "{canonical}"
+
+            [remap]
+            "{base}" = {{ testnet = "{canonical}" }}
         "#},
         None,
     );
@@ -408,7 +414,9 @@ async fn dependencies_of_a_remapped_requirement_are_not_redeployed() {
         &formatdoc! {r#"
             [[project.requirements]]
             contract_id = "{ROUTER}"
-            testnet = "{TESTNET_ROUTER}"
+
+            [remap]
+            "{ROUTER}" = {{ testnet = "{TESTNET_ROUTER}" }}
         "#},
         Some(&calls(&[ROUTER])),
     );
@@ -425,7 +433,9 @@ async fn a_dependency_also_used_directly_is_still_redeployed() {
         &formatdoc! {r#"
             [[project.requirements]]
             contract_id = "{ROUTER}"
-            testnet = "{TESTNET_ROUTER}"
+
+            [remap]
+            "{ROUTER}" = {{ testnet = "{TESTNET_ROUTER}" }}
         "#},
         Some(&calls(&[ROUTER, POOL])),
     );
@@ -477,7 +487,9 @@ async fn partially_remapped_sbtc_generates_a_plan() {
 
             [[project.requirements]]
             contract_id = "{sbtc_deposit}"
-            testnet = "{SBTC_TESTNET_DEPLOYER}.sbtc-deposit"
+
+            [remap]
+            "{sbtc_deposit}" = {{ testnet = "{SBTC_TESTNET_DEPLOYER}.sbtc-deposit" }}
         "#},
         Some(&format!(
             "(define-read-only (header) (contract-call? '{sbtc_deposit} get-burn-header u1))"
@@ -500,7 +512,9 @@ async fn a_redeployed_sbtc_contract_keeps_its_dependencies() {
 
             [[project.requirements]]
             contract_id = "{sbtc_deposit}"
-            testnet = "{SBTC_TESTNET_DEPLOYER}.sbtc-deposit"
+
+            [remap]
+            "{sbtc_deposit}" = {{ testnet = "{SBTC_TESTNET_DEPLOYER}.sbtc-deposit" }}
         "#},
         Some(&format!(
             "(define-read-only (name) (contract-call? '{sbtc_token} get-name))"
@@ -573,7 +587,9 @@ async fn project_override_beats_the_default() {
         &formatdoc! {r#"
             [[project.requirements]]
             contract_id = "{sbtc_token}"
-            testnet = "{mock_token}"
+
+            [remap]
+            "{sbtc_token}" = {{ testnet = "{mock_token}" }}
         "#},
         Some(&calls(&[
             &sbtc_token,
@@ -603,7 +619,9 @@ async fn mainnet_override_is_recorded() {
         &formatdoc! {r#"
             [[project.requirements]]
             contract_id = "{NFT_TRAIT}"
-            mainnet = "{mainnet_trait}"
+
+            [remap]
+            "{NFT_TRAIT}" = {{ mainnet = "{mainnet_trait}" }}
         "#},
         Some(&calls(&[NFT_TRAIT])),
     );
@@ -615,4 +633,53 @@ async fn mainnet_override_is_recorded() {
         contract_remaps(&deployment),
         BTreeMap::from([(NFT_TRAIT.to_string(), mainnet_trait.to_string())])
     );
+}
+
+#[tokio::test]
+async fn an_address_remap_covers_every_contract_of_that_address() {
+    // The issuers of `ROUTER` and `TESTNET_ROUTER`.
+    let address = "SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9";
+    let testnet_address = "ST1NXBK3K5YYMD6FD41MVNP3JS1GABZ8TRVX023PT";
+    let project = Project::new(
+        &formatdoc! {r#"
+            [[project.requirements]]
+            contract_id = "{ROUTER}"
+
+            [remap]
+            "{address}" = {{ testnet = "{testnet_address}" }}
+        "#},
+        Some(&calls(&[ROUTER])),
+    );
+    let server = mock_router_and_pool().await;
+
+    let deployment = project.generate(StacksNetwork::Testnet, &server).await;
+
+    assert_eq!(
+        requirement_publishes(&deployment),
+        Vec::<String>::new(),
+        "neither `router` nor the `pool` it calls is redeployed"
+    );
+    assert_eq!(
+        contract_remaps(&deployment),
+        BTreeMap::from([(address.to_string(), testnet_address.to_string())])
+    );
+
+    let content = deployment.to_file_content(project.dir.path()).unwrap();
+    let content = String::from_utf8(content).unwrap();
+    assert!(
+        content.contains(&formatdoc! {"
+            contract-remaps:
+              {address}: {testnet_address}
+        "}),
+        "{content}"
+    );
+    let file = DeploymentSpecificationFile::from_file_content(&content).unwrap();
+    let reloaded = DeploymentSpecification::from_specifications(
+        &file,
+        &StacksNetwork::Testnet,
+        project.dir.path(),
+        None,
+    )
+    .unwrap();
+    assert_eq!(reloaded.contract_remaps, deployment.contract_remaps);
 }
