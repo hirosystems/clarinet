@@ -64,3 +64,62 @@ it("preserves batch outcomes and transaction options through the synchronous ada
     ],
   });
 });
+
+it("retains nonempty batch events and decodes print and NFT values", () => {
+  vi.mocked(syncSend).mockClear();
+  const sender = "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM";
+  const recipient = "ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5";
+  const transfer = {
+    event: "stx_transfer_event",
+    data: { sender, recipient, amount: "1", memo: `0x${"00".repeat(34)}` },
+  };
+  const print = {
+    event: "print_event",
+    data: {
+      contract_identifier: `${sender}.events`,
+      topic: "print",
+      raw_value: serializeCV(Cl.uint(42)),
+    },
+  };
+  const mint = {
+    event: "nft_mint_event",
+    data: {
+      asset_identifier: `${sender}.events::badge`,
+      recipient: sender,
+      raw_value: serializeCV(Cl.uint(7)),
+    },
+  };
+  const outcome = (events: unknown[]) => ({
+    status: "success",
+    execution: {
+      result: serializeCV(Cl.ok(Cl.bool(true))),
+      events: JSON.stringify(events.map((event) => JSON.stringify(event))),
+      costs: "null",
+    },
+  });
+  vi.mocked(syncSend)
+    .mockReturnValueOnce(JSON.stringify({ result: { accounts: { deployer: sender } } }))
+    .mockReturnValueOnce(
+      JSON.stringify({ result: { results: [outcome([transfer]), outcome([print, mint])] } }),
+    );
+  const simnet = createSyncDebugSimnet();
+  const results = simnet.mineBlock([
+    tx.transferSTX(1, recipient, sender),
+    tx.deployContract(
+      "events",
+      "(define-non-fungible-token badge uint) (print u42) (nft-mint? badge u7 tx-sender)",
+      null,
+      sender,
+    ),
+  ]);
+  expect(results[0]).toMatchObject({ status: "success", execution: { events: [transfer] } });
+  expect(results[1]).toMatchObject({
+    status: "success",
+    execution: {
+      events: [
+        { ...print, data: { ...print.data, value: Cl.uint(42) } },
+        { ...mint, data: { ...mint.data, value: Cl.uint(7) } },
+      ],
+    },
+  });
+});

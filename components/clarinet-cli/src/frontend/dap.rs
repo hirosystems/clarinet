@@ -10,6 +10,7 @@ use clarity::vm::EvaluationResult;
 use clarity_repl::repl::clarity_values::to_raw_value;
 use clarity_repl::repl::debug::dap::DAPDebugger;
 use clarity_repl::repl::Session;
+use clarity_repl::utils::sdk_events::serialize_events;
 use clarity_repl::utils::{serialize_event, Environment};
 
 #[cfg(feature = "telemetry")]
@@ -737,7 +738,7 @@ fn execute_block_entry(
             let failed = matches!(value, Some(Value::Response(response)) if !response.committed);
             let result = serde_json::json!({
                 "result": value.map(to_raw_value).unwrap_or_else(|| "0x03".into()),
-                "events": serde_json::to_string(&execution.events.iter().map(serialize_event).collect::<Vec<_>>()).unwrap(),
+                "events": serialize_events(&execution.events),
                 "costs": serde_json::to_string(&execution.cost).unwrap(),
             });
             if failed {
@@ -960,6 +961,62 @@ mod batch_tests {
             to_raw_value(&Value::UInt(1))
         );
         assert!(session.contracts.contains_key(&id));
+    }
+
+    #[test]
+    fn debug_batch_events_use_sdk_encoding_and_preserve_clarity_values() {
+        let mut session = Session::new(SessionSettings::default());
+        session.update_epoch(clarinet_defaults::DEFAULT_EPOCH);
+        let sender = session.get_tx_sender();
+        let recipient = "ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5";
+        session
+            .interpreter
+            .mint_stx_balance(PrincipalData::parse(&sender).unwrap(), 100)
+            .unwrap();
+        let mut dap = DAPDebugger::no_op();
+        let transfer = execute_block_entry(
+            &mut session,
+            &mut dap,
+            &json!({
+                "type": "transferSTX", "amount": 1, "recipient": recipient, "sender": sender,
+            }),
+        );
+        let deployment = execute_block_entry(
+            &mut session,
+            &mut dap,
+            &json!({
+                "type": "deployContract", "name": "events", "sender": sender,
+                "content": "(define-non-fungible-token badge uint) (print u42) (nft-mint? badge u7 tx-sender)",
+            }),
+        );
+        let decode_events = |outcome: &serde_json::Value| {
+            assert_eq!(outcome["status"], "success");
+            let events: Vec<String> =
+                serde_json::from_str(outcome["execution"]["events"].as_str().unwrap()).unwrap();
+            events
+                .iter()
+                .map(|event| serde_json::from_str::<serde_json::Value>(event).unwrap())
+                .collect::<Vec<_>>()
+        };
+        let events = decode_events(&transfer);
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0]["event"], "stx_transfer_event");
+        assert_eq!(events[0]["data"]["sender"], sender);
+        assert_eq!(events[0]["data"]["recipient"], recipient);
+        assert_eq!(events[0]["data"]["amount"], "1");
+        let events = decode_events(&deployment);
+        assert_eq!(events.len(), 2);
+        assert_eq!(events[0]["event"], "print_event");
+        assert_eq!(
+            events[0]["data"]["raw_value"],
+            to_raw_value(&Value::UInt(42))
+        );
+        assert_eq!(events[1]["event"], "nft_mint_event");
+        assert_eq!(
+            events[1]["data"]["raw_value"],
+            to_raw_value(&Value::UInt(7))
+        );
+        assert_eq!(events[1]["data"]["recipient"], sender);
     }
 
     #[test]

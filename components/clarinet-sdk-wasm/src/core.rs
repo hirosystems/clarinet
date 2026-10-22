@@ -18,7 +18,6 @@ use clarity::types::Address;
 use clarity::vm::analysis::contract_interface_builder::{
     ContractInterface, ContractInterfaceFunction, ContractInterfaceFunctionAccess,
 };
-use clarity::vm::events::StacksTransactionEvent;
 use clarity::vm::types::{PrincipalData, QualifiedContractIdentifier, StandardPrincipalData};
 use clarity::vm::{ClarityVersion, EvaluationResult, ExecutionResult, SymbolicExpression};
 use clarity_repl::repl::boot::{
@@ -36,6 +35,7 @@ use clarity_repl::repl::{
     clarity_values, epoch_from_str, ClarityCodeSource, ClarityContract, ContractDeployer, Epoch,
     Session, SessionSettings,
 };
+use clarity_repl::utils::sdk_events::serialize_events;
 use clarity_repl::utils::Environment;
 use gloo_utils::format::JsValueSerdeExt;
 use js_sys::Function as JsFunction;
@@ -44,8 +44,6 @@ use serde_json::json;
 use serde_wasm_bindgen::to_value as encode_to_js;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsValue;
-
-use crate::utils::events::serialize_event;
 
 #[wasm_bindgen]
 extern "C" {
@@ -370,15 +368,6 @@ pub struct TransactionResRaw {
 pub struct SessionReport {
     pub coverage: String,
     pub costs: String,
-}
-
-/// Events as the SDK parses them: a JSON array of JSON-encoded events.
-fn serialize_events(events: &[StacksTransactionEvent]) -> String {
-    let events: Vec<_> = events
-        .iter()
-        .map(|event| json!(serialize_event(event)).to_string())
-        .collect();
-    json!(events).to_string()
 }
 
 pub fn execution_result_to_transaction_res(execution: &ExecutionResult) -> TransactionRes {
