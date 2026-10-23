@@ -3,6 +3,8 @@ import { Cl, serializeCVBytes } from "@stacks/transactions";
 import {
   parseCosts,
   parseBlockTransactionResult,
+  parseTransactionResult,
+  type SerializedTransactionResult,
   type SerializedBlockTransactionResult,
   parseEvents,
   serializePostConditions,
@@ -15,29 +17,21 @@ import {
   type GetDataVar,
   type GetMapEntry,
   type MineBlock,
-  type ParsedTransactionResult,
   type TransferSTX,
 } from "./sdkProxyHelpers.js";
 
-type WasmTransactionRes = {
-  result: string;
-  events: string;
-  costs: string;
-  performance?: string;
-};
-
 type ProxySdk = {
   broadcastTransaction(rawHex: string): string;
-  callReadOnlyFn(args: unknown): WasmTransactionRes;
-  callPublicFn(args: unknown): WasmTransactionRes;
-  callPrivateFn(args: unknown): WasmTransactionRes;
-  deployContract(args: unknown): WasmTransactionRes;
-  execute(snippet: string): WasmTransactionRes;
+  callReadOnlyFn(args: unknown): SerializedTransactionResult;
+  callPublicFn(args: unknown): SerializedTransactionResult;
+  callPrivateFn(args: unknown): SerializedTransactionResult;
+  deployContract(args: unknown): SerializedTransactionResult;
+  execute(snippet: string): SerializedTransactionResult;
   getDataVar(contract: string, varName: string): string;
   getMapEntry(contract: string, mapName: string, mapKey: Uint8Array): string;
   mineBlock(txs: unknown[]): SerializedBlockTransactionResult[];
   runSnippet(snippet: string): string;
-  transferSTX(args: unknown): WasmTransactionRes;
+  transferSTX(args: unknown): SerializedTransactionResult;
 };
 
 /** @deprecated use `simnet.execute(command)` instead */
@@ -94,15 +88,6 @@ type ProxyBindings<ContractOptions> = {
   ) => unknown;
 };
 
-function parseTxResponse(response: WasmTransactionRes): ParsedTransactionResult {
-  return {
-    result: Cl.deserialize(response.result),
-    events: parseEvents(response.events),
-    costs: parseCosts(response.costs),
-    performance: response.performance ?? undefined,
-  };
-}
-
 export function createSessionProxy<S extends ProxySdk, ContractOptions>(
   bindings: ProxyBindings<ContractOptions>,
 ): ProxyHandler<S> {
@@ -125,7 +110,7 @@ export function createSessionProxy<S extends ProxySdk, ContractOptions>(
               postConditionMode,
             ),
           );
-          return parseTxResponse(response);
+          return parseTransactionResult(response);
         };
         return callFn;
       }
@@ -148,7 +133,7 @@ export function createSessionProxy<S extends ProxySdk, ContractOptions>(
             return {
               status: "success",
               transaction: transaction!,
-              execution: parseTxResponse(response.execution),
+              execution: parseTransactionResult(response.execution),
             };
           }
           return {
@@ -168,7 +153,7 @@ export function createSessionProxy<S extends ProxySdk, ContractOptions>(
       }
 
       if (prop === "execute") {
-        const execute: Execute = (snippet) => parseTxResponse(sdk.execute(snippet));
+        const execute: Execute = (snippet) => parseTransactionResult(sdk.execute(snippet));
         return execute;
       }
 
@@ -185,7 +170,7 @@ export function createSessionProxy<S extends ProxySdk, ContractOptions>(
             : new ContractOptions();
           const { postConditions, postConditionMode } =
             serializePostConditions(postConditionOptions);
-          return parseTxResponse(
+          return parseTransactionResult(
             sdk.deployContract(
               new DeployContractArgs(
                 name,
@@ -204,7 +189,7 @@ export function createSessionProxy<S extends ProxySdk, ContractOptions>(
       if (prop === "transferSTX") {
         const transferSTX: TransferSTX = (amount, recipient, sender, options) => {
           const { postConditions, postConditionMode } = serializePostConditions(options);
-          return parseTxResponse(
+          return parseTransactionResult(
             sdk.transferSTX(
               new TransferSTXArgs(
                 BigInt(amount),

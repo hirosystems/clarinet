@@ -288,33 +288,48 @@ export type BlockTransactionResult =
 
 export type MineBlock = (txs: Array<Tx>) => BlockTransactionResult[];
 
+export type SerializedTransactionResult = {
+  result: string;
+  events: string;
+  costs: string;
+  performance?: string;
+};
+
+export function parseTransactionResult(
+  response: SerializedTransactionResult,
+): ParsedTransactionResult {
+  return {
+    result: Cl.deserialize(response.result),
+    events: parseEvents(response.events),
+    costs: parseCosts(response.costs),
+    performance: response.performance ?? undefined,
+  };
+}
+
 export type SerializedBlockTransactionResult =
-  | {
-      status: "success";
-      execution: { result: string; events: string; costs: string; performance?: string };
-    }
+  | { status: "success"; execution: SerializedTransactionResult }
   | {
       status: "included_failure";
       error: string;
-      execution: { result: string; events: string; costs: string; performance?: string } | null;
+      execution: SerializedTransactionResult | null;
     }
   | { status: "rejected"; error: string };
 
 export function parseBlockTransactionResult(
   response: SerializedBlockTransactionResult,
 ): BlockTransactionResult {
-  if (response.status === "rejected") return response;
-  const execution =
-    response.execution === null
-      ? null
-      : {
-          result: Cl.deserialize(response.execution.result),
-          events: parseEvents(response.execution.events),
-          costs: parseCosts(response.execution.costs),
-          performance: response.execution.performance ?? undefined,
-        };
-  if (response.status === "success") return { status: "success", execution: execution! };
-  return { status: "included_failure", error: response.error, execution };
+  switch (response.status) {
+    case "rejected":
+      return response;
+    case "success":
+      return { status: "success", execution: parseTransactionResult(response.execution) };
+    case "included_failure":
+      return {
+        status: "included_failure",
+        error: response.error,
+        execution: response.execution === null ? null : parseTransactionResult(response.execution),
+      };
+  }
 }
 export type Execute = (snippet: string) => ParsedTransactionResult;
 export type GetDataVar = (contract: string, dataVar: string) => ClarityValue;
