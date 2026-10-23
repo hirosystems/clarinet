@@ -1085,10 +1085,16 @@ impl SDK {
         required_access: ContractInterfaceFunctionAccess,
     ) -> Result<TransactionRes, TransactionError> {
         let wrong_access = match self.get_function_interface(&args.contract, &args.method) {
-            Ok(interface) if interface.access != required_access => Some(format!(
-                "{} is not a {required_access:?} function",
-                args.method
-            )),
+            Ok(interface)
+                if interface.access != required_access
+                    && !(required_access == ContractInterfaceFunctionAccess::public
+                        && interface.access == ContractInterfaceFunctionAccess::read_only) =>
+            {
+                Some(format!(
+                    "{} is not a {required_access:?} function",
+                    args.method
+                ))
+            }
             _ => None,
         };
 

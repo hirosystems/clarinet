@@ -212,20 +212,16 @@ async fn it_charges_a_nonce_for_a_call_the_access_preflight_rejects() {
     .unwrap();
     assert_eq!(sdk.get_account_nonce(SENDER).unwrap(), 1);
 
-    // Rejected by the preflight, because the interface says the access is wrong.
-    for (method, expected) in [
-        ("peek", "peek is not a public function"),
-        ("hidden", "hidden is not a public function"),
-    ] {
-        let before = sdk.get_account_nonce(SENDER).unwrap();
-        let err = sdk.call_public_fn(&call(method)).unwrap_err();
-        assert_eq!(err, expected);
-        assert_eq!(
-            sdk.get_account_nonce(SENDER).unwrap(),
-            before + 1,
-            "mainnet mines a call to a non-public function, so `{method}` owes a nonce"
-        );
-    }
+    // Block execution permits read-only targets and charges the transaction nonce.
+    let before = sdk.get_account_nonce(SENDER).unwrap();
+    let result = sdk.call_public_fn(&call("peek")).unwrap();
+    assert_tx_result(&result, ClarityValue::UInt(1));
+    assert_eq!(sdk.get_account_nonce(SENDER).unwrap(), before + 1);
+
+    let before = sdk.get_account_nonce(SENDER).unwrap();
+    let err = sdk.call_public_fn(&call("hidden")).unwrap_err();
+    assert_eq!(err, "hidden is not a public function");
+    assert_eq!(sdk.get_account_nonce(SENDER).unwrap(), before + 1);
 
     // The same failure reached through the VM: no interface entry exists for a
     // name the contract does not define, so the preflight has nothing to say.
@@ -282,7 +278,8 @@ async fn it_gates_the_preflight_nonce_on_the_epoch_like_the_vm_does() {
         sdk.deploy_contract(&DeployContractArgs::new(
             "access-contract".into(),
             "(define-read-only (peek) u1)
-             (define-public (poke) (ok u1))"
+             (define-public (poke) (ok u1))
+             (define-private (hidden) u1)"
                 .into(),
             ContractOptions::new(None),
             SENDER.into(),
@@ -302,10 +299,15 @@ async fn it_gates_the_preflight_nonce_on_the_epoch_like_the_vm_does() {
             )
         };
 
-        // The cached interface rejects `peek` before it reaches the VM.
         let before = sdk.get_account_nonce(SENDER).unwrap();
-        let err = sdk.call_public_fn(&call("peek")).unwrap_err();
-        assert_eq!(err, "peek is not a public function");
+        let result = sdk.call_public_fn(&call("peek")).unwrap();
+        assert_tx_result(&result, ClarityValue::UInt(1));
+        assert_eq!(sdk.get_account_nonce(SENDER).unwrap(), before + 1);
+
+        // Private targets still fail the cached-interface access check.
+        let before = sdk.get_account_nonce(SENDER).unwrap();
+        let err = sdk.call_public_fn(&call("hidden")).unwrap_err();
+        assert_eq!(err, "hidden is not a public function");
         let preflight_delta = sdk.get_account_nonce(SENDER).unwrap() - before;
 
         // An unknown function reaches the VM and produces the equivalent error.

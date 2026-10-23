@@ -67,6 +67,12 @@ for (const outcome of simnet.mineBlock(transactions)) {
 The synchronous debug adapter uses the same batch outcome contract, transaction
 nonce rules, and inclusion height.
 
+Contract-call transactions may target `define-public` or `define-read-only`
+functions. A read-only target still consumes a transaction nonce when invoked
+through `callPublicFn` or `mineBlock`; use `callReadOnlyFn` for a nonce-free query.
+These execution paths do not apply the node's mempool admission policy, which
+rejects direct transactions targeting read-only functions.
+
 ## Signed transactions
 
 `simnet.broadcastTransaction(rawHex)` accepts a complete signed Stacks transaction

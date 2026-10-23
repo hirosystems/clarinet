@@ -649,7 +649,11 @@ fn execute_block_entry(
                     .get(&contract_id)
                     .and_then(|contract| contract.analysis.contract_interface.as_ref())
                     .and_then(|interface| interface.functions.iter().find(|f| f.name == method))
-                    .is_some_and(|function| function.access != required_access);
+                    .is_some_and(|function| {
+                        function.access != required_access
+                            && !(required_access == ContractInterfaceFunctionAccess::public
+                                && function.access == ContractInterfaceFunctionAccess::read_only)
+                    });
                 if wrong_access {
                     let inclusion =
                         BlockInclusion::from_uncallable_function(contract, method, epoch);
@@ -907,6 +911,72 @@ mod batch_tests {
     use serde_json::json;
 
     use super::*;
+
+    #[test]
+    fn debug_batch_executes_read_only_targets_as_transactions() {
+        let mut session = Session::new(SessionSettings::default());
+        session.update_epoch(clarinet_defaults::DEFAULT_EPOCH);
+        let sender = session.get_tx_sender();
+        let principal = PrincipalData::parse(&sender).unwrap();
+        let mut dap = DAPDebugger::no_op();
+        let deployment = json!({
+            "type": "deployContract", "name": "reads", "sender": sender,
+            "content": indoc::indoc! {"
+                (define-data-var count uint u0)
+                (define-public (increment) (ok (var-set count (+ (var-get count) u1))))
+                (define-read-only (peek) (var-get count))
+                (define-read-only (fail) (err u7))
+                (define-read-only (panic) (/ u1 u0))
+                (define-private (hidden) u99)
+            "},
+        });
+        assert_eq!(
+            execute_block_entry(&mut session, &mut dap, &deployment)["status"],
+            "success"
+        );
+        let nonce = session.get_nonce(&principal).unwrap();
+        session.advance_chain_tip(1);
+        let height = session.interpreter.get_block_height();
+        let results: Vec<_> = ["peek", "increment", "peek", "fail", "panic", "hidden", "peek"]
+            .into_iter()
+            .map(|method| {
+                execute_block_entry(
+                    &mut session,
+                    &mut dap,
+                    &json!({"type": "callPublicFn", "contract": "reads", "function": method, "args": [], "sender": sender}),
+                )
+            })
+            .collect();
+        for (result, expected) in results.iter().zip([
+            "success",
+            "success",
+            "success",
+            "included_failure",
+            "included_failure",
+            "included_failure",
+            "success",
+        ]) {
+            assert_eq!(result["status"], expected, "{result}");
+        }
+        for (index, value) in [
+            (0, Value::UInt(0)),
+            (2, Value::UInt(1)),
+            (3, Value::err_uint(7)),
+            (6, Value::UInt(1)),
+        ] {
+            assert_eq!(results[index]["execution"]["result"], to_raw_value(&value));
+            assert_eq!(results[index]["execution"]["events"], "[]");
+        }
+        assert_eq!(results[4]["execution"], serde_json::Value::Null);
+        assert!(results[4]["error"]
+            .as_str()
+            .unwrap()
+            .contains("DivisionByZero"));
+        assert_eq!(results[5]["execution"], serde_json::Value::Null);
+        assert_eq!(results[5]["error"], "hidden is not a public function");
+        assert_eq!(session.get_nonce(&principal).unwrap(), nonce + 7);
+        assert_eq!(session.interpreter.get_block_height(), height);
+    }
 
     #[test]
     fn debug_batch_rejects_malformed_entries_without_charging_nonces() {

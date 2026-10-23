@@ -10,6 +10,48 @@ beforeEach(async () => {
   simnet = await initSimnet("tests/fixtures/Clarinet.toml");
 });
 
+it("executes read-only batch targets as transactions and keeps RPC reads nonce-free", () => {
+  simnet.deployContract(
+    "read-targets",
+    `(define-data-var count uint u0)
+     (define-public (increment) (ok (var-set count (+ (var-get count) u1))))
+     (define-read-only (peek) (var-get count))
+     (define-read-only (fail) (err u7))
+     (define-read-only (panic) (/ u1 u0))
+     (define-private (hidden) u99)`,
+    null,
+    sender,
+  );
+  const nonce = simnet.getAccountNonce(sender);
+  const height = simnet.blockHeight;
+  const results = simnet.mineBlock([
+    tx.callPublicFn("read-targets", "peek", [], sender),
+    tx.callPublicFn("read-targets", "increment", [], sender),
+    tx.callPublicFn("read-targets", "peek", [], sender),
+    tx.callPublicFn("read-targets", "fail", [], sender),
+    tx.callPublicFn("read-targets", "panic", [], sender),
+    tx.callPublicFn("read-targets", "hidden", [], sender),
+    tx.callPublicFn("read-targets", "peek", [], sender),
+  ]);
+  expect(results).toMatchObject([
+    { status: "success", execution: { result: Cl.uint(0) } },
+    { status: "success", execution: { result: Cl.ok(Cl.bool(true)) } },
+    { status: "success", execution: { result: Cl.uint(1) } },
+    { status: "included_failure", execution: { result: Cl.error(Cl.uint(7)) } },
+    { status: "included_failure", execution: null, error: expect.stringMatching(/DivisionByZero/) },
+    { status: "included_failure", execution: null, error: "hidden is not a public function" },
+    { status: "success", execution: { result: Cl.uint(1) } },
+  ]);
+  expect(simnet.blockHeight).toBe(height + 1);
+  expect(simnet.getAccountNonce(sender)).toBe(nonce + 7n);
+  expect(simnet.callReadOnlyFn("read-targets", "peek", [], sender).result).toEqual(Cl.uint(1));
+  expect(simnet.getAccountNonce(sender)).toBe(nonce + 7n);
+  expect(simnet.blockHeight).toBe(height + 1);
+  expect(simnet.callPublicFn("read-targets", "peek", [], sender).result).toEqual(Cl.uint(1));
+  expect(simnet.getAccountNonce(sender)).toBe(nonce + 8n);
+  expect(simnet.blockHeight).toBe(height + 2);
+});
+
 it.each(["u123", "(err u123)", "false"])(
   "returns the node receipt for a function-free deployment ending in %s",
   (lastExpression) => {
