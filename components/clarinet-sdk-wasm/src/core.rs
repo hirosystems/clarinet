@@ -1405,7 +1405,8 @@ impl SDK {
 
     #[wasm_bindgen(js_name=mineBlock)]
     pub fn mine_block_js(&mut self, js_txs: js_sys::Array) -> Result<JsValue, String> {
-        let mut results: Vec<BlockTransactionResult> = vec![];
+        let tx_len = usize::try_from(js_txs.length()).unwrap();
+        let mut results: Vec<BlockTransactionResult> = Vec::with_capacity(tx_len);
 
         {
             let session = self.get_session_mut();

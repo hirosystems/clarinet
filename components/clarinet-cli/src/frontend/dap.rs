@@ -12,6 +12,7 @@ use clarity_repl::repl::debug::dap::DAPDebugger;
 use clarity_repl::repl::Session;
 use clarity_repl::utils::sdk_events::serialize_events;
 use clarity_repl::utils::{serialize_event, Environment};
+use serde::Deserialize;
 
 #[cfg(feature = "telemetry")]
 use super::telemetry::{telemetry_report_event, DeveloperUsageDigest, DeveloperUsageEvent};
@@ -524,12 +525,15 @@ fn run_sdk_request_loop(
 
             // Execute a block of transactions in order, returning one result per tx.
             "mineBlock" => {
-                let txs = request["txs"].as_array().cloned().unwrap_or_default();
+                let txs = request["txs"]
+                    .as_array()
+                    .map(Vec::as_slice)
+                    .unwrap_or_default();
 
                 let mut dap_guard = dap.lock().expect("DAP mutex poisoned");
                 let mut results: Vec<serde_json::Value> = Vec::with_capacity(txs.len());
                 session.advance_chain_tip(1);
-                for tx in &txs {
+                for tx in txs {
                     results.push(execute_block_entry(session, &mut dap_guard, tx));
                 }
 
@@ -601,8 +605,7 @@ fn execute_block_entry(
             let hex: Vec<String> = if tx["postConditions"].is_null() {
                 vec![]
             } else {
-                serde_json::from_value(tx["postConditions"].clone())
-                    .map_err(|e| reject(e.to_string()))?
+                Vec::deserialize(&tx["postConditions"]).map_err(|e| reject(e.to_string()))?
             };
             PostConditionCheck::from_hex(&hex, mode, principal.clone().into()).map_err(reject)?
         };
