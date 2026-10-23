@@ -472,6 +472,7 @@ async fn mine_block_reports_each_entry_and_continues_after_malformed_and_rejecte
         {"callPublicFn": {"contract": contract, "method": "missing", "args_maps": [], "sender": sender}},
         {"transferSTX": {"amount": "invalid"}},
         {},
+        {"callPublicFn": {"contract": contract, "method": "yes", "args_maps": [], "sender": sender}, "deployContract": {"name": "extra", "content": "true", "sender": sender}},
         {"callPublicFn": {"contract": contract, "method": "yes", "args_maps": [{"99": 3}], "sender": sender}},
         {"callPublicFn": {"contract": contract, "method": "yes", "args_maps": [{"0": 255}], "sender": sender}},
         {"callPublicFn": {"contract": contract, "method": "yes", "args_maps": [], "sender": sender}}
@@ -498,6 +499,7 @@ async fn mine_block_reports_each_entry_and_continues_after_malformed_and_rejecte
             "rejected",
             "included_failure",
             "included_failure",
+            "rejected",
             "rejected",
             "rejected",
             "rejected",

@@ -281,13 +281,12 @@ fn post_condition_check(
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-#[wasm_bindgen]
-pub struct TxArgs {
-    call_private_fn: Option<CallContractArgsJSON>,
-    call_public_fn: Option<CallContractArgsJSON>,
-    deploy_contract: Option<DeployContractArgs>,
-    #[serde(rename(serialize = "transfer_stx", deserialize = "transferSTX"))]
-    transfer_stx: Option<TransferSTXArgs>,
+enum TxArgs {
+    CallPrivateFn(CallContractArgsJSON),
+    CallPublicFn(CallContractArgsJSON),
+    DeployContract(DeployContractArgs),
+    #[serde(rename = "transferSTX")]
+    TransferStx(TransferSTXArgs),
 }
 
 #[wasm_bindgen(getter_with_clone)]
@@ -339,7 +338,7 @@ impl From<Result<TransactionRes, TransactionError>> for BlockTransactionResult {
                 if matches!(value, clarity::vm::types::Value::Response(ref response) if !response.committed)
                 {
                     Self::IncludedFailure {
-                        error: value.to_string(),
+                        error: clarity_values::value_to_string(&value),
                         execution: Some(execution),
                     }
                 } else {
@@ -1423,36 +1422,17 @@ impl SDK {
                     continue;
                 }
             };
-            if [
-                tx.call_public_fn.is_some(),
-                tx.call_private_fn.is_some(),
-                tx.transfer_stx.is_some(),
-                tx.deploy_contract.is_some(),
-            ]
-            .into_iter()
-            .filter(|present| *present)
-            .count()
-                != 1
-            {
-                results.push(BlockTransactionResult::Rejected {
-                    error: "Expected exactly one transaction operation".into(),
-                });
-                continue;
-            }
-            let result = if let Some(call_public) = tx.call_public_fn {
-                CallFnArgs::from_json_args(call_public)
+            let result = match tx {
+                TxArgs::CallPublicFn(call_public) => CallFnArgs::from_json_args(call_public)
                     .map_err(TransactionError::from)
-                    .and_then(|args| self.inner_call_public_fn(&args, false))
-            } else if let Some(call_private) = tx.call_private_fn {
-                CallFnArgs::from_json_args(call_private)
+                    .and_then(|args| self.inner_call_public_fn(&args, false)),
+                TxArgs::CallPrivateFn(call_private) => CallFnArgs::from_json_args(call_private)
                     .map_err(TransactionError::from)
-                    .and_then(|args| self.inner_call_private_fn(&args, false))
-            } else if let Some(transfer_stx) = tx.transfer_stx {
-                self.inner_transfer_stx(&transfer_stx, false)
-            } else if let Some(deploy_contract) = tx.deploy_contract {
-                self.inner_deploy_contract(&deploy_contract, false)
-            } else {
-                Err("Invalid tx arguments".to_string().into())
+                    .and_then(|args| self.inner_call_private_fn(&args, false)),
+                TxArgs::TransferStx(transfer_stx) => self.inner_transfer_stx(&transfer_stx, false),
+                TxArgs::DeployContract(deploy_contract) => {
+                    self.inner_deploy_contract(&deploy_contract, false)
+                }
             };
             results.push(result.into());
         }

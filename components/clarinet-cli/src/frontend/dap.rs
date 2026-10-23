@@ -7,7 +7,7 @@ use clarinet_deployments::setup_session_with_deployment;
 use clarinet_files::{paths, ProjectManifest, StacksNetwork};
 use clarity::vm::types::{PrincipalData, QualifiedContractIdentifier};
 use clarity::vm::EvaluationResult;
-use clarity_repl::repl::clarity_values::to_raw_value;
+use clarity_repl::repl::clarity_values::{to_raw_value, value_to_string};
 use clarity_repl::repl::debug::dap::DAPDebugger;
 use clarity_repl::repl::Session;
 use clarity_repl::utils::sdk_events::serialize_events;
@@ -760,7 +760,7 @@ fn execute_block_entry(
                 "costs": serde_json::to_string(&execution.cost).unwrap(),
             });
             if failed {
-                serde_json::json!({"status": "included_failure", "error": value.unwrap().to_string(), "execution": result})
+                serde_json::json!({"status": "included_failure", "error": value_to_string(value.unwrap()), "execution": result})
             } else {
                 serde_json::json!({"status": "success", "execution": result})
             }
