@@ -444,14 +444,14 @@ impl Session {
         contract: &str,
     ) -> Result<QualifiedContractIdentifier, String> {
         let parts_count = contract.split('.').count();
-        if parts_count > 2 {
+        if contract.is_empty() || parts_count > 2 {
             return Err(format!("Invalid contract identifier: {contract}"));
         }
 
-        let is_qualified = parts_count == 2 && &contract[0..1] != ".";
+        let is_qualified = parts_count == 2 && !contract.starts_with('.');
         let contract_id = if is_qualified {
             contract.to_string()
-        } else if &contract[0..1] != "." {
+        } else if !contract.starts_with('.') {
             format!("{}.{}", default_deployer, contract,)
         } else {
             format!("{}{}", default_deployer, contract,)
