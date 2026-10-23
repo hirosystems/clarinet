@@ -561,6 +561,13 @@ fn run_sdk_request_loop(
 // Helpers
 // ---------------------------------------------------------------------------
 
+/// The SDK's `ContractOptions`, so both batch paths reject the same malformed options.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DeployOptions {
+    clarity_version: Option<u32>,
+}
+
 /// Batch entries use transaction methods so VM inclusion owns nonce settlement.
 fn execute_block_entry(
     session: &mut Session,
@@ -713,17 +720,14 @@ fn execute_block_entry(
                 let contract_id =
                     QualifiedContractIdentifier::parse(&format!("{sender}.{name}"))
                         .map_err(|error| reject(format!("Invalid contract identifier: {error}")))?;
+                let options = Option::<DeployOptions>::deserialize(&tx["options"])
+                    .map_err(|e| reject(format!("Invalid deployment options: {e}")))?;
+                let clarity_version = match options.and_then(|o| o.clarity_version) {
+                    Some(v) => clarity_repl::repl::clarity_version_from_u8(v as u8)
+                        .unwrap_or(clarinet_defaults::DEFAULT_CLARITY_VERSION),
+                    None => ClarityVersion::default_for_epoch(epoch),
+                };
                 dap.prepare_for_call(&contract_id, content);
-                let version = tx["options"]["clarityVersion"].as_u64();
-                let clarity_version = version
-                    .and_then(|v| clarity_repl::repl::clarity_version_from_u8(v as u8))
-                    .unwrap_or_else(|| {
-                        if version.is_some() {
-                            clarinet_defaults::DEFAULT_CLARITY_VERSION
-                        } else {
-                            ClarityVersion::default_for_epoch(epoch)
-                        }
-                    });
                 let contract = ClarityContract {
                     name: name.into(),
                     code_source: ClarityCodeSource::ContractInMemory(
@@ -1063,6 +1067,17 @@ mod batch_tests {
             invalid["args"] = args;
             malformed.push(invalid);
         }
+        let deploy =
+            json!({"type": "deployContract", "name": "new", "content": "true", "sender": sender});
+        for options in [
+            json!(false),
+            json!({"clarityVersion": "3"}),
+            json!({"clarityVersion": -1}),
+        ] {
+            let mut invalid = deploy.clone();
+            invalid["options"] = options;
+            malformed.push(invalid);
+        }
 
         session.advance_chain_tip(1);
         for entry in malformed {
@@ -1090,6 +1105,25 @@ mod batch_tests {
         assert_eq!(
             execute_block_entry(&mut session, &mut dap, &empty)["status"],
             "success"
+        );
+        for (name, options) in [
+            ("null-options", serde_json::Value::Null),
+            ("empty-options", json!({})),
+            ("versioned", json!({"clarityVersion": 2})),
+        ] {
+            let mut valid = deploy.clone();
+            valid["name"] = json!(name);
+            valid["options"] = options;
+            assert_eq!(
+                execute_block_entry(&mut session, &mut dap, &valid)["status"],
+                "success",
+                "{valid}"
+            );
+        }
+        let id = session.resolve_contract_id(&sender, "versioned").unwrap();
+        assert_eq!(
+            session.contracts[&id].analysis.clarity_version,
+            clarity::vm::ClarityVersion::Clarity2
         );
     }
 

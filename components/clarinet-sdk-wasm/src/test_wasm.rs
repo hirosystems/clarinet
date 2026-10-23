@@ -523,6 +523,8 @@ async fn mine_block_reports_each_entry_and_continues_after_malformed_and_rejecte
         {"callPublicFn": {"contract": contract, "method": "yes", "args_maps": [{"99": 3}], "sender": sender}},
         {"callPublicFn": {"contract": contract, "method": "yes", "args_maps": [{"0": 255}], "sender": sender}},
         {"callPublicFn": {"contract": contract, "method": "yes", "args_maps": [leftover], "sender": sender}},
+        {"deployContract": {"name": "bad-options", "content": "true", "options": false, "sender": sender}},
+        {"deployContract": {"name": "bad-version", "content": "true", "options": {"clarityVersion": "3"}, "sender": sender}},
         {"callPublicFn": {"contract": contract, "method": "yes", "args_maps": [], "sender": sender}}
     ]);
     let array = js_sys::Array::from(&JsValue::from_serde(&txs).unwrap());
@@ -547,6 +549,8 @@ async fn mine_block_reports_each_entry_and_continues_after_malformed_and_rejecte
             "rejected",
             "included_failure",
             "included_failure",
+            "rejected",
+            "rejected",
             "rejected",
             "rejected",
             "rejected",
