@@ -12,7 +12,6 @@ use clarinet_deployments::{
     update_session_with_deployment_plan,
 };
 use clarinet_files::{paths, FileAccessor, ProjectManifest, StacksNetwork, WASMFileSystemAccessor};
-use clarity::codec::StacksMessageCodec;
 use clarity::types::chainstate::StacksAddress;
 use clarity::types::Address;
 use clarity::vm::analysis::contract_interface_builder::{
@@ -23,7 +22,7 @@ use clarity::vm::{ClarityVersion, EvaluationResult, ExecutionResult, SymbolicExp
 use clarity_repl::repl::boot::{
     remap_mainnet_boot_principals, BOOT_MAINNET_ADDRESS, BOOT_TESTNET_ADDRESS,
 };
-use clarity_repl::repl::clarity_values::{uint8_to_string, uint8_to_value};
+use clarity_repl::repl::clarity_values::{uint8_to_string, uint8_to_value, value_from_bytes_exact};
 use clarity_repl::repl::hooks::perf::CostField;
 use clarity_repl::repl::interpreter::BlockInclusion;
 use clarity_repl::repl::post_conditions::{
@@ -140,12 +139,6 @@ impl CallFnArgs {
                 for (i, v) in arg {
                     *parsed_arg.get_mut(i).ok_or("Invalid argument byte index")? = v;
                 }
-                let mut bytes = parsed_arg.as_slice();
-                clarity::vm::Value::consensus_deserialize(&mut bytes)
-                    .map_err(|error| format!("Invalid Clarity argument: {error}"))?;
-                if !bytes.is_empty() {
-                    return Err("Trailing bytes in Clarity argument".into());
-                }
                 Ok(parsed_arg)
             })
             .collect::<Result<Vec<_>, String>>()?;
@@ -159,6 +152,17 @@ impl CallFnArgs {
             post_condition_mode: json_args.post_condition_mode,
         })
     }
+}
+
+/// Decode contract-call arguments as a node decodes a transaction's.
+fn decode_call_args(args: &[Vec<u8>]) -> Result<Vec<SymbolicExpression>, String> {
+    args.iter()
+        .map(|arg| {
+            value_from_bytes_exact(arg)
+                .map(SymbolicExpression::atom_value)
+                .map_err(|error| format!("Invalid Clarity argument: {error}"))
+        })
+        .collect()
 }
 
 fn clarity_version_from_u32(
@@ -967,10 +971,7 @@ impl SDK {
             return Err(format!("Invalid sender address '{sender}'.").into());
         }
 
-        let parsed_args = args
-            .iter()
-            .map(|a| SymbolicExpression::atom_value(uint8_to_value(a)))
-            .collect::<Vec<SymbolicExpression>>();
+        let parsed_args = decode_call_args(args)?;
 
         let post_conditions = post_condition_check(
             post_conditions.as_deref(),
@@ -1109,6 +1110,7 @@ impl SDK {
                 &args.sender,
             )?
             .validate_for_epoch(epoch)?;
+            decode_call_args(&args.args)?;
             self.charge_preflight_rejection(args)?;
             return Err(TransactionError {
                 message,

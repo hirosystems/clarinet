@@ -380,6 +380,46 @@ async fn it_handles_invalid_sender_address() {
 }
 
 #[wasm_bindgen_test]
+async fn contract_calls_reject_arguments_with_leftover_bytes() {
+    let mut sdk = init_sdk().await;
+    let sender = "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM";
+    sdk.deploy_contract(&DeployContractArgs::new(
+        "echo".into(),
+        "(define-public (echo (x uint)) (ok x)) (define-read-only (peek (x uint)) x) (define-private (hidden (x uint)) (ok x))".into(),
+        ContractOptions::new(None),
+        sender.into(),
+        None,
+        None,
+    ))
+    .unwrap();
+    let nonce = sdk.get_account_nonce(sender).unwrap();
+    let mut leftover = ClarityValue::UInt(1).serialize_to_vec().unwrap();
+    leftover.push(0xff);
+    let args = |method: &str| {
+        CallFnArgs::new(
+            "echo".into(),
+            method.into(),
+            vec![js_sys::Uint8Array::from(leftover.as_slice())],
+            sender.into(),
+            None,
+            None,
+        )
+    };
+
+    // `hidden` fails the public access check, which would otherwise charge a nonce.
+    for result in [
+        sdk.call_public_fn(&args("echo")),
+        sdk.call_public_fn(&args("hidden")),
+        sdk.call_private_fn(&args("hidden")),
+        sdk.call_read_only_fn(&args("peek")),
+    ] {
+        let error = result.err().unwrap();
+        assert!(error.contains("bytes left over"), "{error}");
+    }
+    assert_eq!(sdk.get_account_nonce(sender).unwrap(), nonce);
+}
+
+#[wasm_bindgen_test]
 async fn it_handles_contract_recipient_address() {
     let mut sdk = init_sdk().await;
     sdk.mint_stx("ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM".into(), 1000)
@@ -465,6 +505,13 @@ async fn mine_block_reports_each_entry_and_continues_after_malformed_and_rejecte
     let before = sdk.get_account_nonce(sender).unwrap();
     let height = sdk.block_height();
     let contract = format!("{sender}.batch");
+    let mut leftover = ClarityValue::UInt(1).serialize_to_vec().unwrap();
+    leftover.push(0xff);
+    let leftover: serde_json::Map<_, _> = leftover
+        .into_iter()
+        .enumerate()
+        .map(|(i, byte)| (i.to_string(), json!(byte)))
+        .collect();
     let txs = json!([
         {"deployContract": {"name": "batch", "content": "(define-public (fail) (err u7)) (define-public (yes) (ok true))", "sender": sender}},
         {"transferSTX": {"amount": 0, "recipient": sender, "sender": sender}},
@@ -475,6 +522,7 @@ async fn mine_block_reports_each_entry_and_continues_after_malformed_and_rejecte
         {"callPublicFn": {"contract": contract, "method": "yes", "args_maps": [], "sender": sender}, "deployContract": {"name": "extra", "content": "true", "sender": sender}},
         {"callPublicFn": {"contract": contract, "method": "yes", "args_maps": [{"99": 3}], "sender": sender}},
         {"callPublicFn": {"contract": contract, "method": "yes", "args_maps": [{"0": 255}], "sender": sender}},
+        {"callPublicFn": {"contract": contract, "method": "yes", "args_maps": [leftover], "sender": sender}},
         {"callPublicFn": {"contract": contract, "method": "yes", "args_maps": [], "sender": sender}}
     ]);
     let array = js_sys::Array::from(&JsValue::from_serde(&txs).unwrap());
@@ -499,6 +547,7 @@ async fn mine_block_reports_each_entry_and_continues_after_malformed_and_rejecte
             "rejected",
             "included_failure",
             "included_failure",
+            "rejected",
             "rejected",
             "rejected",
             "rejected",

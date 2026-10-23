@@ -5,9 +5,10 @@ use std::sync::{Arc, Mutex};
 
 use clarinet_deployments::setup_session_with_deployment;
 use clarinet_files::{paths, ProjectManifest, StacksNetwork};
+use clarity::util::hash::hex_bytes;
 use clarity::vm::types::{PrincipalData, QualifiedContractIdentifier};
 use clarity::vm::EvaluationResult;
-use clarity_repl::repl::clarity_values::{to_raw_value, value_to_string};
+use clarity_repl::repl::clarity_values::{to_raw_value, value_from_bytes_exact, value_to_string};
 use clarity_repl::repl::debug::dap::DAPDebugger;
 use clarity_repl::repl::Session;
 use clarity_repl::utils::sdk_events::serialize_events;
@@ -637,9 +638,11 @@ fn execute_block_entry(
                         let hex = arg.as_str().ok_or_else(|| {
                             reject("Invalid argument: expected hex string".into())
                         })?;
-                        Value::try_deserialize_hex_untyped(hex)
+                        let bytes = hex_bytes(hex.strip_prefix("0x").unwrap_or(hex))
+                            .map_err(|e| reject(format!("Invalid argument: {e}")))?;
+                        value_from_bytes_exact(&bytes)
                             .map(SymbolicExpression::atom_value)
-                            .map_err(|e| reject(e.to_string()))
+                            .map_err(|e| reject(format!("Invalid Clarity argument: {e}")))
                     })
                     .collect::<Result<Vec<_>, _>>()?;
                 let required_access = if operation == "callPrivateFn" {
@@ -1048,7 +1051,13 @@ mod batch_tests {
             malformed.push(invalid);
         }
         // Argument validation must precede the access check that charges a nonce.
-        for args in [serde_json::Value::Null, json!([false]), json!(["zz"])] {
+        let leftover = format!("{}ff", to_raw_value(&Value::UInt(1)));
+        for args in [
+            serde_json::Value::Null,
+            json!([false]),
+            json!(["zz"]),
+            json!([leftover]),
+        ] {
             let mut invalid = call.clone();
             invalid["function"] = json!("hidden");
             invalid["args"] = args;
