@@ -625,7 +625,7 @@ fn execute_block_entry(
                 error
                     .diagnostics
                     .iter()
-                    .map(|d| d.message.to_string())
+                    .map(|d| d.diagnostic.message.to_string())
                     .collect::<Vec<_>>()
                     .join("; "),
             )
@@ -708,7 +708,7 @@ fn execute_block_entry(
                     reject(
                         diagnostics
                             .iter()
-                            .map(|d| d.message.to_string())
+                            .map(|d| d.diagnostic.message.to_string())
                             .collect::<Vec<_>>()
                             .join("; "),
                     )
@@ -897,7 +897,7 @@ fn eval_snippet_as_tx(
             serde_json::json!({"result": hex, "events": events_json, "costs": costs_json})
         }
         Err(diagnostics) => {
-            let errors: Vec<&str> = diagnostics.iter().map(|d| &*d.message).collect();
+            let errors: Vec<&str> = diagnostics.iter().map(|d| &*d.diagnostic.message).collect();
             let msg = errors.join("; ");
             serde_json::json!({"error": msg})
         }

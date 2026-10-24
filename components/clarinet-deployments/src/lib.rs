@@ -20,6 +20,7 @@ use clarity::vm::{
     ClarityVersion, ContractName, EvaluationResult, ExecutionResult, SymbolicExpression,
 };
 use clarity_repl::analysis::ast_dependency_detector::{ASTDependencyDetector, DependencySet};
+use clarity_repl::analysis::LintDiagnostic;
 use clarity_repl::repl::boot::{
     get_boot_contract_epoch_and_clarity_version, remap_mainnet_boot_principals,
     BOOT_CONTRACTS_DATA, BOOT_MAINNET_PRINCIPAL, BOOT_TESTNET_PRINCIPAL, SBTC_BOOT_CONTRACTS,
@@ -135,7 +136,11 @@ pub fn setup_session_with_deployment(
 ) -> DeploymentGenerationArtifacts {
     let mut session = initiate_session_from_manifest(manifest);
     if !enable_analysis {
-        session.interpreter.repl_settings.analysis.disable_all();
+        session
+            .interpreter
+            .repl_settings
+            .analysis
+            .disable_all_lints();
     }
 
     // Older plans carry no marker, and requirements lacked one until they were
@@ -229,7 +234,14 @@ pub fn setup_session_with_deployment(
             }
             Err(errors) => {
                 success = false;
-                diags.insert(contract_id.clone(), errors);
+                // Keep lint identities in the lint channel.
+                let (lint_diagnostics, diagnostics): (Vec<_>, Vec<_>) =
+                    errors.into_iter().partition(|d| d.lint_name.is_some());
+                lint_diags.insert(contract_id.clone(), lint_diagnostics);
+                diags.insert(
+                    contract_id,
+                    diagnostics.into_iter().map(Diagnostic::from).collect(),
+                );
             }
         }
     }
@@ -598,7 +610,7 @@ fn handle_emulated_contract_publish(
     tx: &EmulatedContractPublishSpecification,
     contract_ast: Option<&ContractAST>,
     epoch: StacksEpochId,
-) -> Result<AnnotatedExecutionResult, Vec<Diagnostic>> {
+) -> Result<AnnotatedExecutionResult, Vec<LintDiagnostic>> {
     let default_tx_sender = session.get_tx_sender();
     session.set_tx_sender(&tx.emulated_sender.to_string());
 
@@ -627,7 +639,7 @@ fn handle_emulated_contract_publish(
 fn handle_emulated_contract_call(
     session: &mut Session,
     tx: &EmulatedContractCallSpecification,
-) -> Result<ExecutionResult, Vec<Diagnostic>> {
+) -> Result<ExecutionResult, Vec<LintDiagnostic>> {
     let default_tx_sender = session.get_tx_sender();
     session.set_tx_sender(&tx.emulated_sender.to_string());
 
@@ -648,7 +660,10 @@ fn handle_emulated_contract_call(
         PostConditionCheck::Unchecked,
     );
     if let Err(errors) = &result {
-        clarity_repl::ueprint!("error: {:?}", errors.diagnostics.first().unwrap().message);
+        clarity_repl::ueprint!(
+            "error: {:?}",
+            errors.diagnostics.first().unwrap().diagnostic.message
+        );
     }
 
     session.set_tx_sender(&default_tx_sender);
@@ -1691,7 +1706,7 @@ mod tests {
         name: &str,
         source: &str,
         epoch: StacksEpochId,
-    ) -> Result<AnnotatedExecutionResult, Vec<Diagnostic>> {
+    ) -> Result<AnnotatedExecutionResult, Vec<LintDiagnostic>> {
         let emulated_publish_spec = EmulatedContractPublishSpecification {
             contract_name: ContractName::try_from(name).unwrap(),
             emulated_sender: PrincipalData::parse_standard_principal(DEPLOYER).unwrap(),
@@ -2047,11 +2062,11 @@ mod tests {
         );
     }
 
-    /// When analysis is globally disabled via `disable_all()` (as done by
+    /// When analysis is globally disabled via `disable_all_lints()` (as done by
     /// `setup_session_with_deployment` when `enable_analysis=false`),
     /// deploying a contract should produce NO lint diagnostics even when
     /// `skip_analysis` is false on the contract itself — because the session
-    /// has no lints/passes configured.
+    /// has no lints configured.
     #[test]
     fn deploy_with_analysis_globally_disabled_produces_no_diagnostics() {
         let settings = SessionSettings::default();
@@ -2065,7 +2080,11 @@ mod tests {
             clarity_repl::analysis::SettingsFile::default(),
         )
         .unwrap();
-        session.interpreter.repl_settings.analysis.disable_all();
+        session
+            .interpreter
+            .repl_settings
+            .analysis
+            .disable_all_lints();
 
         let spec = EmulatedContractPublishSpecification {
             contract_name: ContractName::from_literal("lint-test"),
@@ -2073,7 +2092,7 @@ mod tests {
             source: LINT_TRIGGERING_SOURCE.to_string(),
             clarity_version: ClarityVersion::Clarity2,
             location: PathBuf::from("/contracts/lint-test.clar"),
-            skip_analysis: false, // Even with skip_analysis=false, disable_all() prevents lints
+            skip_analysis: false, // Even with skip_analysis=false, disable_all_lints() prevents lints
             remap_principals: BTreeMap::new(),
         };
 
@@ -2086,7 +2105,7 @@ mod tests {
             .collect();
         assert!(
             lint_diags.is_empty(),
-            "expected no lint diagnostics after disable_all(), got: {lint_diags:?}"
+            "expected no lint diagnostics after disable_all_lints(), got: {lint_diags:?}"
         );
     }
 
@@ -2104,7 +2123,11 @@ mod tests {
         )
         .unwrap();
         if disable_analysis {
-            session.interpreter.repl_settings.analysis.disable_all();
+            session
+                .interpreter
+                .repl_settings
+                .analysis
+                .disable_all_lints();
         }
 
         let deployment = DeploymentSpecification {

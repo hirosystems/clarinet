@@ -573,7 +573,11 @@ impl SDK {
             .await?;
 
         let mut session = initiate_session_from_manifest(&manifest);
-        session.interpreter.repl_settings.analysis.disable_all();
+        session
+            .interpreter
+            .repl_settings
+            .analysis
+            .disable_all_lints();
         if self.options.track_coverage {
             session.enable_coverage_hook();
         }
@@ -605,8 +609,11 @@ impl SDK {
                     }
                 }
                 Err(diagnostics) => {
-                    let contract_diagnostics =
-                        HashMap::from([(contract_id.clone(), diagnostics.clone())]);
+                    // Linting is disabled for this session; report the remaining diagnostics directly.
+                    let contract_diagnostics = HashMap::from([(
+                        contract_id.clone(),
+                        diagnostics.iter().map(|d| d.diagnostic.clone()).collect(),
+                    )]);
                     let diags_digest =
                         DiagnosticsDigest::new(&contract_diagnostics, &HashMap::new(), &deployment);
                     if diags_digest.errors > 0 {
@@ -1000,7 +1007,7 @@ impl SDK {
                         .join(", ")
                 );
                 if let Some(diag) = failure.diagnostics.last() {
-                    message = format!("{message} -> {}", diag.message);
+                    message = format!("{message} -> {}", diag.diagnostic.message);
                 }
                 TransactionError {
                     message,
@@ -1181,7 +1188,7 @@ impl SDK {
             Err(diagnostics) => {
                 let mut message = format!("{}: {}", "STX transfer error", args.sender);
                 if let Some(diag) = diagnostics.last() {
-                    message = format!("{} -> {}", message, diag.message);
+                    message = format!("{message} -> {}", diag.diagnostic.message);
                 }
                 return Err(message.into());
             }
@@ -1278,7 +1285,7 @@ impl SDK {
                         args.sender, args.name
                     );
                     if let Some(diag) = failure.diagnostics.last() {
-                        message = format!("{} -> {}", message, diag.message);
+                        message = format!("{} -> {}", message, diag.diagnostic.message);
                     }
                     return Err(TransactionError {
                         message,
@@ -1496,7 +1503,7 @@ impl SDK {
             Err(diagnostics) => {
                 let mut message = "error:".to_string();
                 diagnostics.iter().for_each(|d| {
-                    message = format!("{message}\n{}", d.message);
+                    message = format!("{message}\n{}", d.diagnostic.message);
                 });
                 message
             }
@@ -1512,7 +1519,7 @@ impl SDK {
             Err(diagnostics) => {
                 let message = diagnostics
                     .iter()
-                    .map(|d| d.message.to_string())
+                    .map(|d| d.diagnostic.message.to_string())
                     .collect::<Vec<String>>()
                     .join("\n");
                 Err(format!("error: {message}"))

@@ -991,7 +991,7 @@ pub async fn build_state(
             &deployment,
             Some(&artifacts.asts),
         );
-        for (contract_id, mut result) in contracts.into_iter() {
+        for (contract_id, result) in contracts.into_iter() {
             let Some((_, contract_location)) = deployment.contracts.get(&contract_id) else {
                 continue;
             };
@@ -1058,11 +1058,25 @@ pub async fn build_state(
                             .insert(contract_id.clone(), Some(contract_result.contract.analysis));
                     };
                 }
-                Err(ref mut diags) => {
+                Err(errors) => {
+                    // Rejected lints use the same tagged channel as successful ones.
+                    let (mut contract_lint_diags, plain): (Vec<_>, Vec<_>) =
+                        errors.into_iter().partition(|d| d.lint_name.is_some());
                     if let Some(entry) = artifacts.diags.get_mut(&contract_id) {
-                        tag_diagnostics(environment, global_found_env_simnet, &mut *diags);
-                        entry.append(diags);
+                        let mut diags: Vec<Diagnostic> =
+                            plain.into_iter().map(Diagnostic::from).collect();
+                        tag_diagnostics(environment, global_found_env_simnet, &mut diags);
+                        entry.append(&mut diags);
                     }
+                    tag_lint_diagnostics(
+                        environment,
+                        global_found_env_simnet,
+                        &mut contract_lint_diags,
+                    );
+                    lint_diagnostics
+                        .entry(contract_id.clone())
+                        .or_default()
+                        .extend(contract_lint_diags);
                     continue;
                 }
             };

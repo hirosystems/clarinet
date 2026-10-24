@@ -710,7 +710,9 @@ mod lsp_tests {
     use std::path::PathBuf;
 
     use clarinet_utils::DEFAULT_DEPLOYER_MNEMONIC;
+    use clarity::vm::diagnostic::Level;
     use clarity::vm::ClarityVersion;
+    use clarity_repl::analysis::linter::LintName;
     use clarity_repl::utils::Environment;
     use indoc::{formatdoc, indoc};
     use ls_types::{
@@ -842,7 +844,7 @@ mod lsp_tests {
                 epoch = 'latest'
                 clarity_version = 3
 
-                [repl.analysis.lint_groups]
+                [linter.groups]
                 all = false
             "#}
             .to_string();
@@ -870,6 +872,24 @@ mod lsp_tests {
         fn with_unparsable_manifest(contract: String) -> Self {
             Self {
                 project_manifest: "[project".to_string(),
+                ..Self::new(contract)
+            }
+        }
+
+        /// The same project with the default lint configuration, instead of the
+        /// `[linter.groups] all = false` the other tests use.
+        fn with_default_lints(contract: String) -> Self {
+            Self {
+                project_manifest: indoc! {r#"
+                    [project]
+                    name = 'test-project'
+
+                    [contracts.counter]
+                    path = 'contracts/test.clar'
+                    epoch = 'latest'
+                    clarity_version = 3
+                "#}
+                .to_string(),
                 ..Self::new(contract)
             }
         }
@@ -1330,6 +1350,39 @@ mod lsp_tests {
         // annotation on line 3 (0-indexed: 2), block ends on line 6 (0-indexed: 5)
         assert_eq!(diags[0].range.start.line, 2);
         assert_eq!(diags[0].range.end.line, 5);
+    }
+
+    /// A contract rejected by a lint must report it with its lint name, so the
+    /// editor can identify it (and not as a nameless analysis error).
+    #[tokio::test]
+    async fn test_lint_rejection_keeps_its_name() {
+        let source = indoc! {r#"
+            (define-private (foo (a uint)) (ok a))
+
+            (define-public (main)
+              (ok (foo u1 u2))
+            )
+        "#};
+
+        let file_accessor = TestFileAccessor::with_default_lints(source.to_string());
+        let mut editor_state_input = EditorStateInput::Owned(EditorState::new());
+
+        let notification = LspNotification::ContractSaved(PathBuf::from("test.clar"));
+        let response =
+            process_notification(notification, &mut editor_state_input, Some(&file_accessor))
+                .await
+                .expect("Failed to process notification");
+
+        let diagnostics: Vec<_> = response
+            .aggregated_diagnostics
+            .iter()
+            .flat_map(|(_, diagnostics)| diagnostics.iter())
+            .collect();
+        let rejecting = diagnostics
+            .iter()
+            .find(|d| d.lint_name == Some(LintName::CallChecker))
+            .unwrap_or_else(|| panic!("expected a `call_checker` diagnostic, got {diagnostics:?}"));
+        assert_eq!(rejecting.diagnostic.level, Level::Error);
     }
 
     /// Proves cache hits actually short-circuit the parser. We populate the

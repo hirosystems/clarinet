@@ -55,10 +55,12 @@ fn test_opening_counter_contract_should_return_fresh_analysis() {
         panic!("Unable to get response")
     };
 
-    // the counter project should emit 2 warnings and 2 notes coming from counter.clar
+    // a fresh analysis reports both counter contracts, which have no diagnostics
     assert_eq!(response.aggregated_diagnostics.len(), 2);
-    let (_url, diags) = &response.aggregated_diagnostics[0];
-    assert_eq!(diags.len(), 4);
+    assert!(response
+        .aggregated_diagnostics
+        .iter()
+        .all(|(_, diags)| diags.is_empty()));
 
     // re-opening this contract should not trigger a full analysis
     let _ = notification_tx.send(LspNotification::ContractOpened(contract_location));
@@ -98,10 +100,12 @@ fn test_opening_counter_manifest_should_return_fresh_analysis() {
         panic!("Unable to get response")
     };
 
-    // the counter project should emit 2 warnings and 2 notes coming from counter.clar
+    // a fresh analysis reports both counter contracts, which have no diagnostics
     assert_eq!(response.aggregated_diagnostics.len(), 2);
-    let (_url, diags) = &response.aggregated_diagnostics[0];
-    assert_eq!(diags.len(), 4);
+    assert!(response
+        .aggregated_diagnostics
+        .iter()
+        .all(|(_, diags)| diags.is_empty()));
 
     // re-opening this manifest should not trigger a full analysis
     let _ = notification_tx.send(LspNotification::ManifestOpened(manifest_location));
@@ -139,8 +143,8 @@ fn test_opening_simple_nft_manifest_should_return_fresh_analysis() {
 
     assert_eq!(response.aggregated_diagnostics.len(), 1);
     let (_, diags_0) = &response.aggregated_diagnostics[0];
-    // the counter project should emit 4 warnings and 4 notes coming from counter.clar
-    assert_eq!(diags_0.len(), 8);
+    // default lints emit 2 warnings and 3 notes for simple-nft.clar
+    assert_eq!(diags_0.len(), 5);
 }
 
 /// Helper: build an `initialize` JSON-RPC request.  When `code_lens_refresh`
