@@ -17,6 +17,7 @@ use clarity::types::Address;
 use clarity::vm::analysis::contract_interface_builder::{
     ContractInterface, ContractInterfaceFunction, ContractInterfaceFunctionAccess,
 };
+use clarity::vm::events::StacksTransactionEvent;
 use clarity::vm::types::{PrincipalData, QualifiedContractIdentifier, StandardPrincipalData};
 use clarity::vm::{ClarityVersion, EvaluationResult, ExecutionResult, SymbolicExpression};
 use clarity_repl::repl::boot::{
@@ -305,6 +306,15 @@ pub struct SessionReport {
     pub costs: String,
 }
 
+/// Events as the SDK parses them: a JSON array of JSON-encoded events.
+fn serialize_events(events: &[StacksTransactionEvent]) -> String {
+    let events: Vec<_> = events
+        .iter()
+        .map(|event| json!(serialize_event(event)).to_string())
+        .collect();
+    json!(events).to_string()
+}
+
 pub fn execution_result_to_transaction_res(execution: &ExecutionResult) -> TransactionRes {
     let result = match &execution.result {
         EvaluationResult::Snippet(result) => clarity_values::to_raw_value(&result.result),
@@ -313,15 +323,9 @@ pub fn execution_result_to_transaction_res(execution: &ExecutionResult) -> Trans
             _ => "0x03".into(),
         },
     };
-    let events_as_strings = execution
-        .events
-        .iter()
-        .map(|e| json!(serialize_event(e)).to_string())
-        .collect::<Vec<String>>();
-
     TransactionRes {
         result,
-        events: json!(events_as_strings).to_string(),
+        events: serialize_events(&execution.events),
         costs: json!(execution.cost).to_string(),
         performance: None,
     }
@@ -1210,6 +1214,88 @@ impl SDK {
         };
 
         Ok(execution_result_to_transaction_res(&execution))
+    }
+
+    /// Execute a signed transaction in the next block, retaining it only on inclusion.
+    #[wasm_bindgen(js_name=broadcastTransaction)]
+    pub fn broadcast_transaction(&mut self, raw_hex: &str) -> String {
+        use clarity_repl::repl::raw_transaction::{
+            RawFailureKind, RawTransactionMetadata, RawTransactionOutcome, RawTransactionResult,
+        };
+        let outcome = self
+            .get_session_mut()
+            .broadcast_transaction_in_next_block(raw_hex);
+        let metadata_json = |metadata: &RawTransactionMetadata| {
+            json!({
+                "txid": metadata.txid,
+                "fee": metadata.fee.to_string(),
+                "nonce": metadata.nonce.to_string(),
+            })
+        };
+        let response = match outcome {
+            RawTransactionOutcome::Rejected { metadata, error } => {
+                json!({ "status": "rejected", "transaction": metadata.as_ref().map(metadata_json), "error": error })
+            }
+            RawTransactionOutcome::Included { metadata, result } => {
+                // Like convenience calls, report returned responses (including err),
+                // but not VM errors or post-condition aborts.
+                let cost = match &result {
+                    RawTransactionResult::Success(execution) => execution.cost.as_ref(),
+                    RawTransactionResult::Failure {
+                        kind: RawFailureKind::Response,
+                        cost,
+                        ..
+                    } => Some(cost),
+                    _ => None,
+                };
+                if self.options.track_costs {
+                    if let (Some(call), Some(cost)) = (&metadata.contract_call, cost) {
+                        self.costs_reports.push(CostsReport {
+                            test_name: self.current_test_name.clone(),
+                            contract_id: call.to_clarity_contract_id().to_string(),
+                            method: call.function_name.to_string(),
+                            // Preserve the Display format used by convenience-call reports.
+                            args: call.function_args.iter().map(ToString::to_string).collect(),
+                            cost_result: cost.clone(),
+                        });
+                    }
+                }
+                let transaction = metadata_json(&metadata);
+                match result {
+                    RawTransactionResult::Success(execution) => {
+                        if let Some((id, interface)) = contract_interface_from_result(&execution) {
+                            self.contracts_interfaces.insert(id, interface);
+                        }
+                        let mut response = execution_result_to_transaction_res(&execution);
+                        if self.options.track_performance {
+                            response.performance = self.get_session().get_performance_data();
+                        }
+                        json!({ "status": "success", "transaction": transaction, "execution": response })
+                    }
+                    RawTransactionResult::Failure {
+                        kind,
+                        error,
+                        output,
+                        events,
+                        cost,
+                    } => {
+                        let performance = if self.options.track_performance
+                            && matches!(kind, RawFailureKind::Response)
+                        {
+                            self.get_session().get_performance_data()
+                        } else {
+                            None
+                        };
+                        let status: &'static str = kind.into();
+                        json!({ "status": status, "transaction": transaction, "error": error,
+                            "result": output.as_deref().map(clarity_values::to_raw_value),
+                            "events": serialize_events(&events), "costs": json!(cost).to_string(),
+                            "performance": performance })
+                    }
+                }
+            }
+        };
+        response.to_string()
     }
 
     #[wasm_bindgen(js_name=deployContract)]

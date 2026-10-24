@@ -4,6 +4,8 @@ import {
   parseCosts,
   parseEvents,
   serializePostConditions,
+  type BroadcastTransaction,
+  type RawTransactionResult,
   type CallFn,
   type CallReadOnlyFn,
   type DeployContract,
@@ -23,6 +25,7 @@ type WasmTransactionRes = {
 };
 
 type ProxySdk = {
+  broadcastTransaction(rawHex: string): string;
   callReadOnlyFn(args: unknown): WasmTransactionRes;
   callPublicFn(args: unknown): WasmTransactionRes;
   callPrivateFn(args: unknown): WasmTransactionRes;
@@ -39,25 +42,27 @@ type ProxySdk = {
 type RunSnippet<S extends ProxySdk> = S["runSnippet"];
 
 export type ProxiedSimnet<S extends ProxySdk> = {
-  [K in keyof S]: K extends "callReadOnlyFn"
-    ? CallReadOnlyFn
-    : K extends "callPublicFn" | "callPrivateFn"
-      ? CallFn
-      : K extends "execute"
-        ? Execute
-        : K extends "runSnippet"
-          ? RunSnippet<S>
-          : K extends "deployContract"
-            ? DeployContract
-            : K extends "transferSTX"
-              ? TransferSTX
-              : K extends "mineBlock"
-                ? MineBlock
-                : K extends "getDataVar"
-                  ? GetDataVar
-                  : K extends "getMapEntry"
-                    ? GetMapEntry
-                    : S[K];
+  [K in keyof S]: K extends "broadcastTransaction"
+    ? BroadcastTransaction
+    : K extends "callReadOnlyFn"
+      ? CallReadOnlyFn
+      : K extends "callPublicFn" | "callPrivateFn"
+        ? CallFn
+        : K extends "execute"
+          ? Execute
+          : K extends "runSnippet"
+            ? RunSnippet<S>
+            : K extends "deployContract"
+              ? DeployContract
+              : K extends "transferSTX"
+                ? TransferSTX
+                : K extends "mineBlock"
+                  ? MineBlock
+                  : K extends "getDataVar"
+                    ? GetDataVar
+                    : K extends "getMapEntry"
+                      ? GetMapEntry
+                      : S[K];
 };
 
 type ProxyBindings<ContractOptions> = {
@@ -92,7 +97,7 @@ function parseTxResponse(response: WasmTransactionRes): ParsedTransactionResult 
     result: Cl.deserialize(response.result),
     events: parseEvents(response.events),
     costs: parseCosts(response.costs),
-    performance: response.performance,
+    performance: response.performance ?? undefined,
   };
 }
 
@@ -121,6 +126,43 @@ export function createSessionProxy<S extends ProxySdk, ContractOptions>(
           return parseTxResponse(response);
         };
         return callFn;
+      }
+
+      if (prop === "broadcastTransaction") {
+        const broadcast: BroadcastTransaction = (rawHex) => {
+          const response = JSON.parse(sdk.broadcastTransaction(rawHex));
+          const transaction =
+            response.transaction === null
+              ? null
+              : {
+                  txid: response.transaction.txid,
+                  fee: BigInt(response.transaction.fee),
+                  nonce: BigInt(response.transaction.nonce),
+                };
+          if (response.status === "rejected") {
+            return { status: "rejected", transaction, error: response.error };
+          }
+          if (response.status === "success") {
+            return {
+              status: "success",
+              transaction: transaction!,
+              execution: parseTxResponse(response.execution),
+            };
+          }
+          return {
+            status: response.status as Exclude<
+              RawTransactionResult["status"],
+              "success" | "rejected"
+            >,
+            transaction: transaction!,
+            error: response.error,
+            result: response.result === null ? null : Cl.deserialize(response.result),
+            events: parseEvents(response.events),
+            costs: parseCosts(response.costs),
+            performance: response.performance ?? undefined,
+          };
+        };
+        return broadcast;
       }
 
       if (prop === "execute") {
