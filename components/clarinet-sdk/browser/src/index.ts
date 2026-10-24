@@ -13,6 +13,7 @@ export {
   tx,
   type ClarityEvent,
   type ParsedTransactionResult,
+  type BlockTransactionResult,
   type RawTransactionResult,
   type RawTransactionMetadata,
   type BroadcastTransaction,

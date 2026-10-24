@@ -1,3 +1,5 @@
+pub mod sdk_events;
+
 use ::clarity::types::StacksEpochId;
 use ::clarity::vm::ast::parser;
 use ::clarity::vm::ast::stack_depth_checker::StackDepthLimits;
